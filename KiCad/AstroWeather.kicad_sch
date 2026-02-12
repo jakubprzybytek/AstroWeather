@@ -1,0 +1,302 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(generator_version "9.0")
+	(uuid "8561283c-f5b3-4542-8880-7f435c3a9f7c")
+	(paper "A4")
+	(lib_symbols)
+	(sheet
+		(at 114.3 97.79)
+		(size 39.37 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "4c8e54d0-2d5b-47d4-b46b-1559d4095c20")
+		(property "Sheetname" "Controller"
+			(at 114.3 97.0784 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "Controller.kicad_sch"
+			(at 114.3 123.7746 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "AstroWeather"
+				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c"
+					(page "4")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 62.23 52.07)
+		(size 33.02 19.05)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "4e5845db-e9e3-4a64-a835-2e404d8331a5")
+		(property "Sheetname" "ST67W611M1"
+			(at 62.23 51.3584 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "ST67W611M1.kicad_sch"
+			(at 62.23 71.7046 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "AstroWeather"
+				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 185.42 69.85)
+		(size 40.64 21.59)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "d40768ac-029c-4883-87fe-7ced274514bd")
+		(property "Sheetname" "Display"
+			(at 185.42 69.1384 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "Display.kicad_sch"
+			(at 185.42 92.0246 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "Gnd" input
+			(at 204.47 91.44 270)
+			(uuid "b654c28c-3675-4c35-8e24-0203bf5a8a50")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "Vdd" input
+			(at 207.01 69.85 90)
+			(uuid "eef73f8e-0724-4a9e-8078-de0c24fd8c2b")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "!SCT_EN" input
+			(at 185.42 86.36 180)
+			(uuid "0aa54d6f-3b57-4c5b-9cc3-4f4554ea4cbc")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "!SCT_LA" input
+			(at 185.42 82.55 180)
+			(uuid "2ff9b97e-384b-40b6-9d47-a7051b930900")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "+3.3V" input
+			(at 201.93 69.85 90)
+			(uuid "be66aa90-2e78-45ab-bc1c-dad6bdd0e597")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DIS1_EN" input
+			(at 226.06 74.93 0)
+			(uuid "079f5141-5b00-417c-9bf2-02ffaeda303e")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DIS2_EN" input
+			(at 226.06 77.47 0)
+			(uuid "7e7e5cfe-4719-4ca6-934f-090d0feac188")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DIS3_EN" input
+			(at 226.06 80.01 0)
+			(uuid "735b13e4-cecc-4529-b1d2-25b8c3f1d475")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DIS4_EN" input
+			(at 226.06 82.55 0)
+			(uuid "fb40b8c9-98d8-40b1-8bae-4c8ee7bf96eb")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DIS5_EN" input
+			(at 226.06 85.09 0)
+			(uuid "8efbe66f-cef7-4c6a-a3bc-6d0f71d9267b")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "SCT_CLK" input
+			(at 185.42 76.2 180)
+			(uuid "eee38c52-a39f-423c-ac55-b49f3f15ba29")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "STC_SDI" input
+			(at 185.42 73.66 180)
+			(uuid "c0c4ac59-ed48-4277-86c7-6ba8d1104b75")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(instances
+			(project "AstroWeather"
+				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c"
+					(page "5")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 116.84 48.26)
+		(size 40.64 29.21)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "d62dd27e-49e2-449e-88dd-01d5559c6bc2")
+		(property "Sheetname" "Host Controller"
+			(at 116.84 47.5484 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "HostController.kicad_sch"
+			(at 116.84 78.0546 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "AstroWeather"
+				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)
