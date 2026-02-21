@@ -629,6 +629,10 @@
     [
       "d40768ac-029c-4883-87fe-7ced274514bd",
       "Display"
+    ],
+    [
+      "50b8a1dd-352e-4a33-913d-a72ec72f4116",
+      "Power Supply"
     ]
   ],
   "text_variables": {}
