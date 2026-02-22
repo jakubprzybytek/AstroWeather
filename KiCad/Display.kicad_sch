@@ -11831,16 +11831,16 @@
 			)
 		)
 	)
-	(hierarchical_label "!SCT_EN"
+	(hierarchical_label "~{SCT_EN}"
 		(shape input)
-		(at 82.55 281.94 180)
+		(at 82.55 353.06 180)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify right)
 		)
-		(uuid "05a4f896-0c6a-4b28-99e1-d95fda312c82")
+		(uuid "0bb3c737-5c42-463b-b237-47cfe67b8a88")
 	)
 	(hierarchical_label "DIS1_EN"
 		(shape input)
@@ -11853,7 +11853,7 @@
 		)
 		(uuid "1324d090-a699-437e-9485-9913fbcf37d5")
 	)
-	(hierarchical_label "Gnd"
+	(hierarchical_label "GND"
 		(shape input)
 		(at 38.1 49.53 180)
 		(effects
@@ -11897,17 +11897,6 @@
 		)
 		(uuid "490f3c74-345c-45f8-92e8-45dd401073f1")
 	)
-	(hierarchical_label "!SCT_EN"
-		(shape input)
-		(at 82.55 209.55 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "51c3f5b0-7fcc-46ec-8463-a552dbaef7e6")
-	)
 	(hierarchical_label "DIS2_EN"
 		(shape input)
 		(at 242.57 107.95 0)
@@ -11918,6 +11907,17 @@
 			(justify left)
 		)
 		(uuid "76440e39-fd04-4cd1-99b4-0d6836d7ac07")
+	)
+	(hierarchical_label "~{SCT_EN}"
+		(shape input)
+		(at 82.55 281.94 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "787d3dfe-1089-4486-a6d5-ad920e677af3")
 	)
 	(hierarchical_label "+3.3V"
 		(shape input)
@@ -11930,6 +11930,28 @@
 		)
 		(uuid "7c776aba-073f-43c4-a1d2-5945ae58ade8")
 	)
+	(hierarchical_label "~{SCT_LA}"
+		(shape input)
+		(at 82.55 284.48 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "885305f0-f4f1-4902-a36b-eb36531f7c38")
+	)
+	(hierarchical_label "~{SCT_LA}"
+		(shape input)
+		(at 82.55 212.09 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "8df3f721-2b1b-458a-a991-ec4c4d5d874a")
+	)
 	(hierarchical_label "DIS5_EN"
 		(shape input)
 		(at 271.78 130.81 0)
@@ -11941,18 +11963,7 @@
 		)
 		(uuid "a042d8da-255f-4db7-9287-8943724bebfd")
 	)
-	(hierarchical_label "!SCT_LA"
-		(shape input)
-		(at 82.55 212.09 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "a6f14ff9-08a3-4998-bae2-44861c9af9ee")
-	)
-	(hierarchical_label "!SCT_LA"
+	(hierarchical_label "~{SCT_LA}"
 		(shape input)
 		(at 83.82 130.81 180)
 		(effects
@@ -11985,18 +11996,7 @@
 		)
 		(uuid "ba862a03-a7e9-49b2-85e5-b41d4c3bbd88")
 	)
-	(hierarchical_label "!SCT_LA"
-		(shape input)
-		(at 82.55 284.48 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "c7d4b85b-d1fa-4b72-af03-6f7859b7fb7e")
-	)
-	(hierarchical_label "Vdd"
+	(hierarchical_label "VLED"
 		(shape input)
 		(at 38.1 41.91 180)
 		(effects
@@ -12007,16 +12007,16 @@
 		)
 		(uuid "d2850b25-36a8-4c8d-9cb3-7588fc7744a9")
 	)
-	(hierarchical_label "!SCT_EN"
+	(hierarchical_label "~{SCT_EN}"
 		(shape input)
-		(at 82.55 353.06 180)
+		(at 82.55 209.55 180)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify right)
 		)
-		(uuid "e07ecbbd-6d7d-4e5c-818b-42daf13ad4ee")
+		(uuid "d6891ae9-15fa-4105-9446-6037da1e27d6")
 	)
 	(hierarchical_label "DIS3_EN"
 		(shape input)
@@ -12029,18 +12029,7 @@
 		)
 		(uuid "e28da932-2e4a-459a-b1e0-8c4ed3310097")
 	)
-	(hierarchical_label "!SCT_LA"
-		(shape input)
-		(at 82.55 355.6 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "e720d702-b720-450d-bab7-be1c98f291b3")
-	)
-	(hierarchical_label "!SCT_EN"
+	(hierarchical_label "~{SCT_EN}"
 		(shape input)
 		(at 83.82 128.27 180)
 		(effects
@@ -12050,6 +12039,17 @@
 			(justify right)
 		)
 		(uuid "f2602a4c-0d9a-4316-9c59-778f919de316")
+	)
+	(hierarchical_label "~{SCT_LA}"
+		(shape input)
+		(at 82.55 355.6 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "f30dee6e-eeb8-4995-a12f-ff2bd26ae3a3")
 	)
 	(symbol
 		(lib_id "Amplifier_Operational:MCP6001-OT")
