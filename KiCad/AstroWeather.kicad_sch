@@ -2120,6 +2120,18 @@
 			(embedded_fonts no)
 		)
 	)
+	(text "Power consumption\n-----------------\nST67W611M1   <1mA / ~400mA peak\nSTM32G0B1xx  10mA max\nSCT2024      10mA max x 4"
+		(exclude_from_sim no)
+		(at 17.78 20.574 0)
+		(effects
+			(font
+				(face "Consolas")
+				(size 1.27 1.27)
+			)
+			(justify left top)
+		)
+		(uuid "18d13126-b5ff-4ae6-96c0-42df7b9951e3")
+	)
 	(junction
 		(at 173.99 78.74)
 		(diameter 0)
@@ -2178,6 +2190,16 @@
 	)
 	(wire
 		(pts
+			(xy 95.25 105.41) (xy 107.95 105.41)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "07f771c1-28d2-4fbc-8fbd-facf1f1cd9e7")
+	)
+	(wire
+		(pts
 			(xy 165.1 74.93) (xy 171.45 74.93)
 		)
 		(stroke
@@ -2215,6 +2237,16 @@
 			(type default)
 		)
 		(uuid "1b0a6b6c-1e45-40c7-95cf-938c391d2f6c")
+	)
+	(wire
+		(pts
+			(xy 139.7 66.04) (xy 139.7 68.58)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "215dc935-f6c7-4170-92ae-5530d96c7424")
 	)
 	(wire
 		(pts
@@ -2478,6 +2510,16 @@
 	)
 	(wire
 		(pts
+			(xy 81.28 111.76) (xy 81.28 114.3)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "78815b99-edd8-4320-8076-d47f18a8d1e1")
+	)
+	(wire
+		(pts
 			(xy 147.32 165.1) (xy 147.32 167.64)
 		)
 		(stroke
@@ -2485,6 +2527,16 @@
 			(type default)
 		)
 		(uuid "78a29ce9-53b8-45c7-b8e4-00b21a1e9320")
+	)
+	(wire
+		(pts
+			(xy 95.25 93.98) (xy 107.95 93.98)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7abcae87-5cd2-48fc-a532-67d26b9a5860")
 	)
 	(wire
 		(pts
@@ -2548,6 +2600,16 @@
 	)
 	(wire
 		(pts
+			(xy 95.25 107.95) (xy 107.95 107.95)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "96fc7199-6e50-4865-8132-3d4264137017")
+	)
+	(wire
+		(pts
 			(xy 137.16 165.1) (xy 137.16 167.64)
 		)
 		(stroke
@@ -2565,6 +2627,16 @@
 			(type default)
 		)
 		(uuid "9ad4e006-ae71-48c2-b72c-bc1ba462d471")
+	)
+	(wire
+		(pts
+			(xy 81.28 71.12) (xy 81.28 74.93)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a2a484ee-3340-4d61-9280-b0829af50719")
 	)
 	(wire
 		(pts
@@ -2695,6 +2767,16 @@
 			(type default)
 		)
 		(uuid "e821b9cb-37c0-43d0-9f1c-3fd77fad1d20")
+	)
+	(wire
+		(pts
+			(xy 95.25 97.79) (xy 107.95 97.79)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f7d23684-b1d5-4071-a990-0e62595c171b")
 	)
 	(symbol
 		(lib_id "power:GND")
@@ -3273,6 +3355,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 81.28 114.3 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "75c75317-a25c-4f37-bbd9-d6d102ac8c5e")
+		(property "Reference" "#PWR0108"
+			(at 81.28 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 81.28 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 81.28 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 81.28 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 81.28 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "59e24d1a-405b-4e63-a8c4-e4d16eefed2f")
+		)
+		(instances
+			(project "AstroWeather"
+				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c"
+					(reference "#PWR0108")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Connector_Generic:Conn_01x10")
 		(at 184.15 152.4 270)
 		(unit 1)
@@ -3608,6 +3756,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 81.28 71.12 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "cf444592-e1ed-40c7-9e4b-3798ec8b6520")
+		(property "Reference" "#PWR0109"
+			(at 81.28 74.93 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 81.28 66.04 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 81.28 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 81.28 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 81.28 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "a58dfd63-b61f-4280-aab6-05e3ec0f1a0b")
+		)
+		(instances
+			(project "AstroWeather"
+				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c"
+					(reference "#PWR0109")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:D_TVS")
 		(at 137.16 161.29 90)
 		(unit 1)
@@ -3813,6 +4027,72 @@
 			)
 		)
 	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 139.7 66.04 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "fefda2e8-dea6-4573-9972-eba5fe09f202")
+		(property "Reference" "#PWR0110"
+			(at 139.7 69.85 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 139.7 60.96 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 139.7 66.04 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 139.7 66.04 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 139.7 66.04 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "209a5350-0ca4-4990-be56-c812095080d8")
+		)
+		(instances
+			(project "AstroWeather"
+				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c"
+					(reference "#PWR0110")
+					(unit 1)
+				)
+			)
+		)
+	)
 	(sheet
 		(at 218.44 132.08)
 		(size 39.37 25.4)
@@ -3856,8 +4136,8 @@
 		)
 	)
 	(sheet
-		(at 62.23 74.93)
-		(size 33.02 27.94)
+		(at 72.39 74.93)
+		(size 22.86 36.83)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
@@ -3872,7 +4152,7 @@
 		)
 		(uuid "4e5845db-e9e3-4a64-a835-2e404d8331a5")
 		(property "Sheetname" "ST67W611M1"
-			(at 62.23 74.2184 0)
+			(at 72.39 74.2184 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3881,7 +4161,7 @@
 			)
 		)
 		(property "Sheetfile" "ST67W611M1.kicad_sch"
-			(at 62.23 103.4546 0)
+			(at 72.39 112.3446 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3890,7 +4170,7 @@
 			)
 		)
 		(pin "GND" input
-			(at 81.28 102.87 270)
+			(at 81.28 111.76 270)
 			(uuid "cd35c1d6-ea2f-4173-8019-41881fd0eaff")
 			(effects
 				(font
@@ -3939,16 +4219,6 @@
 				(justify right)
 			)
 		)
-		(pin "ST67_RDY" input
-			(at 95.25 99.06 0)
-			(uuid "e4f09805-d2dc-4830-af97-8a77c351e3d9")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
 		(pin "ST67_RX" output
 			(at 95.25 80.01 0)
 			(uuid "f269ec70-938a-44d5-a37e-9bce67b02cab")
@@ -3962,6 +4232,46 @@
 		(pin "ST67_TX" input
 			(at 95.25 82.55 0)
 			(uuid "9d27bbfc-98fc-4dbd-b370-67e5820a8248")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "+3.3V" input
+			(at 81.28 74.93 90)
+			(uuid "574b8092-f20b-4550-88ce-daf72bc8c3f9")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "BOOT" input
+			(at 95.25 107.95 0)
+			(uuid "576ecf4f-6120-48aa-906f-7f79aa3c27a6")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "CHIP_EN" input
+			(at 95.25 105.41 0)
+			(uuid "5badb09d-f4b2-4d92-8779-da1bb89adbf8")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "ST67_RDY" output
+			(at 95.25 97.79 0)
+			(uuid "6b24c583-1133-4241-8221-5f723339b382")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4015,6 +4325,48 @@
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c"
 					(page "6")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 242.57 69.85)
+		(size 30.48 17.78)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "54a3934f-66b1-477e-b50e-6a509e6ce5d3")
+		(property "Sheetname" "Power Supply +3.3V"
+			(at 242.57 69.1384 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "PowerSupply3.3V.kicad_sch"
+			(at 242.57 88.2146 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "AstroWeather"
+				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c"
+					(page "7")
 				)
 			)
 		)
@@ -4493,6 +4845,46 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+			)
+		)
+		(pin "ST67_BOOT" output
+			(at 107.95 107.95 180)
+			(uuid "926875e6-d29f-43a4-bfd8-58dab01e119f")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "ST67_CHIP_EN" output
+			(at 107.95 105.41 180)
+			(uuid "7692d517-c24b-4593-b197-45ca80e49559")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "ST67_CS" output
+			(at 107.95 93.98 180)
+			(uuid "ff78f6e1-0ad5-4ba7-a8fa-400708f81cb0")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "ST67_RDY" input
+			(at 107.95 97.79 180)
+			(uuid "0018d930-0792-4c62-affc-dc395fcdc8f5")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
 			)
 		)
 		(instances

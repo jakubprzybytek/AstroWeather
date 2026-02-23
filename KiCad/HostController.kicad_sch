@@ -3500,6 +3500,17 @@
 		)
 		(uuid "224f7880-9536-4846-a2f1-def9ed302410")
 	)
+	(hierarchical_label "ST67_CHIP_EN"
+		(shape output)
+		(at 210.82 76.2 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "2a826db9-37fc-4ce0-829b-e020178fec39")
+	)
 	(hierarchical_label "~{SCT_LA}"
 		(shape output)
 		(at 223.52 104.14 0)
@@ -3544,6 +3555,17 @@
 		)
 		(uuid "736cd5ca-6653-46bc-8100-89f5192b2221")
 	)
+	(hierarchical_label "ST67_RDY"
+		(shape input)
+		(at 214.63 67.31 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "91a68aa6-cd48-4356-941b-33caf82208bc")
+	)
 	(hierarchical_label "ST67_RX"
 		(shape input)
 		(at 189.23 66.04 0)
@@ -3565,6 +3587,17 @@
 			(justify right)
 		)
 		(uuid "92778548-d818-4bbb-b826-4b676b2076b0")
+	)
+	(hierarchical_label "ST67_BOOT"
+		(shape output)
+		(at 210.82 78.74 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "a935dc8b-9308-407a-a27f-94ed84f0305d")
 	)
 	(hierarchical_label "SWDIO"
 		(shape input)
@@ -3741,6 +3774,17 @@
 			(justify left)
 		)
 		(uuid "f6741413-caf2-44bc-aa1e-96124d9fec1c")
+	)
+	(hierarchical_label "ST67_CS"
+		(shape output)
+		(at 208.28 72.39 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "f765e155-60e3-4cf8-9566-b9072e7c2e0c")
 	)
 	(symbol
 		(lib_id "power:GND")

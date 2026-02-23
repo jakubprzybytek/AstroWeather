@@ -1,4 +1,4 @@
-27292985177548849
+27296527125570957
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -70356,6 +70356,13 @@ ESP8266 WiFi microcontroller
 0
 16
 16
+JPComms
+ST67W611M1
+
+
+0
+45
+33
 JPConnectors
 FPC_30
 
@@ -70461,6 +70468,13 @@ JPDisplays
 0
 8
 8
+JPDisplays
+KW3-281AVA
+3 digit 7 segment red LED, http://www.kingbrightusa.com/images/catalog/SPEC/CA56-12EWA.pdf
+3 digit 7 segment red LED
+0
+13
+11
 JPDisplays
 LED-14.2x3
 
