@@ -11985,7 +11985,7 @@
 		)
 		(uuid "b9fd5b1f-4c48-4d0e-b6a2-b274c33fbe9b")
 	)
-	(hierarchical_label "STC_SDI"
+	(hierarchical_label "SCT_SDI"
 		(shape input)
 		(at 87.63 115.57 180)
 		(effects
