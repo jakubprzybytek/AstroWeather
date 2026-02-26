@@ -2869,7 +2869,7 @@
 	)
 	(wire
 		(pts
-			(xy 85.09 143.51) (xy 85.09 144.78)
+			(xy 90.17 143.51) (xy 90.17 144.78)
 		)
 		(stroke
 			(width 0)
@@ -2969,7 +2969,7 @@
 	)
 	(wire
 		(pts
-			(xy 85.09 129.54) (xy 97.79 129.54)
+			(xy 90.17 129.54) (xy 102.87 129.54)
 		)
 		(stroke
 			(width 0)
@@ -3009,7 +3009,7 @@
 	)
 	(wire
 		(pts
-			(xy 96.52 132.08) (xy 97.79 132.08)
+			(xy 101.6 132.08) (xy 102.87 132.08)
 		)
 		(stroke
 			(width 0)
@@ -3109,7 +3109,7 @@
 	)
 	(wire
 		(pts
-			(xy 85.09 152.4) (xy 85.09 153.67)
+			(xy 90.17 152.4) (xy 90.17 153.67)
 		)
 		(stroke
 			(width 0)
@@ -3199,7 +3199,7 @@
 	)
 	(wire
 		(pts
-			(xy 96.52 143.51) (xy 96.52 144.78)
+			(xy 101.6 143.51) (xy 101.6 144.78)
 		)
 		(stroke
 			(width 0)
@@ -3289,7 +3289,7 @@
 	)
 	(wire
 		(pts
-			(xy 96.52 152.4) (xy 96.52 153.67)
+			(xy 101.6 152.4) (xy 101.6 153.67)
 		)
 		(stroke
 			(width 0)
@@ -3479,7 +3479,7 @@
 	)
 	(wire
 		(pts
-			(xy 96.52 135.89) (xy 96.52 132.08)
+			(xy 101.6 135.89) (xy 101.6 132.08)
 		)
 		(stroke
 			(width 0)
@@ -3529,7 +3529,7 @@
 	)
 	(wire
 		(pts
-			(xy 85.09 135.89) (xy 85.09 129.54)
+			(xy 90.17 135.89) (xy 90.17 129.54)
 		)
 		(stroke
 			(width 0)
@@ -3728,7 +3728,7 @@
 		(uuid "3fcf9073-f7c0-4902-b5c9-6ab2d8564c86")
 	)
 	(label "LED2"
-		(at 97.79 132.08 0)
+		(at 102.87 132.08 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -3758,7 +3758,7 @@
 		(uuid "8e256700-562a-4c3d-baa5-8c12604cf653")
 	)
 	(label "LED1"
-		(at 97.79 129.54 0)
+		(at 102.87 129.54 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4161,7 +4161,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 85.09 153.67 0)
+		(at 90.17 153.67 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -4170,7 +4170,7 @@
 		(fields_autoplaced yes)
 		(uuid "04689f48-f351-4fc0-9720-b1fa220ff773")
 		(property "Reference" "#PWR0316"
-			(at 85.09 160.02 0)
+			(at 90.17 160.02 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4179,7 +4179,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 85.09 158.75 0)
+			(at 90.17 158.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4187,7 +4187,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 85.09 153.67 0)
+			(at 90.17 153.67 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4196,7 +4196,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 85.09 153.67 0)
+			(at 90.17 153.67 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4205,7 +4205,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 85.09 153.67 0)
+			(at 90.17 153.67 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4360,7 +4360,7 @@
 	)
 	(symbol
 		(lib_id "Device:LED")
-		(at 96.52 148.59 90)
+		(at 101.6 148.59 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -4369,7 +4369,7 @@
 		(fields_autoplaced yes)
 		(uuid "0ea9a5c3-8800-4a2a-9804-8d6a4a47ed6a")
 		(property "Reference" "D302"
-			(at 100.33 148.9074 90)
+			(at 105.41 148.9074 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4378,7 +4378,7 @@
 			)
 		)
 		(property "Value" "LED2"
-			(at 100.33 151.4474 90)
+			(at 105.41 151.4474 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4387,7 +4387,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 96.52 148.59 0)
+			(at 101.6 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4396,7 +4396,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 96.52 148.59 0)
+			(at 101.6 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4405,7 +4405,7 @@
 			)
 		)
 		(property "Description" "Light emitting diode"
-			(at 96.52 148.59 0)
+			(at 101.6 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4414,7 +4414,7 @@
 			)
 		)
 		(property "Sim.Pins" "1=K 2=A"
-			(at 96.52 148.59 0)
+			(at 101.6 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4574,7 +4574,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 96.52 139.7 180)
+		(at 101.6 139.7 180)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -4583,7 +4583,7 @@
 		(fields_autoplaced yes)
 		(uuid "2a42e8f8-f171-418c-a2b8-45d898d5934c")
 		(property "Reference" "R304"
-			(at 99.06 138.4299 0)
+			(at 104.14 138.4299 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4592,7 +4592,7 @@
 			)
 		)
 		(property "Value" "2k2"
-			(at 99.06 140.9699 0)
+			(at 104.14 140.9699 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4601,7 +4601,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 98.298 139.7 90)
+			(at 103.378 139.7 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4610,7 +4610,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 96.52 139.7 0)
+			(at 101.6 139.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4619,7 +4619,7 @@
 			)
 		)
 		(property "Description" "Resistor"
-			(at 96.52 139.7 0)
+			(at 101.6 139.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4784,7 +4784,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 85.09 139.7 180)
+		(at 90.17 139.7 180)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -4793,7 +4793,7 @@
 		(fields_autoplaced yes)
 		(uuid "44dc297e-773a-4041-b21e-ef3268250248")
 		(property "Reference" "R303"
-			(at 87.63 138.4299 0)
+			(at 92.71 138.4299 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4802,7 +4802,7 @@
 			)
 		)
 		(property "Value" "2k2"
-			(at 87.63 140.9699 0)
+			(at 92.71 140.9699 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4811,7 +4811,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 86.868 139.7 90)
+			(at 91.948 139.7 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4820,7 +4820,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 85.09 139.7 0)
+			(at 90.17 139.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4829,7 +4829,7 @@
 			)
 		)
 		(property "Description" "Resistor"
-			(at 85.09 139.7 0)
+			(at 90.17 139.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5669,7 +5669,7 @@
 	)
 	(symbol
 		(lib_id "Device:LED")
-		(at 85.09 148.59 90)
+		(at 90.17 148.59 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -5678,7 +5678,7 @@
 		(fields_autoplaced yes)
 		(uuid "b555baa9-2bf6-42f5-85e7-dd062e3ba944")
 		(property "Reference" "D301"
-			(at 88.9 148.9074 90)
+			(at 93.98 148.9074 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5687,7 +5687,7 @@
 			)
 		)
 		(property "Value" "LED1"
-			(at 88.9 151.4474 90)
+			(at 93.98 151.4474 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5696,7 +5696,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 85.09 148.59 0)
+			(at 90.17 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5705,7 +5705,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 85.09 148.59 0)
+			(at 90.17 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5714,7 +5714,7 @@
 			)
 		)
 		(property "Description" "Light emitting diode"
-			(at 85.09 148.59 0)
+			(at 90.17 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5723,7 +5723,7 @@
 			)
 		)
 		(property "Sim.Pins" "1=K 2=A"
-			(at 85.09 148.59 0)
+			(at 90.17 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6490,7 +6490,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 96.52 153.67 0)
+		(at 101.6 153.67 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -6499,7 +6499,7 @@
 		(fields_autoplaced yes)
 		(uuid "d18d0184-7055-4cf0-bbe0-de730b70af2a")
 		(property "Reference" "#PWR0317"
-			(at 96.52 160.02 0)
+			(at 101.6 160.02 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6508,7 +6508,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 96.52 158.75 0)
+			(at 101.6 158.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6516,7 +6516,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 96.52 153.67 0)
+			(at 101.6 153.67 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6525,7 +6525,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 96.52 153.67 0)
+			(at 101.6 153.67 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6534,7 +6534,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 96.52 153.67 0)
+			(at 101.6 153.67 0)
 			(effects
 				(font
 					(size 1.27 1.27)
