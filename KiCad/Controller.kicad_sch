@@ -144,130 +144,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "Device:R"
-			(pin_numbers
-				(hide yes)
-			)
-			(pin_names
-				(offset 0)
-			)
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(property "Reference" "R"
-				(at 2.032 0 90)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "R"
-				(at 0 0 90)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" ""
-				(at -1.778 0 90)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Datasheet" "~"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Description" "Resistor"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "ki_keywords" "R res resistor"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "ki_fp_filters" "R_*"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(symbol "R_0_1"
-				(rectangle
-					(start -1.016 -2.54)
-					(end 1.016 2.54)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-			)
-			(symbol "R_1_1"
-				(pin passive line
-					(at 0 3.81 270)
-					(length 1.27)
-					(name "~"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 0 -3.81 90)
-					(length 1.27)
-					(name "~"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "MCU_ST_STM32G0:STM32G030F6Px"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -1554,17 +1430,6 @@
 		)
 		(uuid "13e734ae-c973-4c80-98ab-33f15750f566")
 	)
-	(hierarchical_label "LOW_POWER_ENABLE"
-		(shape output)
-		(at 185.42 87.63 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "24348729-6228-4572-ac1f-4bcd66071066")
-	)
 	(hierarchical_label "SWCLK"
 		(shape input)
 		(at 171.45 97.79 0)
@@ -1758,7 +1623,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 169.8752 40.64 0)
 			(effects
 				(font
@@ -1810,7 +1675,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "0b8b7888-11f8-47b3-bcaf-c35e67d219ce")
-		(property "Reference" "#PWR0406"
+		(property "Reference" "#PWR0403"
 			(at 156.21 49.53 0)
 			(effects
 				(font
@@ -1860,7 +1725,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4c8e54d0-2d5b-47d4-b46b-1559d4095c20"
-					(reference "#PWR0406")
+					(reference "#PWR0403")
 					(unit 1)
 				)
 			)
@@ -1876,7 +1741,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "3afa5e28-cf24-43f5-b0c7-3e3a8a6ef9a0")
-		(property "Reference" "#PWR0405"
+		(property "Reference" "#PWR0401"
 			(at 156.21 34.29 0)
 			(effects
 				(font
@@ -1926,7 +1791,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4c8e54d0-2d5b-47d4-b46b-1559d4095c20"
-					(reference "#PWR0405")
+					(reference "#PWR0401")
 					(unit 1)
 				)
 			)
@@ -1942,7 +1807,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "53c42711-6613-4cc5-b055-194c32558f37")
-		(property "Reference" "#PWR0402"
+		(property "Reference" "#PWR0408"
 			(at 139.7 113.03 0)
 			(effects
 				(font
@@ -1992,7 +1857,7 @@
 		(instances
 			(project ""
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4c8e54d0-2d5b-47d4-b46b-1559d4095c20"
-					(reference "#PWR0402")
+					(reference "#PWR0408")
 					(unit 1)
 				)
 			)
@@ -2096,7 +1961,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 157.1752 40.64 0)
 			(effects
 				(font
@@ -2148,7 +2013,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "7263a2cd-899d-41bd-b333-9191a990612b")
-		(property "Reference" "#PWR0404"
+		(property "Reference" "#PWR0405"
 			(at 139.7 62.23 0)
 			(effects
 				(font
@@ -2198,77 +2063,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4c8e54d0-2d5b-47d4-b46b-1559d4095c20"
-					(reference "#PWR0404")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 86.36 59.69 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "75f2dd3b-72a7-42d4-bbf5-9400263a84c3")
-		(property "Reference" "R401"
-			(at 88.9 58.4199 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "R"
-			(at 88.9 60.9599 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" ""
-			(at 84.582 59.69 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 86.36 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 86.36 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "326626e2-2427-4527-a65a-a676d06ebaa7")
-		)
-		(pin "1"
-			(uuid "3d2ac6ef-35a3-454d-84a3-1da814a62b1d")
-		)
-		(instances
-			(project ""
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4c8e54d0-2d5b-47d4-b46b-1559d4095c20"
-					(reference "R401")
+					(reference "#PWR0405")
 					(unit 1)
 				)
 			)
@@ -2284,7 +2079,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "7f77a11d-48ec-4e77-b800-74b5b1fe2a98")
-		(property "Reference" "#PWR0408"
+		(property "Reference" "#PWR0407"
 			(at 100.33 87.63 0)
 			(effects
 				(font
@@ -2334,7 +2129,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4c8e54d0-2d5b-47d4-b46b-1559d4095c20"
-					(reference "#PWR0408")
+					(reference "#PWR0407")
 					(unit 1)
 				)
 			)
@@ -2350,7 +2145,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "953d5ede-b206-465d-a729-96e621863a1b")
-		(property "Reference" "#PWR0407"
+		(property "Reference" "#PWR0406"
 			(at 88.9 87.63 0)
 			(effects
 				(font
@@ -2400,7 +2195,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4c8e54d0-2d5b-47d4-b46b-1559d4095c20"
-					(reference "#PWR0407")
+					(reference "#PWR0406")
 					(unit 1)
 				)
 			)
@@ -2434,7 +2229,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Button_Switch_SMD:SW_Tactile_SPST_NO_Straight_CK_PTS636Sx25SMTRLFS"
 			(at 83.82 74.93 0)
 			(effects
 				(font
@@ -2617,7 +2412,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "bc6ea7d1-08cd-4b57-a599-854e951061ac")
-		(property "Reference" "#PWR0403"
+		(property "Reference" "#PWR0404"
 			(at 57.15 50.8 0)
 			(effects
 				(font
@@ -2667,7 +2462,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4c8e54d0-2d5b-47d4-b46b-1559d4095c20"
-					(reference "#PWR0403")
+					(reference "#PWR0404")
 					(unit 1)
 				)
 			)
@@ -2683,7 +2478,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "db91fd55-d422-48a7-963b-64997fc31181")
-		(property "Reference" "#PWR0401"
+		(property "Reference" "#PWR0402"
 			(at 57.15 38.1 0)
 			(effects
 				(font
@@ -2733,7 +2528,7 @@
 		(instances
 			(project ""
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4c8e54d0-2d5b-47d4-b46b-1559d4095c20"
-					(reference "#PWR0401")
+					(reference "#PWR0402")
 					(unit 1)
 				)
 			)

@@ -1903,7 +1903,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "03e3c368-a03d-452f-8ab0-1955d1430f72")
-		(property "Reference" "#PWR0207"
+		(property "Reference" "#PWR0202"
 			(at 101.6 38.1 0)
 			(effects
 				(font
@@ -1953,7 +1953,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0207")
+					(reference "#PWR0202")
 					(unit 1)
 				)
 			)
@@ -1969,7 +1969,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "0e69e17a-d1c5-43be-a22f-5254c35463fc")
-		(property "Reference" "#PWR0203"
+		(property "Reference" "#PWR0209"
 			(at 50.8 69.85 0)
 			(effects
 				(font
@@ -2020,7 +2020,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0203")
+					(reference "#PWR0209")
 					(unit 1)
 				)
 			)
@@ -2035,7 +2035,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "0fc9ab8e-9e6d-45c9-8070-05c3c8dad6d0")
-		(property "Reference" "C205"
+		(property "Reference" "C203"
 			(at 117.094 38.354 0)
 			(effects
 				(font
@@ -2053,7 +2053,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 117.8052 44.45 0)
 			(effects
 				(font
@@ -2089,7 +2089,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "C205")
+					(reference "C203")
 					(unit 1)
 				)
 			)
@@ -2105,7 +2105,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "2f5d6075-9b43-4969-b7c1-793d5fc23b2b")
-		(property "Reference" "#PWR0208"
+		(property "Reference" "#PWR0204"
 			(at 97.79 52.07 0)
 			(effects
 				(font
@@ -2155,7 +2155,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0208")
+					(reference "#PWR0204")
 					(unit 1)
 				)
 			)
@@ -2328,7 +2328,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "36d5b555-269d-4259-8916-bb6f41b0ef33")
-		(property "Reference" "#PWR0205"
+		(property "Reference" "#PWR0201"
 			(at 35.56 38.1 0)
 			(effects
 				(font
@@ -2378,7 +2378,7 @@
 		(instances
 			(project ""
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0205")
+					(reference "#PWR0201")
 					(unit 1)
 				)
 			)
@@ -2394,7 +2394,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "503b077e-ee11-41ff-ae59-68c1c1af0eda")
-		(property "Reference" "#PWR0204"
+		(property "Reference" "#PWR0208"
 			(at 50.8 62.23 0)
 			(effects
 				(font
@@ -2445,7 +2445,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0204")
+					(reference "#PWR0208")
 					(unit 1)
 				)
 			)
@@ -2460,7 +2460,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "53c7ad03-353d-426d-ad78-4c392095eab7")
-		(property "Reference" "C202"
+		(property "Reference" "C205"
 			(at 62.23 74.168 90)
 			(effects
 				(font
@@ -2476,7 +2476,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 66.04 68.8848 0)
 			(effects
 				(font
@@ -2512,7 +2512,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "C202")
+					(reference "C205")
 					(unit 1)
 				)
 			)
@@ -2528,7 +2528,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5633c06e-3fae-48ce-9399-d0ac07e2ded1")
-		(property "Reference" "#PWR0201"
+		(property "Reference" "#PWR0207"
 			(at 35.56 53.34 0)
 			(effects
 				(font
@@ -2578,7 +2578,7 @@
 		(instances
 			(project ""
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0201")
+					(reference "#PWR0207")
 					(unit 1)
 				)
 			)
@@ -2594,7 +2594,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "61713315-a482-42ed-a544-2fc42ca54640")
-		(property "Reference" "#PWR0212"
+		(property "Reference" "#PWR0210"
 			(at 71.12 83.82 0)
 			(effects
 				(font
@@ -2645,7 +2645,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0212")
+					(reference "#PWR0210")
 					(unit 1)
 				)
 			)
@@ -2661,7 +2661,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "6cc82997-dc40-4e3b-a29f-5cd69ddd9a11")
-		(property "Reference" "#PWR0202"
+		(property "Reference" "#PWR0211"
 			(at 102.87 93.98 0)
 			(effects
 				(font
@@ -2711,7 +2711,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0202")
+					(reference "#PWR0211")
 					(unit 1)
 				)
 			)
@@ -2744,7 +2744,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
 			(at 76.5048 86.36 0)
 			(effects
 				(font
@@ -2796,7 +2796,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "824ccae8-2950-4b4b-a1bb-13e95e1ac6dc")
-		(property "Reference" "C201"
+		(property "Reference" "C204"
 			(at 62.23 54.61 90)
 			(effects
 				(font
@@ -2812,7 +2812,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 66.04 61.2648 0)
 			(effects
 				(font
@@ -2848,7 +2848,7 @@
 		(instances
 			(project ""
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "C201")
+					(reference "C204")
 					(unit 1)
 				)
 			)
@@ -2863,7 +2863,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "8a5c351f-f78c-49fc-8e02-5427c00cccfa")
-		(property "Reference" "C203"
+		(property "Reference" "C201"
 			(at 97.282 43.18 0)
 			(effects
 				(font
@@ -2881,7 +2881,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 96.8248 36.83 0)
 			(effects
 				(font
@@ -2917,7 +2917,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "C203")
+					(reference "C201")
 					(unit 1)
 				)
 			)
@@ -2949,7 +2949,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 72.39 82.042 90)
 			(effects
 				(font
@@ -3001,7 +3001,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a6d3b6c5-7f04-4079-a148-a7e4d63e5659")
-		(property "Reference" "#PWR0211"
+		(property "Reference" "#PWR0212"
 			(at 77.47 101.6 0)
 			(effects
 				(font
@@ -3051,7 +3051,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0211")
+					(reference "#PWR0212")
 					(unit 1)
 				)
 			)
@@ -3067,7 +3067,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a9eaf89f-78c9-4b62-a0db-4bbd77fad4c1")
-		(property "Reference" "#PWR0209"
+		(property "Reference" "#PWR0205"
 			(at 110.49 52.07 0)
 			(effects
 				(font
@@ -3117,7 +3117,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0209")
+					(reference "#PWR0205")
 					(unit 1)
 				)
 			)
@@ -3132,7 +3132,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "b4c5cfd7-29f6-488f-892e-20ccd3c1c97e")
-		(property "Reference" "C204"
+		(property "Reference" "C202"
 			(at 110.744 38.354 0)
 			(effects
 				(font
@@ -3150,7 +3150,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 111.4552 44.45 0)
 			(effects
 				(font
@@ -3186,7 +3186,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "C204")
+					(reference "C202")
 					(unit 1)
 				)
 			)
@@ -3202,7 +3202,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "c68a1eda-c8e0-4b6f-ae47-236540a7af9a")
-		(property "Reference" "#PWR0206"
+		(property "Reference" "#PWR0203"
 			(at 105.41 38.1 0)
 			(effects
 				(font
@@ -3252,7 +3252,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0206")
+					(reference "#PWR0203")
 					(unit 1)
 				)
 			)
@@ -3286,7 +3286,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Crystal:Crystal_SMD_7050-2Pin_7.0x5.0mm"
 			(at 68.58 66.04 0)
 			(effects
 				(font
@@ -3338,7 +3338,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "e3178adf-14e0-4711-a3d1-0d59a69ecc74")
-		(property "Reference" "#PWR0210"
+		(property "Reference" "#PWR0206"
 			(at 116.84 52.07 0)
 			(effects
 				(font
@@ -3388,7 +3388,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0210")
+					(reference "#PWR0206")
 					(unit 1)
 				)
 			)

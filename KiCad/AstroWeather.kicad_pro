@@ -633,6 +633,10 @@
     [
       "50b8a1dd-352e-4a33-913d-a72ec72f4116",
       "Power Supply"
+    ],
+    [
+      "65ca801d-1256-4be1-997f-247ca21d6f46",
+      "Light Sensor"
     ]
   ],
   "text_variables": {}
