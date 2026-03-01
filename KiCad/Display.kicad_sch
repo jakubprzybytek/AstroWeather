@@ -4323,10 +4323,6 @@
 		(color 0 0 0 0)
 		(uuid "ffc67cff-ac4a-4b7c-a676-0a0cb5f10155")
 	)
-	(no_connect
-		(at 91.44 342.9)
-		(uuid "db046465-6348-419e-b71e-a04143516be3")
-	)
 	(bus_entry
 		(at 146.05 361.95)
 		(size 2.54 -2.54)
@@ -5620,6 +5616,16 @@
 			(type default)
 		)
 		(uuid "1137e8b5-44d5-41bf-b997-34e7881bdadd")
+	)
+	(wire
+		(pts
+			(xy 102.87 74.93) (xy 102.87 76.2)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "11fbd732-4b42-4954-a725-92dcc326e437")
 	)
 	(wire
 		(pts
@@ -7093,16 +7099,6 @@
 	)
 	(wire
 		(pts
-			(xy 102.87 85.09) (xy 102.87 86.36)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5fedff36-3bee-4ca1-94bf-2898cd0d24c1")
-	)
-	(wire
-		(pts
 			(xy 60.96 153.67) (xy 66.04 153.67)
 		)
 		(stroke
@@ -7550,6 +7546,16 @@
 			(type default)
 		)
 		(uuid "75c0dc80-c630-484d-b6f2-ba355f5e01a0")
+	)
+	(wire
+		(pts
+			(xy 82.55 342.9) (xy 91.44 342.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "75ea0c1a-c41f-4a21-8278-99f0aa27e675")
 	)
 	(wire
 		(pts
@@ -8123,7 +8129,7 @@
 	)
 	(wire
 		(pts
-			(xy 102.87 93.98) (xy 102.87 102.87)
+			(xy 102.87 85.09) (xy 102.87 102.87)
 		)
 		(stroke
 			(width 0)
@@ -10351,6 +10357,16 @@
 		)
 		(uuid "68cb0fe7-7508-47b2-b25d-4f830d06c12d")
 	)
+	(label "SCT1_REXT"
+		(at 68.58 137.16 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "6dcd51ea-4d7c-451b-a8b5-ff5428ad3016")
+	)
 	(label "DIS1_DP"
 		(at 115.57 124.46 0)
 		(effects
@@ -10560,6 +10576,16 @@
 			(justify right bottom)
 		)
 		(uuid "98f7ac15-9a58-4882-8d94-37a93a28aa96")
+	)
+	(label "SCT1_VDD"
+		(at 110.49 85.09 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "9936a493-e52f-47b9-9dbf-1704e148d7f5")
 	)
 	(label "DIS3_3"
 		(at 123.19 193.04 180)
@@ -10920,6 +10946,17 @@
 			(justify right bottom)
 		)
 		(uuid "fda5967d-22ae-4c9b-a69d-9e290dc99a81")
+	)
+	(hierarchical_label "SCT_SDO"
+		(shape output)
+		(at 82.55 342.9 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "031e4f08-7e29-4b1e-86af-3e6126eb503b")
 	)
 	(hierarchical_label "~{SCT_EN}"
 		(shape input)
@@ -11410,7 +11447,7 @@
 	)
 	(symbol
 		(lib_id "power:+3.3V")
-		(at 102.87 83.82 0)
+		(at 102.87 74.93 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -11419,7 +11456,7 @@
 		(fields_autoplaced yes)
 		(uuid "05d11432-ac36-4691-8327-ef42f40688d5")
 		(property "Reference" "#PWR0505"
-			(at 102.87 87.63 0)
+			(at 102.87 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11428,7 +11465,7 @@
 			)
 		)
 		(property "Value" "+3.3V"
-			(at 102.87 78.74 0)
+			(at 102.87 69.85 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11436,7 +11473,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 102.87 83.82 0)
+			(at 102.87 74.93 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11445,7 +11482,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 102.87 83.82 0)
+			(at 102.87 74.93 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11454,7 +11491,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
-			(at 102.87 83.82 0)
+			(at 102.87 74.93 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14538,7 +14575,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 102.87 90.17 0)
+		(at 102.87 80.01 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -14546,7 +14583,7 @@
 		(dnp no)
 		(uuid "7c5b6140-1845-400f-b960-056ed50940e1")
 		(property "Reference" "R501"
-			(at 96.012 88.9 0)
+			(at 96.012 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14555,7 +14592,7 @@
 			)
 		)
 		(property "Value" "10"
-			(at 98.552 91.694 0)
+			(at 98.552 81.534 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14564,7 +14601,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-			(at 101.092 90.17 90)
+			(at 101.092 80.01 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14573,7 +14610,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 102.87 90.17 0)
+			(at 102.87 80.01 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14582,7 +14619,7 @@
 			)
 		)
 		(property "Description" "Resistor"
-			(at 102.87 90.17 0)
+			(at 102.87 80.01 0)
 			(effects
 				(font
 					(size 1.27 1.27)

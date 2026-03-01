@@ -1396,7 +1396,7 @@
 		(dnp no)
 		(uuid "0d577368-8b1c-47b5-9548-7eb07e91df0c")
 		(property "Reference" "R704"
-			(at 101.6 60.706 0)
+			(at 99.822 60.706 0)
 			(effects
 				(font
 					(size 1.27 1.27)

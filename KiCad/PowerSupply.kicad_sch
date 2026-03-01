@@ -1219,6 +1219,17 @@
 			(embedded_fonts no)
 		)
 	)
+	(text "R=20k -> Vout=3.576V\nR=19.1k -> Vout=3.716V"
+		(exclude_from_sim no)
+		(at 186.436 122.936 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left top)
+		)
+		(uuid "cfa0f820-094b-4f19-8856-33ac4e72c5e3")
+	)
 	(junction
 		(at 173.99 93.98)
 		(diameter 0)
@@ -3595,7 +3606,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 121.6152 91.44 0)
 			(effects
 				(font
