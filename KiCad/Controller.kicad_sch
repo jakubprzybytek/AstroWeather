@@ -1419,6 +1419,17 @@
 		)
 		(uuid "fe81021c-cc3e-4f81-b43f-420e810ff9a4")
 	)
+	(hierarchical_label "DISPLAY2_EN"
+		(shape output)
+		(at 207.01 78.74 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "101ab436-0822-4264-b98a-d55535dd42dd")
+	)
 	(hierarchical_label "SWDIO"
 		(shape input)
 		(at 171.45 95.25 0)
@@ -1441,17 +1452,6 @@
 		)
 		(uuid "2c037848-c836-4819-a2e2-c21c4c75a6c2")
 	)
-	(hierarchical_label "DIS2_EN"
-		(shape output)
-		(at 185.42 77.47 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "30c9990a-c09a-4fc6-ba57-f15710809391")
-	)
 	(hierarchical_label "GND"
 		(shape input)
 		(at 53.34 41.91 180)
@@ -1462,28 +1462,6 @@
 			(justify right)
 		)
 		(uuid "30d247df-c27e-4935-bd39-565dc2f32a91")
-	)
-	(hierarchical_label "DIS3_EN"
-		(shape output)
-		(at 185.42 80.01 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "52c5e5bb-0447-4335-b0c5-de6585eda12e")
-	)
-	(hierarchical_label "DIS1_EN"
-		(shape output)
-		(at 185.42 74.93 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "5f6d8df3-872f-4c6a-91f5-817582ebcbe2")
 	)
 	(hierarchical_label "+3.3V"
 		(shape input)
@@ -1518,17 +1496,6 @@
 		)
 		(uuid "8400dba0-5c59-4ece-b17a-508f3e92106f")
 	)
-	(hierarchical_label "DIS5_EN"
-		(shape output)
-		(at 185.42 85.09 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "8b655922-68d7-432c-94b5-e499b88868b4")
-	)
 	(hierarchical_label "I2C_SDA"
 		(shape bidirectional)
 		(at 171.45 92.71 0)
@@ -1539,17 +1506,6 @@
 			(justify left)
 		)
 		(uuid "8e65ca7f-9487-425b-96d3-e96a296e35a8")
-	)
-	(hierarchical_label "DIS4_EN"
-		(shape output)
-		(at 185.42 82.55 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "acfcb9bf-c7b0-4c80-a331-4b13c6873e93")
 	)
 	(hierarchical_label "NRST"
 		(shape input)
@@ -1584,6 +1540,17 @@
 		)
 		(uuid "e9ca1aa6-8f48-450c-a5d3-4b25efa42271")
 	)
+	(hierarchical_label "DISPLAY3_EN"
+		(shape output)
+		(at 207.01 81.28 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "ea396966-617f-4a72-8924-1de74427739f")
+	)
 	(hierarchical_label "SCT_CLK"
 		(shape output)
 		(at 171.45 69.85 0)
@@ -1594,6 +1561,39 @@
 			(justify left)
 		)
 		(uuid "eb1d54ab-d856-4056-b505-5e55dd08e4cf")
+	)
+	(hierarchical_label "DISPLAY5_EN"
+		(shape output)
+		(at 207.01 86.36 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "f0356c67-ed19-4329-9486-0118c4e56c75")
+	)
+	(hierarchical_label "DISPLAY1_EN"
+		(shape output)
+		(at 207.01 76.2 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "f0790711-61a6-4f4c-b534-10b01e69ad0b")
+	)
+	(hierarchical_label "DISPLAY4_EN"
+		(shape output)
+		(at 207.01 83.82 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "fc319cb9-5621-421c-8760-21aacbe9773a")
 	)
 	(symbol
 		(lib_id "Device:C")

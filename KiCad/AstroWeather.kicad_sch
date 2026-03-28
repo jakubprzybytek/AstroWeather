@@ -6442,7 +6442,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Connector_JST:JST_PH_S6B-PH-SM4-TB_1x06-1MP_P2.00mm_Horizontal"
+		(property "Footprint" "Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical"
 			(at 140.97 83.82 0)
 			(effects
 				(font
@@ -7257,7 +7257,7 @@
 				)
 			)
 		)
-		(property "Value" "USB_C_Receptacle_USB2.0_14P"
+		(property "Value" "USB"
 			(at 129.54 201.93 0)
 			(effects
 				(font
@@ -7265,7 +7265,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Connector_USB:USB_C_Receptacle_GCT_USB4135-GF-A_6P_TopMnt_Horizontal"
+		(property "Footprint" "JPConnectors:USB_C_Receptacle_GCT_USB4216"
 			(at 133.35 220.98 0)
 			(effects
 				(font
@@ -9338,56 +9338,6 @@
 				(justify right)
 			)
 		)
-		(pin "DIS1_EN" output
-			(at 217.17 69.85 0)
-			(uuid "82becf35-61b9-4ec2-930d-ecd5f9acdedb")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(pin "DIS2_EN" output
-			(at 217.17 72.39 0)
-			(uuid "7beec17b-c78e-4377-8dea-f5349e350047")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(pin "DIS3_EN" output
-			(at 217.17 74.93 0)
-			(uuid "9e02900d-03e9-409c-9f08-bd69e6d3f8bd")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(pin "DIS4_EN" output
-			(at 217.17 77.47 0)
-			(uuid "abd874cc-0bc1-4989-ae01-34172135d798")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(pin "DIS5_EN" output
-			(at 217.17 80.01 0)
-			(uuid "1d4e096e-6000-4d18-9349-e5f0c1339b5d")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
 		(pin "GND" input
 			(at 193.04 87.63 270)
 			(uuid "f9a19908-831e-44b7-8bb9-0d5fc506f61d")
@@ -9481,6 +9431,56 @@
 		(pin "~{SCT_LA}" output
 			(at 217.17 63.5 0)
 			(uuid "38617cee-31e4-4dbc-8f43-abef4b0414b5")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DISPLAY1_EN" output
+			(at 217.17 69.85 0)
+			(uuid "1cda80d2-f826-441b-9142-83536d3af1f0")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DISPLAY2_EN" output
+			(at 217.17 72.39 0)
+			(uuid "185ff505-8018-4426-a9dc-e11333803ec6")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DISPLAY3_EN" output
+			(at 217.17 74.93 0)
+			(uuid "2817b323-4603-45d2-a110-011b44f8b0e2")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DISPLAY4_EN" output
+			(at 217.17 77.47 0)
+			(uuid "1f889016-f0ef-4415-a38a-a156c1ff19dd")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DISPLAY5_EN" output
+			(at 217.17 80.01 0)
+			(uuid "a7372d23-0b06-415f-9a43-f487b34dd34d")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -9856,56 +9856,6 @@
 				(justify right)
 			)
 		)
-		(pin "DIS1_EN" input
-			(at 295.91 133.35 180)
-			(uuid "079f5141-5b00-417c-9bf2-02ffaeda303e")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(pin "DIS2_EN" input
-			(at 295.91 135.89 180)
-			(uuid "7e7e5cfe-4719-4ca6-934f-090d0feac188")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(pin "DIS3_EN" input
-			(at 295.91 138.43 180)
-			(uuid "735b13e4-cecc-4529-b1d2-25b8c3f1d475")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(pin "DIS4_EN" input
-			(at 295.91 140.97 180)
-			(uuid "fb40b8c9-98d8-40b1-8bae-4c8ee7bf96eb")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(pin "DIS5_EN" input
-			(at 295.91 143.51 180)
-			(uuid "8efbe66f-cef7-4c6a-a3bc-6d0f71d9267b")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
 		(pin "SCT_CLK" input
 			(at 295.91 123.19 180)
 			(uuid "eee38c52-a39f-423c-ac55-b49f3f15ba29")
@@ -9979,6 +9929,56 @@
 		(pin "SCT_SDO" output
 			(at 295.91 120.65 180)
 			(uuid "bac1b41b-23ba-48d4-9aaf-11dfefb283d9")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "DISPLAY1_EN" input
+			(at 295.91 133.35 180)
+			(uuid "1e5746c7-499b-4fd0-acbf-702880c064d9")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "DISPLAY2_EN" input
+			(at 295.91 135.89 180)
+			(uuid "8a13c03e-ede2-4cbd-ac6f-3fa3dc5b3c4a")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "DISPLAY3_EN" input
+			(at 295.91 138.43 180)
+			(uuid "7ea34eda-e0e4-4818-9f65-cd33d8d15336")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "DISPLAY4_EN" input
+			(at 295.91 140.97 180)
+			(uuid "3508a2ae-6059-4142-bcce-08b211f78311")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "DISPLAY5_EN" input
+			(at 295.91 143.51 180)
+			(uuid "fd1e78c2-c2fd-4d85-92f4-53b9e2c21bb5")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -10187,56 +10187,6 @@
 				(justify left)
 			)
 		)
-		(pin "DIS1_EN" output
-			(at 217.17 133.35 0)
-			(uuid "90c1f8e6-1d66-4710-bce7-98fed339fc6d")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(pin "DIS2_EN" output
-			(at 217.17 135.89 0)
-			(uuid "4d280e1b-9463-4c0b-a61f-9a6238000a3e")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(pin "DIS3_EN" output
-			(at 217.17 138.43 0)
-			(uuid "d24187e1-329c-4783-a940-f232d0e85894")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(pin "DIS4_EN" output
-			(at 217.17 140.97 0)
-			(uuid "6bb28c56-5b0d-47fc-9b71-14afb8e56734")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(pin "DIS5_EN" output
-			(at 217.17 143.51 0)
-			(uuid "d34a141d-a35e-4499-b06c-e8dc2b23677a")
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
 		(pin "SCT_CLK" output
 			(at 217.17 123.19 0)
 			(uuid "1e8743fd-4621-4fef-8b9b-db967c9d1dff")
@@ -10345,6 +10295,56 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
+			)
+		)
+		(pin "DISPLAY1_EN" output
+			(at 217.17 133.35 0)
+			(uuid "6a232981-3827-4167-80a9-ce63fb92e65f")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DISPLAY2_EN" output
+			(at 217.17 135.89 0)
+			(uuid "0ebaa6dd-3496-4d5f-8849-def083c0f873")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DISPLAY3_EN" output
+			(at 217.17 138.43 0)
+			(uuid "22cde576-9703-42c8-95a7-c9e6e4101046")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DISPLAY4_EN" output
+			(at 217.17 140.97 0)
+			(uuid "e5822346-6228-4051-8389-d632fc8aac6a")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "DISPLAY5_EN" output
+			(at 217.17 143.51 0)
+			(uuid "6cd9ac96-641b-42ba-b666-67565b77cb72")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
 			)
 		)
 		(instances
