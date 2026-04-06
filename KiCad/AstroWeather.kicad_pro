@@ -188,6 +188,7 @@
       ],
       "track_widths": [
         0.0,
+        0.25,
         0.5,
         1.0
       ],
@@ -221,6 +222,14 @@
         {
           "diameter": 0.0,
           "drill": 0.0
+        },
+        {
+          "diameter": 0.7,
+          "drill": 0.4
+        },
+        {
+          "diameter": 0.8,
+          "drill": 0.5
         }
       ],
       "zones_allow_external_fillets": false
@@ -501,7 +510,7 @@
         "wire_width": 6
       },
       {
-        "clearance": 0.25,
+        "clearance": 0.2,
         "name": "Power150",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 0,
@@ -511,7 +520,7 @@
         "via_drill": 0.8
       },
       {
-        "clearance": 0.25,
+        "clearance": 0.2,
         "name": "Power40",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 1,
@@ -580,6 +589,14 @@
       {
         "netclass": "Power150",
         "pattern": "VBUS"
+      },
+      {
+        "netclass": "Power150",
+        "pattern": "+3.3V"
+      },
+      {
+        "netclass": "Power150",
+        "pattern": "*VOLTAGE_SENSE"
       }
     ]
   },
@@ -722,10 +739,6 @@
     [
       "d62dd27e-49e2-449e-88dd-01d5559c6bc2",
       "Host Controller"
-    ],
-    [
-      "4c8e54d0-2d5b-47d4-b46b-1559d4095c20",
-      "Controller"
     ],
     [
       "d40768ac-029c-4883-87fe-7ced274514bd",

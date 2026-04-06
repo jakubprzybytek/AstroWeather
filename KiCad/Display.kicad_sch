@@ -4054,12 +4054,6 @@
 		(uuid "3fa2aeb1-9fe7-48c1-9bf5-cd26340c79e1")
 	)
 	(junction
-		(at 82.55 361.95)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "3fc07b6a-03c0-4b54-9443-689502acb85c")
-	)
-	(junction
 		(at 218.44 237.49)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -4180,12 +4174,6 @@
 		(uuid "9cf67947-df2b-4364-a0fb-c2ef5f99c52e")
 	)
 	(junction
-		(at 82.55 137.16)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "9db3965a-884d-4801-bae2-59c1d1217c23")
-	)
-	(junction
 		(at 259.08 212.09)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -4270,12 +4258,6 @@
 		(uuid "d9795d2b-76e7-408b-8103-51c94bc7c6c9")
 	)
 	(junction
-		(at 82.55 288.29)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "e5ef7c99-4493-42a6-b54f-7fb12d073f16")
-	)
-	(junction
 		(at 107.95 322.58)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -4292,12 +4274,6 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "f2c8b922-a76a-4824-a749-7f8ffc4709aa")
-	)
-	(junction
-		(at 82.55 218.44)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "f422875c-efc4-4707-b4f3-b2a37583b035")
 	)
 	(junction
 		(at 228.6 204.47)
@@ -5473,7 +5449,7 @@
 	)
 	(wire
 		(pts
-			(xy 66.04 218.44) (xy 82.55 218.44)
+			(xy 66.04 218.44) (xy 91.44 218.44)
 		)
 		(stroke
 			(width 0)
@@ -5620,16 +5596,6 @@
 			(type default)
 		)
 		(uuid "1282a69c-16ed-472c-ad9d-4674a0518182")
-	)
-	(wire
-		(pts
-			(xy 82.55 292.1) (xy 82.55 288.29)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "13152b2b-3954-4854-9f3d-72f27397550a")
 	)
 	(bus
 		(pts
@@ -6083,7 +6049,7 @@
 	)
 	(wire
 		(pts
-			(xy 82.55 288.29) (xy 91.44 288.29)
+			(xy 66.04 288.29) (xy 91.44 288.29)
 		)
 		(stroke
 			(width 0)
@@ -6583,16 +6549,6 @@
 	)
 	(wire
 		(pts
-			(xy 82.55 137.16) (xy 91.44 137.16)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "3e507035-949e-4ed0-b0f0-19953761cdd4")
-	)
-	(wire
-		(pts
 			(xy 102.87 308.61) (xy 102.87 311.15)
 		)
 		(stroke
@@ -6983,16 +6939,6 @@
 	)
 	(wire
 		(pts
-			(xy 82.55 218.44) (xy 91.44 218.44)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "585fef9f-d84f-4483-95a3-d4b69cbf02b5")
-	)
-	(wire
-		(pts
 			(xy 195.58 280.67) (xy 248.92 280.67)
 		)
 		(stroke
@@ -7181,16 +7127,6 @@
 		)
 		(uuid "62ee787a-02d8-41b3-be18-38570baef433")
 	)
-	(wire
-		(pts
-			(xy 66.04 361.95) (xy 82.55 361.95)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "631780fb-d855-477f-bb93-0d065248de70")
-	)
 	(bus
 		(pts
 			(xy 125.73 226.06) (xy 125.73 228.6)
@@ -7230,16 +7166,6 @@
 			(type default)
 		)
 		(uuid "63c7909b-1aa3-4e47-85ef-63d8b2bbd5ec")
-	)
-	(wire
-		(pts
-			(xy 82.55 373.38) (xy 82.55 375.92)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "64954354-b1f9-41b0-bc89-2cff1afb5701")
 	)
 	(wire
 		(pts
@@ -7603,16 +7529,6 @@
 	)
 	(wire
 		(pts
-			(xy 82.55 365.76) (xy 82.55 361.95)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "79983107-02fc-4056-8d74-f699b62de093")
-	)
-	(wire
-		(pts
 			(xy 114.3 351.79) (xy 124.46 351.79)
 		)
 		(stroke
@@ -7951,16 +7867,6 @@
 		)
 		(uuid "874be1c8-f6f1-446b-9c96-57003911f88f")
 	)
-	(wire
-		(pts
-			(xy 82.55 299.72) (xy 82.55 302.26)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "87e0ae42-b9cd-40cc-b265-bdf0887861b0")
-	)
 	(bus
 		(pts
 			(xy 127 356.87) (xy 127 359.41)
@@ -8210,16 +8116,6 @@
 			(type default)
 		)
 		(uuid "9880e5f9-808c-4044-b7a7-5a0956677449")
-	)
-	(wire
-		(pts
-			(xy 82.55 140.97) (xy 82.55 137.16)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9959f067-c182-4aaa-8ad5-e1b22112e503")
 	)
 	(wire
 		(pts
@@ -8533,16 +8429,6 @@
 	)
 	(wire
 		(pts
-			(xy 66.04 288.29) (xy 82.55 288.29)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "aabc5c2b-2599-41a4-8758-da73184f3e17")
-	)
-	(wire
-		(pts
 			(xy 85.09 118.11) (xy 85.09 196.85)
 		)
 		(stroke
@@ -8600,16 +8486,6 @@
 			(type default)
 		)
 		(uuid "ad1e0647-379f-47d3-9c6f-eb2855af810b")
-	)
-	(wire
-		(pts
-			(xy 82.55 222.25) (xy 82.55 218.44)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ad8e6600-31f7-46a0-8e97-86c883b56f7c")
 	)
 	(wire
 		(pts
@@ -9103,16 +8979,6 @@
 	)
 	(wire
 		(pts
-			(xy 82.55 148.59) (xy 82.55 151.13)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d040045d-09a8-408e-982e-154014bbb4a4")
-	)
-	(wire
-		(pts
 			(xy 102.87 165.1) (xy 102.87 167.64)
 		)
 		(stroke
@@ -9131,16 +8997,6 @@
 		)
 		(uuid "d1094bd8-2d98-4320-8943-6e537f794752")
 	)
-	(wire
-		(pts
-			(xy 82.55 229.87) (xy 82.55 232.41)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d11c4ea2-1dd0-4aaa-a9c6-414c76d27b8c")
-	)
 	(bus
 		(pts
 			(xy 146.05 212.09) (xy 146.05 214.63)
@@ -9153,7 +9009,7 @@
 	)
 	(wire
 		(pts
-			(xy 82.55 361.95) (xy 91.44 361.95)
+			(xy 66.04 361.95) (xy 91.44 361.95)
 		)
 		(stroke
 			(width 0)
@@ -9243,7 +9099,7 @@
 	)
 	(wire
 		(pts
-			(xy 66.04 137.16) (xy 82.55 137.16)
+			(xy 66.04 137.16) (xy 91.44 137.16)
 		)
 		(stroke
 			(width 0)
@@ -12901,146 +12757,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:R")
-		(at 82.55 226.06 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "3acb166c-cb74-4019-86b6-52184db8ebee")
-		(property "Reference" "R507"
-			(at 85.09 224.7899 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "dnp"
-			(at 85.09 227.3299 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-			(at 80.772 226.06 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 82.55 226.06 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 82.55 226.06 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "c3934224-46a9-4485-b419-86dd9c6f9a1a")
-		)
-		(pin "2"
-			(uuid "e1072cbd-1d49-4a64-b2c4-c7d0d6f28651")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R507")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 82.55 295.91 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "3db4a71a-6f65-4d1c-a94b-3328bdfe90af")
-		(property "Reference" "R511"
-			(at 85.09 294.6399 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "dnp"
-			(at 85.09 297.1799 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-			(at 80.772 295.91 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 82.55 295.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 82.55 295.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "6a5d3350-33f3-46c8-b35c-fe2345aee451")
-		)
-		(pin "2"
-			(uuid "a16a0eee-b860-413b-8610-d4ed7be91142")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R511")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:GND")
 		(at 118.11 95.25 0)
 		(unit 1)
@@ -13628,72 +13344,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:GND")
-		(at 82.55 151.13 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "5b203ac8-e8e6-41bc-a66b-2f6624526bce")
-		(property "Reference" "#PWR0511"
-			(at 82.55 157.48 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "GND"
-			(at 82.55 156.21 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 82.55 151.13 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 82.55 151.13 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 82.55 151.13 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "14699549-61ff-45bb-9ca3-b4f87b58263d")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0511")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "myLib:LFD028BUE-103A")
 		(at 186.69 322.58 0)
 		(unit 1)
@@ -13789,72 +13439,6 @@
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
 					(reference "U512")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 82.55 232.41 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "5e55bc6f-e196-452d-af47-255f555ed124")
-		(property "Reference" "#PWR0519"
-			(at 82.55 238.76 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "GND"
-			(at 82.55 237.49 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 82.55 232.41 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 82.55 232.41 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 82.55 232.41 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "8adcdf10-25ac-417a-9054-7cdba847b7b3")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0519")
 					(unit 1)
 				)
 			)
@@ -14368,76 +13952,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:R")
-		(at 82.55 369.57 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "71ed72a2-f959-4b25-898a-e745f812564f")
-		(property "Reference" "R515"
-			(at 85.09 368.2999 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "dnp"
-			(at 85.09 370.8399 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-			(at 80.772 369.57 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 82.55 369.57 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 82.55 369.57 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "de5777b3-4c52-431f-9261-3768b2a3a295")
-		)
-		(pin "2"
-			(uuid "a4e87056-144a-4c77-9b4b-56ea6d54bdb5")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R515")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:GND")
 		(at 66.04 250.19 0)
 		(unit 1)
@@ -14498,76 +14012,6 @@
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
 					(reference "#PWR0523")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 82.55 144.78 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "7882bde8-46a1-424a-b6a7-c52534e05547")
-		(property "Reference" "R503"
-			(at 85.09 143.5099 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "dnp"
-			(at 85.09 146.0499 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-			(at 80.772 144.78 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 82.55 144.78 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 82.55 144.78 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "a227edec-7e69-4042-a243-b36c2ee6493d")
-		)
-		(pin "2"
-			(uuid "40f2e686-66dd-477a-a4ce-3875097f9e0c")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R503")
 					(unit 1)
 				)
 			)
@@ -15071,72 +14515,6 @@
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
 					(reference "#PWR0502")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 82.55 375.92 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "8001c67b-05a7-49c1-bd01-2d1e35738264")
-		(property "Reference" "#PWR0535"
-			(at 82.55 382.27 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "GND"
-			(at 82.55 381 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 82.55 375.92 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 82.55 375.92 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 82.55 375.92 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "f94d0d64-55d6-48a2-bc7d-328885c4dfd6")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0535")
 					(unit 1)
 				)
 			)
@@ -16851,72 +16229,6 @@
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
 					(reference "#PWR0527")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 82.55 302.26 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "bd4c13ff-5ae6-46cf-9860-c57a9bccdf0c")
-		(property "Reference" "#PWR0528"
-			(at 82.55 308.61 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "GND"
-			(at 82.55 307.34 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 82.55 302.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 82.55 302.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 82.55 302.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "cf712e00-7c51-43df-8a39-c0f0151df824")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0528")
 					(unit 1)
 				)
 			)

@@ -1,4 +1,4 @@
-27298299615318268
+27300072963686353
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -70433,6 +70433,13 @@ SolderingHoles-2_P6.00mm_D2.0mm
 0
 2
 2
+JPConnectors
+USB_C_Receptacle_GCT_USB4216
+USB 2.0 Type C Receptacle, GCT, 16P, top mounted, horizontal, 5A, https://gct.co/files/drawings/usb4110.pdf
+USB 2.0 C Type-C Receptacle SMD 16P 16C USB4216-03-A
+0
+20
+17
 JPConnectors
 XT60PW-F
 
