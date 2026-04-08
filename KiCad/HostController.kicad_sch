@@ -5,6 +5,113 @@
 	(uuid "98e8112e-d6db-465f-8807-b6cf261e4116")
 	(paper "A4")
 	(lib_symbols
+		(symbol "Connector:TestPoint"
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0.762)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "TP"
+				(at 0 6.858 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "TestPoint"
+				(at 0 5.08 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 5.08 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "~"
+				(at 5.08 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "test point"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "test point tp"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "Pin* Test*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "TestPoint_0_1"
+				(circle
+					(center 0 3.302)
+					(radius 0.762)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "TestPoint_1_1"
+				(pin passive line
+					(at 0 0 90)
+					(length 2.54)
+					(name "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Device:C"
 			(pin_numbers
 				(hide yes)
@@ -2962,12 +3069,6 @@
 		(uuid "22f55722-4cd4-4ea4-b4bd-a67f332a487d")
 	)
 	(junction
-		(at 82.55 69.85)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "343679f0-c357-400f-aba2-8c892e4503e7")
-	)
-	(junction
 		(at 87.63 54.61)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -3057,16 +3158,6 @@
 	)
 	(wire
 		(pts
-			(xy 76.2 69.85) (xy 82.55 69.85)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "06d9f133-5e65-41ee-ad32-a88bd65eda36")
-	)
-	(wire
-		(pts
 			(xy 182.88 78.74) (xy 189.23 78.74)
 		)
 		(stroke
@@ -3124,6 +3215,16 @@
 			(type default)
 		)
 		(uuid "10c00bf0-9095-4cc4-be04-21a23a5f1427")
+	)
+	(wire
+		(pts
+			(xy 182.88 71.12) (xy 189.23 71.12)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "10c07458-6bb0-43e0-aae5-493f4b349f7e")
 	)
 	(wire
 		(pts
@@ -3267,16 +3368,6 @@
 	)
 	(wire
 		(pts
-			(xy 82.55 82.55) (xy 82.55 83.82)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "3ef1ec95-d2db-446f-aa35-899d3a20a467")
-	)
-	(wire
-		(pts
 			(xy 36.83 30.48) (xy 36.83 26.67)
 		)
 		(stroke
@@ -3287,7 +3378,7 @@
 	)
 	(wire
 		(pts
-			(xy 182.88 106.68) (xy 189.23 106.68)
+			(xy 182.88 106.68) (xy 209.55 106.68)
 		)
 		(stroke
 			(width 0)
@@ -3397,7 +3488,17 @@
 	)
 	(wire
 		(pts
-			(xy 82.55 69.85) (xy 95.25 69.85)
+			(xy 182.88 68.58) (xy 189.23 68.58)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5903fb42-298b-42d0-903f-cb3bb1ee7fca")
+	)
+	(wire
+		(pts
+			(xy 76.2 69.85) (xy 95.25 69.85)
 		)
 		(stroke
 			(width 0)
@@ -3464,6 +3565,16 @@
 			(type default)
 		)
 		(uuid "69b05a72-d20e-44e6-9f2f-25654717f4ab")
+	)
+	(wire
+		(pts
+			(xy 182.88 121.92) (xy 189.23 121.92)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6a6bf974-a41d-4a2c-8360-c11c03b15122")
 	)
 	(wire
 		(pts
@@ -3617,6 +3728,16 @@
 	)
 	(wire
 		(pts
+			(xy 182.88 104.14) (xy 189.23 104.14)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "898d25c8-8045-45c6-a6d1-8b7156cfe8cf")
+	)
+	(wire
+		(pts
 			(xy 182.88 66.04) (xy 189.23 66.04)
 		)
 		(stroke
@@ -3634,6 +3755,16 @@
 			(type default)
 		)
 		(uuid "8a7a97f7-6739-4c84-8054-fd74fd93cdc3")
+	)
+	(wire
+		(pts
+			(xy 209.55 106.68) (xy 209.55 104.14)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8dca456f-d47a-4e8a-8f7c-eaa44917c3dc")
 	)
 	(wire
 		(pts
@@ -3757,6 +3888,16 @@
 	)
 	(wire
 		(pts
+			(xy 182.88 119.38) (xy 189.23 119.38)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b2bf5613-06b0-4de2-b60c-00868d04b99e")
+	)
+	(wire
+		(pts
 			(xy 157.48 48.26) (xy 157.48 50.8)
 		)
 		(stroke
@@ -3774,6 +3915,26 @@
 			(type default)
 		)
 		(uuid "b44960fa-56fe-462e-b709-73a89a5b9678")
+	)
+	(wire
+		(pts
+			(xy 182.88 116.84) (xy 189.23 116.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bc20be8e-c6f6-41bd-a728-9f2bd49452b2")
+	)
+	(wire
+		(pts
+			(xy 182.88 58.42) (xy 189.23 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bcd4d8b8-876f-46c6-ac5d-9c3878194918")
 	)
 	(wire
 		(pts
@@ -4047,16 +4208,6 @@
 	)
 	(wire
 		(pts
-			(xy 82.55 69.85) (xy 82.55 72.39)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "f7568308-4dc6-42ed-a528-c3f1bda50737")
-	)
-	(wire
-		(pts
 			(xy 33.02 151.13) (xy 39.37 151.13)
 		)
 		(stroke
@@ -4175,7 +4326,7 @@
 		)
 		(uuid "39829820-635a-411b-bd7a-b5de75d767ad")
 	)
-	(label "OSC_OUT"
+	(label "OSC_OUT_PIN"
 		(at 189.23 106.68 0)
 		(effects
 			(font
@@ -4311,7 +4462,7 @@
 	)
 	(hierarchical_label "ST67_CHIP_EN"
 		(shape output)
-		(at 210.82 76.2 0)
+		(at 189.23 58.42 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4322,7 +4473,7 @@
 	)
 	(hierarchical_label "~{SCT_LA}"
 		(shape output)
-		(at 204.47 115.57 0)
+		(at 189.23 116.84 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4388,7 +4539,7 @@
 	)
 	(hierarchical_label "ST67_RDY"
 		(shape input)
-		(at 214.63 67.31 0)
+		(at 189.23 68.58 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4421,7 +4572,7 @@
 	)
 	(hierarchical_label "ST67_BOOT"
 		(shape output)
-		(at 210.82 78.74 0)
+		(at 189.23 104.14 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4443,7 +4594,7 @@
 	)
 	(hierarchical_label "~{SCT_EN}"
 		(shape output)
-		(at 204.47 118.11 0)
+		(at 189.23 119.38 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4454,7 +4605,7 @@
 	)
 	(hierarchical_label "LOW_POWER_ENABLE"
 		(shape output)
-		(at 204.47 140.97 0)
+		(at 189.23 121.92 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4608,7 +4759,7 @@
 	)
 	(hierarchical_label "ST67_CS"
 		(shape output)
-		(at 208.28 72.39 0)
+		(at 189.23 71.12 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5664,76 +5815,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Switch:SW_Push")
-		(at 82.55 77.47 90)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "59101622-8051-4334-bf8d-f6942b92b800")
-		(property "Reference" "SW301"
-			(at 83.82 76.1999 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Value" "Reset"
-			(at 83.82 78.7399 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" "Button_Switch_SMD:SW_Tactile_SPST_NO_Straight_CK_PTS636Sx25SMTRLFS"
-			(at 77.47 77.47 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 77.47 77.47 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Push button switch, generic, two pins"
-			(at 82.55 77.47 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "454f60d5-017f-4a1f-b5a3-380cee6d6694")
-		)
-		(pin "1"
-			(uuid "d30714f6-f130-4d94-91f7-885e09cd97df")
-		)
-		(instances
-			(project ""
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
-					(reference "SW301")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R")
 		(at 264.16 38.1 0)
 		(unit 1)
@@ -6343,6 +6424,73 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 209.55 104.14 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "ad438e40-d175-48ce-880b-5f1e54a2316a")
+		(property "Reference" "TP301"
+			(at 212.09 99.5679 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 212.09 102.1079 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
+			(at 214.63 104.14 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 214.63 104.14 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "test point"
+			(at 209.55 104.14 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "171f7a32-f042-4e99-acf1-2e29f9e6e91f")
+		)
+		(instances
+			(project ""
+				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
+					(reference "TP301")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 95.25 83.82 0)
 		(unit 1)
@@ -6817,72 +6965,6 @@
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
 					(reference "C304")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 82.55 83.82 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "bdd0801f-978b-454f-a6fd-8c81d70b067c")
-		(property "Reference" "#PWR0313"
-			(at 82.55 90.17 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "GND"
-			(at 82.55 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 82.55 83.82 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 82.55 83.82 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 82.55 83.82 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "70bfe0e5-6e45-4593-b7f3-9736ee80ac21")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
-					(reference "#PWR0313")
 					(unit 1)
 				)
 			)

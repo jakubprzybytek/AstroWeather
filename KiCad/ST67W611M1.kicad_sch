@@ -144,155 +144,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "Device:Crystal_Small"
-			(pin_numbers
-				(hide yes)
-			)
-			(pin_names
-				(offset 1.016)
-				(hide yes)
-			)
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(property "Reference" "Y"
-				(at 0 2.54 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "Crystal_Small"
-				(at 0 -2.54 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" ""
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Datasheet" "~"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Description" "Two pin crystal, small symbol"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "ki_keywords" "quartz ceramic resonator oscillator"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "ki_fp_filters" "Crystal*"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(symbol "Crystal_Small_0_1"
-				(polyline
-					(pts
-						(xy -1.27 -0.762) (xy -1.27 0.762)
-					)
-					(stroke
-						(width 0.381)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(rectangle
-					(start -0.762 -1.524)
-					(end 0.762 1.524)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 -0.762) (xy 1.27 0.762)
-					)
-					(stroke
-						(width 0.381)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-			)
-			(symbol "Crystal_Small_1_1"
-				(pin passive line
-					(at -2.54 0 0)
-					(length 1.27)
-					(name "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 2.54 0 180)
-					(length 1.27)
-					(name "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "Device:R"
 			(pin_numbers
 				(hide yes)
@@ -1301,18 +1152,6 @@
 		)
 	)
 	(junction
-		(at 68.58 62.23)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "07f125dc-1958-4dbd-878f-1bbf7fdaca91")
-	)
-	(junction
-		(at 68.58 69.85)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "08ea00a1-c8a6-488e-b5c1-7d75b5b4cbdd")
-	)
-	(junction
 		(at 77.47 76.2)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -1364,16 +1203,6 @@
 	)
 	(wire
 		(pts
-			(xy 87.63 66.04) (xy 78.74 66.04)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "0a858b9e-e886-4da2-8114-0435edae2d5a")
-	)
-	(wire
-		(pts
 			(xy 119.38 69.85) (xy 127 69.85)
 		)
 		(stroke
@@ -1411,16 +1240,6 @@
 			(type default)
 		)
 		(uuid "225ae3a0-88c8-438d-aa2d-c0e72dcf0390")
-	)
-	(wire
-		(pts
-			(xy 57.15 62.23) (xy 58.42 62.23)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "26e766c4-1a46-4fbd-813d-926e9c54a44f")
 	)
 	(wire
 		(pts
@@ -1464,16 +1283,6 @@
 	)
 	(wire
 		(pts
-			(xy 68.58 68.58) (xy 68.58 69.85)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "545d18aa-0aa7-4bbe-948e-a8ababfffb8f")
-	)
-	(wire
-		(pts
 			(xy 35.56 41.91) (xy 30.48 41.91)
 		)
 		(stroke
@@ -1481,16 +1290,6 @@
 			(type default)
 		)
 		(uuid "575c2457-42dc-4c06-84cf-e26c1db656c6")
-	)
-	(wire
-		(pts
-			(xy 66.04 62.23) (xy 68.58 62.23)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "57647316-b4dc-4b04-81dc-11529b0fb387")
 	)
 	(wire
 		(pts
@@ -1561,16 +1360,6 @@
 			(type default)
 		)
 		(uuid "82926e27-9b9f-4649-963a-8092b951940f")
-	)
-	(wire
-		(pts
-			(xy 78.74 66.04) (xy 78.74 62.23)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "869219bf-4c77-4e46-b0b5-63c71951bd35")
 	)
 	(wire
 		(pts
@@ -1694,16 +1483,6 @@
 	)
 	(wire
 		(pts
-			(xy 57.15 69.85) (xy 58.42 69.85)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d3fa258b-4681-4fb3-9819-324c6a2e1daa")
-	)
-	(wire
-		(pts
 			(xy 86.36 80.01) (xy 87.63 80.01)
 		)
 		(stroke
@@ -1721,46 +1500,6 @@
 			(type default)
 		)
 		(uuid "da99c050-4d6b-4342-ac32-867517d3783d")
-	)
-	(wire
-		(pts
-			(xy 68.58 62.23) (xy 68.58 63.5)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "e19b0b8f-dae6-4852-9a3b-309e3d9d6e90")
-	)
-	(wire
-		(pts
-			(xy 66.04 69.85) (xy 68.58 69.85)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "f0a687d9-fcfc-4f5a-84f8-48288918ab23")
-	)
-	(wire
-		(pts
-			(xy 68.58 69.85) (xy 87.63 69.85)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "f0b2f562-b130-4c41-857c-22af04873047")
-	)
-	(wire
-		(pts
-			(xy 78.74 62.23) (xy 68.58 62.23)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "f2f283a6-d2a2-4987-8ed4-1b5b1af366c4")
 	)
 	(wire
 		(pts
@@ -1954,73 +1693,6 @@
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
 					(reference "#PWR0202")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 57.15 69.85 270)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "0e69e17a-d1c5-43be-a22f-5254c35463fc")
-		(property "Reference" "#PWR0209"
-			(at 50.8 69.85 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "GND"
-			(at 53.34 69.8499 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" ""
-			(at 57.15 69.85 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 57.15 69.85 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 57.15 69.85 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "cbf41d08-6383-4236-b139-fad593c41afe")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0209")
 					(unit 1)
 				)
 			)
@@ -2386,140 +2058,6 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 57.15 62.23 270)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "503b077e-ee11-41ff-ae59-68c1c1af0eda")
-		(property "Reference" "#PWR0208"
-			(at 50.8 62.23 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "GND"
-			(at 53.34 62.2299 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" ""
-			(at 57.15 62.23 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 57.15 62.23 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 57.15 62.23 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "dd53dd07-0e2e-47a2-b704-e2ef4ac13628")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "#PWR0208")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:C")
-		(at 62.23 69.85 90)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "53c7ad03-353d-426d-ad78-4c392095eab7")
-		(property "Reference" "C205"
-			(at 62.23 74.168 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "5p1"
-			(at 62.23 76.708 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
-			(at 66.04 68.8848 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 62.23 69.85 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Unpolarized capacitor"
-			(at 62.23 69.85 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "89e11055-1a0e-43f4-89d1-789e032ca0c7")
-		)
-		(pin "2"
-			(uuid "8aa70f17-35ce-468e-bd9d-91ae74e277a6")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "C205")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
 		(at 35.56 46.99 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -2781,74 +2319,6 @@
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
 					(reference "C206")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:C")
-		(at 62.23 62.23 90)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "824ccae8-2950-4b4b-a1bb-13e95e1ac6dc")
-		(property "Reference" "C204"
-			(at 62.23 54.61 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "5p1"
-			(at 62.23 57.15 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
-			(at 66.04 61.2648 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 62.23 62.23 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Unpolarized capacitor"
-			(at 62.23 62.23 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "74767aab-5f5e-4123-a8ef-20f202bc9cef")
-		)
-		(pin "2"
-			(uuid "d9719bb2-3575-4897-92e3-582221fb5034")
-		)
-		(instances
-			(project ""
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "C204")
 					(unit 1)
 				)
 			)
@@ -3253,76 +2723,6 @@
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
 					(reference "#PWR0203")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:Crystal_Small")
-		(at 68.58 66.04 270)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "cb7c7f7d-b063-4dc0-ae66-6ada5820819b")
-		(property "Reference" "Y201"
-			(at 71.12 64.7699 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "32.768k"
-			(at 71.12 67.3099 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Crystal:Crystal_SMD_7050-2Pin_7.0x5.0mm"
-			(at 68.58 66.04 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 68.58 66.04 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Two pin crystal, small symbol"
-			(at 68.58 66.04 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "1e6116c9-f0f2-4be6-96f2-4b032e58caeb")
-		)
-		(pin "1"
-			(uuid "5fc36a22-0a21-490d-9412-dfc61f074f8f")
-		)
-		(instances
-			(project ""
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/4e5845db-e9e3-4a64-a835-2e404d8331a5"
-					(reference "Y201")
 					(unit 1)
 				)
 			)
