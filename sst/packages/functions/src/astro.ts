@@ -8,14 +8,20 @@ const LOCATIONS = {
   }
 } as const;
 
+type LocationId = keyof typeof LOCATIONS;
+
 function toIsoOrNull(value?: Date) {
   return value ? value.toISOString() : null;
+}
+
+function isLocationId(value: string): value is LocationId {
+  return value in LOCATIONS;
 }
 
 export const handler = async (event: { pathParameters?: { configId?: string } }) => {
   const configId = event.pathParameters?.configId;
 
-  if (!configId || !(configId in LOCATIONS)) {
+  if (!configId || !isLocationId(configId)) {
     return {
       statusCode: 404,
       headers: {
@@ -27,7 +33,7 @@ export const handler = async (event: { pathParameters?: { configId?: string } })
     };
   }
 
-  const location = LOCATIONS[configId as keyof typeof LOCATIONS];
+  const location = LOCATIONS[configId];
   const now = new Date();
   const sunTimes = SunCalc.getTimes(now, location.latitude, location.longitude);
   const moonTimes = SunCalc.getMoonTimes(now, location.latitude, location.longitude);
