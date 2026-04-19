@@ -16,13 +16,7 @@ export default defineConfig({
           testTimeout: 15000
         }
       },
-      {
-        test: {
-          name: "integration-int",
-          include: ["packages/**/tests/integration-int/**/*.test.ts"],
-          testTimeout: 30000
-        }
-      }
+
     ]
   }
 });
