@@ -10,8 +10,12 @@ const LOCATIONS = {
 
 type LocationId = keyof typeof LOCATIONS;
 
-function toIsoOrNull(value?: Date) {
-  return value ? value.toISOString() : null;
+function toIsoOrNull(value?: Date | null) {
+  if (!value || Number.isNaN(value.getTime())) {
+    return null;
+  }
+
+  return value.toISOString();
 }
 
 function isLocationId(value: string): value is LocationId {
@@ -47,8 +51,8 @@ export const handler = async (event: { pathParameters?: { configId?: string } })
       configId,
       timezone: location.timezone,
       sun: {
-        rise: sunTimes.sunrise.toISOString(),
-        set: sunTimes.sunset.toISOString()
+        rise: toIsoOrNull(sunTimes.sunrise),
+        set: toIsoOrNull(sunTimes.sunset)
       },
       moon: {
         rise: toIsoOrNull(moonTimes.rise),
