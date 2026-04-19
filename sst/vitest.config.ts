@@ -18,8 +18,8 @@ export default defineConfig({
       },
       {
         test: {
-          name: "integration-live",
-          include: ["packages/**/tests/integration-live/**/*.test.ts"],
+          name: "integration-int",
+          include: ["packages/**/tests/integration-int/**/*.test.ts"],
           testTimeout: 30000
         }
       }

@@ -9,7 +9,7 @@
     "remove": "sst remove",
     "test": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
-    "test:integration:live": "vitest run --project integration-live",
+    "test:integration:int": "vitest run --project integration-int",
     "test:all": "vitest run"
   },
   "devDependencies": {
