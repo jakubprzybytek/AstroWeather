@@ -6,10 +6,15 @@
   "scripts": {
     "dev": "sst dev",
     "deploy": "sst deploy",
-    "remove": "sst remove"
+    "remove": "sst remove",
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:integration:live": "vitest run --project integration-live",
+    "test:all": "vitest run"
   },
   "devDependencies": {
-    "@types/suncalc": "^1.9.2"
+    "@types/suncalc": "^1.9.2",
+    "vitest": "^4.1.4"
   },
   "dependencies": {
     "sst": "^4.7.9",
