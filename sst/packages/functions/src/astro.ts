@@ -5,6 +5,11 @@ const LOCATIONS = {
     latitude: 50.0647,
     longitude: 19.945,
     timezone: "Europe/Warsaw"
+  },
+  "wroclaw": {
+    latitude: 51.1079,
+    longitude: 17.0385,
+    timezone: "Europe/Warsaw"
   }
 } as const;
 

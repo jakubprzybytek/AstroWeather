@@ -8,7 +8,7 @@
     "deploy": "sst deploy",
     "remove": "sst remove",
     "test": "vitest run --project unit",
-    "test:integration": "vitest run --project integration",
+    "test:integration": "sst shell -- vitest run --project integration",
     "test:all": "vitest run"
   },
   "devDependencies": {
