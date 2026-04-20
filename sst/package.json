@@ -1,0 +1,22 @@
+{
+  "name": "astroweather-sst",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "sst dev",
+    "deploy": "sst deploy",
+    "remove": "sst remove",
+    "test": "vitest run --project unit",
+    "test:integration": "sst shell -- vitest run --project integration",
+    "test:all": "vitest run"
+  },
+  "devDependencies": {
+    "@types/suncalc": "^1.9.2",
+    "vitest": "^4.1.4"
+  },
+  "dependencies": {
+    "sst": "^4.7.9",
+    "suncalc": "^1.9.0"
+  }
+}
