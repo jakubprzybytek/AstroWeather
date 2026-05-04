@@ -707,119 +707,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "EnvSensor-v2-rescue:+3.3V-power"
-			(power)
-			(pin_names
-				(offset 0)
-			)
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(property "Reference" "#PWR"
-				(at 0 -3.81 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Value" "+3.3V-power"
-				(at 0 3.556 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" ""
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Datasheet" ""
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Description" ""
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(symbol "+3.3V-power_0_1"
-				(polyline
-					(pts
-						(xy -0.762 1.27) (xy 0 2.54)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 0 2.54) (xy 0.762 1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 0 0) (xy 0 2.54)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-			)
-			(symbol "+3.3V-power_1_1"
-				(pin power_in line
-					(at 0 0 90)
-					(length 0)
-					(hide yes)
-					(name "+3V3"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "MCU_ST_STM32G0:STM32G0B1CETx"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -3448,6 +3335,16 @@
 	)
 	(wire
 		(pts
+			(xy 182.88 132.08) (xy 189.23 132.08)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "50f39574-9061-4450-bb29-c7fb4b1436ef")
+	)
+	(wire
+		(pts
 			(xy 62.23 153.67) (xy 62.23 151.13)
 		)
 		(stroke
@@ -3648,6 +3545,16 @@
 	)
 	(wire
 		(pts
+			(xy 182.88 124.46) (xy 189.23 124.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7592841b-1353-40cf-af76-048a24a74cee")
+	)
+	(wire
+		(pts
 			(xy 252.73 53.34) (xy 255.27 53.34)
 		)
 		(stroke
@@ -3705,6 +3612,16 @@
 			(type default)
 		)
 		(uuid "821f7c4a-e423-4c68-bdcc-8048b04d0ee7")
+	)
+	(wire
+		(pts
+			(xy 182.88 134.62) (xy 189.23 134.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "831d68b9-23f5-4d3f-a846-b9119d85ef68")
 	)
 	(wire
 		(pts
@@ -3965,6 +3882,16 @@
 			(type default)
 		)
 		(uuid "c08b8000-3392-4dd9-a256-253cdf9305c1")
+	)
+	(wire
+		(pts
+			(xy 121.92 91.44) (xy 127 91.44)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c362c19b-23dd-48fe-a20a-e53675d1e737")
 	)
 	(wire
 		(pts
@@ -4276,8 +4203,8 @@
 		)
 		(uuid "13db36dd-a7bb-40bc-95d5-6dc3cb5067a3")
 	)
-	(label "LED1"
-		(at 105.41 115.57 0)
+	(label "LED2"
+		(at 189.23 124.46 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4307,7 +4234,7 @@
 		(uuid "2804bab9-76ae-42a1-a0c9-709d8274c564")
 	)
 	(label "SWITCH_1"
-		(at 90.17 113.03 0)
+		(at 189.23 134.62 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4347,17 +4274,17 @@
 		(uuid "481fd413-3ad4-46da-9058-f0d6ad8858fb")
 	)
 	(label "LED1"
-		(at 105.41 113.03 0)
+		(at 121.92 91.44 180)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
-			(justify left bottom)
+			(justify right bottom)
 		)
 		(uuid "6a25dc69-6087-489f-91ef-17ec79364c03")
 	)
 	(label "SWITCH_2"
-		(at 90.17 116.84 0)
+		(at 189.23 132.08 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5952,6 +5879,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 26.67 127 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "700c4a90-c6f8-4847-b154-3680b0c420bd")
+		(property "Reference" "#PWR0313"
+			(at 26.67 130.81 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 26.67 121.92 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 26.67 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 26.67 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 26.67 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "b1aa57ed-4b1c-43f4-8635-28e56ea9f4d3")
+		)
+		(instances
+			(project "AstroWeather"
+				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
+					(reference "#PWR0313")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Switch:SW_Push")
 		(at 55.88 144.78 90)
 		(unit 1)
@@ -6424,6 +6417,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 55.88 127 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "9d8172fb-0d00-40fc-8d84-e9a7d22beb0f")
+		(property "Reference" "#PWR0315"
+			(at 55.88 130.81 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 55.88 121.92 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 55.88 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 55.88 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 55.88 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "0db78261-f42b-4022-8396-bec6e05720b9")
+		)
+		(instances
+			(project "AstroWeather"
+				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
+					(reference "#PWR0315")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Connector:TestPoint")
 		(at 209.55 104.14 0)
 		(unit 1)
@@ -6768,71 +6827,6 @@
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
 					(reference "R304")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "EnvSensor-v2-rescue:+3.3V-power")
-		(at 55.88 127 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "b6ad37ca-154c-40af-b77c-fc2a79e31edc")
-		(property "Reference" "#PWR0316"
-			(at 55.88 130.81 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "+3V3"
-			(at 56.261 122.6058 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 55.88 127 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 55.88 127 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 55.88 127 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "7d717343-cff7-405c-a417-cb5e56ffb27d")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
-					(reference "#PWR0316")
 					(unit 1)
 				)
 			)
@@ -7450,71 +7444,6 @@
 			(project ""
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
 					(reference "U301")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "EnvSensor-v2-rescue:+3.3V-power")
-		(at 26.67 127 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "daa5f112-2c19-497a-97d1-8bb533887f44")
-		(property "Reference" "#PWR0315"
-			(at 26.67 130.81 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "+3V3"
-			(at 27.051 122.6058 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 26.67 127 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 26.67 127 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 26.67 127 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "f65b19ea-5b65-4a35-a935-dec622989a67")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
-					(reference "#PWR0315")
 					(unit 1)
 				)
 			)
