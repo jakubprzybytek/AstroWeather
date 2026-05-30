@@ -1968,7 +1968,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Inductor_SMD:L_Wuerth_MAPI-4020"
+		(property "Footprint" "Inductor_SMD:L_Panasonic_PCC-M0630M"
 			(at 134.62 93.98 0)
 			(effects
 				(font
@@ -3516,7 +3516,6 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "e3245e6b-ec08-4af9-944c-c1d9f27372e6")
 		(property "Reference" "C602"
 			(at 73.66 95.2499 0)
@@ -3527,8 +3526,8 @@
 				(justify right)
 			)
 		)
-		(property "Value" "10u"
-			(at 73.66 97.7899 0)
+		(property "Value" "10u/35V"
+			(at 70.866 99.568 0)
 			(effects
 				(font
 					(size 1.27 1.27)

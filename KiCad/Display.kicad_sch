@@ -3969,6 +3969,16 @@
 		)
 		(uuid "d9974d1b-df17-4dea-9946-082c069efc7c")
 	)
+	(text "52 Leds * 4mA = 208mA"
+		(exclude_from_sim no)
+		(at 45.466 182.372 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "e0f40aef-78b0-4a59-bf64-29867b3c4590")
+	)
 	(junction
 		(at 62.23 111.76)
 		(diameter 0)
@@ -11475,7 +11485,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "05d11432-ac36-4691-8327-ef42f40688d5")
-		(property "Reference" "#PWR0505"
+		(property "Reference" "#PWR0504"
 			(at 102.87 78.74 0)
 			(effects
 				(font
@@ -11525,7 +11535,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0505")
+					(reference "#PWR0504")
 					(unit 1)
 				)
 			)
@@ -11540,7 +11550,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "05edebeb-fc81-4835-9841-e75d849d9b51")
-		(property "Reference" "R514"
+		(property "Reference" "R511"
 			(at 96.012 313.69 0)
 			(effects
 				(font
@@ -11594,7 +11604,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R514")
+					(reference "R511")
 					(unit 1)
 				)
 			)
@@ -11609,7 +11619,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "089b0e69-96d7-47b6-8211-01f525b979d2")
-		(property "Reference" "C508"
+		(property "Reference" "C507"
 			(at 110.49 251.968 0)
 			(effects
 				(font
@@ -11663,7 +11673,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "C508")
+					(reference "C507")
 					(unit 1)
 				)
 			)
@@ -11679,7 +11689,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "0b618ea3-66c7-4fe8-9f70-60eef017195f")
-		(property "Reference" "#PWR0531"
+		(property "Reference" "#PWR0529"
 			(at 66.04 326.39 0)
 			(effects
 				(font
@@ -11729,7 +11739,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0531")
+					(reference "#PWR0529")
 					(unit 1)
 				)
 			)
@@ -12066,7 +12076,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "1bc7e717-f323-4ee9-bfbd-41f5e05c21b7")
-		(property "Reference" "#PWR0533"
+		(property "Reference" "#PWR0528"
 			(at 124.46 314.96 0)
 			(effects
 				(font
@@ -12116,7 +12126,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0533")
+					(reference "#PWR0528")
 					(unit 1)
 				)
 			)
@@ -12201,7 +12211,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "26e55e20-9991-4d8b-9d54-017bf71eba4f")
-		(property "Reference" "#PWR0534"
+		(property "Reference" "#PWR0531"
 			(at 45.72 363.22 0)
 			(effects
 				(font
@@ -12251,7 +12261,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0534")
+					(reference "#PWR0531")
 					(unit 1)
 				)
 			)
@@ -12267,7 +12277,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "2944c066-5315-410f-af38-16133e7e6906")
-		(property "Reference" "#PWR0513"
+		(property "Reference" "#PWR0512"
 			(at 45.72 162.56 0)
 			(effects
 				(font
@@ -12317,7 +12327,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0513")
+					(reference "#PWR0512")
 					(unit 1)
 				)
 			)
@@ -12399,7 +12409,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "2b75c1f9-fbfa-4b61-a758-67cdf4d56d56")
-		(property "Reference" "#PWR0525"
+		(property "Reference" "#PWR0522"
 			(at 124.46 252.73 0)
 			(effects
 				(font
@@ -12449,7 +12459,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0525")
+					(reference "#PWR0522")
 					(unit 1)
 				)
 			)
@@ -12634,7 +12644,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "330b231d-f40f-4ad5-8d09-36fb279f421f")
-		(property "Reference" "#PWR0521"
+		(property "Reference" "#PWR0519"
 			(at 45.72 243.84 0)
 			(effects
 				(font
@@ -12684,7 +12694,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0521")
+					(reference "#PWR0519")
 					(unit 1)
 				)
 			)
@@ -12700,7 +12710,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "39c6256f-34e3-4754-bc9c-75081d96475b")
-		(property "Reference" "#PWR0504"
+		(property "Reference" "#PWR0505"
 			(at 218.44 86.36 0)
 			(effects
 				(font
@@ -12750,7 +12760,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0504")
+					(reference "#PWR0505")
 					(unit 1)
 				)
 			)
@@ -12831,7 +12841,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "3fbe8284-d53b-4eb5-8b6e-391adffeda01")
-		(property "Reference" "C505"
+		(property "Reference" "C506"
 			(at 110.49 177.292 0)
 			(effects
 				(font
@@ -12885,7 +12895,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "C505")
+					(reference "C506")
 					(unit 1)
 				)
 			)
@@ -13077,7 +13087,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "4ef79199-0adf-4d26-8307-f4b4f8382b21")
-		(property "Reference" "C506"
+		(property "Reference" "C505"
 			(at 110.49 169.418 0)
 			(effects
 				(font
@@ -13131,7 +13141,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "C506")
+					(reference "C505")
 					(unit 1)
 				)
 			)
@@ -13147,7 +13157,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5226dc4a-79a7-4016-9e2b-10373716bdcb")
-		(property "Reference" "#PWR0524"
+		(property "Reference" "#PWR0523"
 			(at 124.46 260.35 0)
 			(effects
 				(font
@@ -13197,7 +13207,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0524")
+					(reference "#PWR0523")
 					(unit 1)
 				)
 			)
@@ -13283,7 +13293,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5708a6ce-a4e6-44c3-88b7-e64175b126f5")
-		(property "Reference" "R513"
+		(property "Reference" "R510"
 			(at 68.58 312.4199 0)
 			(effects
 				(font
@@ -13337,7 +13347,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R513")
+					(reference "R510")
 					(unit 1)
 				)
 			)
@@ -13454,7 +13464,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5ffe396e-870e-47a7-837f-6a57a6a23210")
-		(property "Reference" "#PWR0517"
+		(property "Reference" "#PWR0515"
 			(at 124.46 170.18 0)
 			(effects
 				(font
@@ -13504,7 +13514,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0517")
+					(reference "#PWR0515")
 					(unit 1)
 				)
 			)
@@ -13520,7 +13530,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "60b706be-ddb2-4459-95f0-9155352cf44b")
-		(property "Reference" "R508"
+		(property "Reference" "R506"
 			(at 57.15 228.6 90)
 			(effects
 				(font
@@ -13572,7 +13582,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R508")
+					(reference "R506")
 					(unit 1)
 				)
 			)
@@ -13825,7 +13835,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "6d74cc21-026a-42c0-9c5a-b8ef5186a946")
-		(property "Reference" "R517"
+		(property "Reference" "R513"
 			(at 68.58 386.0799 0)
 			(effects
 				(font
@@ -13879,7 +13889,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R517")
+					(reference "R513")
 					(unit 1)
 				)
 			)
@@ -13961,7 +13971,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "727217a6-1489-4d99-bf80-923250f48735")
-		(property "Reference" "#PWR0523"
+		(property "Reference" "#PWR0521"
 			(at 66.04 256.54 0)
 			(effects
 				(font
@@ -14011,7 +14021,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0523")
+					(reference "#PWR0521")
 					(unit 1)
 				)
 			)
@@ -14125,7 +14135,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "7c58cfba-b8a4-4600-908d-f34d95b2d1d2")
-		(property "Reference" "#PWR0520"
+		(property "Reference" "#PWR0518"
 			(at 102.87 238.76 0)
 			(effects
 				(font
@@ -14175,7 +14185,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0520")
+					(reference "#PWR0518")
 					(unit 1)
 				)
 			)
@@ -14394,7 +14404,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "7d6d0f66-1a0a-497e-be7b-f940e89ae7e6")
-		(property "Reference" "C510"
+		(property "Reference" "C509"
 			(at 110.49 314.198 0)
 			(effects
 				(font
@@ -14448,7 +14458,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "C510")
+					(reference "C509")
 					(unit 1)
 				)
 			)
@@ -14530,7 +14540,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "803c0b4d-ff71-4f06-b504-58e6ce2a26e1")
-		(property "Reference" "#PWR0538"
+		(property "Reference" "#PWR0534"
 			(at 66.04 400.05 0)
 			(effects
 				(font
@@ -14580,7 +14590,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0538")
+					(reference "#PWR0534")
 					(unit 1)
 				)
 			)
@@ -14596,7 +14606,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "81c05899-f3a3-4578-a141-ada6668e5226")
-		(property "Reference" "#PWR0529"
+		(property "Reference" "#PWR0526"
 			(at 45.72 313.69 0)
 			(effects
 				(font
@@ -14646,7 +14656,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0529")
+					(reference "#PWR0526")
 					(unit 1)
 				)
 			)
@@ -14797,7 +14807,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "8c06f10f-6f4c-4c19-8595-7f4621093778")
-		(property "Reference" "#PWR0522"
+		(property "Reference" "#PWR0520"
 			(at 102.87 250.19 0)
 			(effects
 				(font
@@ -14847,7 +14857,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0522")
+					(reference "#PWR0520")
 					(unit 1)
 				)
 			)
@@ -14863,7 +14873,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "8fd22ba0-bee5-49b6-96df-67e7c5976250")
-		(property "Reference" "#PWR0518"
+		(property "Reference" "#PWR0517"
 			(at 45.72 219.71 0)
 			(effects
 				(font
@@ -14913,7 +14923,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0518")
+					(reference "#PWR0517")
 					(unit 1)
 				)
 			)
@@ -15023,7 +15033,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "9243237e-3798-4c51-920d-aaf04d514b58")
-		(property "Reference" "R504"
+		(property "Reference" "R503"
 			(at 57.15 147.32 90)
 			(effects
 				(font
@@ -15075,7 +15085,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R504")
+					(reference "R503")
 					(unit 1)
 				)
 			)
@@ -15265,7 +15275,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "9ffefdf1-386f-4024-b011-de44044689cd")
-		(property "Reference" "C507"
+		(property "Reference" "C508"
 			(at 110.49 259.842 0)
 			(effects
 				(font
@@ -15319,7 +15329,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "C507")
+					(reference "C508")
 					(unit 1)
 				)
 			)
@@ -15335,7 +15345,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a134bc8b-7802-4aed-b2ee-76fb2ad43d96")
-		(property "Reference" "R509"
+		(property "Reference" "R507"
 			(at 68.58 242.5699 0)
 			(effects
 				(font
@@ -15389,7 +15399,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R509")
+					(reference "R507")
 					(unit 1)
 				)
 			)
@@ -15405,7 +15415,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a29ab2fa-28a3-4dad-b3d3-867612533f12")
-		(property "Reference" "R512"
+		(property "Reference" "R509"
 			(at 57.15 298.45 90)
 			(effects
 				(font
@@ -15457,7 +15467,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R512")
+					(reference "R509")
 					(unit 1)
 				)
 			)
@@ -15538,7 +15548,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "a7a2b184-6003-47a1-be84-2e674b56b4d5")
-		(property "Reference" "R505"
+		(property "Reference" "R504"
 			(at 68.58 160.0199 0)
 			(effects
 				(font
@@ -15592,7 +15602,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R505")
+					(reference "R504")
 					(unit 1)
 				)
 			)
@@ -15608,7 +15618,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a87533e6-6190-4b05-a331-704e009f9e4b")
-		(property "Reference" "#PWR0536"
+		(property "Reference" "#PWR0532"
 			(at 102.87 382.27 0)
 			(effects
 				(font
@@ -15658,7 +15668,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0536")
+					(reference "#PWR0532")
 					(unit 1)
 				)
 			)
@@ -15842,7 +15852,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "b0dfa789-ff44-4406-97ef-0df2886963e7")
-		(property "Reference" "#PWR0514"
+		(property "Reference" "#PWR0513"
 			(at 102.87 168.91 0)
 			(effects
 				(font
@@ -15892,7 +15902,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0514")
+					(reference "#PWR0513")
 					(unit 1)
 				)
 			)
@@ -15908,7 +15918,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "b3689b2f-4d43-49e6-8339-5eddebc32f1b")
-		(property "Reference" "#PWR0530"
+		(property "Reference" "#PWR0527"
 			(at 102.87 312.42 0)
 			(effects
 				(font
@@ -15958,7 +15968,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0530")
+					(reference "#PWR0527")
 					(unit 1)
 				)
 			)
@@ -16108,7 +16118,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "bcdc7c5b-0aae-4111-b70e-7f2b9200d63f")
-		(property "Reference" "C509"
+		(property "Reference" "C510"
 			(at 110.49 322.072 0)
 			(effects
 				(font
@@ -16162,7 +16172,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "C509")
+					(reference "C510")
 					(unit 1)
 				)
 			)
@@ -16178,7 +16188,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "bd16d679-aed7-4bf7-924f-4b960e204c15")
-		(property "Reference" "#PWR0527"
+		(property "Reference" "#PWR0525"
 			(at 102.87 299.72 0)
 			(effects
 				(font
@@ -16228,7 +16238,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0527")
+					(reference "#PWR0525")
 					(unit 1)
 				)
 			)
@@ -16310,7 +16320,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "be9ec718-aaa4-4c58-ae6b-107d0d6f96a1")
-		(property "Reference" "R506"
+		(property "Reference" "R505"
 			(at 96.012 170.18 0)
 			(effects
 				(font
@@ -16364,7 +16374,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R506")
+					(reference "R505")
 					(unit 1)
 				)
 			)
@@ -16447,7 +16457,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "c1e8a6f9-7c1f-4b41-bd7a-1dc4bc0029e8")
-		(property "Reference" "#PWR0537"
+		(property "Reference" "#PWR0533"
 			(at 45.72 387.35 0)
 			(effects
 				(font
@@ -16497,7 +16507,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0537")
+					(reference "#PWR0533")
 					(unit 1)
 				)
 			)
@@ -16588,7 +16598,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "c6dbee43-e665-417b-9c57-86cc2a1a84fa")
-		(property "Reference" "R510"
+		(property "Reference" "R508"
 			(at 96.012 251.46 0)
 			(effects
 				(font
@@ -16642,7 +16652,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R510")
+					(reference "R508")
 					(unit 1)
 				)
 			)
@@ -16752,7 +16762,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "d31f11a5-cadb-4207-93fc-c45f8e32558b")
-		(property "Reference" "#PWR0532"
+		(property "Reference" "#PWR0530"
 			(at 124.46 322.58 0)
 			(effects
 				(font
@@ -16802,7 +16812,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0532")
+					(reference "#PWR0530")
 					(unit 1)
 				)
 			)
@@ -16818,7 +16828,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "e26e75a7-61c0-469e-9d04-7f1e735c5808")
-		(property "Reference" "#PWR0512"
+		(property "Reference" "#PWR0511"
 			(at 102.87 157.48 0)
 			(effects
 				(font
@@ -16868,7 +16878,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0512")
+					(reference "#PWR0511")
 					(unit 1)
 				)
 			)
@@ -17172,7 +17182,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "ed16c36e-fd5c-473c-b269-4f360cfe3c74")
-		(property "Reference" "#PWR0526"
+		(property "Reference" "#PWR0524"
 			(at 45.72 289.56 0)
 			(effects
 				(font
@@ -17222,7 +17232,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0526")
+					(reference "#PWR0524")
 					(unit 1)
 				)
 			)
@@ -17408,7 +17418,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f3ce0450-ee6b-4400-a9c8-4b5a1838d3a0")
-		(property "Reference" "R516"
+		(property "Reference" "R512"
 			(at 57.15 372.11 90)
 			(effects
 				(font
@@ -17460,7 +17470,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "R516")
+					(reference "R512")
 					(unit 1)
 				)
 			)
@@ -17476,7 +17486,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f9d9bec0-af48-4188-9fc8-3c20edf4f6b8")
-		(property "Reference" "#PWR0515"
+		(property "Reference" "#PWR0514"
 			(at 66.04 172.72 0)
 			(effects
 				(font
@@ -17526,7 +17536,7 @@
 		(instances
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d40768ac-029c-4883-87fe-7ced274514bd"
-					(reference "#PWR0515")
+					(reference "#PWR0514")
 					(unit 1)
 				)
 			)
