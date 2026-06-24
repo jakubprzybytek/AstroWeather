@@ -1329,7 +1329,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "IRLML2502"
+		(property "Value" "Si2374DS"
 			(at 95.504 81.788 0)
 			(effects
 				(font

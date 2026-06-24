@@ -3948,14 +3948,14 @@
 		)
 		(uuid "01d34659-8f9f-4623-956a-c6fbcdbaf910")
 	)
-	(text "Voltage on SCT\nVout ~ 1V"
+	(text "Voltage on SCT\nVout ~ 1V\n\nIled: 0.2-4mA\nLEDs on (max) 4*8+3*7=53\nIled(max): 53*4mA = 212mA"
 		(exclude_from_sim no)
-		(at 132.842 107.188 0)
+		(at 142.24 81.28 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
-			(justify left)
+			(justify left top)
 		)
 		(uuid "8686d39f-5360-441c-ab38-22b8670ed5c2")
 	)
@@ -11764,7 +11764,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "Si2365EDS"
+		(property "Value" "Si2333DDS"
 			(at 214.63 101.5999 0)
 			(effects
 				(font
@@ -13021,7 +13021,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "Si2365EDS"
+		(property "Value" "Si2333DDS"
 			(at 255.27 132.0799 0)
 			(effects
 				(font
@@ -15993,7 +15993,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "SCT2024"
+		(property "Value" "SCT2024CSSG"
 			(at 104.8386 102.87 0)
 			(effects
 				(font
@@ -16532,7 +16532,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "Si2365EDS"
+		(property "Value" "Si2333DDS"
 			(at 245.11 124.4599 0)
 			(effects
 				(font
@@ -16972,7 +16972,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "Si2365EDS"
+		(property "Value" "Si2333DDS"
 			(at 224.79 109.2199 0)
 			(effects
 				(font
@@ -17257,7 +17257,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "Si2365EDS"
+		(property "Value" "Si2333DDS"
 			(at 234.95 116.8399 0)
 			(effects
 				(font

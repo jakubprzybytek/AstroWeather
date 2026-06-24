@@ -1231,7 +1231,7 @@
 		(uuid "cfa0f820-094b-4f19-8856-33ac4e72c5e3")
 	)
 	(junction
-		(at 77.47 91.44)
+		(at 81.28 91.44)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "48202074-d944-4437-9932-fa9819d1efdd")
@@ -1279,7 +1279,7 @@
 		(uuid "974af954-4aac-4a45-aec3-c995f9906ebd")
 	)
 	(junction
-		(at 62.23 91.44)
+		(at 69.85 91.44)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "a4f1fc69-3c61-4022-86d1-976a21af7abf")
@@ -1370,7 +1370,7 @@
 	)
 	(wire
 		(pts
-			(xy 77.47 91.44) (xy 92.71 91.44)
+			(xy 81.28 91.44) (xy 92.71 91.44)
 		)
 		(stroke
 			(width 0)
@@ -1390,7 +1390,7 @@
 	)
 	(wire
 		(pts
-			(xy 62.23 91.44) (xy 77.47 91.44)
+			(xy 69.85 91.44) (xy 81.28 91.44)
 		)
 		(stroke
 			(width 0)
@@ -1450,7 +1450,7 @@
 	)
 	(wire
 		(pts
-			(xy 77.47 92.71) (xy 77.47 91.44)
+			(xy 81.28 92.71) (xy 81.28 91.44)
 		)
 		(stroke
 			(width 0)
@@ -1460,7 +1460,7 @@
 	)
 	(wire
 		(pts
-			(xy 62.23 100.33) (xy 62.23 101.6)
+			(xy 69.85 100.33) (xy 69.85 101.6)
 		)
 		(stroke
 			(width 0)
@@ -1570,7 +1570,7 @@
 	)
 	(wire
 		(pts
-			(xy 62.23 92.71) (xy 62.23 91.44)
+			(xy 69.85 92.71) (xy 69.85 91.44)
 		)
 		(stroke
 			(width 0)
@@ -1640,7 +1640,7 @@
 	)
 	(wire
 		(pts
-			(xy 77.47 100.33) (xy 77.47 101.6)
+			(xy 81.28 100.33) (xy 81.28 101.6)
 		)
 		(stroke
 			(width 0)
@@ -1670,7 +1670,7 @@
 	)
 	(wire
 		(pts
-			(xy 57.15 91.44) (xy 57.15 90.17)
+			(xy 64.77 91.44) (xy 64.77 90.17)
 		)
 		(stroke
 			(width 0)
@@ -1710,7 +1710,7 @@
 	)
 	(wire
 		(pts
-			(xy 57.15 91.44) (xy 62.23 91.44)
+			(xy 64.77 91.44) (xy 69.85 91.44)
 		)
 		(stroke
 			(width 0)
@@ -1960,7 +1960,7 @@
 				)
 			)
 		)
-		(property "Value" "SRR6038-33u"
+		(property "Value" "6u8"
 			(at 134.62 91.44 90)
 			(effects
 				(font
@@ -1968,7 +1968,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Inductor_SMD:L_Bourns_SRP7028A_7.3x6.6mm"
+		(property "Footprint" "Inductor_SMD:L_Panasonic_PCC-M0630M"
 			(at 134.62 93.98 0)
 			(effects
 				(font
@@ -2908,7 +2908,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 62.23 101.6 0)
+		(at 69.85 101.6 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -2917,7 +2917,7 @@
 		(fields_autoplaced yes)
 		(uuid "7e6c4b5e-1cb4-4e66-a2dc-5fce30fadbfe")
 		(property "Reference" "#PWR0606"
-			(at 62.23 107.95 0)
+			(at 69.85 107.95 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2926,7 +2926,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 62.23 106.68 0)
+			(at 69.85 106.68 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2934,7 +2934,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 62.23 101.6 0)
+			(at 69.85 101.6 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2943,7 +2943,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 62.23 101.6 0)
+			(at 69.85 101.6 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2952,7 +2952,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 62.23 101.6 0)
+			(at 69.85 101.6 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3242,7 +3242,7 @@
 	)
 	(symbol
 		(lib_id "power:VDD")
-		(at 57.15 90.17 0)
+		(at 64.77 90.17 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -3251,7 +3251,7 @@
 		(fields_autoplaced yes)
 		(uuid "ba226ca0-0c38-4e08-bd47-08fd12bdc8cb")
 		(property "Reference" "#PWR0604"
-			(at 57.15 93.98 0)
+			(at 64.77 93.98 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3260,7 +3260,7 @@
 			)
 		)
 		(property "Value" "VDD"
-			(at 57.15 85.09 0)
+			(at 64.77 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3268,7 +3268,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 57.15 90.17 0)
+			(at 64.77 90.17 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3277,7 +3277,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 57.15 90.17 0)
+			(at 64.77 90.17 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3286,7 +3286,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"VDD\""
-			(at 57.15 90.17 0)
+			(at 64.77 90.17 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3374,7 +3374,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 77.47 101.6 0)
+		(at 81.28 101.6 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -3383,7 +3383,7 @@
 		(fields_autoplaced yes)
 		(uuid "cadb9c4e-b1ec-44bf-a881-4aad81cef118")
 		(property "Reference" "#PWR0607"
-			(at 77.47 107.95 0)
+			(at 81.28 107.95 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3392,7 +3392,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 77.47 106.68 0)
+			(at 81.28 106.68 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3400,7 +3400,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 77.47 101.6 0)
+			(at 81.28 101.6 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3409,7 +3409,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 77.47 101.6 0)
+			(at 81.28 101.6 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3418,7 +3418,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 77.47 101.6 0)
+			(at 81.28 101.6 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3510,7 +3510,7 @@
 	)
 	(symbol
 		(lib_id "Device:C")
-		(at 62.23 96.52 180)
+		(at 69.85 96.52 180)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -3518,7 +3518,7 @@
 		(dnp no)
 		(uuid "e3245e6b-ec08-4af9-944c-c1d9f27372e6")
 		(property "Reference" "C602"
-			(at 66.04 95.2499 0)
+			(at 73.66 95.2499 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3527,7 +3527,7 @@
 			)
 		)
 		(property "Value" "10u/35V"
-			(at 63.246 99.568 0)
+			(at 70.866 99.568 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3536,7 +3536,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
-			(at 61.2648 92.71 0)
+			(at 68.8848 92.71 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3545,7 +3545,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 62.23 96.52 0)
+			(at 69.85 96.52 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3554,7 +3554,7 @@
 			)
 		)
 		(property "Description" "Unpolarized capacitor"
-			(at 62.23 96.52 0)
+			(at 69.85 96.52 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3649,15 +3649,16 @@
 	)
 	(symbol
 		(lib_id "Device:C")
-		(at 77.47 96.52 0)
+		(at 81.28 96.52 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
+		(fields_autoplaced yes)
 		(uuid "f4ba1a20-8a55-4ae6-8110-406f0b2bd4a6")
 		(property "Reference" "C603"
-			(at 81.28 95.2499 0)
+			(at 85.09 95.2499 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3665,8 +3666,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "100n/35V"
-			(at 78.74 99.822 0)
+		(property "Value" "100n"
+			(at 85.09 97.7899 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3675,7 +3676,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
-			(at 78.4352 100.33 0)
+			(at 82.2452 100.33 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3684,7 +3685,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 77.47 96.52 0)
+			(at 81.28 96.52 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3693,7 +3694,7 @@
 			)
 		)
 		(property "Description" "Unpolarized capacitor"
-			(at 77.47 96.52 0)
+			(at 81.28 96.52 0)
 			(effects
 				(font
 					(size 1.27 1.27)

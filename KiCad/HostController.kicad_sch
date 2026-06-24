@@ -251,10 +251,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "Device:Crystal_Small"
-			(pin_numbers
-				(hide yes)
-			)
+		(symbol "Device:Crystal_GND24_Small"
 			(pin_names
 				(offset 1.016)
 				(hide yes)
@@ -263,19 +260,21 @@
 			(in_bom yes)
 			(on_board yes)
 			(property "Reference" "Y"
-				(at 0 2.54 0)
+				(at 1.27 4.445 0)
 				(effects
 					(font
 						(size 1.27 1.27)
 					)
+					(justify left)
 				)
 			)
-			(property "Value" "Crystal_Small"
-				(at 0 -2.54 0)
+			(property "Value" "Crystal_GND24_Small"
+				(at 1.27 2.54 0)
 				(effects
 					(font
 						(size 1.27 1.27)
 					)
+					(justify left)
 				)
 			)
 			(property "Footprint" ""
@@ -296,8 +295,28 @@
 					(hide yes)
 				)
 			)
-			(property "Description" "Two pin crystal, small symbol"
+			(property "Description" "Four pin crystal, GND on pins 2 and 4, small symbol"
 				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property private "KLC_S3.3" "The rectangle is not a symbol body but a graphical element"
+				(at 0 -10.16 0)
+				(show_name)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property private "KLC_S4.1" "Some pins are on 50mil grid to make the symbol small"
+				(at 0 -12.7 0)
+				(show_name)
 				(effects
 					(font
 						(size 1.27 1.27)
@@ -323,13 +342,37 @@
 					(hide yes)
 				)
 			)
-			(symbol "Crystal_Small_0_1"
+			(symbol "Crystal_GND24_Small_0_1"
+				(polyline
+					(pts
+						(xy -1.27 1.27) (xy -1.27 1.905) (xy 1.27 1.905) (xy 1.27 1.27)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
 				(polyline
 					(pts
 						(xy -1.27 -0.762) (xy -1.27 0.762)
 					)
 					(stroke
 						(width 0.381)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.27 -1.27) (xy -1.27 -1.905) (xy 1.27 -1.905) (xy 1.27 -1.27)
+					)
+					(stroke
+						(width 0)
 						(type default)
 					)
 					(fill
@@ -360,7 +403,7 @@
 					)
 				)
 			)
-			(symbol "Crystal_Small_1_1"
+			(symbol "Crystal_GND24_Small_1_1"
 				(pin passive line
 					(at -2.54 0 0)
 					(length 1.27)
@@ -374,15 +417,15 @@
 					(number "1"
 						(effects
 							(font
-								(size 1.27 1.27)
+								(size 0.762 0.762)
 							)
 						)
 					)
 				)
 				(pin passive line
-					(at 2.54 0 180)
-					(length 1.27)
-					(name "2"
+					(at 0 -2.54 90)
+					(length 0.635)
+					(name "G"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -392,7 +435,44 @@
 					(number "2"
 						(effects
 							(font
+								(size 0.762 0.762)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -2.54 90)
+					(length 0.635)
+					(hide yes)
+					(name "G"
+						(effects
+							(font
 								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 0.762 0.762)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 2.54 0 180)
+					(length 1.27)
+					(name "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 0.762 0.762)
 							)
 						)
 					)
@@ -2912,6 +2992,12 @@
 		(uuid "3fda7179-a446-4dfe-b227-b352e9394abd")
 	)
 	(junction
+		(at 76.2 59.69)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "46026b17-100e-4e52-bcfb-b798e2c86e17")
+	)
+	(junction
 		(at 157.48 48.26)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -3255,6 +3341,16 @@
 	)
 	(wire
 		(pts
+			(xy 76.2 66.04) (xy 76.2 59.69)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "411b14d0-c94c-47fd-b556-0aadcc9cccdd")
+	)
+	(wire
+		(pts
 			(xy 182.88 106.68) (xy 209.55 106.68)
 		)
 		(stroke
@@ -3385,7 +3481,7 @@
 	)
 	(wire
 		(pts
-			(xy 76.2 69.85) (xy 95.25 69.85)
+			(xy 91.44 69.85) (xy 95.25 69.85)
 		)
 		(stroke
 			(width 0)
@@ -3472,6 +3568,16 @@
 			(type default)
 		)
 		(uuid "6a6bf974-a41d-4a2c-8360-c11c03b15122")
+	)
+	(wire
+		(pts
+			(xy 76.2 54.61) (xy 76.2 59.69)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6ba8f4c2-5453-4395-9425-df2eac3aed28")
 	)
 	(wire
 		(pts
@@ -3732,6 +3838,26 @@
 			(type default)
 		)
 		(uuid "9489113f-2a97-4ac3-927f-c239e3029d9a")
+	)
+	(wire
+		(pts
+			(xy 74.93 59.69) (xy 76.2 59.69)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "965032ea-30ee-4380-b5d7-e4a4e05f0fc8")
+	)
+	(wire
+		(pts
+			(xy 76.2 59.69) (xy 85.09 59.69)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9b412031-39b4-45a0-8af4-ccbbfb1f5027")
 	)
 	(wire
 		(pts
@@ -4814,7 +4940,7 @@
 	)
 	(hierarchical_label "NRST"
 		(shape input)
-		(at 76.2 69.85 180)
+		(at 91.44 69.85 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5625,7 +5751,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "100n"
+		(property "Value" "1u"
 			(at 242.57 90.1699 0)
 			(effects
 				(font
@@ -5737,76 +5863,6 @@
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
 					(reference "#PWR0320")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:Crystal_Small")
-		(at 87.63 59.69 90)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "31ae2300-546c-4baf-90d0-ebd286f69e1c")
-		(property "Reference" "Y301"
-			(at 90.17 58.4199 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Value" "24M"
-			(at 90.17 60.9599 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" "Crystal:Crystal_SMD_Abracon_ABM3-2Pin_5.0x3.2mm"
-			(at 87.63 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 87.63 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Two pin crystal, small symbol"
-			(at 87.63 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "7419cbd6-7fee-462a-b7d3-d7122a7e4343")
-		)
-		(pin "1"
-			(uuid "f1b05dd8-2ca7-4923-bc0d-7f27db7b0967")
-		)
-		(instances
-			(project ""
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
-					(reference "Y301")
 					(unit 1)
 				)
 			)
@@ -6353,6 +6409,102 @@
 			(project "AstroWeather"
 				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
 					(reference "R309")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:Crystal_GND24_Small")
+		(at 87.63 59.69 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "6165e052-ea03-4e4c-b79d-16c70cd8ec36")
+		(property "Reference" "Y301"
+			(at 90.17 58.4199 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Crystal_GND24_Small"
+			(at 90.17 60.9599 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Crystal:Crystal_SMD_Abracon_ABM3B-4Pin_5.0x3.2mm"
+			(at 87.63 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 87.63 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Four pin crystal, GND on pins 2 and 4, small symbol"
+			(at 87.63 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property private "KLC_S3.3" "The rectangle is not a symbol body but a graphical element"
+			(at 77.47 59.69 0)
+			(show_name yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property private "KLC_S4.1" "Some pins are on 50mil grid to make the symbol small"
+			(at 74.93 59.69 0)
+			(show_name yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "4"
+			(uuid "8adbf716-89ee-4f39-9463-cf264f418f04")
+		)
+		(pin "1"
+			(uuid "d1441c87-79d2-4d5d-bb6e-ef93f183f2bf")
+		)
+		(pin "3"
+			(uuid "e19e315a-e713-4d16-88c4-8e473e24b89c")
+		)
+		(pin "2"
+			(uuid "ba0cf917-4729-4771-a92f-9941e67a342f")
+		)
+		(instances
+			(project ""
+				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
+					(reference "Y301")
 					(unit 1)
 				)
 			)
@@ -7180,7 +7332,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "100n"
+		(property "Value" "1u"
 			(at 251.46 111.7599 0)
 			(effects
 				(font
@@ -7589,15 +7741,15 @@
 		(dnp no)
 		(uuid "ba4113fa-940a-4b93-a77f-6f18e0d23c83")
 		(property "Reference" "C304"
-			(at 81.28 58.42 90)
+			(at 81.28 72.136 90)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Value" "10p"
-			(at 81.28 60.96 90)
+		(property "Value" "20p"
+			(at 81.28 69.85 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7713,73 +7865,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:GND")
-		(at 76.2 66.04 270)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "c45ea566-7455-49f9-9ba0-1db74df68cb7")
-		(property "Reference" "#PWR0312"
-			(at 69.85 66.04 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "GND"
-			(at 72.39 66.0399 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" ""
-			(at 76.2 66.04 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 76.2 66.04 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 76.2 66.04 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "1a5e9b2c-50a1-4773-be91-d2228a438474")
-		)
-		(instances
-			(project "AstroWeather"
-				(path "/8561283c-f5b3-4542-8880-7f435c3a9f7c/d62dd27e-49e2-449e-88dd-01d5559c6bc2"
-					(reference "#PWR0312")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:C")
 		(at 81.28 54.61 90)
 		(unit 1)
@@ -7797,7 +7882,7 @@
 				)
 			)
 		)
-		(property "Value" "10p"
+		(property "Value" "20p"
 			(at 81.28 49.53 90)
 			(effects
 				(font
@@ -8215,7 +8300,7 @@
 				)
 			)
 		)
-		(property "Value" "?"
+		(property "Value" "100k"
 			(at 254 100.33 90)
 			(effects
 				(font
@@ -8332,7 +8417,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 76.2 54.61 270)
+		(at 74.93 59.69 270)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -8341,7 +8426,7 @@
 		(fields_autoplaced yes)
 		(uuid "dc5f6536-34a5-461e-853b-98b32d27dd9c")
 		(property "Reference" "#PWR0309"
-			(at 69.85 54.61 0)
+			(at 68.58 59.69 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8350,7 +8435,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 72.39 54.6099 90)
+			(at 71.12 59.6899 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8359,7 +8444,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 76.2 54.61 0)
+			(at 74.93 59.69 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8368,7 +8453,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 76.2 54.61 0)
+			(at 74.93 59.69 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8377,7 +8462,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 76.2 54.61 0)
+			(at 74.93 59.69 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8547,7 +8632,7 @@
 				)
 			)
 		)
-		(property "Value" "?"
+		(property "Value" "100k"
 			(at 245.11 78.74 90)
 			(effects
 				(font
