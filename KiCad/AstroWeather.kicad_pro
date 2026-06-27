@@ -511,9 +511,19 @@
       },
       {
         "clearance": 0.2,
+        "name": "HighSpeed",
+        "pcb_color": "rgb(255, 0, 241)",
+        "priority": 0,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.25,
+        "via_diameter": 0.7,
+        "via_drill": 0.4
+      },
+      {
+        "clearance": 0.2,
         "name": "Power150",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 0,
+        "priority": 1,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 1.0,
         "via_diameter": 1.4,
@@ -523,7 +533,7 @@
         "clearance": 0.2,
         "name": "Power40",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 1,
+        "priority": 2,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 0.5,
         "via_diameter": 0.9,
@@ -533,7 +543,7 @@
         "clearance": 0.2,
         "name": "Power5",
         "pcb_color": "rgb(255, 245, 109)",
-        "priority": 2,
+        "priority": 3,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 0.3,
         "via_diameter": 0.8,
@@ -597,6 +607,46 @@
       {
         "netclass": "Power150",
         "pattern": "*VOLTAGE_SENSE"
+      },
+      {
+        "netclass": "HighSpeed",
+        "pattern": "*MISO"
+      },
+      {
+        "netclass": "HighSpeed",
+        "pattern": "*MOSI"
+      },
+      {
+        "netclass": "HighSpeed",
+        "pattern": "*RX"
+      },
+      {
+        "netclass": "HighSpeed",
+        "pattern": "*TX"
+      },
+      {
+        "netclass": "HighSpeed",
+        "pattern": "*SCL"
+      },
+      {
+        "netclass": "HighSpeed",
+        "pattern": "*SDA"
+      },
+      {
+        "netclass": "HighSpeed",
+        "pattern": "*CLK*"
+      },
+      {
+        "netclass": "HighSpeed",
+        "pattern": "*SWDIO"
+      },
+      {
+        "netclass": "HighSpeed",
+        "pattern": "*SDI"
+      },
+      {
+        "netclass": "HighSpeed",
+        "pattern": "*SDO"
       }
     ]
   },
@@ -605,7 +655,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "",
+      "plot": "./",
       "pos_files": "",
       "specctra_dsn": "",
       "step": "",
