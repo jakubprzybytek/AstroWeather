@@ -4084,6 +4084,16 @@
 		)
 		(uuid "fd9c1d2d-f4bc-4d8e-8b1a-ca33d52ac8d0")
 	)
+	(label "VBUS_IN"
+		(at 156.21 193.04 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "9816e9ee-20de-421c-8012-b98ed4dce041")
+	)
 	(symbol
 		(lib_id "power:GND")
 		(at 147.32 83.82 90)
