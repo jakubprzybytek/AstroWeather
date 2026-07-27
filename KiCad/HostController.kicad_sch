@@ -2973,6 +2973,16 @@
 			(embedded_fonts no)
 		)
 	)
+	(text "25.07.2026 - 22p"
+		(exclude_from_sim no)
+		(at 81.534 42.418 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "94e8b500-9457-4126-8ce4-21c8cdf202dc")
+	)
 	(junction
 		(at 33.02 151.13)
 		(diameter 0)

@@ -1219,6 +1219,16 @@
 			(embedded_fonts no)
 		)
 	)
+	(text "47p nie mam, u użyłem 67p"
+		(exclude_from_sim no)
+		(at 156.21 120.65 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "ac9a2d13-9fb5-45ea-b2de-869e7adffc7a")
+	)
 	(text "R=20k -> Vout=3.576V\nR=19.1k -> Vout=3.716V"
 		(exclude_from_sim no)
 		(at 186.436 122.936 0)
