@@ -1,0 +1,76 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "default",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+		    "toolchainFile": "${sourceDir}/cmake/gcc-arm-none-eabi.cmake",
+            "cacheVariables": {
+            }
+        },
+        {
+            "name": "Debug",
+            "hidden": true,
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "Release",
+            "hidden": true,
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "Debug-HostController",
+            "inherits": "Debug",
+            "cacheVariables": {
+                "FIRMWARE_VARIANT": "HostController"
+            }
+        },
+        {
+            "name": "Debug-DisplayController",
+            "inherits": "Debug",
+            "cacheVariables": {
+                "FIRMWARE_VARIANT": "DisplayController"
+            }
+        },
+        {
+            "name": "Release-HostController",
+            "inherits": "Release",
+            "cacheVariables": {
+                "FIRMWARE_VARIANT": "HostController"
+            }
+        },
+        {
+            "name": "Release-DisplayController",
+            "inherits": "Release",
+            "cacheVariables": {
+                "FIRMWARE_VARIANT": "DisplayController"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "Debug-HostController",
+            "configurePreset": "Debug-HostController"
+        },
+        {
+            "name": "Debug-DisplayController",
+            "configurePreset": "Debug-DisplayController"
+        },
+        {
+            "name": "Release-HostController",
+            "configurePreset": "Release-HostController"
+        },
+        {
+            "name": "Release-DisplayController",
+            "configurePreset": "Release-DisplayController"
+        }
+    ]
+}
