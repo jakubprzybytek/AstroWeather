@@ -59,6 +59,22 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED_1_Pin GPIO_PIN_13
 #define LED_1_GPIO_Port GPIOC
+#define ST67_SCK_Pin GPIO_PIN_1
+#define ST67_SCK_GPIO_Port GPIOA
+#define ST67_TX_Pin GPIO_PIN_2
+#define ST67_TX_GPIO_Port GPIOA
+#define ST67_RX_Pin GPIO_PIN_3
+#define ST67_RX_GPIO_Port GPIOA
+#define ST67_RDY_Pin GPIO_PIN_4
+#define ST67_RDY_GPIO_Port GPIOA
+#define ST67_CS_Pin GPIO_PIN_5
+#define ST67_CS_GPIO_Port GPIOA
+#define ST67_MISO_Pin GPIO_PIN_6
+#define ST67_MISO_GPIO_Port GPIOA
+#define ST67_MOSI_Pin GPIO_PIN_7
+#define ST67_MOSI_GPIO_Port GPIOA
+#define ST67_BOOT_Pin GPIO_PIN_1
+#define ST67_BOOT_GPIO_Port GPIOB
 #define LED_2_Pin GPIO_PIN_9
 #define LED_2_GPIO_Port GPIOB
 
