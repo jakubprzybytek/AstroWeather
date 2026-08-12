@@ -24,6 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <AstroWeather.hpp>
+#include "task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -305,7 +306,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, ST67_BOOT_Pin|LED_2_Pin, GPIO_PIN_RESET);
@@ -343,6 +344,18 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+volatile const char* g_stackOverflowTaskName = 0;
+
+void vApplicationStackOverflowHook(TaskHandle_t xTask, signed char *pcTaskName)
+{
+  (void)xTask;
+  g_stackOverflowTaskName = (const char*)pcTaskName;
+  __disable_irq();
+  while (1)
+  {
+  }
+}
 
 /* USER CODE END 4 */
 
