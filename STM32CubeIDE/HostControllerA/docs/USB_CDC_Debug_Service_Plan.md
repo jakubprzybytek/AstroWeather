@@ -15,7 +15,7 @@ Build a dedicated USB debug service under User/.../Debug that centralizes CDC ac
 9. Use an event flag or task notification to wake the debug task on new RX data and queued log events; avoid 100 ms polling latency.
 10. Protect shared RX assembler state with lightweight synchronization appropriate for ISR/task crossing (critical section around ring-buffer head/tail updates or CMSIS ISR-safe queue APIs).
 11. Phase 3 - Protocol behavior.
-12. Implement line-based RX parsing with newline terminator. Each complete line from host triggers an echo response: [mm:ss]: <line>\n, using HAL_GetTick() uptime.
+12. Implement line-based RX parsing with newline terminator. Each complete line from host triggers an echo response: [d:h:mm:ss]: <line>\n, using HAL_GetTick() uptime. `h` stands for hours since last boot, `d` for days sine last boot (no upper limit).
 13. Keep host healthcheck independent from logging path but serialized by same TX owner task so outbound packets are ordered and collision-free.
 14. Sanitize RX payload to bounded text buffers and null-terminate only in local parsing buffer (never assume USB packet has C-string terminator).
 15. Phase 4 - Integration with generated STM32 files.

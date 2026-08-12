@@ -24,7 +24,6 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <AstroWeather.hpp>
-#include "usbd_cdc_if.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -232,23 +231,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-#define USB_BUFFER_SIZE 128
 
-uint8_t usbTxBuffer[USB_BUFFER_SIZE];
-uint16_t usbTxBufferLength;
-
-uint8_t usbRxBuffer[USB_BUFFER_SIZE];
-uint16_t usbRxBufferLength;
-uint8_t usbRxBufferReady = 0;
-
-void USB_RXCallback(uint8_t* Buf, uint32_t *Len) {
-  if (*Len > USB_BUFFER_SIZE) {
-    *Len = USB_BUFFER_SIZE;
-  }  
-  memcpy(usbRxBuffer, Buf, *Len);
-  usbRxBufferLength = *Len;
-  usbRxBufferReady = 1;
-}  
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -266,16 +249,7 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(100);
-
-    if (usbRxBufferReady && usbRxBufferLength > 0) {
-      uint32_t timeNowMS = HAL_GetTick();
-
-      usbTxBufferLength = snprintf((char*)usbTxBuffer, USB_BUFFER_SIZE, "[%02lu:%02lu]: %s\n", (timeNowMS / 60000) % 60, (timeNowMS / 1000) % 60, usbRxBuffer);
-      CDC_Transmit_FS(usbTxBuffer, usbTxBufferLength);
-
-      usbRxBufferReady = 0;
-    }
+    osDelay(1000);
   }
   /* USER CODE END 5 */
 }

@@ -6,8 +6,8 @@
 #include <Misc/BlinkingLeds.hpp>
 #include <Debug/BlinkingLed.hpp>
 
-static BlinkingLed led1(LED_1_GPIO_Port, LED_1_Pin, 1000, "Led1");
-static BlinkingLed led2(LED_2_GPIO_Port, LED_2_Pin, 250, "Led2");
+static BlinkingLed led1(LED_1_GPIO_Port, LED_1_Pin, 5000, "Led1");
+static BlinkingLed led2(LED_2_GPIO_Port, LED_2_Pin, 2000, "Led2");
 
 void AstroWeather_Init() {
   // BlinkingLeds::start();
@@ -15,5 +15,5 @@ void AstroWeather_Init() {
   led1.start();
   led2.start();
 
-  // AppVariant_Init();
+  AppVariant_Init();
 }

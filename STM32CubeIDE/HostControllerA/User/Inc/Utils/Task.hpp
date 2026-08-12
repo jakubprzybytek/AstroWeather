@@ -1,3 +1,5 @@
+#pragma once
+
 #include "TaskBase.hpp"
 #include "FreeRTOS.h"
 

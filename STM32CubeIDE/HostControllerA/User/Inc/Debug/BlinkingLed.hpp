@@ -1,7 +1,7 @@
 #include <Utils/Task.hpp>
 #include "main.h"  // GPIO_TypeDef, HAL_GPIO_* types
 
-class BlinkingLed : public Task<256>
+class BlinkingLed : public Task<768>
 {
 public:
     BlinkingLed(GPIO_TypeDef* port, uint16_t pin, uint32_t periodMs,

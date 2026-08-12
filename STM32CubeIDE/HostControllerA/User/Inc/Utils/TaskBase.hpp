@@ -1,3 +1,5 @@
+#pragma once
+
 #include "cmsis_os2.h"
 
 class TaskBase
@@ -9,6 +11,7 @@ public:
 
     void start();
     osThreadId_t getHandle() const { return handle_; }
+    const char* getName() const { return name_; }
 
 protected:
     virtual void run() = 0;
