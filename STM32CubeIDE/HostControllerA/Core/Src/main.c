@@ -253,7 +253,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 921600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -306,7 +306,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOA, ST67_CHIP_EN_Pin|ST67_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, ST67_BOOT_Pin|LED_2_Pin, GPIO_PIN_RESET);
@@ -318,18 +318,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_1_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : ST67_CHIP_EN_Pin ST67_CS_Pin */
+  GPIO_InitStruct.Pin = ST67_CHIP_EN_Pin|ST67_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
   /*Configure GPIO pin : ST67_RDY_Pin */
   GPIO_InitStruct.Pin = ST67_RDY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(ST67_RDY_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : ST67_CS_Pin */
-  GPIO_InitStruct.Pin = ST67_CS_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(ST67_CS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : ST67_BOOT_Pin LED_2_Pin */
   GPIO_InitStruct.Pin = ST67_BOOT_Pin|LED_2_Pin;
