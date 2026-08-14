@@ -17,6 +17,11 @@ public:
     // ISR-safe: routes to whichever SwitchTask instance is currently active.
     static void handleExtiFalling(uint16_t gpioPin);
 
+    // Registers a callback invoked (from SwitchTask's own thread) whenever
+    // SWITCH_2 is pressed. Lets variant-specific code (e.g. HostController)
+    // react to the switch without SwitchTask depending on it directly.
+    static void setSwitch2Handler(void (*handler)());
+
 protected:
     void run() override;
 
@@ -32,4 +37,5 @@ private:
 
     Led& led2_;
     static SwitchTask* s_activeInstance;
+    static void (*s_switch2Handler)();
 };

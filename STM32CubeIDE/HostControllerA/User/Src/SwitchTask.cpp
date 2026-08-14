@@ -5,11 +5,17 @@
 #include "main.h"
 
 SwitchTask* SwitchTask::s_activeInstance = nullptr;
+void (*SwitchTask::s_switch2Handler)() = nullptr;
 
 SwitchTask::SwitchTask(Led& led2)
     : Task<512>("SwitchTask", osPriorityNormal), led2_(led2)
 {
     s_activeInstance = this;
+}
+
+void SwitchTask::setSwitch2Handler(void (*handler)())
+{
+    s_switch2Handler = handler;
 }
 
 void SwitchTask::onSwitch1Pressed()
@@ -38,6 +44,10 @@ void SwitchTask::run()
         if ((flags & kFlagSwitch2) != 0U)
         {
             led2_.blink(kSwitch2BlinkMs);
+            if (s_switch2Handler != nullptr)
+            {
+                s_switch2Handler();
+            }
         }
     }
 }

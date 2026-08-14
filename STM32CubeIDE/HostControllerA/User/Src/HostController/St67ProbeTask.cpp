@@ -20,19 +20,27 @@ class St67ProbeTask : public Task<2048> {
     return task;
   }
 
+  void trigger() {
+    osThreadFlagsSet(getHandle(), kFlagTrigger);
+  }
+
  protected:
   void run() override {
     // Wait until scheduler and USB debug path are up.
     osDelay(4000);
 
-    probeAtCommand();
-
     for (;;) {
-      osDelay(10000);
+      uint32_t flags = osThreadFlagsWait(kFlagTrigger, osFlagsWaitAny, osWaitForever);
+      if ((flags & osFlagsError) != 0U) {
+        continue;
+      }
+      probeAtCommand();
     }
   }
 
  private:
+  static constexpr uint32_t kFlagTrigger = 1u << 0;
+
   St67ProbeTask() : Task<2048>("St67Probe", osPriorityBelowNormal) {}
 
   void probeAtCommand() {
@@ -107,6 +115,10 @@ namespace HostController {
 
 void StartSt67ProbeTask() {
   St67ProbeTask::instance().start();
+}
+
+void TriggerSt67Probe() {
+  St67ProbeTask::instance().trigger();
 }
 
 }  // namespace HostController

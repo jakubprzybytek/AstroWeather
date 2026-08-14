@@ -4,6 +4,7 @@
 namespace HostController {
 
 void StartSt67ProbeTask();
+void TriggerSt67Probe();
 
 }  // namespace HostController
 
