@@ -4,18 +4,13 @@
 
 #include "main.h"
 
-// Defined in AstroWeather.cpp.
-extern Led led2;
+SwitchTask* SwitchTask::s_activeInstance = nullptr;
 
-SwitchTask& SwitchTask::instance()
+SwitchTask::SwitchTask(Led& led2)
+    : Task<512>("SwitchTask", osPriorityNormal), led2_(led2)
 {
-    static SwitchTask task;
-    return task;
+    s_activeInstance = this;
 }
-
-SwitchTask::SwitchTask()
-    : Task<512>("SwitchTask", osPriorityNormal)
-{}
 
 void SwitchTask::onSwitch1Pressed()
 {
@@ -38,23 +33,32 @@ void SwitchTask::run()
         }
         if ((flags & kFlagSwitch1) != 0U)
         {
-            led2.blink(kSwitch1BlinkMs);
+            led2_.blink(kSwitch1BlinkMs);
         }
         if ((flags & kFlagSwitch2) != 0U)
         {
-            led2.blink(kSwitch2BlinkMs);
+            led2_.blink(kSwitch2BlinkMs);
         }
+    }
+}
+
+void SwitchTask::handleExtiFalling(uint16_t gpioPin)
+{
+    if (s_activeInstance == nullptr)
+    {
+        return;
+    }
+    if (gpioPin == SWITCH_1_Pin)
+    {
+        s_activeInstance->onSwitch1Pressed();
+    }
+    else if (gpioPin == SWITCH_2_Pin)
+    {
+        s_activeInstance->onSwitch2Pressed();
     }
 }
 
 extern "C" void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 {
-    if (GPIO_Pin == SWITCH_1_Pin)
-    {
-        SwitchTask::instance().onSwitch1Pressed();
-    }
-    else if (GPIO_Pin == SWITCH_2_Pin)
-    {
-        SwitchTask::instance().onSwitch2Pressed();
-    }
+    SwitchTask::handleExtiFalling(GPIO_Pin);
 }

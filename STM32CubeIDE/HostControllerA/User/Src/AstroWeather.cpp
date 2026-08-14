@@ -10,8 +10,8 @@
 static BlinkingLed led1(LED_1_GPIO_Port, LED_1_Pin, 2000, "Led1");
 // static BlinkingLed led2(LED_2_GPIO_Port, LED_2_Pin, 2000, "Led2");
 
-// Used by SwitchTask (extern) to blink on switch presses.
-Led led2(LED_2_GPIO_Port, LED_2_Pin);
+static Led led2(LED_2_GPIO_Port, LED_2_Pin);
+static SwitchTask switchTask(led2);
 
 void AstroWeather_Init() {
   // BlinkingLeds::start();
@@ -19,7 +19,7 @@ void AstroWeather_Init() {
   led1.start();
   // led2.start();
 
-  SwitchTask::instance().start();
+  switchTask.start();
 
   AppVariant_Init();
 }
