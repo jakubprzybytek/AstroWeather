@@ -1,3 +1,10 @@
 *-backups
 _autosave*
 ~*
+
+STM32CubeIDE/Controller
+STM32CubeIDE/HostController
+STM32CubeIDE/HostController2
+STM32CubeIDE/HostController3
+STM32CubeIDE/HostController4
+STM32CubeIDE/HostController5

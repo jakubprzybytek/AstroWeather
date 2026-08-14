@@ -77,6 +77,12 @@ void Error_Handler(void);
 #define ST67_MOSI_GPIO_Port GPIOA
 #define ST67_BOOT_Pin GPIO_PIN_1
 #define ST67_BOOT_GPIO_Port GPIOB
+#define SWITCH_1_Pin GPIO_PIN_12
+#define SWITCH_1_GPIO_Port GPIOB
+#define SWITCH_1_EXTI_IRQn EXTI4_15_IRQn
+#define SWITCH_2_Pin GPIO_PIN_13
+#define SWITCH_2_GPIO_Port GPIOB
+#define SWITCH_2_EXTI_IRQn EXTI4_15_IRQn
 #define LED_2_Pin GPIO_PIN_9
 #define LED_2_GPIO_Port GPIOB
 
