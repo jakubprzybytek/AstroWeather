@@ -242,7 +242,11 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
     break;
 
     case CDC_SET_CONTROL_LINE_STATE:
-
+    {
+      /* wLength is 0 for this request, so pbuf is the raw setup request (wValue bit 0 = DTR). */
+      const USBD_SetupReqTypedef *setup_req = (const USBD_SetupReqTypedef *)pbuf;
+      Bridge_OnHostConnectionChanged((setup_req->wValue & 0x0001u) != 0u);
+    }
     break;
 
     case CDC_SEND_BREAK:

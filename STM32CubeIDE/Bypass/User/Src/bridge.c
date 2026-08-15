@@ -4,6 +4,7 @@
 
 #include "bridge_config.h"
 #include "main.h"
+#include "st67_mode.h"
 #include "usbd_cdc_if.h"
 
 extern UART_HandleTypeDef huart2;
@@ -30,6 +31,10 @@ static volatile bool usb_tx_busy;
 static volatile uint32_t usb_to_uart_overflow_count;
 static volatile uint32_t uart_to_usb_overflow_count;
 static volatile uint32_t uart_hardware_overrun_count;
+
+/* Re-running ST67_EnterMode is deferred to the foreground loop; HAL_Delay must not run in USB IRQ context. */
+static volatile bool host_dtr_asserted;
+static volatile bool st67_reset_pending;
 
 static void bridge_usb_to_uart(void)
 {
@@ -75,6 +80,8 @@ void Bridge_Init(void)
   usb_to_uart_overflow_count = 0u;
   uart_to_usb_overflow_count = 0u;
   uart_hardware_overrun_count = 0u;
+  host_dtr_asserted = false;
+  st67_reset_pending = false;
 
 #ifdef UART_IT_RXFNE
   __HAL_UART_ENABLE_IT(&huart2, UART_IT_RXFNE);
@@ -87,8 +94,22 @@ void Bridge_Init(void)
 
 void Bridge_Process(void)
 {
+  if (st67_reset_pending) {
+    st67_reset_pending = false;
+    ST67_EnterMode((St67Mode)ST67_DEFAULT_MODE);
+  }
+
   bridge_usb_to_uart();
   bridge_uart_to_usb();
+}
+
+void Bridge_OnHostConnectionChanged(bool dtr_asserted)
+{
+  if (dtr_asserted && !host_dtr_asserted) {
+    /* Terminal just opened the port: redo ST67 reset so its banner is sent while someone is listening. */
+    st67_reset_pending = true;
+  }
+  host_dtr_asserted = dtr_asserted;
 }
 
 void Bridge_OnUsbRx(const uint8_t *data, uint32_t length)
