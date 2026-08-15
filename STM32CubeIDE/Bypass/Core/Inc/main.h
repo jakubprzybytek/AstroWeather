@@ -53,16 +53,23 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-void USB_ReceiveCallback(uint8_t* Buf, uint32_t *Len);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
 #define LED_1_Pin GPIO_PIN_13
 #define LED_1_GPIO_Port GPIOC
+#define ST67_CHIP_EN_Pin GPIO_PIN_0
+#define ST67_CHIP_EN_GPIO_Port GPIOA
 #define ST_USART2_TX_Pin GPIO_PIN_2
 #define ST_USART2_TX_GPIO_Port GPIOA
 #define ST_USART2_RX_Pin GPIO_PIN_3
 #define ST_USART2_RX_GPIO_Port GPIOA
+#define ST67_RDY_Pin GPIO_PIN_4
+#define ST67_RDY_GPIO_Port GPIOA
+#define ST67_CS_Pin GPIO_PIN_5
+#define ST67_CS_GPIO_Port GPIOA
+#define ST67_BOOT_Pin GPIO_PIN_1
+#define ST67_BOOT_GPIO_Port GPIOB
 #define LED_2_Pin GPIO_PIN_9
 #define LED_2_GPIO_Port GPIOB
 

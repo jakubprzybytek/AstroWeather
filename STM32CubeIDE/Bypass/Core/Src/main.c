@@ -18,21 +18,37 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "bridge.h"
 #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "usbd_cdc_if.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef enum {
+  ST67_MODE_MANUFACTURE = 0,
+  ST67_MODE_BOOTLOADER = 1
+} St67Mode;
 
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define USB_BUFFER_SIZE 128
+#define ST67_DEFAULT_MODE_MANUFACTURE 0u
+#define ST67_DEFAULT_MODE_BOOTLOADER  1u
+
+#ifndef ST67_DEFAULT_MODE
+#define ST67_DEFAULT_MODE ST67_DEFAULT_MODE_MANUFACTURE
+#endif
+
+#if (ST67_DEFAULT_MODE == ST67_DEFAULT_MODE_BOOTLOADER)
+#error "ST67 bootloader mode straps are not verified yet."
+#endif
+
+#define ST67_ENABLE_PULSE_MS 20u
+#define ST67_STARTUP_DELAY_MS 20u
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -44,12 +60,6 @@
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-uint8_t usbTxBuffer[USB_BUFFER_SIZE];
-uint8_t usbTxBufferLen = 0;
-
-uint8_t usbRxBuffer[USB_BUFFER_SIZE];
-uint8_t usbRxBufferLen = 0;
-uint8_t usbRxBufferReady = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -57,16 +67,26 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
+static void ST67_EnterMode(St67Mode mode);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void USB_ReceiveCallback(uint8_t* Buf, uint32_t *Len)
+static void ST67_EnterMode(St67Mode mode)
 {
-  usbRxBufferLen = *Len;
-  memcpy(usbRxBuffer, Buf, usbRxBufferLen);
-  usbRxBufferReady = 1;
+  HAL_GPIO_WritePin(ST67_CHIP_EN_GPIO_Port, ST67_CHIP_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_SET);
+
+  if (mode == ST67_MODE_MANUFACTURE) {
+    HAL_GPIO_WritePin(ST67_BOOT_GPIO_Port, ST67_BOOT_Pin, GPIO_PIN_RESET);
+  } else {
+    Error_Handler();
+  }
+
+  HAL_Delay(ST67_ENABLE_PULSE_MS);
+  HAL_GPIO_WritePin(ST67_CHIP_EN_GPIO_Port, ST67_CHIP_EN_Pin, GPIO_PIN_SET);
+  HAL_Delay(ST67_STARTUP_DELAY_MS);
 }
 /* USER CODE END 0 */
 
@@ -100,7 +120,9 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  Bridge_Init();
   MX_USB_Device_Init();
+  ST67_EnterMode(ST67_MODE_MANUFACTURE);
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -111,16 +133,7 @@ int main(void)
   {
     /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
-    if (usbRxBufferLen && usbRxBufferReady) {
-      uint32_t timeNowMS = HAL_GetTick();
-
-      usbTxBufferLen = snprintf((char*)usbTxBuffer, USB_BUFFER_SIZE, "%lu: %.*s\r\n", timeNowMS, usbRxBufferLen, usbRxBuffer);
-
-      CDC_Transmit_FS(usbTxBuffer, usbTxBufferLen);
-
-      usbRxBufferReady = 0;
-      usbRxBufferLen = 0;
-    }
+    Bridge_Process();
   }
   /* USER CODE END 3 */
 }
@@ -209,7 +222,7 @@ static void MX_USART2_UART_Init(void)
   {
     Error_Handler();
   }
-  if (HAL_UARTEx_DisableFifoMode(&huart2) != HAL_OK)
+  if (HAL_UARTEx_EnableFifoMode(&huart2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -236,6 +249,11 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
+  /* Configure initial ST67 output levels before output mode to avoid glitches. */
+  HAL_GPIO_WritePin(ST67_CHIP_EN_GPIO_Port, ST67_CHIP_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(ST67_BOOT_GPIO_Port, ST67_BOOT_Pin, GPIO_PIN_RESET);
+
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, GPIO_PIN_SET);
 
@@ -255,6 +273,26 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_2_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : ST67_CHIP_EN_Pin ST67_CS_Pin */
+  GPIO_InitStruct.Pin = ST67_CHIP_EN_Pin|ST67_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : ST67_BOOT_Pin */
+  GPIO_InitStruct.Pin = ST67_BOOT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(ST67_BOOT_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : ST67_RDY_Pin */
+  GPIO_InitStruct.Pin = ST67_RDY_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(ST67_RDY_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
