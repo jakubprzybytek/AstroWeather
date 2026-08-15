@@ -36,6 +36,40 @@ static volatile uint32_t uart_hardware_overrun_count;
 static volatile bool host_dtr_asserted;
 static volatile bool st67_reset_pending;
 
+/* Forwarding a short burst can finish in microseconds, faster than the eye can see; stretch the LED pulse. */
+#define LED_MIN_ON_MS 60u
+
+static volatile uint32_t tx_led_last_activity_tick;
+static volatile uint32_t rx_led_last_activity_tick;
+
+void Bridge_SetTxLed(bool on)
+{
+  HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, on ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+void Bridge_SetRxLed(bool on)
+{
+  HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, on ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+static void bridge_update_tx_led(void)
+{
+  bool busy = (usb_to_uart_tail != usb_to_uart_head);
+  Bridge_SetTxLed(busy || ((HAL_GetTick() - tx_led_last_activity_tick) < LED_MIN_ON_MS));
+}
+
+static void bridge_update_rx_led(void)
+{
+  bool busy = usb_tx_busy || (uart_to_usb_tail != uart_to_usb_head);
+  Bridge_SetRxLed(busy || ((HAL_GetTick() - rx_led_last_activity_tick) < LED_MIN_ON_MS));
+}
+
+static void bridge_update_leds(void)
+{
+  bridge_update_tx_led();
+  bridge_update_rx_led();
+}
+
 static void bridge_usb_to_uart(void)
 {
   while (usb_to_uart_tail != usb_to_uart_head) {
@@ -45,6 +79,8 @@ static void bridge_usb_to_uart(void)
     huart2.Instance->TDR = usb_to_uart_data[usb_to_uart_tail & (USB_TO_UART_RING_SIZE - 1u)];
     ++usb_to_uart_tail;
   }
+
+  bridge_update_tx_led();
 }
 
 static void bridge_uart_to_usb(void)
@@ -62,12 +98,15 @@ static void bridge_uart_to_usb(void)
     ++next_tail;
   }
 
+  Bridge_SetRxLed(true);
   usb_tx_busy = true;
   if (CDC_Transmit_FS(usb_tx_buffer, length) == USBD_OK) {
     uart_to_usb_tail = next_tail;
   } else {
     usb_tx_busy = false;
   }
+
+  bridge_update_rx_led();
 }
 
 void Bridge_Init(void)
@@ -82,6 +121,8 @@ void Bridge_Init(void)
   uart_hardware_overrun_count = 0u;
   host_dtr_asserted = false;
   st67_reset_pending = false;
+  tx_led_last_activity_tick = HAL_GetTick();
+  rx_led_last_activity_tick = HAL_GetTick();
 
 #ifdef UART_IT_RXFNE
   __HAL_UART_ENABLE_IT(&huart2, UART_IT_RXFNE);
@@ -101,6 +142,7 @@ void Bridge_Process(void)
 
   bridge_usb_to_uart();
   bridge_uart_to_usb();
+  bridge_update_leds();
 }
 
 void Bridge_OnHostConnectionChanged(bool dtr_asserted)
@@ -126,11 +168,15 @@ void Bridge_OnUsbRx(const uint8_t *data, uint32_t length)
     usb_to_uart_data[head & (USB_TO_UART_RING_SIZE - 1u)] = data[index];
     usb_to_uart_head = head + 1u;
   }
+
+  tx_led_last_activity_tick = HAL_GetTick();
+  bridge_update_leds();
 }
 
 void Bridge_OnUsbTxComplete(void)
 {
   usb_tx_busy = false;
+  bridge_update_leds();
 }
 
 void USART2_IRQHandler(void)
@@ -147,6 +193,11 @@ void USART2_IRQHandler(void)
     } else {
       ++uart_to_usb_overflow_count;
     }
+  }
+
+  if (uart_to_usb_head != uart_to_usb_tail) {
+    rx_led_last_activity_tick = HAL_GetTick();
+    bridge_update_leds();
   }
 
   if ((uart->ISR & USART_ISR_ORE) != 0u) {
