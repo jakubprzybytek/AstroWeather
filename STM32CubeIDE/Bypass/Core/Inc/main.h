@@ -60,6 +60,8 @@ void Error_Handler(void);
 #define LED_1_GPIO_Port GPIOC
 #define ST67_CHIP_EN_Pin GPIO_PIN_0
 #define ST67_CHIP_EN_GPIO_Port GPIOA
+#define ST67_SCK_Pin GPIO_PIN_1
+#define ST67_SCK_GPIO_Port GPIOA
 #define ST_USART2_TX_Pin GPIO_PIN_2
 #define ST_USART2_TX_GPIO_Port GPIOA
 #define ST_USART2_RX_Pin GPIO_PIN_3
@@ -68,6 +70,10 @@ void Error_Handler(void);
 #define ST67_RDY_GPIO_Port GPIOA
 #define ST67_CS_Pin GPIO_PIN_5
 #define ST67_CS_GPIO_Port GPIOA
+#define ST67_MISO_Pin GPIO_PIN_6
+#define ST67_MISO_GPIO_Port GPIOA
+#define ST67_MOSI_Pin GPIO_PIN_7
+#define ST67_MOSI_GPIO_Port GPIOA
 #define ST67_BOOT_Pin GPIO_PIN_1
 #define ST67_BOOT_GPIO_Port GPIOB
 #define LED_2_Pin GPIO_PIN_9

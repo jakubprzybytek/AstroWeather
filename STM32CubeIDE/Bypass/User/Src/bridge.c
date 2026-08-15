@@ -2,14 +2,19 @@
 
 #include <stdbool.h>
 
+#include "bridge_config.h"
 #include "main.h"
 #include "usbd_cdc_if.h"
 
 extern UART_HandleTypeDef huart2;
 
-#define USB_TO_UART_RING_SIZE  512u
-#define UART_TO_USB_RING_SIZE  4096u
-#define USB_TX_BUFFER_SIZE     256u
+#if ((USB_TO_UART_RING_SIZE & (USB_TO_UART_RING_SIZE - 1u)) != 0u)
+#error "USB_TO_UART_RING_SIZE must be a power of two"
+#endif
+
+#if ((UART_TO_USB_RING_SIZE & (UART_TO_USB_RING_SIZE - 1u)) != 0u)
+#error "UART_TO_USB_RING_SIZE must be a power of two"
+#endif
 
 static uint8_t usb_to_uart_data[USB_TO_UART_RING_SIZE];
 static volatile uint32_t usb_to_uart_head;
