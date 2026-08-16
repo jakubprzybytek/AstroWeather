@@ -11,28 +11,54 @@
             }
         },
         {
-            "name": "Debug",
+            "name": "Debug-Manufacture",
             "inherits": "default",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "ST67_DEFAULT_MODE": "MANUFACTURE"
             }
         },
         {
-            "name": "Release",
+            "name": "Release-Manufacture",
             "inherits": "default",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
+                "CMAKE_BUILD_TYPE": "Release",
+                "ST67_DEFAULT_MODE": "MANUFACTURE"
+            }
+        },
+        {
+            "name": "Debug-Bootloader",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "ST67_DEFAULT_MODE": "BOOTLOADER"
+            }
+        },
+        {
+            "name": "Release-Bootloader",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "ST67_DEFAULT_MODE": "BOOTLOADER"
             }
         }
     ],
     "buildPresets": [
         {
-            "name": "Debug",
-            "configurePreset": "Debug"
+            "name": "Debug-Manufacture",
+            "configurePreset": "Debug-Manufacture"
         },
         {
-            "name": "Release",
-            "configurePreset": "Release"
+            "name": "Release-Manufacture",
+            "configurePreset": "Release-Manufacture"
+        },
+        {
+            "name": "Debug-Bootloader",
+            "configurePreset": "Debug-Bootloader"
+        },
+        {
+            "name": "Release-Bootloader",
+            "configurePreset": "Release-Bootloader"
         }
     ]
 }

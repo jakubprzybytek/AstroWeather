@@ -28,6 +28,18 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 project(${CMAKE_PROJECT_NAME})
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
+set(ST67_DEFAULT_MODE "MANUFACTURE" CACHE STRING
+    "ST67 startup mode: MANUFACTURE or BOOTLOADER")
+set_property(CACHE ST67_DEFAULT_MODE PROPERTY STRINGS MANUFACTURE BOOTLOADER)
+
+if(ST67_DEFAULT_MODE STREQUAL "MANUFACTURE")
+    set(ST67_DEFAULT_MODE_DEFINE ST67_DEFAULT_MODE_MANUFACTURE)
+elseif(ST67_DEFAULT_MODE STREQUAL "BOOTLOADER")
+    set(ST67_DEFAULT_MODE_DEFINE ST67_DEFAULT_MODE_BOOTLOADER)
+else()
+    message(FATAL_ERROR "Unsupported ST67_DEFAULT_MODE: ${ST67_DEFAULT_MODE}")
+endif()
+
 # Enable CMake support for ASM and C languages
 enable_language(C ASM)
 
@@ -58,7 +70,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
-    ST67_DEFAULT_MODE=ST67_DEFAULT_MODE_MANUFACTURE
+    ST67_DEFAULT_MODE=${ST67_DEFAULT_MODE_DEFINE}
 )
 
 # Remove wrong libob.a library dependency when using cpp files

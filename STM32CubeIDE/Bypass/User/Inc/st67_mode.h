@@ -15,8 +15,9 @@ typedef enum {
 #define ST67_DEFAULT_MODE ST67_DEFAULT_MODE_MANUFACTURE
 #endif
 
-#if (ST67_DEFAULT_MODE == ST67_DEFAULT_MODE_BOOTLOADER)
-#error "ST67 bootloader mode straps are not verified yet."
+#if (ST67_DEFAULT_MODE != ST67_DEFAULT_MODE_MANUFACTURE) && \
+  (ST67_DEFAULT_MODE != ST67_DEFAULT_MODE_BOOTLOADER)
+#error "ST67_DEFAULT_MODE must be MANUFACTURE (0) or BOOTLOADER (1)."
 #endif
 
 void ST67_EnterMode(St67Mode mode);

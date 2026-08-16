@@ -31,6 +31,12 @@ static volatile bool usb_tx_busy;
 static volatile uint32_t usb_to_uart_overflow_count;
 static volatile uint32_t uart_to_usb_overflow_count;
 static volatile uint32_t uart_hardware_overrun_count;
+static volatile uint32_t uart_framing_error_count;
+static volatile uint32_t uart_noise_error_count;
+static volatile uint32_t uart_parity_error_count;
+static volatile uint32_t usb_tx_failure_count;
+static volatile uint32_t usb_tx_stale_flush_count;
+static volatile uint32_t st67_session_reset_count;
 
 /* Re-running ST67_EnterMode is deferred to the foreground loop; HAL_Delay must not run in USB IRQ context. */
 static volatile bool host_dtr_asserted;
@@ -39,8 +45,12 @@ static volatile bool st67_reset_pending;
 /* Forwarding a short burst can finish in microseconds, faster than the eye can see; stretch the LED pulse. */
 #define LED_MIN_ON_MS 60u
 
+/* Bound how long a reset waits for an already-submitted USB IN transfer to drain before proceeding. */
+#define USB_TX_DRAIN_TIMEOUT_MS 50u
+
 static volatile uint32_t tx_led_last_activity_tick;
 static volatile uint32_t rx_led_last_activity_tick;
+static volatile bool tx_led_activity_seen;
 
 void Bridge_SetTxLed(bool on)
 {
@@ -55,6 +65,12 @@ void Bridge_SetRxLed(bool on)
 static void bridge_update_tx_led(void)
 {
   bool busy = (usb_to_uart_tail != usb_to_uart_head);
+  if (busy) {
+    tx_led_activity_seen = true;
+  }
+  if (!tx_led_activity_seen) {
+    return; /* Keep CubeMX's initial ON level until the first byte is actually forwarded. */
+  }
   Bridge_SetTxLed(busy || ((HAL_GetTick() - tx_led_last_activity_tick) < LED_MIN_ON_MS));
 }
 
@@ -68,6 +84,29 @@ static void bridge_update_leds(void)
 {
   bridge_update_tx_led();
   bridge_update_rx_led();
+}
+
+static void bridge_reset_transport_state(void)
+{
+  USART_TypeDef *uart = huart2.Instance;
+  uint32_t wait_start = HAL_GetTick();
+
+  /* Let an already-submitted USB IN transfer finish so old-session bytes don't linger past this point. */
+  while (usb_tx_busy && ((HAL_GetTick() - wait_start) < USB_TX_DRAIN_TIMEOUT_MS)) {
+  }
+  if (usb_tx_busy) {
+    usb_tx_busy = false;
+    ++usb_tx_stale_flush_count;
+  }
+
+  usb_to_uart_tail = usb_to_uart_head;
+  uart_to_usb_tail = uart_to_usb_head;
+
+  while ((uart->ISR & USART_ISR_RXNE_RXFNE) != 0u) {
+    (void)uart->RDR;
+  }
+  __HAL_UART_CLEAR_FLAG(&huart2, UART_CLEAR_OREF | UART_CLEAR_NEF |
+                        UART_CLEAR_PEF | UART_CLEAR_FEF);
 }
 
 static void bridge_usb_to_uart(void)
@@ -104,6 +143,7 @@ static void bridge_uart_to_usb(void)
     uart_to_usb_tail = next_tail;
   } else {
     usb_tx_busy = false;
+    ++usb_tx_failure_count;
   }
 
   bridge_update_rx_led();
@@ -119,8 +159,15 @@ void Bridge_Init(void)
   usb_to_uart_overflow_count = 0u;
   uart_to_usb_overflow_count = 0u;
   uart_hardware_overrun_count = 0u;
+  uart_framing_error_count = 0u;
+  uart_noise_error_count = 0u;
+  uart_parity_error_count = 0u;
+  usb_tx_failure_count = 0u;
+  usb_tx_stale_flush_count = 0u;
+  st67_session_reset_count = 0u;
   host_dtr_asserted = false;
   st67_reset_pending = false;
+  tx_led_activity_seen = false;
   tx_led_last_activity_tick = HAL_GetTick();
   rx_led_last_activity_tick = HAL_GetTick();
 
@@ -137,6 +184,8 @@ void Bridge_Process(void)
 {
   if (st67_reset_pending) {
     st67_reset_pending = false;
+    ++st67_session_reset_count;
+    bridge_reset_transport_state();
     ST67_EnterMode((St67Mode)ST67_DEFAULT_MODE);
   }
 
@@ -203,5 +252,20 @@ void USART2_IRQHandler(void)
   if ((uart->ISR & USART_ISR_ORE) != 0u) {
     __HAL_UART_CLEAR_OREFLAG(&huart2);
     ++uart_hardware_overrun_count;
+  }
+
+  if ((uart->ISR & USART_ISR_FE) != 0u) {
+    __HAL_UART_CLEAR_FLAG(&huart2, UART_CLEAR_FEF);
+    ++uart_framing_error_count;
+  }
+
+  if ((uart->ISR & USART_ISR_NE) != 0u) {
+    __HAL_UART_CLEAR_FLAG(&huart2, UART_CLEAR_NEF);
+    ++uart_noise_error_count;
+  }
+
+  if ((uart->ISR & USART_ISR_PE) != 0u) {
+    __HAL_UART_CLEAR_FLAG(&huart2, UART_CLEAR_PEF);
+    ++uart_parity_error_count;
   }
 }
