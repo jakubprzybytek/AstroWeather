@@ -10,7 +10,6 @@
             "request": "launch",
             "cwd": "${workspaceFolder}",
             "preBuild": "${command:st-stm32-ide-debug-launch.build}",
-            "runEntry": "main",
             "imagesAndSymbols": [
                 {
                     "imageFileName": "${workspaceFolder}/build/Debug-HostController/HostControllerA.elf"
@@ -24,7 +23,6 @@
             "request": "launch",
             "cwd": "${workspaceFolder}",
             "preBuild": "${command:st-stm32-ide-debug-launch.build}",
-            "runEntry": "main",
             "imagesAndSymbols": [
                 {
                     "imageFileName": "${workspaceFolder}/build/Release-HostController/HostControllerA.elf"

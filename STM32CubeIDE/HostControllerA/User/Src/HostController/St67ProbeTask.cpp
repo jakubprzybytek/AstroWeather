@@ -8,7 +8,7 @@
 #include <cstring>
 
 extern "C" {
-extern UART_HandleTypeDef huart2;
+extern SPI_HandleTypeDef hspi1;
 }
 
 namespace {
@@ -49,62 +49,65 @@ class St67ProbeTask : public Task<2048> {
     uint16_t responseLen = 0;
     bool seenAnyByte = false;
 
-    // For UART AT probing: keep SPI CS deasserted and BOOT in normal mode.
+    // Chip powered, normal (non-boot) mode, CS idle deasserted before selecting it.
     HAL_GPIO_WritePin(ST67_CHIP_EN_GPIO_Port, ST67_CHIP_EN_Pin, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_SET);
     HAL_GPIO_WritePin(ST67_BOOT_GPIO_Port, ST67_BOOT_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_SET);
     osDelay(20);
 
     GPIO_PinState rdy = HAL_GPIO_ReadPin(ST67_RDY_GPIO_Port, ST67_RDY_Pin);
     DebugService::instance().logf(DebugService::Level::Info,
                                   "ST67 pre-probe pins: CS=1 BOOT=0 RDY=%d", (rdy == GPIO_PIN_SET) ? 1 : 0);
 
-    // Drain any stale bytes left in RX before the probe.
-    for (;;) {
-      uint8_t discard = 0;
-      if (HAL_UART_Receive(&huart2, &discard, 1, 2) != HAL_OK) {
+    // Select the slave for the AT command transaction.
+    HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_RESET);
+
+    HAL_StatusTypeDef tx = HAL_SPI_Transmit(&hspi1,
+                                            const_cast<uint8_t*>(kAtCommand),
+                                            sizeof(kAtCommand) - 1,
+                                            100);
+    if (tx != HAL_OK) {
+      HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_SET);
+      DebugService::instance().logf(DebugService::Level::Error,
+                                    "ST67 SPI probe TX failed: status=%d", static_cast<int>(tx));
+      return;
+    }
+
+    // RDY signals a response byte is ready to be clocked in; it drops once the slave is drained.
+    uint32_t startTick = HAL_GetTick();
+    while ((HAL_GetTick() - startTick) < 500U && responseLen < (sizeof(response) - 1U)) {
+      if (HAL_GPIO_ReadPin(ST67_RDY_GPIO_Port, ST67_RDY_Pin) != GPIO_PIN_SET) {
+        if (seenAnyByte) {
+          break;
+        }
+        osDelay(1);
+        continue;
+      }
+
+      uint8_t byte = 0;
+      HAL_StatusTypeDef rx = HAL_SPI_Receive(&hspi1, &byte, 1, 30);
+      if (rx != HAL_OK) {
+        DebugService::instance().logf(DebugService::Level::Error,
+                                      "ST67 SPI probe RX failed: status=%d", static_cast<int>(rx));
+        HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_SET);
+        return;
+      }
+      response[responseLen++] = byte;
+      seenAnyByte = true;
+      if (responseLen >= 2U && response[responseLen - 2U] == 'O' && response[responseLen - 1U] == 'K') {
         break;
       }
     }
 
-    HAL_StatusTypeDef tx = HAL_UART_Transmit(&huart2,
-                                             const_cast<uint8_t*>(kAtCommand),
-                                             sizeof(kAtCommand) - 1,
-                                             100);
-    if (tx != HAL_OK) {
-      DebugService::instance().logf(DebugService::Level::Error,
-                                    "ST67 probe TX failed: status=%d", static_cast<int>(tx));
-      return;
-    }
-
-    uint32_t startTick = HAL_GetTick();
-    while ((HAL_GetTick() - startTick) < 500U && responseLen < (sizeof(response) - 1U)) {
-      uint8_t byte = 0;
-      HAL_StatusTypeDef rx = HAL_UART_Receive(&huart2, &byte, 1, 30);
-      if (rx == HAL_OK) {
-        response[responseLen++] = byte;
-        seenAnyByte = true;
-        if (responseLen >= 2U && response[responseLen - 2U] == 'O' && response[responseLen - 1U] == 'K') {
-          break;
-        }
-      } else if (rx == HAL_TIMEOUT) {
-        if (seenAnyByte) {
-          break;
-        }
-      } else {
-        DebugService::instance().logf(DebugService::Level::Error,
-                                      "ST67 probe RX failed: status=%d", static_cast<int>(rx));
-        return;
-      }
-    }
+    HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_SET);
 
     response[responseLen] = '\0';
     if (std::strstr(reinterpret_cast<const char*>(response), "OK") != nullptr) {
       DebugService::instance().logf(DebugService::Level::Info,
-                                    "ST67 AT probe OK: '%s'", response);
+                                    "ST67 SPI AT probe OK: '%s'", response);
     } else {
       DebugService::instance().logf(DebugService::Level::Warn,
-                                    "ST67 AT probe no OK, rx='%s'", response);
+                                    "ST67 SPI AT probe no OK, rx='%s'", response);
     }
   }
 };

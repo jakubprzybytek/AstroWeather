@@ -1,5 +1,3 @@
-#include <bits/stdc++.h>
-
 #include <Debug/BlinkingLed.hpp>
 #include <Debug/DebugService.hpp>
 
@@ -15,6 +13,6 @@ void BlinkingLed::run() {
   for (;;) {
     HAL_GPIO_TogglePin(port_, pin_);
     DebugService::instance().logf(DebugService::Level::Info, "%s toggled", getName());
-    osDelay(rand() % periodMs_);
+    osDelay(periodMs_);
   }
 }
