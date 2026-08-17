@@ -110,15 +110,10 @@ in project-owned files.
   `NCP_info/QConn_Eflash.exe -r --efuse --start=0x0 --end=0x1ff` +
   `read_chip_info`. Never needs `--force`. This is the right first check
   before ever running `Program-ST67.sh --force`.
-- `Dump-ST67-Flash.sh` - bulk flash read-back for manual inspection. **Known
-  issue:** it calls `QConn_Eflash.exe -r --flash`, which enforces a strict
-  flash-type match against the config's `flash_id` (default `ef4016`,
-  Winbond) and hard-fails with `QCC74X FLASH MATCH TYPE FAIL` on hardware
-  whose actual flash chip doesn't match (see validation notes below).
-  `QConn_Flash_Cmd.exe --read` does **not** have this restriction - it logs
-  "flash config Not found, use default" and proceeds. If this script needs
-  to work reliably across boards, switch it to `QConn_Flash_Cmd.exe --read`
-  instead of `QConn_Eflash.exe --flash -r`.
+- `Dump-ST67-Flash.sh` - bulk flash read-back for manual inspection. It uses
+  `QConn_Flash_Cmd.exe --read`, which does not enforce the strict flash-type
+  match applied by `QConn_Eflash.exe -r --flash`; it logs "flash config Not
+  found, use default" and proceeds across boards with different flash chips.
 - All scripts validate `--port` before touching the SDK (checked against
   `[System.IO.Ports.SerialPort]::GetPortNames()` on Windows, or file
   existence on Linux) and clean up any generated temp files in a
@@ -190,6 +185,7 @@ erase/program/verify cycle with the fixed firmware reflashed (plan Stage F),
 and inspecting the diagnostic counters via debugger immediately after to
 close out Stage D formally.
 
+
 ## Open items / suggested next steps
 
 1. Reflash the board with a rebuilt `*-Bootloader` firmware (ring-size fix
@@ -198,8 +194,7 @@ close out Stage D formally.
 2. Inspect the `bridge.c` diagnostic counters via debugger after a large
    transfer to confirm they're all zero (currently only inferred indirectly
    from identical repeated reads).
-3. Fix or replace `Dump-ST67-Flash.sh`'s use of `QConn_Eflash.exe --flash -r`
-   per the gotcha above.
+3. Re-validate `Dump-ST67-Flash.sh` across boards with different flash chips.
 4. Update `ST67_Bypass_Bootloader_Project_Guide.md`: replace the "bootloader
    straps not yet specified" section with the verified sequence in
    `st67_mode.c`, and reconcile its STM32G0B1 references with the actual

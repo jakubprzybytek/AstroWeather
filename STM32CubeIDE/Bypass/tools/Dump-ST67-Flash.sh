@@ -13,7 +13,7 @@
 #
 # Usage:
 #   ./Dump-ST67-Flash.sh --port <PORT> [--start <hex>] [--length <hex>]
-#       [--output <path>] [--sdk-root <path>] [--chipname <name>]
+#       [--output <path>] [--sdk-root <path>]
 #
 #   --port       Required. Serial device for the Bypass USB CDC port.
 #   --start      Optional. Flash start address (hex, e.g. 0x0). Default 0x0.
@@ -26,8 +26,6 @@
 #                st67-flash-dump-<start>-<length>.bin in the current
 #                directory. Not deleted automatically.
 #   --sdk-root   Optional. Path to the imported x-cube-st67w61 package.
-#   --chipname   Optional. Vendor eflash-loader chip identifier. Defaults
-#                to qcc743.
 #
 #   Example:
 #     ./Dump-ST67-Flash.sh --port COM4 --length 0x180000
@@ -48,7 +46,6 @@ start="0x0"
 length="0x180000"
 output=""
 sdk_root=""
-chipname="qcc743"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -57,7 +54,6 @@ while [[ $# -gt 0 ]]; do
     --length) length="${2:-}"; shift 2 ;;
     --output) output="${2:-}"; shift 2 ;;
     --sdk-root) sdk_root="${2:-}"; shift 2 ;;
-    --chipname) chipname="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) die "Unknown argument: $1" ;;
   esac
@@ -76,6 +72,8 @@ end_hex="$(printf '0x%x' "$end_dec")"
 if [[ -z "$output" ]]; then
   output="st67-flash-dump-${start}-${length}.bin"
 fi
+output_dir="$(cd "$(dirname "$output")" && pwd)"
+output="$output_dir/$(basename "$output")"
 
 check_port() {
   local port="$1"
@@ -105,21 +103,31 @@ fi
 [[ -d "$sdk_root" ]] || die "X-CUBE-ST67 SDK root was not found: $sdk_root"
 sdk_root="$(cd "$sdk_root" && pwd)"
 
-ncp_info_root="$sdk_root/Projects/ST67W6X_Scripts/Binaries/NCP_info"
-[[ -d "$ncp_info_root" ]] || die "NCP_info directory was not found: $ncp_info_root"
+qconn_root="$sdk_root/Projects/ST67W6X_Scripts/Binaries/QConn_Flash"
+[[ -d "$qconn_root" ]] || die "QConn_Flash directory was not found: $qconn_root"
 
 case "$(uname -s)" in
-  Linux*) eflash_name="QConn_Eflash-ubuntu" ;;
-  MINGW*|MSYS*|CYGWIN*) eflash_name="QConn_Eflash.exe" ;;
-  *) die "Unsupported OS for QConn_Eflash: $(uname -s)" ;;
+  Linux*) flash_cmd_name="QConn_Flash_Cmd-ubuntu" ;;
+  MINGW*|MSYS*|CYGWIN*) flash_cmd_name="QConn_Flash_Cmd.exe" ;;
+  *) die "Unsupported OS for QConn_Flash_Cmd: $(uname -s)" ;;
 esac
 
-mapfile -t eflash_candidates < <(find "$ncp_info_root" -maxdepth 1 -type f -iname "$eflash_name" 2>/dev/null)
-[[ ${#eflash_candidates[@]} -eq 1 ]] || die "Expected exactly one $eflash_name under $ncp_info_root, found ${#eflash_candidates[@]}."
-eflash="${eflash_candidates[0]}"
+mapfile -t flash_cmd_candidates < <(find "$qconn_root" -type f -iname "$flash_cmd_name" 2>/dev/null)
+[[ ${#flash_cmd_candidates[@]} -eq 1 ]] || die "Expected exactly one $flash_cmd_name under $qconn_root, found ${#flash_cmd_candidates[@]}."
+flash_cmd="${flash_cmd_candidates[0]}"
+
+qconn_output="$output"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    command -v cygpath >/dev/null 2>&1 || die "cygpath is required to pass the output path to QConn_Flash_Cmd"
+    qconn_output="$(cygpath -w "$output")"
+    ;;
+esac
 
 echo "Reading $length_dec bytes of ST67 flash from $start to $end_hex (read-only) through $port"
-"$eflash" -r --flash --chipname="$chipname" -p "$port" --start="$start" --end="$end_hex" --file="$output"
+"$flash_cmd" --read --port "$port" --start="$start" --end="$end_hex" --file="$qconn_output"
+
+[[ -f "$output" ]] || die "QConn_Flash_Cmd reported success but did not create the dump: $output"
 
 actual_size=$(wc -c < "$output")
 echo
