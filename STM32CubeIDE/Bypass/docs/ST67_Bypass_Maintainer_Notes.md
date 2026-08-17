@@ -98,7 +98,14 @@ in project-owned files.
   references, the selected/newest firmware version, and the efuse image,
   before generating a temporary absolute-path config and invoking QConn.
   Requires `--force` to actually run QConn; otherwise prints the lock-risk
-  warning and exits 1. Propagates QConn's exact exit code on failure.
+  warning and exits 1. Propagates QConn's exact exit code on failure, and
+  also treats a `Parse para error`/`ErrorCode:`/Python traceback in QConn's
+  own output as a failure even when it exits 0 (it does, for some error
+  paths). The bash version writes native Windows paths (`cygpath -w`) into
+  the generated ini - QConn is a native Windows program that reads that
+  file itself, so MSYS's argv path translation never applies to paths
+  embedded inside it; a raw `/d/...` path gets misread as "root of current
+  drive, folder literally named d".
 - `Query-ST67.sh` - non-destructive efuse/chip-info read via
   `NCP_info/QConn_Eflash.exe -r --efuse --start=0x0 --end=0x1ff` +
   `read_chip_info`. Never needs `--force`. This is the right first check
@@ -136,6 +143,30 @@ in project-owned files.
   programming already includes a built-in verification step regardless of
   which value is configured - `0` is not "no verification".
 
+## Known critical bug (fixed 2026-08-17): write-direction ring overflow
+
+The first real `Program-ST67.sh --force` attempt erased the chip, then the
+boot2 write got zero real acks for ~14 minutes straight (every single
+write-chunk and the write-check retried on a fixed timeout, never a genuine
+ack). Root cause: `USB_TO_UART_RING_SIZE` was 512 bytes, but QConn's own
+loader config specifies `tx_size = 2056` - each write chunk arrives over USB
+as one burst about 4x the ring's capacity, and `CDC_Receive_FS` always
+re-arms the OUT endpoint regardless of ring space (no backpressure), so most
+of every write chunk was silently dropped (would show up as a large
+`usb_to_uart_overflow_count` on a debugger). The ST67 then received
+corrupted/truncated data and never acked it. Reads were unaffected because
+the read-direction ring was already 8192 bytes and isn't host-burst-driven.
+
+Fixed by raising `USB_TO_UART_RING_SIZE` to 8192 in `bridge_config.h`
+(matches the read-side ring). **This requires reflashing the STM32 with a
+rebuilt Bootloader-mode firmware** - it's a firmware bug, not a host-script
+bug, so retrying with only the host-tooling fixes applied would not help.
+
+Also confirmed: a failed/interrupted write does not brick the board. The
+ST67 ROM bootloader lives in mask ROM, independent of external SPI flash
+content, so the same strap/reset entry sequence is always available for a
+retry regardless of flash state.
+
 ## Real-hardware validation on record
 
 Recorded 2026-08-16, board attached on `COM4`:
@@ -153,13 +184,16 @@ Recorded 2026-08-16, board attached on `COM4`:
   bridge is lossless at 2,000,000 baud under sustained real-world load in
   both directions (small commands host->ST67, bulk data ST67->host).
 
-Not yet done: an actual erase/program/verify cycle with `Program-ST67.sh
---force` (plan Stage F), and inspecting the diagnostic counters above via
-debugger immediately after a stress test to close out Stage D formally.
+First real `--force` attempt (2026-08-17, before the ring-size fix above)
+erased the chip and failed to write boot2. Not yet done: a successful full
+erase/program/verify cycle with the fixed firmware reflashed (plan Stage F),
+and inspecting the diagnostic counters via debugger immediately after to
+close out Stage D formally.
 
 ## Open items / suggested next steps
 
-1. Run `Program-ST67.sh --force` once against a known-compatible, low-risk
+1. Reflash the board with a rebuilt `*-Bootloader` firmware (ring-size fix
+   above), then retry `Program-ST67.sh --force` against a known-compatible
    profile and record the result (plan Stage F).
 2. Inspect the `bridge.c` diagnostic counters via debugger after a large
    transfer to confirm they're all zero (currently only inferred indirectly

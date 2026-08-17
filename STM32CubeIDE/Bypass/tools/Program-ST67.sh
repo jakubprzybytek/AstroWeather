@@ -47,6 +47,25 @@ usage() {
   sed -n '2,33p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
+# QConn is a native Windows program: it reads paths out of the generated ini
+# itself, so MSYS's argv path translation never applies to them and a raw
+# "/d/..." path is misread as "root of current drive, folder literally named d".
+to_win_path() {
+  local path="$1"
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      if command -v cygpath >/dev/null 2>&1; then
+        cygpath -w "$path"
+      else
+        printf '%s' "$path" | sed -E 's#^/([A-Za-z])/#\U\1:/#' | tr '/' '\\'
+      fi
+      ;;
+    *)
+      printf '%s' "$path"
+      ;;
+  esac
+}
+
 port=""
 profile=""
 version=""
@@ -166,7 +185,7 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
     configured_path="${configured_path%"${configured_path##*[![:space:]]}"}"
     if [[ $configured_path =~ $firmware_pattern ]]; then
       firmware_matches=$((firmware_matches + 1))
-      resolved_lines+=("filedir = $selected_image")
+      resolved_lines+=("filedir = $(to_win_path "$selected_image")")
     else
       if [[ "$configured_path" = /* ]]; then
         reference_path="$configured_path"
@@ -175,7 +194,7 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
       fi
       resolved_reference="$(realpath -m "$reference_path")"
       [[ -f "$resolved_reference" ]] || die "Configuration references a missing image: $resolved_reference"
-      resolved_lines+=("filedir = $resolved_reference")
+      resolved_lines+=("filedir = $(to_win_path "$resolved_reference")")
     fi
   else
     resolved_lines+=("$line")
@@ -184,9 +203,13 @@ done < "$template_path"
 [[ $firmware_matches -eq 1 ]] || die "Expected exactly one $profile firmware filedir entry in $template_path, found $firmware_matches."
 
 generated_config=""
+qconn_log=""
 cleanup() {
   if [[ -n "$generated_config" && -f "$generated_config" ]]; then
     rm -f -- "$generated_config" || echo "Warning: could not remove $generated_config" >&2
+  fi
+  if [[ -n "$qconn_log" && -f "$qconn_log" ]]; then
+    rm -f -- "$qconn_log" || echo "Warning: could not remove $qconn_log" >&2
   fi
 }
 trap cleanup EXIT
@@ -198,10 +221,18 @@ printf '%s\n' "${resolved_lines[@]}" > "$generated_config"
 
 echo "Programming $profile version $version through $port"
 echo "Using QConn: $qconn"
-result=0
-"$qconn" --port "$port" --config "$generated_config" "--efuse=$efuse_image" || result=$?
+qconn_log="$(mktemp)"
+set +e
+"$qconn" --port "$port" --config "$generated_config" "--efuse=$efuse_image" 2>&1 | tee "$qconn_log"
+result=$?
+set -e
+
+# QConn can print a fatal message and still exit 0; don't trust the exit code alone.
+if [[ $result -eq 0 ]] && grep -qiE 'Parse para error|ErrorCode:|Traceback \(most recent call last\)' "$qconn_log"; then
+  result=1
+fi
 if [[ $result -ne 0 ]]; then
-  echo "Error: QConn_Flash_Cmd failed with exit code $result. Re-enter bootloader mode before any retry." >&2
+  echo "Error: QConn_Flash_Cmd failed (exit $result). Re-enter bootloader mode before any retry." >&2
   exit "$result"
 fi
 echo "QConn programming completed successfully."
