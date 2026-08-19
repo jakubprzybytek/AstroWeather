@@ -18,10 +18,11 @@
 #   --port       Required. Serial device for the Bypass USB CDC port.
 #   --start      Optional. Flash start address (hex, e.g. 0x0). Default 0x0.
 #   --length     Optional. Bytes to read (hex, e.g. 0x180000). Default
-#                0x180000 (1.5 MiB): covers boot2, the partition table, and
-#                the start of the application image. This chip's flash_id
-#                (ef4016) is a 4 MiB (0x400000) part, so --length can be
-#                raised up to that for a full-chip dump.
+#                0x180000 (1.5 MiB): covers boot2 (0x0), the partition table
+#                (0xE000), and the active firmware slot (0x10000). The part
+#                is 4 MiB, so --length can be raised to 0x400000 for a
+#                full-chip dump (which also covers the standby OTA slot at
+#                0x1C4000).
 #   --output     Optional. Where to save the raw dump. Defaults to
 #                st67-flash-dump-<start>-<length>.bin in the current
 #                directory. Not deleted automatically.

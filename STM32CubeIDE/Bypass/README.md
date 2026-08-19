@@ -106,9 +106,15 @@ flashing the STM32 itself.
    touching the device - use that first to sanity-check your arguments.
    A PowerShell equivalent, `tools/Program-ST67.ps1`, is also available with
    the same flags for native PowerShell/CI use on Windows.
-4. `tools/Dump-ST67-Flash.sh` can read back flash content for inspection;
-   see [docs/ST67_Bypass_Maintainer_Notes.md](docs/ST67_Bypass_Maintainer_Notes.md)
-   for a caveat about which underlying vendor tool that script uses.
+4. `tools/Dump-ST67-Flash.sh` reads flash content back for inspection, e.g.
+   to confirm which image a board is actually running:
+
+   ```bash
+   ./tools/Dump-ST67-Flash.sh --port COM4 --length 0x400000
+   ```
+
+   See [docs/ST67_Bypass_Maintainer_Notes.md](docs/ST67_Bypass_Maintainer_Notes.md)
+   for the verified flash map and how to match a dump against a vendor image.
 
 None of the host scripts ever invoke STM32CubeProgrammer or select a NUCLEO
 host image - they only ever touch the Bypass board's own USB CDC port and

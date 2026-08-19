@@ -62,9 +62,25 @@ inspectable via debugger - intentionally not exposed through the CDC stream):
 `usb_to_uart_overflow_count`, `uart_to_usb_overflow_count`,
 `uart_hardware_overrun_count`, `uart_framing_error_count`,
 `uart_noise_error_count`, `uart_parity_error_count`, `usb_tx_failure_count`,
-`usb_tx_stale_flush_count`, `st67_session_reset_count`. All should read 0
-after a healthy session; check them with a debugger after any transport
-stress test.
+`usb_tx_stale_flush_count`, `st67_session_reset_count`. Check them with a
+debugger after any transport stress test.
+
+**`usb_tx_failure_count` is not a data-loss indicator and does not need to be
+zero.** `bridge_uart_to_usb` only advances `uart_to_usb_tail` (i.e. discards
+bytes from the ring) after `CDC_Transmit_FS` returns `USBD_OK`; on failure it
+just resets `usb_tx_busy` and retries the same bytes next loop iteration.
+Confirmed 2026-08-19: a full 4 MiB debugger-instrumented read logged
+`usb_tx_failure_count = 1131` and `uart_framing_error_count = 1`, yet
+re-hashing that exact dump (boot2, partition table, and the active FW slot)
+matched the vendor files byte-for-byte. The counters that actually indicate
+lost/corrupted bytes are the ring overflow counters
+(`usb_to_uart_overflow_count`, `uart_to_usb_overflow_count`) and the
+hardware UART error counters (`uart_hardware_overrun_count`,
+`uart_framing_error_count`, `uart_noise_error_count`,
+`uart_parity_error_count`) - those should be 0, or if not, the dump they
+came from should be independently re-hashed against a known-good image
+before trusting it, since a SHA-256 match is stronger evidence than a clean
+counter reading.
 
 ## LED semantics
 
@@ -138,6 +154,54 @@ in project-owned files.
   programming already includes a built-in verification step regardless of
   which value is configured - `0` is not "no verification".
 
+## Verified ST67 flash map (and the A/B slot trap)
+
+Confirmed 2026-08-18 against a full 4 MiB read-back of a board programmed
+with `Program-ST67.sh --port COM4 --profile MissionT02 --force`:
+
+| Region | Address | Content |
+|---|---|---|
+| boot2 | `0x000000` | `st67w611m_boot2_v8.1.9.bin` (exact match) |
+| partition table | `0x00E000` | `partition.bin` (exact match) |
+| FW slot A (active) | `0x010000` | the programmed profile image (exact match) |
+| FW slot B (standby) | `0x1C4000` | erased `0xFF` unless an OTA has run |
+
+**The `FW` partition entry is an A/B (OTA) pair, not a single address.**
+Entry layout in `partition.bin` at offset `0x34`: `type`, `device`,
+`activeIndex`, `name[8]`, then `addr[0]`, `addr[1]`, `maxlen[0]`,
+`maxlen[1]` as little-endian `uint32`s:
+
+```text
+00000034: 00000046 57000000 00000000 00000100
+00000044: 00401c00 00401b00 00401b00 00000000
+```
+
+- `activeIndex = 0` -> slot A at `addr[0] = 0x00010000` is what runs
+- `addr[1] = 0x001C4000` is the standby slot, `maxlen` `0x1B4000` each
+
+Reading `0x1C4000` and finding all `0xFF` therefore means "no OTA image
+staged", **not** "firmware missing". Mistaking `addr[1]` for the firmware
+address makes every image comparison fail against blank flash.
+
+To identify which image a board is running, compare at `0x10000`:
+
+```bash
+sdk=External/x-cube-st67w61/Projects/ST67W6X_Scripts/Binaries/NCP_Binaries
+for image in "$sdk"/st67w611m_{mission,mfg}_*.bin; do
+  size=$(wc -c < "$image")
+  dd if=dump.bin bs=4096 skip=16 2>/dev/null | head -c "$size" |
+    cmp -s - "$image" && echo "MATCH: $(basename "$image")"
+done
+```
+
+Do **not** try to identify an image by its first 16 bytes: every packaged
+image starts with the same `42464e50...` (`BFNP`) container header, so that
+signature matches all nine of them. Searching `xxd -p` output with
+`grep -bo` is also wrong - it reports offsets into the hex *text*, i.e.
+double the real byte offset. Match on a long chunk taken from well inside
+the image instead, and confirm the candidate offsets are self-consistent
+(a constant delta across several samples) before trusting them.
+
 ## Known critical bug (fixed 2026-08-17): write-direction ring overflow
 
 The first real `Program-ST67.sh --force` attempt erased the chip, then the
@@ -180,24 +244,42 @@ Recorded 2026-08-16, board attached on `COM4`:
   both directions (small commands host->ST67, bulk data ST67->host).
 
 First real `--force` attempt (2026-08-17, before the ring-size fix above)
-erased the chip and failed to write boot2. Not yet done: a successful full
-erase/program/verify cycle with the fixed firmware reflashed (plan Stage F),
-and inspecting the diagnostic counters via debugger immediately after to
-close out Stage D formally.
+erased the chip and failed to write boot2.
+
+Recorded 2026-08-18, with the ring-size fix reflashed - **plan Stage F is
+closed**:
+
+- `Program-ST67.sh --port COM4 --profile MissionT02 --force` completed a
+  full erase/program/verify cycle successfully.
+- An independent 4 MiB read-back confirmed it byte-for-byte: boot2, the
+  partition table, and the active FW slot at `0x10000` all match their
+  vendor files exactly. Active image
+  `st67w611m_mission_t02_v2.0.106.bin`, SHA-256
+  `7762646fdff5f658659389849f20be0235ce3ba1a917b42e6568318762154a90`.
+- That read-back is also the strongest transport evidence on record: a
+  1.27 MiB vendor binary recovered with an exact hash match, so the bridge
+  is lossless in bulk in both directions.
+
+Recorded 2026-08-19 - **plan Stage D is closed**:
+
+- Debugger-instrumented full 4 MiB read logged `usb_tx_failure_count = 1131`
+  and `uart_framing_error_count = 1`; every other counter (both ring
+  overflow counters and the remaining three UART hardware error counters)
+  read 0.
+- Re-hashing that exact dump (not a separate run) still matched boot2, the
+  partition table, and the active FW slot byte-for-byte against the vendor
+  files. This confirms `usb_tx_failure_count` is a benign retry counter (see
+  the note under Reset/session-boundary handling above) and that the single
+  framing error was a one-off line glitch that didn't desync either ring or
+  corrupt any delivered byte.
 
 
 ## Open items / suggested next steps
 
-1. Reflash the board with a rebuilt `*-Bootloader` firmware (ring-size fix
-   above), then retry `Program-ST67.sh --force` against a known-compatible
-   profile and record the result (plan Stage F).
-2. Inspect the `bridge.c` diagnostic counters via debugger after a large
-   transfer to confirm they're all zero (currently only inferred indirectly
-   from identical repeated reads).
-3. Re-validate `Dump-ST67-Flash.sh` across boards with different flash chips.
-4. Update `ST67_Bypass_Bootloader_Project_Guide.md`: replace the "bootloader
+1. Re-validate `Dump-ST67-Flash.sh` across boards with different flash chips.
+2. Update `ST67_Bypass_Bootloader_Project_Guide.md`: replace the "bootloader
    straps not yet specified" section with the verified sequence in
    `st67_mode.c`, and reconcile its STM32G0B1 references with the actual
    STM32G0B0 target.
-5. Delete any stale `build/Debug` / `build/Release` directories left over
+3. Delete any stale `build/Debug` / `build/Release` directories left over
    from before the four-preset scheme, if they reappear.
