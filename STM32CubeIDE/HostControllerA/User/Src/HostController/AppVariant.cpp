@@ -8,5 +8,6 @@ void AppVariant_Init() {
   DebugService::instance().init();
   DebugService::instance().start();
   HostController::StartSt67ProbeTask();
+  SwitchTask::setSwitch1Handler(&HostController::TriggerSt67CwlapProbe);
   SwitchTask::setSwitch2Handler(&HostController::TriggerSt67Probe);
 }

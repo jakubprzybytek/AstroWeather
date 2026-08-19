@@ -235,9 +235,13 @@ bool DebugService::transmit(const uint8_t* data, uint16_t len)
 
 void DebugService::emitStats()
 {
+    char uptime[24];
+    formatUptime(uptime, sizeof(uptime));
+
     char line[96];
     std::snprintf(line, sizeof(line),
-                  "[STATS] sent=%lu dropped=%lu busyDrop=%lu rxOverflow=%lu rxTrunc=%lu",
+                  "%s [STATS] sent=%lu dropped=%lu busyDrop=%lu rxOverflow=%lu rxTrunc=%lu",
+                  uptime,
                   static_cast<unsigned long>(sentCount_), static_cast<unsigned long>(droppedCount_),
                   static_cast<unsigned long>(busyDropCount_), static_cast<unsigned long>(rxOverflowCount_),
                   static_cast<unsigned long>(rxTruncatedCount_));

@@ -1,5 +1,5 @@
-// #include <Debug/BlinkingLed.hpp>
-#include <Debug/DebugService.hpp>
+#include <Debug/BlinkingLed.hpp>
+// #include <Debug/DebugService.hpp>
 
 BlinkingLed::BlinkingLed(GPIO_TypeDef *port, uint16_t pin, uint32_t periodMs,
                          const char *name)

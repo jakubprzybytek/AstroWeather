@@ -18,6 +18,11 @@ public:
     static void handleExtiFalling(uint16_t gpioPin);
 
     // Registers a callback invoked (from SwitchTask's own thread) whenever
+    // SWITCH_1 is pressed. Lets variant-specific code (e.g. HostController)
+    // react to the switch without SwitchTask depending on it directly.
+    static void setSwitch1Handler(void (*handler)());
+
+    // Registers a callback invoked (from SwitchTask's own thread) whenever
     // SWITCH_2 is pressed. Lets variant-specific code (e.g. HostController)
     // react to the switch without SwitchTask depending on it directly.
     static void setSwitch2Handler(void (*handler)());
@@ -37,5 +42,6 @@ private:
 
     Led& led2_;
     static SwitchTask* s_activeInstance;
+    static void (*s_switch1Handler)();
     static void (*s_switch2Handler)();
 };

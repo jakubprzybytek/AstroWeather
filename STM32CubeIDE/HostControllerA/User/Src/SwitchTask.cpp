@@ -2,15 +2,23 @@
 
 #include <Utils/Led.hpp>
 
+#include <Debug/DebugService.hpp>
+
 #include "main.h"
 
 SwitchTask* SwitchTask::s_activeInstance = nullptr;
+void (*SwitchTask::s_switch1Handler)() = nullptr;
 void (*SwitchTask::s_switch2Handler)() = nullptr;
 
 SwitchTask::SwitchTask(Led& led2)
     : Task<512>("SwitchTask", osPriorityNormal), led2_(led2)
 {
     s_activeInstance = this;
+}
+
+void SwitchTask::setSwitch1Handler(void (*handler)())
+{
+    s_switch1Handler = handler;
 }
 
 void SwitchTask::setSwitch2Handler(void (*handler)())
@@ -20,11 +28,13 @@ void SwitchTask::setSwitch2Handler(void (*handler)())
 
 void SwitchTask::onSwitch1Pressed()
 {
+    DebugService::instance().logf(DebugService::Level::Info, "SWITCH_1 press");
     osThreadFlagsSet(getHandle(), kFlagSwitch1);
 }
 
 void SwitchTask::onSwitch2Pressed()
 {
+    DebugService::instance().logf(DebugService::Level::Info, "SWITCH_2 press");
     osThreadFlagsSet(getHandle(), kFlagSwitch2);
 }
 
@@ -40,6 +50,10 @@ void SwitchTask::run()
         if ((flags & kFlagSwitch1) != 0U)
         {
             led2_.blink(kSwitch1BlinkMs);
+            if (s_switch1Handler != nullptr)
+            {
+                s_switch1Handler();
+            }
         }
         if ((flags & kFlagSwitch2) != 0U)
         {
