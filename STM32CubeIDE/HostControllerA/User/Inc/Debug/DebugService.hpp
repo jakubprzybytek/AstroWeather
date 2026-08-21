@@ -15,7 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 
-class DebugService : public Task<1024>
+class DebugService : public Task<1536>
 {
 public:
     enum class Level : uint8_t { Info, Warn, Error };

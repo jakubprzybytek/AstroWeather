@@ -381,11 +381,15 @@ Exit criteria:
 
 ### Phase 2 - Official W6X driver smoke test
 
+Detailed implementation steps, callback ownership, failure boundaries, and
+validation gates are defined in
+[`ST67_Phase_2_Implementation_Plan.md`](ST67_Phase_2_Implementation_Plan.md).
+
 Implement the smallest official-driver task, following the package's T02 examples:
 
 1. Create a persistent `W6X_App_Cb_t` callback table. Its lifetime must exceed the initialized driver lifetime.
-2. Call `W6X_RegisterAppCb()` before driver initialization.
-3. Call `W6X_Init()` and verify module/network-mode information.
+2. Call `W6X_Init()` as the first W6X API and verify module/network-mode information.
+3. Call `W6X_RegisterAppCb()` before Wi-Fi initialization.
 4. Call `W6X_WiFi_Init()`.
 5. Call `MX_LWIP_Init()` only after Wi-Fi initialization, because it queries station/AP MAC addresses and initializes `W6X_Netif`.
 6. Run `W6X_WiFi_Scan()` and wait on a bounded event flag for scan completion.
@@ -398,6 +402,50 @@ Exit criteria:
 
 - Boot, module information, Wi-Fi init, LwIP init, and scan all succeed from a cold `CHIP_EN`-low start.
 - The sequence succeeds repeatedly without leaked heap.
+
+#### Phase 2 validation result (2026-08-21)
+
+The first bench run completed the official-driver smoke test after a switch 1
+press. The module reported X-CUBE-ST67W61 1.3.0 and SDK 2.0.106;
+`W6X_Init()`, callback registration, `W6X_WiFi_Init()`, and `MX_LWIP_Init()`
+all returned success. The asynchronous scan callback completed successfully
+and reported 20 APs.
+
+Resource measurements from the run were:
+
+| Point | Free heap | Minimum-ever heap |
+|---|---:|---:|
+| Before W6X | 39,080 B | 39,080 B |
+| After W6X | 33,184 B | 31,536 B |
+| After Wi-Fi | 33,104 B | 31,464 B |
+| After LwIP | 24,752 B | 24,752 B |
+| After scan | 23,824 B | 22,136 B |
+
+The ST67 service task retained 472 bytes at its lowest observed watermark and
+the run had no debug queue drops, USB overflow, or truncation. DebugService
+initially retained only 128 bytes, below the Phase 2 256-byte margin, so its
+static stack was increased from 1,024 to 1,536 bytes. The scan request was also
+reduced from 32 to 20 results to match the vendor's fixed
+`W61_WIFI_MAX_DETECTED_AP=20` storage and eliminate the corresponding warning.
+
+The run is functionally successful. A post-stack-change watermark capture and
+ten cold-boot repetitions remain required before closing the Phase 2
+definition of done.
+
+#### Phase 2 post-fix validation (2026-08-21)
+
+After increasing the official driver's SPI transfer task stack from 768 to
+1,536 bytes, the scan completed without further HardFaults. Two post-scan
+captures reported stable heap values:
+
+| Capture | Free heap | Minimum-ever heap |
+|---|---:|---:|
+| 1 | 23,056 B | 21,368 B |
+| 2 | 23,056 B | 21,376 B |
+
+The result supports the stack-corruption diagnosis and confirms that the
+official-driver scan path remains within the Phase 2 8 KB minimum heap margin.
+The ten cold-boot repetition test is still outstanding.
 
 ### Phase 3 - Connect, DHCP, disconnect, and shutdown
 

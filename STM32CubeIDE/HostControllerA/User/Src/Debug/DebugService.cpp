@@ -18,7 +18,7 @@ DebugService& DebugService::instance()
 }
 
 DebugService::DebugService()
-    : Task<1024>("DebugService", osPriorityNormal),
+    : Task<1536>("DebugService", osPriorityNormal),
       logQueueHandle_(nullptr), logQueueCb_{}, logQueueStorage_{},
       rxRing_{}, rxHead_(0), rxTail_(0),
       rxLine_{}, rxLineLen_(0), rxLineTruncated_(false),
