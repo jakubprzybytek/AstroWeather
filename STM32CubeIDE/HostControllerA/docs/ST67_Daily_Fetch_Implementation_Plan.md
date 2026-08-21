@@ -340,16 +340,44 @@ items. No heap, LwIP, task-size, SPI, or DMA tuning was made for this baseline.
 
 ### Phase 1 - Make the generated transport production-ready
 
-1. Update `HostControllerA.ioc` for an approximately 8 MHz SPI clock and SPI1 RX/TX DMA.
+1. Update `HostControllerA.ioc` for an approximately 1 MHz SPI clock and SPI1 RX/TX DMA. The initial production-ready target is intentionally conservative; increase the clock only after the transport is stable on the bench.
 2. Regenerate and review only the expected changes in `Core/Src/main.c`, `Core/Src/stm32g0xx_hal_msp.c`, interrupt files, and DMA handles.
-3. Verify that all SPI DMA completion callbacks reach `spi_port_transaction_complete_cb`.
+3. Verify that all SPI DMA completion callbacks reach `spi_port_transaction_complete_cb`, and that ST67 RDY rising edges reach `spi_on_txn_data_ready`.
 4. Change SPI error handling from a permanent global halt to an error path that the lifecycle owner can report and recover from, after basic bring-up is proven.
-5. Validate repeated raw transport initialization with the ST driver, not the manual frame implementation.
+5. Validate DMA completion and repeated raw port initialization/deinitialization with a temporary bounded low-level harness. Keep `W6X_Init()` and end-to-end W61 protocol validation in Phase 2.
+
+#### Phase 1 validation result (2026-08-21)
+
+The temporary DMA validation task was run for 100 init/deinit cycles and then
+removed from the product source. The captured result was:
+
+```text
+cycles=100 starts=100 completions=100 timeouts=0 halErrors=0 initFailures=0
+heapFree=39080 heapMin=39080
+```
+
+All 100 DMA transfers completed, with no timeout, HAL error, or initialization
+failure. FreeRTOS heap usage remained stable at 39,080 bytes free. The first
+run used a 1,024-byte validation stack and reached only 168 bytes remaining
+after the summary log. The stack was increased to 1,536 bytes for the final
+run; it reported 680 bytes remaining after the test and 1,224 bytes before
+the summary log. No stack overflow occurred. The `heapBefore=3908` field in
+the captured summary was truncated by the fixed 127-character debug record;
+the `[MEM]` lines confirm the full value was 39,080.
+
+The validation task and its compile-time switch were removed after this
+measurement. The normal HostController startup now returns to `St67ProbeTask`.
+The result validates the MCU DMA completion path and repeated raw port
+cycling, but does not validate a complete W61 protocol transaction. That
+remains a Phase 2 `W6X_Init()` smoke-test responsibility.
 
 Exit criteria:
 
-- DMA-backed SPI transfers complete without timeout or HAL error.
-- RDY/CS behavior matches the package protocol over at least 100 init/deinit cycles.
+- SPI1 measures approximately 1 MHz with the expected mode-0 timing.
+- DMA-backed SPI transfers completed 100/100 without timeout or HAL error in the controlled low-level test.
+- The transport recovers from an aborted/error transfer without entering `Error_Handler()` or leaving CS asserted.
+- CHIP_EN and port callback state remained correct over 100 init/deinit cycles.
+- End-to-end W61 protocol and package RDY/CS conformance are explicitly deferred to the Phase 2 `W6X_Init()` smoke test.
 
 ### Phase 2 - Official W6X driver smoke test
 

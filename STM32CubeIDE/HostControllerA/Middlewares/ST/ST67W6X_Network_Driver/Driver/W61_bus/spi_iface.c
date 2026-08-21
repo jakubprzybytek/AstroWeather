@@ -533,6 +533,12 @@ static int32_t spi_txrx(struct spi_xfer_engine *engine, void *tx_buf, void *rx_b
       SPI_STAT_INC(&engine->stat, wait_msg_xfer_timeouts, 1U);
       return -3;
     }
+    if (spi_port_take_error(NULL) != 0)
+    {
+      spi_err("spi txrx asynchronous error\n");
+      SPI_STAT_INC(&engine->stat, io_err, 1U);
+      return -4;
+    }
   }
 
   return 0;
@@ -577,6 +583,12 @@ static int32_t spi_rx(struct spi_xfer_engine *engine, void *rx_buf, uint16_t len
       spi_err("spi rx transaction timeouted\n");
       SPI_STAT_INC(&engine->stat, wait_msg_xfer_timeouts, 1U);
       return -3;
+    }
+    if (spi_port_take_error(NULL) != 0)
+    {
+      spi_err("spi rx asynchronous error\n");
+      SPI_STAT_INC(&engine->stat, io_err, 1U);
+      return -4;
     }
   }
 
