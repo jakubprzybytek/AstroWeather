@@ -189,6 +189,58 @@ Exit criteria:
 - Hardware link evidence and baseline memory numbers are saved.
 - T02 firmware compatibility is confirmed.
 
+#### Phase 0.1 - Manual AT/CWLAP log baseline (2026-08-21)
+
+The current manual SPI probe was run through the switch-triggered `AT` and
+`CWLAP` paths. The module was not reset between probes: after the initial
+startup exchange, subsequent probes reused the powered module and station-mode
+state.
+
+Representative successful startup and scan:
+
+```text
+[0:00:00:13] [INFO] ST67 startup: '\nready\n'
+[0:00:00:13] [INFO] ST67 CWMODE=1: '\nOK\n'
+[0:00:00:20] [INFO] ST67 CWLAP attempt 1/3: 21 read(s), terminated=1, 19 AP(s)
+```
+
+Additional completed scans in the same run reported:
+
+| Scan result | SPI reads | Terminator | AP records |
+|---|---:|---:|---:|
+| Empty result | 2 | `OK` | 0 |
+| Successful scan | 21 | `OK` | 19 |
+| Successful scan | 17 | `OK` | 15 |
+| Successful scan | 18 | `OK` | 16 |
+| Successful scan | 16 | `OK` | 14 |
+
+Representative AP records included:
+
+```text
+ST67 AP: +CWLAP:(3,"lemo",-32,"2c:fd:a1:39:86:d0",5,-1,-1,4,7,1)
+ST67 AP: +CWLAP:(4,"Midgaard",-88,"52:e9:31:49:fa:4f",3,-1,-1,5,15,1)
+ST67 AP: +CWLAP:(4,"PLAY_Swiatlowodowy_6B3C",-88,"5c:7b:5c:21:6b:...,3,-1,-1,5,15,1)
+```
+
+The SPI transport was stable during the completed scans. RDY assertion was
+normally `0-2 ms` after the first startup, RDY deassertion was `0-1 ms`, and
+the cold startup RDY assertion was approximately `570 ms`. The scan response
+arrived over many framed SPI reads, with individual payloads typically around
+`60-78` bytes. A complete result required up to 21 reads in this sample, so a
+single-frame or fixed ten-read implementation is insufficient.
+
+The same capture also contained completed zero-result scans and one
+`CWMODE=1` response of `ERROR`. These observations are retained as diagnostic
+evidence rather than treated as transport failures: the successful scans
+returned the expected `OK` terminator and multiple `+CWLAP:` records, while
+the cause of intermittent empty scans still requires correlation with RF
+conditions, scan timing, and switch-trigger timing.
+
+Baseline conclusion: raw SPI framing, CS/RDY handshaking, multi-frame AT
+responses, and manual AP enumeration are demonstrated. The log capture does
+not yet prove ST67 firmware identity, T02 compatibility, or complete RF scan
+repeatability; those remain separate Phase 0 exit items.
+
 ### Phase 1 - Make the generated transport production-ready
 
 1. Update `HostControllerA.ioc` for an approximately 8 MHz SPI clock and SPI1 RX/TX DMA.
