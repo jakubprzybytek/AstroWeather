@@ -1,0 +1,399 @@
+# ST67W611M1 Daily Fetch Feasibility and Implementation Plan
+
+## 1. Purpose and scope
+
+The target behavior is:
+
+1. Wake or power up the ST67W611M1.
+2. Join a configured Wi-Fi access point as a station.
+3. Obtain network connectivity through LwIP running on the STM32 host.
+4. Fetch data from a configured URL.
+5. Close the network transaction and disconnect from the access point.
+6. Put the ST67W611M1 into its lowest appropriate power state.
+7. Process the fetched data on the host.
+8. Repeat once per day.
+
+The immediate implementation scope is only reliable communication with the ST67W611M1 through ST's `ST67W6X_Network_Driver`. HTTP, HTTPS, response parsing, daily scheduling, and host low power are later milestones.
+
+## 2. Feasibility conclusion
+
+**The functionality is feasible in this project, with required integration work and one important resource caveat.**
+
+The project already has most of the correct software structure:
+
+- X-CUBE-ST67W61 1.3.0 is vendored under `External/x-cube-st67w61`.
+- The build selects `ST67_ARCH=W6X_ARCH_T02`, which is the required LwIP-on-host architecture.
+- ST's service API, AT driver, SPI bus layer, netif bridge, LwIP 2.2.x, FreeRTOS, and board-specific `spi_port.c` are present in the build.
+- The STM32G0B1 provides 512 KB flash and 144 KB RAM, above ST's stated minimum of 256 KB flash and 48 KB RAM.
+- The board exposes SPI, `SPI_CS`, `SPI_RDY`, `CHIP_EN`, and `BOOT` signals.
+- The existing `St67ProbeTask` has already exercised the physical SPI framing and basic AT exchange. This substantially reduces hardware uncertainty.
+
+The current project is not yet able to use the official driver end to end:
+
+- `Appli/App/main_app.h` and `Appli/App/app_config.h` are empty.
+- No application code calls `W6X_RegisterAppCb`, `W6X_Init`, `W6X_WiFi_Init`, or `MX_LWIP_Init`.
+- `St67ProbeTask` directly owns SPI, CS, RDY, and module power. It must not run concurrently with the ST driver.
+- SPI1 is configured at only 62.5 kbit/s. This may prove control commands but is unsuitable for practical network traffic.
+- SPI RX/TX DMA is not configured in the generated MSP code. The ST bus driver uses DMA for transfers above its threshold, so this is a functional blocker for full driver operation.
+- The project uses a 40 KB FreeRTOS heap. ST reports roughly 13-40 KB dynamic use across examples, before this project's other tasks are considered. Runtime measurement and tuning are mandatory.
+- Host LwIP consumes substantial static RAM. ST documents about 46 KB for its default LwIP projects; this project's `lwipopts.h` is somewhat reduced, but actual map and runtime measurements are still required.
+- HTTPS is not currently complete. `http_client.c` is present, but mbedTLS is not linked and `MBEDTLS_CONFIG_FILE` is not defined. Plain HTTP can be added earlier; HTTPS requires a separate RAM/flash assessment.
+
+### Feasibility rating
+
+| Area | Assessment | Notes |
+|---|---|---|
+| Physical host-to-ST67 link | High confidence | Manual framed AT probe exists and has scan support. |
+| Official driver bring-up | Feasible after fixes | Configure DMA/speed and replace direct probe ownership. |
+| Station connect/disconnect | Feasible | Directly supported by W6X Wi-Fi APIs and T02 examples. |
+| Host DHCP/DNS/TCP | Feasible | LwIP netif bridge and required LwIP sources are present. |
+| Plain HTTP GET | Feasible | A host-side HTTP client is already generated. |
+| HTTPS GET | Feasible but resource-sensitive | Requires mbedTLS, CA policy, entropy/time strategy, and memory validation. |
+| ST67 daily shutdown/wake | Feasible | `W6X_DeInit()` powers off through `CHIP_EN`; reinitialization must be proven. |
+| STM32 host daily sleep | Not assessed here | Separate RTC/wakeup and board power work is required later. |
+
+## 3. Architecture required by T02
+
+The selected T02 architecture places the responsibilities as follows:
+
+```text
+Application state machine
+  |  Wi-Fi control: W6X_WiFi_*
+  |  IP traffic: LwIP DNS/socket/HTTP APIs
+  v
+ST67W6X service API              Host LwIP
+  | AT control                     | Ethernet-like frames
+  +---------------+----------------+
+                  v
+        W61 AT driver + NET_IF
+                  v
+             spi_iface task
+                  v
+      SPI1 + DMA + CS/RDY/CHIP_EN
+                  v
+             ST67W611M1
+       mission_t02 v2.0.106 firmware
+```
+
+T02 has two separate traffic types over the same SPI transport:
+
+- AT commands and asynchronous events control system and Wi-Fi behavior.
+- Network frames move directly between ST's `NET_IF` and host LwIP; they are not wrapped in AT commands.
+
+The W6X network, HTTP, and MQTT offload APIs are disabled in T02. The application must use host LwIP for DHCP, DNS, sockets, HTTP, and future TLS.
+
+## 4. Firmware and hardware prerequisites
+
+### 4.1 ST67 firmware
+
+Flash the ST67W611M1 with the T02 mission image that matches package 1.3.0. X-CUBE-ST67W61 1.3.0 corresponds to ST67 SDK firmware 2.0.106. `W6X_Init()` queries the module network mode and deliberately fails if a T01 image is used with a T02 host build.
+
+Acceptance check:
+
+- `W6X_Init()` reports network mode 0 and prints SDK version 2.0.106 or an explicitly validated compatible T02 version.
+
+### 4.2 SPI and GPIO
+
+Update the IOC and regenerate the STM32 peripheral code:
+
+- Keep SPI1 full-duplex master, 8-bit data, and software-controlled CS.
+- Configure SPI clock below ST's 40 MHz maximum. Start conservatively around 8 MHz, validate, then increase if useful.
+- Add SPI1 RX and TX DMA channels with memory increment enabled and high priority.
+- Enable the corresponding DMA interrupt and keep its priority valid for FreeRTOS API use.
+- Keep `SPI_CS` as push-pull output with the polarity expected by `spi_port_set_cs()`.
+- Keep `CHIP_EN` and `BOOT` as push-pull outputs; `BOOT` must be low for mission firmware.
+- Keep `SPI_RDY` connected and readable. ST's package documentation recommends both-edge EXTI; the current driver polls RDY in its dedicated SPI task, but the generated configuration should remain aligned with the package unless inspection proves EXTI is unused for this target.
+- Ensure SPI1 is not shared with another slave. ST specifies single-slave operation.
+
+Electrical checks before driver bring-up:
+
+- Confirm the module sees valid VDD before raising `CHIP_EN`.
+- Guarantee at least 3.3 ms between module power becoming valid and `CHIP_EN` going high.
+- Confirm the board provides the recommended 100 nF capacitor from `CHIP_EN` to ground.
+- Confirm CS, RDY, BOOT, and CHIP_EN idle levels with a logic analyzer.
+
+### 4.3 RTOS and memory
+
+The driver requires FreeRTOS and creates at least a SPI transfer task and modem receive task. T02 also creates a netif task and LwIP TCP/IP task.
+
+Before adding HTTP or TLS:
+
+- Enable stack overflow checking, which is already configured.
+- Record `xPortGetFreeHeapSize()` and `xPortGetMinimumEverFreeHeapSize()` after each milestone.
+- Record stack high-water marks for the SPI, modem RX, netif, TCP/IP, debug, switch, and application tasks.
+- Require at least 8 KB minimum-ever free FreeRTOS heap during extended connect/disconnect testing; increase this margin before TLS.
+- Produce a linker map summary for flash, `.data`, and `.bss` after enabling the full T02 path.
+- Reduce unused LwIP features and pools only from measured evidence. Do not reduce packet buffers until traffic tests pass.
+
+## 5. Ownership and application boundaries
+
+Create one application-level owner for the ST67 lifecycle. No other task may directly use SPI1, CS, RDY, or CHIP_EN while that owner is active.
+
+Suggested C++ boundary:
+
+```cpp
+enum class St67State {
+  Off,
+  Starting,
+  Ready,
+  Connecting,
+  Online,
+  Disconnecting,
+  Stopping,
+  Fault
+};
+
+struct St67Result {
+  bool success;
+  int32_t driverStatus;
+  uint32_t detail;
+};
+```
+
+The owner should expose asynchronous commands or a single worker-task API rather than allowing arbitrary callers to invoke W6X APIs. W6X callbacks should only copy event data and set task/event flags; they should not run the full workflow.
+
+During initial integration, replace `StartSt67ProbeTask()` in `AppVariant_Init()` with the official driver task. Keep the probe source available behind an explicit build option only if it remains useful for low-level diagnosis. Never compile both owners into an active runtime path.
+
+## 6. Target state machine
+
+```text
+OFF
+  -> STARTING: CHIP_EN/driver initialization
+  -> READY: W6X and host LwIP initialized
+  -> CONNECTING: station connect requested
+  -> ONLINE: Wi-Fi connected and host DHCP has a nonzero address
+  -> FETCHING: DNS and HTTP(S) transaction (later scope)
+  -> DISCONNECTING: sockets closed, W6X_WiFi_Disconnect completed
+  -> STOPPING: LwIP/netif and W6X teardown
+  -> OFF: CHIP_EN low
+
+Any active state
+  -> FAULT: bounded timeout or driver error
+  -> STOPPING: best-effort cleanup
+  -> OFF: retry is scheduled with backoff
+```
+
+Wi-Fi association and usable IP connectivity are different conditions. `W6X_WIFI_EVT_CONNECTED_ID` means association succeeded; the fetch may begin only after the host LwIP station netif is link-up and DHCP has assigned a nonzero address. Do not use an unconditional fixed delay as the production DHCP gate.
+
+## 7. Phased implementation
+
+### Phase 0 - Establish reproducible baselines
+
+1. Preserve logs from the current manual `AT` and `CWLAP` probes.
+2. Record current build flash/RAM usage and FreeRTOS heap margin.
+3. Record ST67 firmware identity and confirm that the installed image is T02 2.0.106.
+4. Capture one successful SPI transaction on a logic analyzer: CS polarity, RDY transitions, clock mode, and startup timing.
+
+Exit criteria:
+
+- Hardware link evidence and baseline memory numbers are saved.
+- T02 firmware compatibility is confirmed.
+
+### Phase 1 - Make the generated transport production-ready
+
+1. Update `HostControllerA.ioc` for an approximately 8 MHz SPI clock and SPI1 RX/TX DMA.
+2. Regenerate and review only the expected changes in `Core/Src/main.c`, `Core/Src/stm32g0xx_hal_msp.c`, interrupt files, and DMA handles.
+3. Verify that all SPI DMA completion callbacks reach `spi_port_transaction_complete_cb`.
+4. Change SPI error handling from a permanent global halt to an error path that the lifecycle owner can report and recover from, after basic bring-up is proven.
+5. Validate repeated raw transport initialization with the ST driver, not the manual frame implementation.
+
+Exit criteria:
+
+- DMA-backed SPI transfers complete without timeout or HAL error.
+- RDY/CS behavior matches the package protocol over at least 100 init/deinit cycles.
+
+### Phase 2 - Official W6X driver smoke test
+
+Implement the smallest official-driver task, following the package's T02 examples:
+
+1. Create a persistent `W6X_App_Cb_t` callback table. Its lifetime must exceed the initialized driver lifetime.
+2. Call `W6X_RegisterAppCb()` before driver initialization.
+3. Call `W6X_Init()` and verify module/network-mode information.
+4. Call `W6X_WiFi_Init()`.
+5. Call `MX_LWIP_Init()` only after Wi-Fi initialization, because it queries station/AP MAC addresses and initializes `W6X_Netif`.
+6. Run `W6X_WiFi_Scan()` and wait on a bounded event flag for scan completion.
+7. Log structured status and memory watermarks through `DebugService`.
+8. On shutdown, deinitialize in reverse order once the necessary deinit behavior has been verified.
+
+Do not initialize BLE, soft AP, MQTT, shell, or ST's logging task for this product path. They consume RAM and are not needed for the daily station workflow.
+
+Exit criteria:
+
+- Boot, module information, Wi-Fi init, LwIP init, and scan all succeed from a cold `CHIP_EN`-low start.
+- The sequence succeeds repeatedly without leaked heap.
+
+### Phase 3 - Connect, DHCP, disconnect, and shutdown
+
+1. Store SSID/password in a product configuration boundary, not directly in generated files or source control. For initial bench testing, a local ignored configuration header is acceptable.
+2. Populate `W6X_WiFi_Connect_Opts_t` and call `W6X_WiFi_Connect()`.
+3. Handle connected, disconnected, reason, and driver error callbacks.
+4. Wait for LwIP station netif link-up and a nonzero DHCP address with a bounded timeout.
+5. Log SSID, channel, RSSI, IPv4 address, gateway, DNS server, elapsed association time, and elapsed DHCP time. Do not log credentials.
+6. Optionally resolve a test hostname through LwIP DNS to prove the complete T02 data path without implementing HTTP.
+7. Call `W6X_WiFi_Disconnect(1)` and wait for the disconnected event. The `restore=1` choice prevents automatic reconnection from undermining the daily duty cycle.
+8. Shut down the module with `W6X_DeInit()`. In package 1.3.0 this sets hibernate, deinitializes W61, and drives `CHIP_EN` low through `spi_port_deinit()`.
+9. Re-run the full initialization path after a delay to prove that driver and netif resources can be recreated safely.
+
+The T02 LwIP code currently has no public deinitializer and allocates netif structures/tasks dynamically. This must be resolved before daily `W6X_DeInit()`/reinit is accepted. Choose one of these designs after a focused test:
+
+- Preferred if supported: initialize W6X/LwIP once, disconnect daily, leave host network tasks alive, and use ST67 automatic standby between jobs. This avoids task/netif recreation but does not reach the 200 nA shutdown state.
+- Preferred for minimum module energy: add a symmetric, idempotent LwIP/netif teardown, then call `W6X_DeInit()` and use `CHIP_EN` shutdown. This needs careful task, timer, netif, DHCP, and allocation cleanup.
+- If the host also reboots or enters a reset-equivalent state each day: cold boot with `CHIP_EN` low and initialize everything once per host boot. This is operationally simple and compatible with full ST67 shutdown.
+
+Exit criteria:
+
+- 100 consecutive connect, DHCP, disconnect cycles pass.
+- At least 20 shutdown and cold reinitialization cycles pass if full shutdown is selected.
+- No downward trend appears in minimum-ever heap or task count.
+
+### Phase 4 - Host network fetch, intentionally deferred
+
+Start with a deterministic small HTTP endpoint on the local network:
+
+1. Resolve the hostname with LwIP DNS.
+2. Use the generated host-side `HTTP_Client_Request()` or a minimal LwIP socket client.
+3. Stream response chunks into a bounded consumer; do not allocate based solely on remote `Content-Length`.
+4. Enforce DNS, connect, receive, total transaction, and maximum-response limits.
+5. Validate status code, content type, framing, and truncation handling.
+6. Close the socket before Wi-Fi disconnect.
+
+For production HTTPS:
+
+1. Add mbedTLS 3.6.x compatible with the package and define `MBEDTLS_CONFIG_FILE`.
+2. Select only required TLS algorithms and certificate parsing features.
+3. Define trust policy: pinned CA or public CA bundle, hostname verification mandatory.
+4. Provide a cryptographically appropriate entropy source.
+5. Provide certificate-time validation. SNTP requires network connectivity and itself needs a trust/bootstrap policy; a retained RTC or constrained certificate strategy may be preferable.
+6. Measure worst-case TLS heap and stack use on the STM32G0B1 before accepting HTTPS as feasible in the final image.
+
+Exit criteria:
+
+- The complete response is fetched repeatedly with bounded memory.
+- Failure at every network stage still proceeds to disconnect and the selected power state.
+
+### Phase 5 - Daily scheduler and data handoff, later scope
+
+1. Trigger the lifecycle owner from an RTC/alarm scheduler rather than a 24-hour RTOS delay.
+2. Use a monotonic job identifier and persist last-success time if missed or duplicate fetches matter.
+3. Apply bounded retry with exponential backoff inside a daily attempt window.
+4. Hand an immutable, length-delimited response to the processing task through a queue or ownership-transfer buffer.
+5. Keep scheduling, transport, and parsing as separate components so malformed data cannot strand the radio online.
+
+## 8. Power-mode decision
+
+ST documents two relevant mechanisms:
+
+- `W6X_SetPowerMode(1)` enables NCP power save. When unconnected, the module enters standby after commands. While connected, it uses DTIM standby by default. CS is also the hardware wake signal from deep sleep.
+- Driving `CHIP_EN` low holds the module in reset and enters shutdown, with a documented typical consumption of 200 nA. Raising it starts a cold module boot.
+
+For a once-per-day transaction, shutdown is the likely final choice, but only after lifecycle teardown/reinitialization is leak-free. Until then, automatic standby is the safer integration state.
+
+The current `W6X_POWER_SAVE_AUTO=1` is appropriate. ST warns that the NCP must exit low power before data traffic; the package's SPI/CS and Wi-Fi API implementation handles this. Application code should use W6X APIs rather than manipulating CS to wake the module.
+
+## 9. Error handling and observability
+
+Every stage needs a bounded timeout and a stable result code:
+
+| Stage | Required diagnostics |
+|---|---|
+| Driver init | W6X status, module SDK, T01/T02 mismatch, elapsed time |
+| Scan | completion/timeout, result count |
+| Association | W6X reason event, elapsed time, retry count |
+| DHCP | link state, address, timeout, elapsed time |
+| DNS | hostname, LwIP error, elapsed time |
+| Fetch | status, bytes, HTTP status, timeout stage |
+| Disconnect | event/reason, elapsed time |
+| Shutdown | CHIP_EN/RDY final levels, elapsed time |
+| Resources | free/minimum heap, task stack high-water marks |
+
+Never log Wi-Fi passwords, authorization headers, URL secrets, response secrets, or certificate private material.
+
+Recovery policy:
+
+1. Close any open socket.
+2. Request Wi-Fi disconnect if the driver is responsive.
+3. Stop or deinitialize networking according to the selected lifecycle design.
+4. Drive the module to a known power state.
+5. Report the failure and schedule a bounded retry.
+6. Escalate to host reset only after repeated transport-level failures and only if other product functions permit it.
+
+## 10. Validation matrix
+
+### Bench functional tests
+
+- Cold boot with access point available and unavailable.
+- Correct, incorrect, and changed credentials.
+- AP disappears during association, DHCP, DNS, and transfer.
+- DHCP server absent or slow.
+- DNS failure and server refusal.
+- Repeated manual button-triggered lifecycle before daily scheduling exists.
+- Disconnect while traffic is idle and active.
+- ST67 shutdown followed by cold wake and reconnect.
+
+### Stress tests
+
+- 100 connect/disconnect cycles.
+- 20 or more full `CHIP_EN` shutdown/reinitialization cycles.
+- 24-hour run with frequent accelerated jobs.
+- Maximum expected response and deliberately oversized response.
+- USB debug traffic concurrent with Wi-Fi traffic.
+- Heap and task-stack watermark collection at every iteration.
+
+### Electrical and power tests
+
+- Logic-analyzer capture of SPI/DMA and CS/RDY timing at the selected clock.
+- Measure ST67 current in off, disconnected standby, associated DTIM standby, and active transfer states.
+- Confirm `CHIP_EN` low reaches shutdown current and RDY reaches the expected idle level.
+- Confirm no host GPIO back-powers the module while `CHIP_EN` is low.
+
+## 11. Expected file changes by milestone
+
+| File or area | Planned change |
+|---|---|
+| `HostControllerA.ioc` | SPI speed, RX/TX DMA, interrupt/platform settings |
+| `Core/Src/main.c` and MSP/IRQ files | Regenerated SPI/DMA setup only |
+| `ST67W6X_Network_Driver/Target/spi_port.c` | Minimal board/error/recovery adaptations if required |
+| `Appli/App/app_config.h` | Non-secret defaults, timeouts, power policy; no committed credentials |
+| `User/Inc/HostController` | Lifecycle owner public API and result types |
+| `User/Src/HostController` | Driver state machine and callbacks |
+| `User/Src/HostController/AppVariant.cpp` | Start official lifecycle owner instead of manual probe |
+| `User/Src/HostController/St67ProbeTask.cpp` | Disable from normal runtime or remove after migration |
+| `LWIP/App/lwip.c` and `lwip_netif.c` | Event hooks and, if full shutdown is selected, symmetric teardown |
+| `LWIP/Target/lwipopts.h` | Only measured memory/feature tuning |
+| `Core/Inc/FreeRTOSConfig.h` | Heap adjustment based on measured peak use |
+| CMake files | Remove unused modules; later add mbedTLS only for HTTPS |
+
+Generated CubeMX files should be changed through the IOC where possible. User code should remain outside generated files except for small, protected port hooks.
+
+## 12. Recommended first implementation increment
+
+The first coding increment should do exactly this:
+
+1. Configure SPI1 DMA and a practical SPI clock.
+2. Disable the manual probe runtime path.
+3. Add one worker task with a persistent callback table.
+4. Execute `W6X_Init -> W6X_WiFi_Init -> MX_LWIP_Init -> scan` once on button press.
+5. Log status and heap/stack watermarks.
+6. Leave the ST67 initialized after the scan; do not yet add connect, HTTP, or repeated teardown.
+
+This increment isolates the highest-risk transition: moving from proven raw SPI framing to ST's multi-task T02 transport and host netif.
+
+## 13. References reviewed
+
+### ST documentation
+
+- Introduction to Wi-Fi, X-CUBE-ST67W61 section: https://wiki.st.com/stm32mcu/wiki/Connectivity:Introduction_to_Wi-Fi#X-CUBE-ST67W61
+- X-CUBE-ST67W61 Overview: https://wiki.st.com/stm32mcu/wiki/Connectivity:X-CUBE-ST67W61_Overview
+- X-CUBE-ST67W61 Architecture: https://wiki.st.com/stm32mcu/wiki/Connectivity:X-CUBE-ST67W61_Architecture
+- ST67W6X Echo Application: https://wiki.st.com/stm32mcu/wiki/Connectivity:Wi-Fi_ST67W6X_Echo_Application
+- How to use X-CUBE-ST67W61 STM32CubeMX pack: https://wiki.st.com/stm32mcu/wiki/Connectivity:Wi-Fi_How_to_use_X_CUBE_ST67W61_STM32CubeMx_pack
+- ST67W611M1 CHIP_EN and shutdown feature: https://wiki.st.com/stm32mcu/wiki/Connectivity:ST67W611M1_shutdown
+- ST67W611M1 wake-up feature: https://wiki.st.com/stm32mcu/wiki/Connectivity:ST67W611M1_Wake-up
+- ST67W611M1 32.768 kHz and low-power operation: https://wiki.st.com/stm32mcu/wiki/Connectivity:ST67W611M1_32KHz_management
+
+### Local sources
+
+- Local X-CUBE-ST67W61 1.3.0 release notes and T02 CLI, MQTT, and FOTA examples
+- Current project CMake, IOC, SPI port, LwIP/netif, W6X configuration, and manual probe implementation
+
+Documentation and package content were assessed against their state on 2026-08-21.
