@@ -1,5 +1,7 @@
 
 #include <Debug/DebugService.hpp>
+
+#include <task.h>
 #include <Debug/DebugServiceBridge.h>
 
 #include "usbd_cdc_if.h"
@@ -246,6 +248,36 @@ void DebugService::emitStats()
                   static_cast<unsigned long>(busyDropCount_), static_cast<unsigned long>(rxOverflowCount_),
                   static_cast<unsigned long>(rxTruncatedCount_));
     transmitLine(line);
+
+    std::snprintf(line, sizeof(line), "%s [MEM] heapFree=%lu heapMin=%lu",
+                  uptime,
+                  static_cast<unsigned long>(xPortGetFreeHeapSize()),
+                  static_cast<unsigned long>(xPortGetMinimumEverFreeHeapSize()));
+    transmitLine(line);
+
+    struct StackReportContext
+    {
+        DebugService* service;
+        const char* uptime;
+    } context{this, uptime};
+
+    TaskBase::visitAll([](const TaskBase& task, void* rawContext) {
+        auto& report = *static_cast<StackReportContext*>(rawContext);
+        const osThreadId_t handle = task.getHandle();
+        if (handle == nullptr)
+        {
+            return;
+        }
+
+        const auto remainingWords = uxTaskGetStackHighWaterMark(reinterpret_cast<TaskHandle_t>(handle));
+        char taskLine[96];
+        std::snprintf(taskLine, sizeof(taskLine),
+                      "%s [STACK] name=%s configured=%lu remaining=%lu",
+                      report.uptime, task.getName(),
+                      static_cast<unsigned long>(task.getStackSizeBytes()),
+                      static_cast<unsigned long>(remainingWords * sizeof(StackType_t)));
+        report.service->transmitLine(taskLine);
+    }, &context);
 }
 
 void DebugService::run()

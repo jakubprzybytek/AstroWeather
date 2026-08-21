@@ -241,6 +241,103 @@ responses, and manual AP enumeration are demonstrated. The log capture does
 not yet prove ST67 firmware identity, T02 compatibility, or complete RF scan
 repeatability; those remain separate Phase 0 exit items.
 
+#### Phase 0.2 - Resource baseline instrumentation (2026-08-21)
+
+The baseline firmware now reports FreeRTOS resource watermarks through the
+existing periodic USB CDC debug statistics path. `TaskBase` maintains a fixed,
+non-allocating registry of constructed tasks, and `DebugService` emits:
+
+```text
+[MEM] heapFree=<bytes> heapMin=<bytes>
+[STACK] name=<task> configured=<bytes> remaining=<bytes>
+```
+
+The stack value is converted from FreeRTOS stack words to bytes. Tasks that
+have been constructed but not started are omitted from the stack report because
+they do not have a valid runtime handle. The registry capacity is 16 tasks;
+the current application is below this limit. The minimum-ever heap value is
+not reset between reports, so the lowest value during a complete test session
+is retained.
+
+The first implementation build used the `Debug-HostController` preset with
+the existing project configuration and completed successfully. The linker
+reported:
+
+| Region | Used | Capacity | Usage |
+|---|---:|---:|---:|
+| RAM | 72,368 B | 147,456 B | 49.08% |
+| FLASH | 68,624 B | 524,288 B | 13.09% |
+
+The section-level ELF report was:
+
+| Section | Size | Role |
+|---|---:|---|
+| `.isr_vector` | 188 B | FLASH |
+| `.text` | 65,944 B | FLASH |
+| `.rodata` | 2,116 B | FLASH |
+| `.data` | 352 B | SRAM, with FLASH load image |
+| `.bss` | 70,476 B | SRAM |
+| `._user_heap_stack` | 1,540 B | linker-reserved RAM |
+
+The static measurement was produced from
+`build/Debug-HostController/HostControllerA.elf` with
+`arm-none-eabi-size -A`.
+
+The image was flashed and exercised through USB CDC on the bench. The runtime
+capture covered idle startup, `AT`, repeated `CWLAP` attempts, a successful
+multi-frame scan, and a post-scan idle window. The observed heap values were
+constant throughout the capture:
+
+| Measurement | Value |
+|---|---:|
+| Configured FreeRTOS heap | 40,000 B |
+| Lowest `heapFree` | 39,080 B |
+| Lowest `heapMin` | 39,080 B |
+| Maximum observed heap used | 920 B |
+
+The per-task stack watermarks were:
+
+| Task | Configured | Lowest remaining | Observation |
+|---|---:|---:|---|
+| `Led1` | 768 B | 600 B | Unchanged during probe |
+| `SwitchTask` | 512 B | 316 B | Unchanged during probe |
+| `DebugService` | 1,024 B | 120 B | Lowest overall margin during idle logging |
+| `St67Probe` | 2,048 B | 504 B | Reduced from 1,852 B during SPI probing |
+
+The runtime heap margin is comfortably above the Phase 0.2 acceptance target
+of 8 KB: `39,080 B` remained free, or `31,080 B` above that target. The heap
+minimum did not decline during the captured startup, AT exchange, scan retries,
+successful scan, or idle period, so this run shows no evidence of a heap leak.
+This is only a short run and does not replace the later repeated-cycle stress
+test.
+
+The stack result requires more caution. `St67Probe` retained `504 B` after the
+largest observed scan, but `DebugService` retained only `120 B` during normal
+periodic reporting. That is a narrow margin for future driver logging or longer
+formatted messages. Before enabling the official ST67 driver, keep debug
+logging bounded and treat the DebugService stack as a resource-risk item to
+retest after each integration increment. No stack-overflow hook fired in this
+capture.
+
+The ST67 transport completed startup and returned `OK` for `CWMODE=1` after an
+initial blank response. The first `CWLAP` invocation returned zero APs on all
+three attempts. A later invocation returned zero APs on attempt 1, then found
+18 APs on attempt 2 using 20 SPI reads and a valid terminator. This confirms
+that the response path handles a large multi-frame scan, but also confirms that
+empty scans remain intermittent and need RF/timing correlation. The log shows
+`busyDrop=269` before useful output was established, then `sent=9` and later
+`sent=64`; the initial CDC line was visibly truncated/interleaved. These are
+debug transport capture-quality issues, not evidence of an ST67 SPI failure,
+but future baseline logs should use a capture setup that preserves complete
+lines.
+
+Phase 0.2 runtime acceptance is complete for this bench run: static FLASH/RAM
+usage is recorded, runtime heap and stack watermarks are recorded before and
+after manual ST67 activity, a successful multi-frame scan is present, and no
+heap decline or stack overflow was observed. T02 firmware identity and
+long-duration/repeated-cycle resource stability remain separate Phase 0 exit
+items. No heap, LwIP, task-size, SPI, or DMA tuning was made for this baseline.
+
 ### Phase 1 - Make the generated transport production-ready
 
 1. Update `HostControllerA.ioc` for an approximately 8 MHz SPI clock and SPI1 RX/TX DMA.
