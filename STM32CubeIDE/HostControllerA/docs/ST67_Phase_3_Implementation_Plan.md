@@ -18,6 +18,11 @@ trigger
 
 HTTP, HTTPS, response parsing, and daily scheduling remain outside this phase.
 
+The single-cycle path has been implemented and validated. The ordered work
+needed to close the remaining stress, teardown, failure, and electrical gates
+is defined in
+[`ST67_Phase_3_Remaining_Work_Plan.md`](ST67_Phase_3_Remaining_Work_Plan.md).
+
 ## 2. Preconditions and source-backed constraints
 
 1. Complete the outstanding Phase 2 ten-cold-boot validation before changing
@@ -247,6 +252,36 @@ shutdown as blocked.
 Acceptance check: at least 20 full shutdown and cold-reinitialization cycles
 pass without heap loss, task growth, stale callbacks, transport failure, or
 host reset.
+
+#### Phase 3 bench validation result (2026-08-22)
+
+One manual station lifecycle was completed successfully from a cold host
+boot using the local ignored credentials. The ST67 reported middleware 1.3.0
+and SDK 2.0.106. The observed sequence was:
+
+- `W6X_Init`, callback registration, `W6X_WiFi_Init`, and `MX_LWIP_Init`
+   completed successfully.
+- The station associated with SSID `lemo` on channel 5 at RSSI `-35`.
+- Host LwIP DHCP assigned `192.168.1.142` with netmask `255.255.255.0`,
+   gateway `192.168.1.1`, and DNS server `192.168.1.1`.
+- `W6X_WiFi_Disconnect(1)` completed, the station link went down, and
+   repeatable ST67 netif teardown returned status 0.
+- The cycle completed without transport drops, RX overflow, or RX truncation.
+
+Resource measurements during the run were:
+
+| Measurement | Result |
+|---|---:|
+| Initial free heap | 39,080 B |
+| Lowest-ever free heap | 21,896 B |
+| Post-cycle free heap | 33,720 B |
+| ST67 service stack | 2,560 B configured, 720 B remaining |
+| Debug service stack | 1,536 B configured, 632 B remaining |
+
+The run satisfies the single-cycle functional checks and the Phase 3 heap
+and stack margins. The 100 persistent connect/DHCP/disconnect cycles, 20
+cold shutdown/reinitialization cycles, and electrical verification of final
+`CHIP_EN` and `SPI_RDY` levels remain outstanding.
 
 ## 6. Error handling
 

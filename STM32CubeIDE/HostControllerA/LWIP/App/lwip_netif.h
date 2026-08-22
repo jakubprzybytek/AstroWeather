@@ -53,6 +53,9 @@ extern "C" {
   */
 int32_t net_if_init(W6X_Net_if_cb_t *net_if_cb);
 
+/** Stop the receive task and release the ST67 network bindings. */
+int32_t net_if_deinit(void);
+
 /**
   * @brief  Sends a packet from the network interface over SPI
   * @param  net_if: Pointer to the network interface structure

@@ -5,6 +5,7 @@ namespace HostController {
 
 void StartSt67ServiceTask();
 void TriggerSt67SmokeTest();
+void TriggerSt67ConnectivityCycle();
 
 }  // namespace HostController
 

@@ -57,6 +57,7 @@ typedef struct
 
 /** Bit indicating that AP interface has data ready to be processed */
 #define NET_IF_AP_RX_RDY        (1UL << 1U)
+#define NET_IF_STOP             (1UL << 2U)
 
 /* USER CODE BEGIN PD */
 
@@ -77,6 +78,7 @@ typedef struct
 
 /* Private variables ---------------------------------------------------------*/
 static TaskHandle_t netif_task_handle = NULL; /*!< Netif task handle */
+static volatile bool netif_stop_requested = false;
 
 /* USER CODE BEGIN PV */
 
@@ -133,6 +135,7 @@ int32_t net_if_init(W6X_Net_if_cb_t *net_if_cb)
     return -1;
   }
 
+  netif_stop_requested = false;
   net_if_cb->rxd_sta_notify_fn = netif_sta_notify_callback;
   net_if_cb->rxd_ap_notify_fn = netif_ap_notify_callback;
 
@@ -149,6 +152,30 @@ int32_t net_if_init(W6X_Net_if_cb_t *net_if_cb)
     return -1;
   }
   vTaskDelay(pdMS_TO_TICKS(100));
+  return 0;
+}
+
+int32_t net_if_deinit(void)
+{
+  TaskHandle_t task = netif_task_handle;
+  if (task == NULL)
+  {
+    W6X_Netif_DeInit();
+    return 0;
+  }
+
+  netif_stop_requested = true;
+  (void)xTaskNotify(task, NET_IF_STOP, eSetBits);
+  const TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(1000U);
+  while (netif_task_handle != NULL && xTaskGetTickCount() < deadline)
+  {
+    vTaskDelay(pdMS_TO_TICKS(1U));
+  }
+  if (netif_task_handle != NULL)
+  {
+    return -1;
+  }
+  W6X_Netif_DeInit();
   return 0;
 }
 
@@ -245,12 +272,18 @@ static void netif_pbuf_free(struct pbuf *pb)
 
 static void netif_sta_notify_callback(void *arg)
 {
-  (void)xTaskNotify(netif_task_handle, NET_IF_STA_RX_RDY, eSetBits);
+  if (netif_task_handle != NULL && !netif_stop_requested)
+  {
+    (void)xTaskNotify(netif_task_handle, NET_IF_STA_RX_RDY, eSetBits);
+  }
 }
 
 static void netif_ap_notify_callback(void *arg)
 {
-  (void)xTaskNotify(netif_task_handle, NET_IF_AP_RX_RDY, eSetBits);
+  if (netif_task_handle != NULL && !netif_stop_requested)
+  {
+    (void)xTaskNotify(netif_task_handle, NET_IF_AP_RX_RDY, eSetBits);
+  }
 }
 
 static int32_t netif_rx_process(uint32_t link_id)
@@ -318,7 +351,13 @@ static void netif_task(void *arg)
 
   while (true)
   {
-    (void)xTaskNotifyWait(0, NET_IF_STA_RX_RDY | NET_IF_AP_RX_RDY, &netif_event, portMAX_DELAY);
+    (void)xTaskNotifyWait(0, NET_IF_STA_RX_RDY | NET_IF_AP_RX_RDY | NET_IF_STOP,
+                          &netif_event, portMAX_DELAY);
+    if ((netif_event & NET_IF_STOP) != 0U || netif_stop_requested)
+    {
+      netif_task_handle = NULL;
+      vTaskDelete(NULL);
+    }
     do
     {
       if ((netif_event & NET_IF_STA_RX_RDY) != 0U)

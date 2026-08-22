@@ -452,6 +452,9 @@ The ten cold-boot repetition test is still outstanding.
 Detailed lifecycle steps, teardown requirements, failure behavior, and
 validation gates are defined in
 [`ST67_Phase_3_Implementation_Plan.md`](ST67_Phase_3_Implementation_Plan.md).
+The remaining work after the successful single-cycle bench result is ordered
+in
+[`ST67_Phase_3_Remaining_Work_Plan.md`](ST67_Phase_3_Remaining_Work_Plan.md).
 
 1. Store SSID/password in a product configuration boundary, not directly in generated files or source control. For initial bench testing, a local ignored configuration header is acceptable.
 2. Populate `W6X_WiFi_Connect_Opts_t` and call `W6X_WiFi_Connect()`.
@@ -474,6 +477,26 @@ Exit criteria:
 - 100 consecutive connect, DHCP, disconnect cycles pass.
 - At least 20 shutdown and cold reinitialization cycles pass if full shutdown is selected.
 - No downward trend appears in minimum-ever heap or task count.
+
+#### Phase 3 bench validation result (2026-08-22)
+
+One manual lifecycle completed successfully using the local ignored
+credentials. The ST67 reported middleware 1.3.0 and SDK 2.0.106, associated
+with SSID `lemo` on channel 5 at RSSI `-35`, and host LwIP assigned
+`192.168.1.142`. The reported netmask was `255.255.255.0`, gateway and DNS
+were both `192.168.1.1`, and the station link was brought down cleanly during
+teardown.
+
+The run completed without transport drops, RX overflow, or RX truncation.
+FreeRTOS resource measurements were 39,080 B initial free heap, 21,896 B
+minimum-ever free heap, and 33,720 B free heap after teardown. The ST67
+service retained 720 B from its 2,560 B stack and DebugService retained 632 B
+from its 1,536 B stack. This satisfies the single-cycle functional, heap, and
+stack checks.
+
+The 100 persistent cycles, 20 cold shutdown/reinitialization cycles, and
+electrical verification of final `CHIP_EN` and `SPI_RDY` levels remain
+outstanding.
 
 ### Phase 4 - Host network fetch, intentionally deferred
 
