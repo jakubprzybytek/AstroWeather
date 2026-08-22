@@ -449,6 +449,10 @@ The ten cold-boot repetition test is still outstanding.
 
 ### Phase 3 - Connect, DHCP, disconnect, and shutdown
 
+Detailed lifecycle steps, teardown requirements, failure behavior, and
+validation gates are defined in
+[`ST67_Phase_3_Implementation_Plan.md`](ST67_Phase_3_Implementation_Plan.md).
+
 1. Store SSID/password in a product configuration boundary, not directly in generated files or source control. For initial bench testing, a local ignored configuration header is acceptable.
 2. Populate `W6X_WiFi_Connect_Opts_t` and call `W6X_WiFi_Connect()`.
 3. Handle connected, disconnected, reason, and driver error callbacks.
