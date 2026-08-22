@@ -1,0 +1,333 @@
+# ST67W611M1 Phase 3 Connect and Shutdown Implementation Plan
+
+## 1. Objective
+
+Extend the Phase 2 official-driver service into a bounded station lifecycle:
+
+```text
+trigger
+  -> initialize W6X, Wi-Fi, and host LwIP when required
+  -> connect to the configured access point
+  -> wait for host LwIP DHCP
+  -> record connection and network diagnostics
+  -> disconnect and clear stored credentials
+  -> tear down the ST67 netif
+  -> shut down the module
+  -> prove cold reinitialization
+```
+
+HTTP, HTTPS, response parsing, and daily scheduling remain outside this phase.
+
+## 2. Preconditions and source-backed constraints
+
+1. Complete the outstanding Phase 2 ten-cold-boot validation before changing
+   the lifecycle path.
+2. Keep `St67ServiceTask` as the only application owner of the ST67 transport
+   and lifecycle.
+3. In the selected T02 architecture, DHCP runs on host LwIP.
+   `W6X_WIFI_EVT_GOT_IP_ID` is compiled only for T01 and must not be used as
+   the T02 connectivity gate.
+4. `W6X_WiFi_Connect()` and `W6X_WiFi_Disconnect()` contain bounded internal
+   waits. The application must still bound its separate DHCP and cleanup
+   stages.
+5. `W6X_WiFi_Disconnect(1)` removes the stored connection information and
+   prevents autoconnect from defeating the daily duty cycle.
+6. The generated `MX_LWIP_Init()` is currently one-way: it allocates two
+   netifs, starts the TCP/IP core, and creates the ST netif task without a
+   public symmetric teardown. Do not call it repeatedly until teardown and
+   partial-failure rollback are implemented and validated.
+7. Keep the LwIP TCP/IP core alive across cycles unless a supported,
+   independently validated shutdown mechanism is found. Recreate only the
+   ST67-facing netifs and worker resources.
+
+## 3. Configuration and credential boundary
+
+Add only non-secret lifecycle settings to `Appli/App/app_config.h`:
+
+- DHCP timeout;
+- disconnect timeout;
+- shutdown settling delay;
+- cold-restart delay;
+- optional accelerated-cycle count for bench testing.
+
+Provide a tracked credential template containing no usable SSID or password
+and an ignored local configuration header for bench credentials. The normal
+tracked build must still compile when that local header is absent and report a
+stable `credentials-unavailable` result without calling
+`W6X_WiFi_Connect()`.
+
+Before copying credentials into `W6X_WiFi_Connect_Opts_t`:
+
+1. zero-initialize the complete structure;
+2. reject an empty SSID;
+3. reject strings longer than `W6X_WIFI_MAX_SSID_SIZE` or
+   `W6X_WIFI_MAX_PASSWORD_SIZE`;
+4. guarantee null termination;
+5. set a finite reconnection policy rather than the driver's zero-value
+   unlimited retry behavior;
+6. leave WPS, WEP, and secured-credential mode disabled unless explicitly
+   required by a later product decision.
+
+Never log the password or include credentials in tracked source, build
+artifacts, test records, or crash diagnostics.
+
+## 4. Application state and callbacks
+
+Extend the service lifecycle to:
+
+```text
+Off
+Starting
+Ready
+Connecting
+Online
+Disconnecting
+Stopping
+Complete
+Fault
+```
+
+Add task flags for connected, disconnected, connection reason, DHCP-ready,
+and driver error. Clear all operation-specific flags before each stage.
+
+The Wi-Fi callback must:
+
+- set the connected flag for `W6X_WIFI_EVT_CONNECTED_ID`;
+- set the disconnected flag for `W6X_WIFI_EVT_DISCONNECTED_ID`;
+- copy the scalar reason code immediately for `W6X_WIFI_EVT_REASON_ID`;
+- record connecting as diagnostic state only;
+- ignore `W6X_WIFI_EVT_GOT_IP_ID` as a T02 readiness mechanism;
+- return without delays, lifecycle calls, or retaining callback pointers.
+
+The driver-error callback continues to copy its status and wake the worker.
+Only the worker task may advance the lifecycle or perform cleanup.
+
+Stable failure stages must include:
+
+```text
+credentials-unavailable
+credentials-invalid
+connect
+connect-state
+dhcp
+disconnect
+link-down
+netif-stop
+netif-remove
+wifi-deinit
+w6x-deinit
+restart
+```
+
+Preserve the first failure as the final result while separately logging any
+best-effort cleanup failures.
+
+## 5. Implementation sequence
+
+### Increment 3.1 - Compile the lifecycle boundary
+
+1. Add the credential template and ignore rule.
+2. Add non-secret Phase 3 timeouts and cycle settings.
+3. Extend `St67ServiceTask` state, flags, event storage, and public trigger
+   naming for a connectivity cycle.
+4. Keep switch 1 as the manual trigger and reject a trigger while a cycle is
+   active.
+5. Compile both firmware variants when shared headers are changed.
+
+Acceptance check: both variants build without local credentials, missing
+credentials fail before connection, and no secret is present in tracked files.
+
+### Increment 3.2 - Associate with the access point
+
+1. Start from the Phase 2 `Ready` state after W6X, Wi-Fi, and LwIP
+   initialization.
+2. Validate and copy local credentials into a zero-initialized
+   `W6X_WiFi_Connect_Opts_t`.
+3. Clear stale callback and driver-error flags and set state to `Connecting`.
+4. Call `W6X_WiFi_Connect()` once.
+5. Treat its return as the authoritative bounded association result; use the
+   application callback flags and copied reason code for diagnostics.
+6. Query `W6X_WiFi_Station_GetState()` after success and require the connected
+   state.
+7. Copy and log bounded connection information: SSID, channel, RSSI, security,
+   protocol, and association elapsed time.
+
+Acceptance check: correct credentials associate; incorrect credentials,
+missing AP, timeout, and reason events produce distinct bounded results.
+
+### Increment 3.3 - Gate online state on host DHCP
+
+Add a narrow application-facing LwIP status interface. Prefer a status
+callback/event notification over polling, but make the final worker check
+authoritative.
+
+The worker may enter `Online` only when:
+
+1. `netif_get_interface(NETIF_STA)` is non-null;
+2. the station netif is up and link-up;
+3. its IPv4 address is nonzero;
+4. all conditions occur before the configured DHCP timeout.
+
+Capture a synchronized snapshot containing IPv4 address, netmask, gateway, and
+the first configured LwIP DNS server. Do not use an unconditional delay or a
+W6X got-IP event.
+
+On timeout, record link state, DHCP state, and elapsed time, then proceed to
+best-effort disconnect. Optionally add a separately configurable host-LwIP DNS
+lookup after DHCP; DNS resolution is diagnostic and not a core Phase 3 exit
+criterion.
+
+Acceptance check: normal and delayed DHCP succeed, absent DHCP times out
+without hanging, and all reported network values come from host LwIP.
+
+### Increment 3.4 - Prove persistent connect/disconnect cycling
+
+Before implementing shutdown:
+
+1. set state to `Disconnecting`;
+2. call `W6X_WiFi_Disconnect(1)`;
+3. require a successful return and observed disconnected event;
+4. require the station netif link to become down and its IPv4 address to be
+   cleared;
+5. return to the persistent initialized `Ready` state;
+6. permit another manual cycle without recreating W6X or LwIP resources.
+
+For failures after association, disconnect is best-effort. Run 100 consecutive
+connect, DHCP, and disconnect cycles while recording heap, task count, stack
+watermarks, and stage timings.
+
+Acceptance check: all cycles pass without automatic reconnect, task growth,
+heap loss, stale DHCP state, callback leakage, or credential logging.
+
+### Increment 3.5 - Add symmetric ST67 netif teardown
+
+Separate one-time LwIP core initialization from repeatable ST67 interface
+creation. Add idempotent teardown APIs to `lwip.c/.h` and
+`lwip_netif.c/.h`.
+
+Teardown must execute in a safe order:
+
+1. prevent new ST67 RX notifications from reaching application-owned
+   resources;
+2. release and stop station DHCP and delete its timer;
+3. stop soft-AP DHCP resources if they were ever allocated;
+4. mark station and AP links and interfaces down;
+5. stop and delete the ST netif worker task;
+6. drain or account for outstanding custom pbufs before driver shutdown;
+7. call `W6X_Netif_DeInit()` to clear link callbacks;
+8. remove both netifs through thread-safe LwIP APIs;
+9. free both allocated netif structures and any AP table;
+10. clear every pointer, timer, task handle, and cached address so a second
+    teardown is harmless.
+
+Add rollback for each partial `MX_LWIP_Init()` failure. Confirm whether the
+vendor SPI network bindings require an explicit unbind; do not accept
+recreation while an old callback or queue binding can survive.
+
+Acceptance check: repeated create/destroy tests restore free heap and task
+count and never execute a callback against removed resources.
+
+### Increment 3.6 - Shut down and cold-reinitialize the module
+
+After a successful disconnect and netif teardown:
+
+1. set state to `Stopping`;
+2. call `W6X_WiFi_DeInit()`;
+3. call `W6X_DeInit()`;
+4. verify `CHIP_EN` is low and RDY reaches the expected idle state;
+5. wait the configured settling delay and return to `Off`;
+6. after the configured restart delay, execute the complete initialization,
+   netif creation, connection, DHCP, disconnect, and shutdown path again.
+
+Teardown must also be safe after partial initialization. If symmetric teardown
+cannot be proven, do not repeatedly call `MX_LWIP_Init()`. Retain W6X/LwIP,
+disconnect between jobs, and use automatic standby while documenting full
+shutdown as blocked.
+
+Acceptance check: at least 20 full shutdown and cold-reinitialization cycles
+pass without heap loss, task growth, stale callbacks, transport failure, or
+host reset.
+
+## 6. Error handling
+
+Every active-stage failure proceeds through the same cleanup policy:
+
+1. preserve the original failed stage and status;
+2. request disconnect if association may exist and the driver responds;
+3. stop DHCP and bring the station link down;
+4. tear down repeatable netif resources if they were created;
+5. deinitialize Wi-Fi and W6X only when their corresponding initialization
+   completed;
+6. report cleanup status and final GPIO state;
+7. require a known `Ready`, `Off`, or terminal `Fault` state before accepting
+   another trigger.
+
+Do not hide a leak or partial teardown by retrying indefinitely. Escalate to a
+host reset only after repeated transport-level failures and only when product
+requirements permit it.
+
+## 7. Observability and resource gates
+
+Emit bounded `DebugService` records containing:
+
+- cycle ID and state transition;
+- stable stage, W6X status, LwIP status, and connection reason;
+- SSID, channel, RSSI, security, and protocol, but never password;
+- IPv4 address, netmask, gateway, and DNS server;
+- association, DHCP, disconnect, teardown, and restart elapsed time;
+- free heap, minimum-ever heap, task count, and relevant stack watermarks;
+- final `complete` or `fault` result and final `CHIP_EN`/RDY levels.
+
+Phase 3 resource gates:
+
+- minimum-ever free heap remains at least 8 KB;
+- every observed task retains a nonzero stack margin;
+- the service task and `DebugService` each retain at least 256 bytes;
+- no downward free-heap trend or upward task-count trend appears across the
+  stress tests;
+- no debug queue overflow obscures a final lifecycle result.
+
+## 8. Verification matrix
+
+### Build checks
+
+1. Build `Debug-HostController` from a clean CMake graph.
+2. Build `Debug-DisplayController` if shared configuration or headers changed.
+3. Confirm no credentials appear in tracked files, binaries, maps, or logs.
+4. Record flash, `.data`, `.bss`, and stack/heap deltas from Phase 2.
+
+### Functional checks
+
+1. Missing, empty, oversized, correct, and incorrect credentials.
+2. Access point unavailable and disappearing during association.
+3. DHCP server normal, delayed, and absent.
+4. Unexpected disconnect before and after DHCP.
+5. Repeated trigger while a cycle is active.
+6. Disconnect with idle data plane.
+7. Partial initialization failure at each allocation or task-creation boundary.
+8. Repeated teardown invocation.
+
+### Stress and electrical checks
+
+1. Run 100 persistent-stack connect/DHCP/disconnect cycles.
+2. Run at least 20 full shutdown/reinitialization cycles.
+3. Capture SPI, CS, RDY, and `CHIP_EN` during disconnect and shutdown.
+4. Confirm `CHIP_EN` low reaches the expected module shutdown current and no
+   host GPIO back-powers the module.
+5. Confirm resource minima and task count remain stable throughout both tests.
+
+## 9. Expected file changes
+
+| File or area | Planned change |
+|---|---|
+| `Appli/App/app_config.h` | Non-secret Phase 3 timeouts and cycle policy |
+| Local credential template and ignore rules | Compile-safe, untracked bench credential boundary |
+| `User/Inc/HostController/St67ServiceTask.hpp` | Connectivity-cycle command/result boundary |
+| `User/Src/HostController/St67ServiceTask.cpp` | Connect, DHCP, disconnect, cleanup, and restart states |
+| `User/Src/HostController/AppVariant.cpp` | Bind the manual Phase 3 lifecycle trigger |
+| `LWIP/App/lwip.h` and `lwip.c` | Host DHCP status snapshot and symmetric netif lifecycle |
+| `LWIP/App/lwip_netif.h` and `lwip_netif.c` | Idempotent netif task/callback teardown |
+| `Core/Inc/FreeRTOSConfig.h` | Heap adjustment only if measurements require it |
+
+Generated files should remain untouched unless an IOC-controlled setting is
+required. HTTP, TLS, scheduling, and response handoff belong to later phases.
