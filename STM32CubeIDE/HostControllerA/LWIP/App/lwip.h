@@ -78,6 +78,9 @@ typedef struct
 
 int32_t lwip_get_station_status(LwipStationStatus_t *status);
 
+/** Return nonzero when both ST67-facing netif pointers have been removed. */
+uint8_t lwip_netifs_are_removed(void);
+
 /**
   * @brief  Retrieve the network interface structure.
   * @param  link_id: Link identifier (0 for STA, 1 for AP)

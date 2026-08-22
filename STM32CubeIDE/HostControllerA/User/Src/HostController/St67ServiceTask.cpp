@@ -6,6 +6,7 @@
 #include "app_config.h"
 #include "logging.h"
 #include "lwip.h"
+#include "lwip_netif.h"
 #include "main.h"
 #include "w6x_api.h"
 
@@ -123,11 +124,28 @@ class St67ServiceTask : public Task<2560> {
   void logMemory(const char* stage) {
     DebugService::instance().logf(
         DebugService::Level::Info,
-        "ST67 %s heap=%lu min=%lu",
+        "ST67 %s heap=%lu min=%lu tasks=%lu",
         stage,
         static_cast<unsigned long>(xPortGetFreeHeapSize()),
-        static_cast<unsigned long>(xPortGetMinimumEverFreeHeapSize()));
+        static_cast<unsigned long>(xPortGetMinimumEverFreeHeapSize()),
+        static_cast<unsigned long>(uxTaskGetNumberOfTasks()));
   }
+
+        void logCheckpoint(const char* stage) {
+          DebugService::instance().logf(
+          DebugService::Level::Info,
+          "ST67 checkpoint=%s heap=%lu min=%lu tasks=%lu pbufs=%lu running=%u sta=%u ap=%u chip=%u rdy=%u",
+          stage,
+          static_cast<unsigned long>(xPortGetFreeHeapSize()),
+          static_cast<unsigned long>(xPortGetMinimumEverFreeHeapSize()),
+          static_cast<unsigned long>(uxTaskGetNumberOfTasks()),
+          static_cast<unsigned long>(net_if_outstanding_pbufs()),
+          static_cast<unsigned int>(net_if_is_running()),
+          netif_get_interface(NETIF_STA) != nullptr ? 1U : 0U,
+          netif_get_interface(NETIF_AP) != nullptr ? 1U : 0U,
+          HAL_GPIO_ReadPin(ST67_CHIP_EN_GPIO_Port, ST67_CHIP_EN_Pin) == GPIO_PIN_SET ? 1U : 0U,
+          HAL_GPIO_ReadPin(ST67_RDY_GPIO_Port, ST67_RDY_Pin) == GPIO_PIN_SET ? 1U : 0U);
+        }
 
   bool logStage(const char* stage, W6X_Status_t status, uint32_t startedAt) {
     DebugService::instance().logf(
@@ -142,14 +160,51 @@ class St67ServiceTask : public Task<2560> {
   }
 
   void fail(const char* stage) {
+    if (firstFailureStage_ == nullptr) {
+      firstFailureStage_ = stage;
+      firstFailureStatus_ = lastStatus_;
+    }
     state_ = State::Fault;
-    DebugService::instance().logf(DebugService::Level::Error,
-                                  "ST67 fault stage=%s status=%d source=%s",
-                                  stage,
-                                  static_cast<int>(lastStatus_),
-                                  (lastErrorFunction_ != nullptr)
-                                      ? lastErrorFunction_
-                                      : "application");
+  }
+
+  bool stationDisconnected() const {
+    W6X_WiFi_StaStateType_e stationState = W6X_WIFI_STATE_STA_OFF;
+    if (W6X_WiFi_Station_GetState(&stationState, nullptr) != W6X_STATUS_OK ||
+        (stationState != W6X_WIFI_STATE_STA_DISCONNECTED &&
+         stationState != W6X_WIFI_STATE_STA_OFF)) {
+      return false;
+    }
+    LwipStationStatus_t network{};
+    return lwip_get_station_status(&network) == 0 && network.link_up == 0U &&
+           network.has_ipv4 == 0U;
+  }
+
+  bool finalHardwareState() const {
+    return lwip_netifs_are_removed() != 0U && net_if_is_running() == 0U &&
+           HAL_GPIO_ReadPin(ST67_CHIP_EN_GPIO_Port, ST67_CHIP_EN_Pin) == GPIO_PIN_RESET &&
+           HAL_GPIO_ReadPin(ST67_RDY_GPIO_Port, ST67_RDY_Pin) == GPIO_PIN_RESET;
+  }
+
+  void logFinalResult() {
+    DebugService::instance().logf(
+        firstFailureStage_ == nullptr ? DebugService::Level::Info
+                                      : DebugService::Level::Error,
+        "ST67 cycle=%lu result=%s stage=%s status=%d heap=%lu min=%lu tasks=%lu",
+        static_cast<unsigned long>(cycleId_),
+        firstFailureStage_ == nullptr ? "complete" : "fault",
+        firstFailureStage_ == nullptr ? "none" : firstFailureStage_,
+        static_cast<int>(firstFailureStage_ == nullptr ? lastStatus_ : firstFailureStatus_),
+        static_cast<unsigned long>(xPortGetFreeHeapSize()),
+        static_cast<unsigned long>(xPortGetMinimumEverFreeHeapSize()),
+        static_cast<unsigned long>(uxTaskGetNumberOfTasks()));
+  }
+
+  void finishFailure(const char* stage, bool disconnect) {
+    fail(stage);
+    cleanup(disconnect);
+    state_ = State::Fault;
+    logMemory("after-cycle");
+    logFinalResult();
   }
 
   bool credentialsValid() const {
@@ -172,33 +227,66 @@ class St67ServiceTask : public Task<2560> {
   }
 
   void cleanup(bool disconnect) {
+    logCheckpoint("before-disconnect");
     if (disconnect && wifiInitialized_) {
       state_ = State::Disconnecting;
       osThreadFlagsClear(kFlagDisconnected | kFlagDriverError);
       const W6X_Status_t status = W6X_WiFi_Disconnect(1U);
       if (status != W6X_STATUS_OK) {
-        DebugService::instance().logf(DebugService::Level::Warn,
-                                      "ST67 disconnect status=%d(%s)",
-                                      static_cast<int>(status), W6X_StatusToStr(status));
+        lastStatus_ = status;
+        fail("disconnect");
       } else {
-        (void)osThreadFlagsWait(kFlagDisconnected | kFlagDriverError,
-                                osFlagsWaitAny, APP_ST67_DISCONNECT_TIMEOUT_MS);
+        const uint32_t flags = osThreadFlagsWait(
+            kFlagDisconnected | kFlagDriverError, osFlagsWaitAny,
+            APP_ST67_DISCONNECT_TIMEOUT_MS);
+        if ((flags & kFlagDisconnected) == 0U) {
+          fail("disconnect");
+        } else if (!stationDisconnected()) {
+          fail("link-down");
+        } else {
+          osDelay(100U);
+          if (!stationDisconnected()) {
+            fail("reconnect");
+          }
+        }
       }
     }
+    logCheckpoint("after-disconnect");
     if (lwipInitialized_) {
       const int32_t status = MX_LWIP_DeInit();
+      if (status != 0) {
+        fail("netif-stop");
+      }
       DebugService::instance().logf(
           status == 0 ? DebugService::Level::Info : DebugService::Level::Warn,
-          "ST67 netif-stop status=%ld", static_cast<long>(status));
+          "ST67 netif-stop status=%ld pbufs=%lu running=%u",
+          static_cast<long>(status),
+          static_cast<unsigned long>(net_if_outstanding_pbufs()),
+          static_cast<unsigned int>(net_if_is_running()));
+      if (status != 0) {
+        state_ = State::Fault;
+        return;
+      }
       lwipInitialized_ = false;
     }
+    logCheckpoint("after-lwip");
     if (wifiInitialized_) {
+      logCheckpoint("before-wifi-deinit");
       W6X_WiFi_DeInit();
       wifiInitialized_ = false;
+      logCheckpoint("after-wifi-deinit");
     }
+    logCheckpoint("after-wifi");
     if (w6xInitialized_) {
+      logCheckpoint("before-w6x-deinit");
       W6X_DeInit();
       w6xInitialized_ = false;
+      logCheckpoint("after-w6x-deinit");
+    }
+    logCheckpoint("after-w6x");
+    osDelay(APP_ST67_SHUTDOWN_SETTLING_DELAY_MS);
+    if (!finalHardwareState()) {
+      fail("final-state");
     }
     state_ = State::Off;
   }
@@ -211,27 +299,30 @@ class St67ServiceTask : public Task<2560> {
       return;
     }
 
+    state_ = (state_ == State::Off) ? State::Starting : State::Ready;
+    ++cycleId_;
+    firstFailureStage_ = nullptr;
+    firstFailureStatus_ = W6X_STATUS_OK;
     if (!credentialsValid()) {
-      state_ = State::Fault;
-      DebugService::instance().log(DebugService::Level::Error,
-                                   "ST67 fault stage=credentials-unavailable");
+      finishFailure("credentials-unavailable", false);
       return;
     }
-
-    state_ = (state_ == State::Off) ? State::Starting : State::Ready;
     logMemory("before");
     const uint32_t startedAt = HAL_GetTick();
 
     if (!w6xInitialized_) {
       lastStatus_ = W6X_Init();
-      if (!logStage("w6x-init", lastStatus_, startedAt)) { fail("w6x-init"); return; }
+      if (!logStage("w6x-init", lastStatus_, startedAt)) {
+        finishFailure("w6x-init", false);
+        return;
+      }
       w6xInitialized_ = true;
     }
     logMemory("after-w6x");
 
     W6X_ModuleInfo_t* moduleInfo = W6X_GetModuleInfo();
     if (moduleInfo == nullptr) {
-      fail("module-info");
+      finishFailure("module-info", false);
       return;
     }
     DebugService::instance().logf(
@@ -247,20 +338,29 @@ class St67ServiceTask : public Task<2560> {
       callbacks_.APP_wifi_cb = &wifiCallback;
       callbacks_.APP_error_cb = &errorCallback;
       lastStatus_ = W6X_RegisterAppCb(&callbacks_);
-      if (!logStage("callback-register", lastStatus_, startedAt)) { fail("callback-register"); cleanup(false); return; }
+      if (!logStage("callback-register", lastStatus_, startedAt)) {
+        finishFailure("callback-register", false);
+        return;
+      }
       lastStatus_ = W6X_WiFi_Init();
-      if (!logStage("wifi-init", lastStatus_, startedAt)) { fail("wifi-init"); cleanup(false); return; }
+      if (!logStage("wifi-init", lastStatus_, startedAt)) {
+        finishFailure("wifi-init", false);
+        return;
+      }
       wifiInitialized_ = true;
     }
     logMemory("after-wifi");
 
     if (!lwipInitialized_) {
-      if (MX_LWIP_Init() != 0) { fail("lwip-init"); cleanup(false); return; }
+      if (MX_LWIP_Init() != 0) {
+        finishFailure("lwip-init", false);
+        return;
+      }
       lwipInitialized_ = true;
     }
     if (netif_get_interface(NETIF_STA) == nullptr ||
         netif_get_interface(NETIF_AP) == nullptr) {
-      fail("lwip-netif");
+      finishFailure("lwip-netif", false);
       return;
     }
     logMemory("after-lwip");
@@ -274,17 +374,26 @@ class St67ServiceTask : public Task<2560> {
     osThreadFlagsClear(kFlagConnected | kFlagDisconnected | kFlagDriverError);
     state_ = State::Connecting;
     lastStatus_ = W6X_WiFi_Connect(&options);
-    if (!logStage("connect", lastStatus_, startedAt)) { fail("connect"); cleanup(true); return; }
+    if (!logStage("connect", lastStatus_, startedAt)) {
+      finishFailure("connect", true);
+      return;
+    }
     W6X_WiFi_StaStateType_e stationState = W6X_WIFI_STATE_STA_OFF;
     W6X_WiFi_Connect_t connection{};
     if (W6X_WiFi_Station_GetState(&stationState, &connection) != W6X_STATUS_OK ||
-        stationState != W6X_WIFI_STATE_STA_CONNECTED) { fail("connect-state"); cleanup(true); return; }
+        stationState != W6X_WIFI_STATE_STA_CONNECTED) {
+      finishFailure("connect-state", true);
+      return;
+    }
     DebugService::instance().logf(DebugService::Level::Info,
                                   "ST67 connected ssid=%s channel=%lu rssi=%ld",
                                   connection.SSID, static_cast<unsigned long>(connection.Channel),
                                   static_cast<long>(connection.Rssi));
     LwipStationStatus_t network{};
-    if (!waitForDhcp(&network)) { fail("dhcp"); cleanup(true); return; }
+    if (!waitForDhcp(&network)) {
+      finishFailure("dhcp", true);
+      return;
+    }
     state_ = State::Online;
     char addressText[16];
     char netmaskText[16];
@@ -299,9 +408,9 @@ class St67ServiceTask : public Task<2560> {
                     static_cast<unsigned long>(lastWifiReason_),
                     addressText, netmaskText, gatewayText, dnsText);
     cleanup(true);
-    state_ = State::Complete;
+    state_ = (firstFailureStage_ == nullptr) ? State::Complete : State::Fault;
     logMemory("after-cycle");
-    DebugService::instance().log(DebugService::Level::Info, "ST67 connectivity cycle complete");
+    logFinalResult();
   }
 
   State state_ = State::Off;
@@ -313,6 +422,9 @@ class St67ServiceTask : public Task<2560> {
   bool w6xInitialized_ = false;
   bool wifiInitialized_ = false;
   bool lwipInitialized_ = false;
+  uint32_t cycleId_ = 0U;
+  const char* firstFailureStage_ = nullptr;
+  W6X_Status_t firstFailureStatus_ = W6X_STATUS_OK;
 };
 
 }  // namespace

@@ -463,7 +463,7 @@ int32_t HTTP_Client_Request(const ip_addr_t *server_addr, uint16_t port,
   {
     addr.sin_family = family;
     addr.sin_port = PP_HTONS(port);
-    addr.sin_addr.s_addr = server_addr->u_addr.ip4.addr;
+    addr.sin_addr.s_addr = ip_2_ip4(server_addr)->addr;
     if (0 != connect(sock, (struct sockaddr *)&addr, sizeof(addr)))
     {
       LogError("Socket connection failed\n");
@@ -648,7 +648,7 @@ static void HTTP_Client_task(void *arg)
     else
 #endif /* W6X_NET_IPV6_ENABLE */
     {
-      (void)inet_ntop(AF_INET, (void *) &Obj->server.u_addr.ip4, host_name, INET_ADDRSTRLEN);
+      (void)inet_ntop(AF_INET, (void *) ip_2_ip4(&Obj->server), host_name, INET_ADDRSTRLEN);
     }
   }
 

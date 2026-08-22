@@ -308,6 +308,7 @@ int32_t W61_AT_ModemInit(W61_Object_t *Obj)
 {
   BaseType_t xReturned;
   int32_t ret = -1;
+  bool io_initialized = false;
   struct modem *mdm = (struct modem *) &Obj->Modem;
 
   /* Cmd handler */
@@ -359,6 +360,7 @@ int32_t W61_AT_ModemInit(W61_Object_t *Obj)
   {
     goto __err;
   }
+  io_initialized = true;
 
   xReturned = xTaskCreate(W61_Modem_Process_task,
                           (char *)"Modem_Process",
@@ -386,6 +388,11 @@ int32_t W61_AT_ModemInit(W61_Object_t *Obj)
 
   return ret;
 __err:
+  if (io_initialized)
+  {
+    (void)io_deinit(&mdm->iface);
+    io_initialized = false;
+  }
   if (mdm->handler_data.rx_buf != NULL)
   {
     vPortFree(mdm->handler_data.rx_buf);
@@ -411,6 +418,7 @@ __err:
     vTaskDelete(mdm->modem_task_handle);
     mdm->modem_task_handle = NULL;
   }
+  modem_cmd_handler_deinit(&mdm->handler_data);
   return ret;
 }
 
@@ -443,6 +451,7 @@ void W61_AT_ModemDeInit(W61_Object_t *Obj)
     vTaskDelete(mdm->modem_task_handle);
     mdm->modem_task_handle = NULL;
   }
+  modem_cmd_handler_deinit(&mdm->handler_data);
 }
 
 W61_Status_t W61_Status(int32_t ret)

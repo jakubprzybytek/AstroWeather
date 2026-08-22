@@ -954,4 +954,22 @@ int32_t modem_cmd_handler_init(struct modem_cmd_handler *handler,
   return 0;
 }
 
+void modem_cmd_handler_deinit(struct modem_cmd_handler_data *data)
+{
+  if (data == NULL)
+  {
+    return;
+  }
+  if (data->sem_tx_lock != NULL)
+  {
+    vSemaphoreDelete(data->sem_tx_lock);
+    data->sem_tx_lock = NULL;
+  }
+  if (data->sem_parse_lock != NULL)
+  {
+    vSemaphoreDelete(data->sem_parse_lock);
+    data->sem_parse_lock = NULL;
+  }
+}
+
 /** @} */

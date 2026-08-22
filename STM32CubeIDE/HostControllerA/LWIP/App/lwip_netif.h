@@ -56,6 +56,12 @@ int32_t net_if_init(W6X_Net_if_cb_t *net_if_cb);
 /** Stop the receive task and release the ST67 network bindings. */
 int32_t net_if_deinit(void);
 
+/** Return nonzero while the ST67 receive task is alive. */
+uint8_t net_if_is_running(void);
+
+/** Return the number of driver-backed pbufs still owned by LwIP. */
+uint32_t net_if_outstanding_pbufs(void);
+
 /**
   * @brief  Sends a packet from the network interface over SPI
   * @param  net_if: Pointer to the network interface structure

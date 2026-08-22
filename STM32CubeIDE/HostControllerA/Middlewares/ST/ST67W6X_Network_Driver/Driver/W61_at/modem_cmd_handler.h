@@ -452,6 +452,9 @@ int32_t modem_cmd_handler_init(struct modem_cmd_handler *handler,
                                struct modem_cmd_handler_data *data,
                                const struct modem_cmd_handler_config *config);
 
+/** Release synchronization objects created by modem_cmd_handler_init(). */
+void modem_cmd_handler_deinit(struct modem_cmd_handler_data *data);
+
 /**
   * @brief  Lock the modem for sending cmds
   * @details This is semaphore-based rather than mutex based, which means there's no

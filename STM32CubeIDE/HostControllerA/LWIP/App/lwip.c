@@ -292,6 +292,14 @@ int32_t MX_LWIP_Init(void)
 
 int32_t MX_LWIP_DeInit(void)
 {
+  LogInfo("ST67 checkpoint=lwip-enter heap=%lu min=%lu tasks=%lu pbufs=%lu running=%u sta=%u ap=%u\n",
+          (unsigned long)xPortGetFreeHeapSize(),
+          (unsigned long)xPortGetMinimumEverFreeHeapSize(),
+          (unsigned long)uxTaskGetNumberOfTasks(),
+          (unsigned long)net_if_outstanding_pbufs(),
+          (unsigned int)net_if_is_running(),
+          netif_usr_list[NETIF_STA] != NULL ? 1U : 0U,
+          netif_usr_list[NETIF_AP] != NULL ? 1U : 0U);
   if (netif_usr_list[NETIF_STA] == NULL && netif_usr_list[NETIF_AP] == NULL)
   {
     return 0;
@@ -311,10 +319,26 @@ int32_t MX_LWIP_DeInit(void)
     netif_set_down(netif_usr_list[NETIF_AP]);
   }
   (void)netif_dhcp_done(&lwip_dhcp_timer);
+    LogInfo("ST67 checkpoint=dhcp-stopped heap=%lu min=%lu tasks=%lu pbufs=%lu running=%u sta=%u ap=%u\n",
+      (unsigned long)xPortGetFreeHeapSize(),
+      (unsigned long)xPortGetMinimumEverFreeHeapSize(),
+      (unsigned long)uxTaskGetNumberOfTasks(),
+      (unsigned long)net_if_outstanding_pbufs(),
+      (unsigned int)net_if_is_running(),
+      netif_usr_list[NETIF_STA] != NULL ? 1U : 0U,
+      netif_usr_list[NETIF_AP] != NULL ? 1U : 0U);
   if (net_if_deinit() != 0)
   {
     return -1;
   }
+    LogInfo("ST67 checkpoint=netif-worker-stopped heap=%lu min=%lu tasks=%lu pbufs=%lu running=%u sta=%u ap=%u\n",
+      (unsigned long)xPortGetFreeHeapSize(),
+      (unsigned long)xPortGetMinimumEverFreeHeapSize(),
+      (unsigned long)uxTaskGetNumberOfTasks(),
+      (unsigned long)net_if_outstanding_pbufs(),
+      (unsigned int)net_if_is_running(),
+      netif_usr_list[NETIF_STA] != NULL ? 1U : 0U,
+      netif_usr_list[NETIF_AP] != NULL ? 1U : 0U);
   if (netif_usr_list[NETIF_AP] != NULL)
   {
     (void)netifapi_netif_remove(netif_usr_list[NETIF_AP]);
@@ -333,6 +357,14 @@ int32_t MX_LWIP_DeInit(void)
     vPortFree(ap_sta_ipv4_table);
     ap_sta_ipv4_table = NULL;
   }
+  LogInfo("ST67 checkpoint=netif-removed heap=%lu min=%lu tasks=%lu pbufs=%lu running=%u sta=%u ap=%u\n",
+          (unsigned long)xPortGetFreeHeapSize(),
+          (unsigned long)xPortGetMinimumEverFreeHeapSize(),
+          (unsigned long)uxTaskGetNumberOfTasks(),
+          (unsigned long)net_if_outstanding_pbufs(),
+          (unsigned int)net_if_is_running(),
+          netif_usr_list[NETIF_STA] != NULL ? 1U : 0U,
+          netif_usr_list[NETIF_AP] != NULL ? 1U : 0U);
   return 0;
 }
 
@@ -359,6 +391,13 @@ int32_t lwip_get_station_status(LwipStationStatus_t *status)
   status->dns_server = *dns_getserver(0);
 #endif
   return 0;
+}
+
+uint8_t lwip_netifs_are_removed(void)
+{
+  return (netif_usr_list[NETIF_STA] == NULL && netif_usr_list[NETIF_AP] == NULL)
+             ? 1U
+             : 0U;
 }
 
 struct netif *netif_get_interface(uint32_t link_id)

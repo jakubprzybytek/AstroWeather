@@ -17,7 +17,7 @@ trigger
 ```
 
 HTTP, HTTPS, response parsing, and daily scheduling remain outside this phase.
-
+ 
 The single-cycle path has been implemented and validated. The ordered work
 needed to close the remaining stress, teardown, failure, and electrical gates
 is defined in
