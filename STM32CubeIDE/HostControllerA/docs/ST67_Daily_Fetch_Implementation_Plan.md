@@ -592,6 +592,16 @@ completion, timeout, framing, and cleanup contracts are insufficient for a
 bounded daily fetch. HTTPS remains a separate resource and trust-validation
 track after plain HTTP passes.
 
+The first single-cycle integration result was recorded on 2026-08-23. The
+configured external JSONPlaceholder endpoint resolved successfully, returned
+HTTP 200 with an 83-byte response, printed the bounded response preview, and
+completed disconnect and full shutdown with zero pbufs and final
+`CHIP_EN=0`/`RDY=0`. The batch passed `1/1`; minimum-ever free heap was
+`15,016 B` and the ST67 service stack margin was `576 B`. This proves the
+initial functional DNS/HTTP integration, but persistent fetch stress, the
+deterministic local endpoint matrix, and the remaining timeout/framing failure
+tests are still open.
+
 ### Phase 5 - Daily scheduler and data handoff, later scope
 
 1. Trigger the lifecycle owner from an RTC/alarm scheduler rather than a 24-hour RTOS delay.

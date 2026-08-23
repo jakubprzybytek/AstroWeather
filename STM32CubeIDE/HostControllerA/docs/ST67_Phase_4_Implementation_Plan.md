@@ -49,6 +49,41 @@ certificates, and response payloads must not be logged or committed. The
 initial endpoint configuration should contain only a non-secret host, port,
 path, expected content type, and response-size limit.
 
+### 2.1 Single-cycle integration result (2026-08-23)
+
+The first integrated fetch completed successfully from a cold
+`CHIP_EN`-low start using the configured `jsonplaceholder.typicode.com`
+endpoint and `SingleFullShutdown` mode. This was an Internet endpoint rather
+than the planned deterministic local test server, so it proves the complete
+DNS/TCP/HTTP path but does not replace the local endpoint matrix.
+
+Observed sequence:
+
+- ST67 middleware `1.3.0`, SDK `2.0.106`, module ID `C6AFDBD111400004`.
+- Wi-Fi association succeeded on channel 2 at RSSI `-33`; DHCP assigned
+   `192.168.1.142` with gateway and DNS server `192.168.1.1`.
+- DNS resolved the configured hostname to `188.114.96.11` in `3133 ms`.
+- TCP connection and HTTP request succeeded; the response was HTTP `200`.
+- The response contained `83` bytes and produced CRC32 `b701dc37`.
+- The bounded sanitized response preview printed the complete JSON payload in
+   two records. Non-printable bytes would be rendered as `.`.
+- The HTTP worker completed before disconnect. The temporary peak observed
+   free heap was `21432 B`; it returned to `23984 B` after the HTTP task ended
+   and reached `33896 B` after full teardown.
+- Final teardown removed both netifs, stopped the worker, released pbufs, and
+   reached `CHIP_EN=0` and `RDY=0`.
+- The batch result was `pass=1 fail=0`. Minimum-ever free heap was `15016 B`;
+   the ST67 service stack retained `576 B` at its lowest observed watermark.
+- RX overflow and truncation remained zero. Five pre-existing USB
+   `busyDrop` events did not increase during the lifecycle.
+- A second switch press during the active batch was rejected as intended.
+
+This closes the single-cycle functional integration check for DNS, plain HTTP,
+bounded preview consumption, completion-before-disconnect, and cleanup. It
+does not close Phase 4: persistent fetch stress, deterministic local endpoint
+fault coverage, late-callback recovery, and the HTTPS track remain open. The
+full-shutdown heap trend identified in Phase 3 also remains unresolved.
+
 ## 3. Source-backed findings in the generated HTTP client
 
 `LWIP/App/http_client.c` is a useful starting point, but it is not ready to be
@@ -66,26 +101,26 @@ The current implementation has these relevant behaviors:
 - `HTTP_CLIENT_THREAD_STACK_SIZE` is 2048 bytes and a new task is created for
   every request. Stack and heap cost must be measured with the existing W6X
   and LwIP tasks active.
-- `HTTP_connection_t::max_response_len` is present in the public structure but
-  is not enforced by the implementation.
+- `HTTP_connection_t::max_response_len` is now enforced for declared and
+   streamed response bytes by the implementation.
 - `HTTP_connection_t::timeout` is not used as the complete request timeout;
   the socket receive timeout is controlled by the compile-time
   `HTTP_CLIENT_TCP_SOCK_RECV_TIMEOUT` value.
-- The result callback is invoked after headers are parsed and before the body
-  is streamed. It is therefore not a transaction-complete signal.
-- A consumer-requested stop breaks the receive loop but is subsequently
-  reported as success. Oversize and consumer errors need distinct results.
-- Responses without `Content-Length` use an unsafe and incorrect trailing
+- The result callback now runs after socket and request-object cleanup, and an
+   idle query is available to the lifecycle owner.
+- Oversize responses and header-consumer rejection now produce failures, but
+   the generated client still needs targeted tests for every error path.
+- Responses without `Content-Length` still use an incomplete trailing
   `CRLF CRLF` body test. It can inspect before the current buffer when fewer
   than four bytes are received and does not implement close-delimited or
   chunked HTTP body framing.
 - Header parsing is bounded by a 4096-byte working buffer, but response framing
   support and status handling need explicit acceptance tests.
-- Normal body callbacks use `recv_fn_arg`; the error path uses
-  `callback_arg`. Callback argument ownership must be made consistent.
-- There is no public cancellation or join API. The lifecycle owner cannot
-  currently prove that the socket is closed and the HTTP task has exited
-  before disconnecting.
+- Normal body callbacks use `recv_fn_arg`; the error path still uses
+   `callback_arg`, so callback argument ownership needs a follow-up cleanup.
+- A cooperative cancellation API now exists, but connect-time cancellation,
+   a complete total-deadline implementation, and a formal join result still
+   need targeted failure-path validation.
 - TLS state is held in file-static pointers, so concurrent HTTPS requests are
   unsafe even after mbedTLS is added.
 

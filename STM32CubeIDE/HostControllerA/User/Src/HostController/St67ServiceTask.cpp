@@ -7,6 +7,8 @@
 #include "logging.h"
 #include "lwip.h"
 #include "lwip_netif.h"
+#include "lwip/dns.h"
+#include "http_client.h"
 #include "main.h"
 #include "w6x_api.h"
 
@@ -47,6 +49,8 @@ constexpr uint32_t kFlagTrigger = 1U << 0;
 constexpr uint32_t kFlagConnected = 1U << 1;
 constexpr uint32_t kFlagDisconnected = 1U << 2;
 constexpr uint32_t kFlagDriverError = 1U << 3;
+constexpr uint32_t kFlagDns = 1U << 4;
+constexpr uint32_t kFlagHttp = 1U << 5;
 
 enum class State : uint8_t {
   Off,
@@ -137,6 +141,34 @@ class St67ServiceTask : public Task<2560> {
     (void)result;
   }
 
+  static void dnsCallback(const char* name, const ip_addr_t* address,
+                          void* argument) {
+    (void)name;
+    static_cast<St67ServiceTask*>(argument)->onDnsResult(address);
+  }
+
+  static void httpResultCallback(void* argument, HTTP_Status_Code_e status,
+                                 uint32_t receivedBytes, uint32_t serverResult,
+                                 int32_t error) {
+    (void)serverResult;
+    static_cast<St67ServiceTask*>(argument)->onHttpResult(
+        status, receivedBytes, error);
+  }
+
+  static int32_t httpHeadersCallback(HTTP_state_t* connection, void* argument,
+                                     uint8_t* headers, uint16_t headerLength,
+                                     uint32_t contentLength) {
+    (void)connection;
+    (void)headerLength;
+    (void)contentLength;
+    return static_cast<St67ServiceTask*>(argument)->onHttpHeaders(headers, headerLength);
+  }
+
+  static int32_t httpDataCallback(void* argument, HTTP_buffer_t* buffer,
+                                  int32_t error) {
+    return static_cast<St67ServiceTask*>(argument)->onHttpData(buffer, error);
+  }
+
   void onWifiEvent(W6X_event_id_t eventId, void* eventArgs) {
     lastWifiEvent_ = eventId;
     if (eventId == W6X_WIFI_EVT_REASON_ID) {
@@ -153,6 +185,185 @@ class St67ServiceTask : public Task<2560> {
     lastStatus_ = status;
     lastErrorFunction_ = functionName;
     osThreadFlagsSet(getHandle(), kFlagDriverError);
+  }
+
+  void onDnsResult(const ip_addr_t* address) {
+    dnsPending_ = false;
+    dnsStatus_ = (address != nullptr) ? ERR_OK : ERR_VAL;
+    if (address != nullptr) {
+      dnsAddress_ = *address;
+    }
+    osThreadFlagsSet(getHandle(), kFlagDns);
+  }
+
+  void onHttpResult(HTTP_Status_Code_e status, uint32_t receivedBytes,
+                    int32_t error) {
+    httpStatus_ = status;
+    httpReceivedBytes_ = receivedBytes;
+    httpError_ = error;
+    osThreadFlagsSet(getHandle(), kFlagHttp);
+  }
+
+  int32_t onHttpHeaders(const uint8_t* headers, uint16_t headerLength) {
+    httpHeaderLength_ = headerLength;
+    if (headers == nullptr ||
+        httpHeaderLength_ > APP_ST67_HTTP_MAX_HEADER_BYTES ||
+        std::strstr(reinterpret_cast<const char*>(headers),
+                                          "Content-Type:") == nullptr) {
+      return -1;
+    }
+    const char* contentType = std::strstr(
+        reinterpret_cast<const char*>(headers), "Content-Type:");
+    const char* value = contentType + std::strlen("Content-Type:");
+    while (*value == ' ' || *value == '\t') {
+      ++value;
+    }
+    const size_t expectedLength = std::strlen(APP_ST67_HTTP_EXPECTED_CONTENT_TYPE);
+    if (std::strncmp(value, APP_ST67_HTTP_EXPECTED_CONTENT_TYPE,
+                     expectedLength) != 0) {
+      httpError_ = HTTP_CLIENT_BAD_PARAM;
+      return -1;
+    }
+    return 0;
+  }
+
+  int32_t onHttpData(const HTTP_buffer_t* buffer, int32_t error) {
+    if (error != 0 || buffer == nullptr || buffer->data == nullptr ||
+        buffer->length < 0) {
+      return -1;
+    }
+    httpReceivedBytes_ += static_cast<uint32_t>(buffer->length);
+    for (int32_t index = 0; index < buffer->length; ++index) {
+      if (httpPreviewLength_ < sizeof(httpPreview_) - 1U) {
+        const uint8_t value = buffer->data[index];
+        httpPreview_[httpPreviewLength_++] =
+            (value >= 32U && value <= 126U) ? static_cast<char>(value) : '.';
+        httpPreview_[httpPreviewLength_] = '\0';
+      }
+      httpCrc_ ^= buffer->data[index];
+      for (uint32_t bit = 0U; bit < 8U; ++bit) {
+        httpCrc_ = (httpCrc_ & 1U) != 0U
+                       ? (httpCrc_ >> 1U) ^ 0xEDB88320U
+                       : (httpCrc_ >> 1U);
+      }
+    }
+    return 0;
+  }
+
+  bool resolveHttpHost() {
+    osThreadFlagsClear(kFlagDns);
+    dnsPending_ = true;
+    dnsStatus_ = ERR_INPROGRESS;
+    const err_t status = dns_gethostbyname(APP_ST67_HTTP_HOST, &dnsAddress_,
+                                           &dnsCallback, this);
+    if (status == ERR_OK) {
+      dnsPending_ = false;
+      return true;
+    }
+    if (status != ERR_INPROGRESS) {
+      dnsPending_ = false;
+      dnsStatus_ = status;
+      return false;
+    }
+    const uint32_t flags = osThreadFlagsWait(kFlagDns, osFlagsWaitAny,
+                                             APP_ST67_DNS_TIMEOUT_MS);
+    return (flags & kFlagDns) != 0U && !dnsPending_ && dnsStatus_ == ERR_OK;
+  }
+
+  bool fetchHttp() {
+    if (std::strlen(APP_ST67_HTTP_HOST) == 0U ||
+        std::strlen(APP_ST67_HTTP_HOST) > HTTP_SNI_MAX_SIZE ||
+        std::strstr(APP_ST67_HTTP_HOST, "://") != nullptr ||
+        std::strchr(APP_ST67_HTTP_HOST, ':') != nullptr ||
+        std::strchr(APP_ST67_HTTP_HOST, '\r') != nullptr ||
+        std::strchr(APP_ST67_HTTP_HOST, '\n') != nullptr ||
+        std::strlen(APP_ST67_HTTP_PATH) == 0U ||
+        APP_ST67_HTTP_PATH[0] != '/' ||
+        std::strchr(APP_ST67_HTTP_PATH, '\r') != nullptr ||
+        std::strchr(APP_ST67_HTTP_PATH, '\n') != nullptr) {
+      DebugService::instance().log(DebugService::Level::Error,
+                                   "ST67 fetch-config invalid");
+      return false;
+    }
+    const uint32_t startedAt = HAL_GetTick();
+    if (!resolveHttpHost() || !IP_IS_V4(&dnsAddress_) ||
+        ip4_addr_get_u32(ip_2_ip4(&dnsAddress_)) == 0U) {
+      DebugService::instance().logf(DebugService::Level::Error,
+                                    "ST67 dns failed elapsed=%lums",
+                                    static_cast<unsigned long>(HAL_GetTick() - startedAt));
+      return false;
+    }
+    char addressText[16];
+    ip4addr_ntoa_r(ip_2_ip4(&dnsAddress_), addressText, sizeof(addressText));
+    DebugService::instance().logf(DebugService::Level::Info,
+                                  "ST67 dns address=%s elapsed=%lums",
+                                  addressText,
+                                  static_cast<unsigned long>(HAL_GetTick() - startedAt));
+
+    osThreadFlagsClear(kFlagHttp);
+    httpStatus_ = HTTP_VERSION_NOT_SUPPORTED;
+    httpError_ = HTTP_CLIENT_ERR;
+    httpReceivedBytes_ = 0U;
+    httpHeaderLength_ = 0U;
+    httpPreviewLength_ = 0U;
+    httpPreview_[0] = '\0';
+    httpCrc_ = 0xFFFFFFFFU;
+    HTTP_connection_t settings{};
+    settings.server_name = const_cast<char*>(APP_ST67_HTTP_HOST);
+    settings.timeout = APP_ST67_HTTP_IO_TIMEOUT_MS;
+    settings.max_response_len = APP_ST67_HTTP_MAX_RESPONSE_BYTES;
+    settings.callback_arg = this;
+    settings.result_fn = &httpResultCallback;
+    settings.headers_done_fn = &httpHeadersCallback;
+    settings.recv_fn = &httpDataCallback;
+    settings.recv_fn_arg = this;
+    const int32_t requestStatus = HTTP_Client_Request(
+        &dnsAddress_, APP_ST67_HTTP_PORT, APP_ST67_HTTP_PATH, HTTP_REQ_TYPE_GET,
+        nullptr, 0U, nullptr, nullptr, nullptr, nullptr, &settings);
+    if (requestStatus != HTTP_CLIENT_SUCCESS) {
+      DebugService::instance().logf(DebugService::Level::Error,
+                                    "ST67 http-start status=%ld",
+                                    static_cast<long>(requestStatus));
+      return false;
+    }
+    const uint32_t flags = osThreadFlagsWait(kFlagHttp, osFlagsWaitAny,
+                                             APP_ST67_HTTP_TOTAL_TIMEOUT_MS);
+    if ((flags & kFlagHttp) == 0U) {
+      DebugService::instance().log(DebugService::Level::Error,
+                                   "ST67 http-timeout");
+      HTTP_Client_Cancel();
+      const uint32_t cancelDeadline = HAL_GetTick() + APP_ST67_HTTP_IO_TIMEOUT_MS;
+      while (!HTTP_Client_IsIdle() &&
+             static_cast<int32_t>(HAL_GetTick() - cancelDeadline) < 0) {
+        osDelay(10U);
+      }
+      return false;
+    }
+    const uint32_t cleanupDeadline = HAL_GetTick() + APP_ST67_HTTP_IO_TIMEOUT_MS;
+    while (!HTTP_Client_IsIdle() &&
+           static_cast<int32_t>(HAL_GetTick() - cleanupDeadline) < 0) {
+      osDelay(10U);
+    }
+    const bool success = HTTP_Client_IsIdle() && httpError_ == 0 &&
+                         httpStatus_ >= OK && httpStatus_ < 300;
+    DebugService::instance().logf(
+        success ? DebugService::Level::Info : DebugService::Level::Error,
+        "ST67 http status=%d error=%ld bytes=%lu crc=%08lx elapsed=%lums",
+        static_cast<int>(httpStatus_), static_cast<long>(httpError_),
+        static_cast<unsigned long>(httpReceivedBytes_),
+        static_cast<unsigned long>(httpCrc_ ^ 0xFFFFFFFFU),
+        static_cast<unsigned long>(HAL_GetTick() - startedAt));
+      for (uint32_t offset = 0U; offset < httpPreviewLength_; offset += 64U) {
+        char chunk[65];
+        const uint32_t remaining = httpPreviewLength_ - offset;
+        const uint32_t length = remaining < 64U ? remaining : 64U;
+        std::memcpy(chunk, &httpPreview_[offset], length);
+        chunk[length] = '\0';
+        DebugService::instance().logf(DebugService::Level::Info,
+                      "ST67 http-data offset=%lu data=\"%s\"",
+                      static_cast<unsigned long>(offset), chunk);
+      }
+    return success;
   }
 
   void logMemory(const char* stage) {
@@ -405,6 +616,11 @@ class St67ServiceTask : public Task<2560> {
                     "ST67 online reason=%lu ip=%s mask=%s gateway=%s dns=%s",
                     static_cast<unsigned long>(lastWifiReason_),
                     addressText, netmaskText, gatewayText, dnsText);
+    if (!fetchHttp()) {
+      fail("fetch");
+      disconnectStation();
+      return false;
+    }
     return disconnectStation();
   }
 
@@ -576,6 +792,16 @@ class St67ServiceTask : public Task<2560> {
   bool w6xInitialized_ = false;
   bool wifiInitialized_ = false;
   bool lwipInitialized_ = false;
+  bool dnsPending_ = false;
+  err_t dnsStatus_ = ERR_INPROGRESS;
+  ip_addr_t dnsAddress_{};
+  HTTP_Status_Code_e httpStatus_ = HTTP_VERSION_NOT_SUPPORTED;
+  int32_t httpError_ = HTTP_CLIENT_ERR;
+  uint32_t httpReceivedBytes_ = 0U;
+  uint32_t httpHeaderLength_ = 0U;
+  char httpPreview_[201]{};
+  uint32_t httpPreviewLength_ = 0U;
+  uint32_t httpCrc_ = 0U;
   uint32_t cycleId_ = 0U;
   bool batchActive_ = false;
   bool triggerRejected_ = false;
