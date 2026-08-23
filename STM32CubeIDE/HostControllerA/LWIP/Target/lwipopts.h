@@ -109,7 +109,7 @@ extern "C" {
 #endif /* MEM_SIZE */
 #endif /* LWIP_HEAP_SIZE */
 
-#define LWIP_IPV6                     0
+#define LWIP_IPV6                     1
 #if (LWIP_IPV6 == 1)
 #define LWIP_IPV6_DHCP6               0
 #define LWIP_IPV6_MLD                 1

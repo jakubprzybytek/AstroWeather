@@ -107,6 +107,10 @@ static W61_Object_t *W6X_WiFi_drv_obj = NULL; /*!< Global W61 context pointer */
 
 /** Wi-Fi private context */
 static W6X_WiFiCtx_t *p_wifi_ctx = NULL;
+static uint32_t wifi_context_alloc_count = 0U;
+static uint32_t wifi_context_free_count = 0U;
+static uint32_t wifi_event_alloc_count = 0U;
+static uint32_t wifi_event_free_count = 0U;
 
 /** Wi-Fi security string */
 static const char *const W6X_WiFi_Security_str[] =
@@ -203,6 +207,7 @@ W6X_Status_t W6X_WiFi_Init(void)
     WIFI_LOG_ERROR("Could not initialize Wi-Fi context structure\n");
     goto _err;
   }
+  ++wifi_context_alloc_count;
   (void)memset(p_wifi_ctx, 0, sizeof(W6X_WiFiCtx_t));
 
   /* Initialize the W61 Wi-Fi module */
@@ -214,6 +219,9 @@ W6X_Status_t W6X_WiFi_Init(void)
 
   /* Create the Wi-Fi event handle */
   p_wifi_ctx->Wifi_event = xEventGroupCreate();
+  if (p_wifi_ctx->Wifi_event != NULL) {
+    ++wifi_event_alloc_count;
+  }
 
   /* Check that application callback is registered */
   p_cb_handler = W6X_GetCbHandler();
@@ -301,6 +309,7 @@ void W6X_WiFi_DeInit(void)
   /* Delete the Wi-Fi event handle */
   vEventGroupDelete(p_wifi_ctx->Wifi_event);
   p_wifi_ctx->Wifi_event = NULL;
+  ++wifi_event_free_count;
 
   /* Deinit the W61 Wi-Fi module */
   (void)W61_WiFi_DeInit(W6X_WiFi_drv_obj);
@@ -311,6 +320,12 @@ void W6X_WiFi_DeInit(void)
   /* Free the Wi-Fi context */
   vPortFree(p_wifi_ctx);
   p_wifi_ctx = NULL;
+  ++wifi_context_free_count;
+  LogInfo("ST67 alloc wifi ctx=%lu/%lu evt=%lu/%lu\n",
+          (unsigned long)wifi_context_alloc_count,
+          (unsigned long)wifi_context_free_count,
+          (unsigned long)wifi_event_alloc_count,
+      (unsigned long)wifi_event_free_count);
 }
 
 W6X_Status_t W6X_WiFi_Scan(W6X_WiFi_Scan_Opts_t *opts, W6X_WiFi_Scan_Result_cb_t scan_result_cb)

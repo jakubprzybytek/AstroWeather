@@ -110,6 +110,12 @@ static TimerHandle_t lwip_dhcp6_timer = NULL;
 /** Table to store stations connected to soft-AP with their MAC and assigned IP */
 static ap_sta_ipv4_entry_t *ap_sta_ipv4_table = NULL;
 static uint8_t ap_dhcp_started = 0U;
+static uint32_t lwip_netif_alloc_count = 0U;
+static uint32_t lwip_netif_free_count = 0U;
+static uint32_t lwip_timer_alloc_count = 0U;
+static uint32_t lwip_timer_free_count = 0U;
+static uint32_t lwip_ap_table_alloc_count = 0U;
+static uint32_t lwip_ap_table_free_count = 0U;
 
 /* USER CODE BEGIN PV */
 
@@ -220,15 +226,18 @@ int32_t MX_LWIP_Init(void)
     return -1;
   }
   (void)memset(netif_usr_list[W6X_NET_IF_STA], 0, sizeof(struct netif));
+  ++lwip_netif_alloc_count;
 
   netif_usr_list[W6X_NET_IF_AP] = pvPortMalloc(sizeof(struct netif));
   if (netif_usr_list[W6X_NET_IF_AP] == NULL)
   {
     vPortFree(netif_usr_list[W6X_NET_IF_STA]);
+    ++lwip_netif_free_count;
     netif_usr_list[W6X_NET_IF_STA] = NULL;
     return -1;
   }
   (void)memset(netif_usr_list[W6X_NET_IF_AP], 0, sizeof(struct netif));
+  ++lwip_netif_alloc_count;
 
   /* Add netif for station interface */
   if (netifapi_netif_add(netif_usr_list[W6X_NET_IF_STA], NULL,
@@ -237,6 +246,7 @@ int32_t MX_LWIP_Init(void)
     LogError("Failed to add netif\n");
     vPortFree(netif_usr_list[NETIF_STA]);
     vPortFree(netif_usr_list[NETIF_AP]);
+    lwip_netif_free_count += 2U;
     netif_usr_list[NETIF_STA] = NULL;
     netif_usr_list[NETIF_AP] = NULL;
     return -1;
@@ -257,6 +267,7 @@ int32_t MX_LWIP_Init(void)
     (void)netifapi_netif_remove(netif_usr_list[NETIF_STA]);
     vPortFree(netif_usr_list[NETIF_STA]);
     vPortFree(netif_usr_list[NETIF_AP]);
+    lwip_netif_free_count += 2U;
     netif_usr_list[NETIF_STA] = NULL;
     netif_usr_list[NETIF_AP] = NULL;
     return -1;
@@ -279,6 +290,7 @@ int32_t MX_LWIP_Init(void)
     (void)netifapi_netif_remove(netif_usr_list[NETIF_STA]);
     vPortFree(netif_usr_list[NETIF_AP]);
     vPortFree(netif_usr_list[NETIF_STA]);
+    lwip_netif_free_count += 2U;
     netif_usr_list[NETIF_AP] = NULL;
     netif_usr_list[NETIF_STA] = NULL;
     return -1;
@@ -344,12 +356,14 @@ int32_t MX_LWIP_DeInit(void)
     (void)netifapi_netif_remove(netif_usr_list[NETIF_AP]);
     vPortFree(netif_usr_list[NETIF_AP]);
     netif_usr_list[NETIF_AP] = NULL;
+    ++lwip_netif_free_count;
   }
   if (netif_usr_list[NETIF_STA] != NULL)
   {
     (void)netifapi_netif_remove(netif_usr_list[NETIF_STA]);
     vPortFree(netif_usr_list[NETIF_STA]);
     netif_usr_list[NETIF_STA] = NULL;
+    ++lwip_netif_free_count;
   }
   ap_sta_ipv4_table_clear();
   if (ap_sta_ipv4_table != NULL)
@@ -365,6 +379,13 @@ int32_t MX_LWIP_DeInit(void)
           (unsigned int)net_if_is_running(),
           netif_usr_list[NETIF_STA] != NULL ? 1U : 0U,
           netif_usr_list[NETIF_AP] != NULL ? 1U : 0U);
+  LogInfo("ST67 alloc lwip net=%lu/%lu tm=%lu/%lu ap=%lu/%lu\n",
+      (unsigned long)lwip_netif_alloc_count,
+      (unsigned long)lwip_netif_free_count,
+      (unsigned long)lwip_timer_alloc_count,
+      (unsigned long)lwip_timer_free_count,
+      (unsigned long)lwip_ap_table_alloc_count,
+      (unsigned long)lwip_ap_table_free_count);
   return 0;
 }
 
@@ -438,6 +459,7 @@ static int32_t netif_link_sta_up_cb(void)
     if (lwip_dhcp6_timer)
     {
       xTimerStart(lwip_dhcp6_timer, 0);
+      ++lwip_timer_alloc_count;
     }
   }
 #endif /* LWIP_IPV6_DHCP6 */
@@ -454,6 +476,7 @@ static int32_t netif_link_sta_up_cb(void)
     if (lwip_dhcp_timer != NULL)
     {
       xTimerStart(lwip_dhcp_timer, 0);
+      ++lwip_timer_alloc_count;
     }
   }
 #endif /* LWIP_IPV4 & LWIP_DHCP */
@@ -613,6 +636,7 @@ static int32_t netif_link_ap_up_cb(void)
   {
     return -1;
   }
+  ++lwip_ap_table_alloc_count;
   ap_sta_ipv4_table_clear();
 
   dhcpd_start(netif_usr_list[NETIF_AP], -1, -1);
@@ -642,6 +666,7 @@ static int32_t netif_link_ap_down_cb(void)
   {
     vPortFree(ap_sta_ipv4_table);
     ap_sta_ipv4_table = NULL;
+    ++lwip_ap_table_free_count;
   }
 
   netif_set_link_down(netif_usr_list[NETIF_AP]);
@@ -660,6 +685,7 @@ static int32_t netif_dhcp_done(TimerHandle_t *dhcp_timer)
     xTimerStop(*dhcp_timer, 0);
     xTimerDelete(*dhcp_timer, 0);
     *dhcp_timer = NULL;
+    ++lwip_timer_free_count;
   }
   return 0;
 }

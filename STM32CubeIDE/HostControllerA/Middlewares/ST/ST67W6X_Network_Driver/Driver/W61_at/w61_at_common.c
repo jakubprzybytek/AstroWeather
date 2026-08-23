@@ -18,6 +18,11 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "w61_at_common.h"
+
+static uint32_t modem_sem_alloc_count = 0U;
+static uint32_t modem_sem_free_count = 0U;
+static uint32_t modem_buffer_alloc_count = 0U;
+static uint32_t modem_buffer_free_count = 0U;
 #include "w61_at_internal.h"
 #include "w61_io.h"
 #include <stdlib.h>
@@ -325,16 +330,19 @@ int32_t W61_AT_ModemInit(W61_Object_t *Obj)
   };
 
   mdm->sem_response = xSemaphoreCreateBinary();
+  if (mdm->sem_response != NULL) { ++modem_sem_alloc_count; }
   if (mdm->sem_response == NULL)
   {
     goto __err;
   }
   mdm->sem_if_ready = xSemaphoreCreateBinary();
+  if (mdm->sem_if_ready != NULL) { ++modem_sem_alloc_count; }
   if (mdm->sem_if_ready == NULL)
   {
     goto __err;
   }
   mdm->sem_tx_ready = xSemaphoreCreateBinary();
+  if (mdm->sem_tx_ready != NULL) { ++modem_sem_alloc_count; }
   if (mdm->sem_tx_ready == NULL)
   {
     goto __err;
@@ -347,6 +355,7 @@ int32_t W61_AT_ModemInit(W61_Object_t *Obj)
   {
     goto __err;
   }
+  ++modem_buffer_alloc_count;
 
   ret = modem_cmd_handler_init(&mdm->handler, &mdm->handler_data,
                                &cmd_handler_config);
@@ -397,21 +406,25 @@ __err:
   {
     vPortFree(mdm->handler_data.rx_buf);
     mdm->handler_data.rx_buf = NULL;
+    ++modem_buffer_free_count;
   }
   if (mdm->sem_response != NULL)
   {
     vSemaphoreDelete(mdm->sem_response);
     mdm->sem_response = NULL;
+    ++modem_sem_free_count;
   }
   if (mdm->sem_if_ready != NULL)
   {
     vSemaphoreDelete(mdm->sem_if_ready);
     mdm->sem_if_ready = NULL;
+    ++modem_sem_free_count;
   }
   if (mdm->sem_tx_ready != NULL)
   {
     vSemaphoreDelete(mdm->sem_tx_ready);
     mdm->sem_tx_ready = NULL;
+    ++modem_sem_free_count;
   }
   if (mdm->modem_task_handle != NULL)
   {
@@ -430,21 +443,25 @@ void W61_AT_ModemDeInit(W61_Object_t *Obj)
   {
     vPortFree(mdm->handler_data.rx_buf);
     mdm->handler_data.rx_buf = NULL;
+    ++modem_buffer_free_count;
   }
   if (mdm->sem_response != NULL)
   {
     vSemaphoreDelete(mdm->sem_response);
     mdm->sem_response = NULL;
+    ++modem_sem_free_count;
   }
   if (mdm->sem_if_ready != NULL)
   {
     vSemaphoreDelete(mdm->sem_if_ready);
     mdm->sem_if_ready = NULL;
+    ++modem_sem_free_count;
   }
   if (mdm->sem_tx_ready != NULL)
   {
     vSemaphoreDelete(mdm->sem_tx_ready);
     mdm->sem_tx_ready = NULL;
+    ++modem_sem_free_count;
   }
   if (mdm->modem_task_handle != NULL)
   {
@@ -452,6 +469,11 @@ void W61_AT_ModemDeInit(W61_Object_t *Obj)
     mdm->modem_task_handle = NULL;
   }
   modem_cmd_handler_deinit(&mdm->handler_data);
+  LogInfo("ST67 alloc modem sem=%lu/%lu buf=%lu/%lu\n",
+          (unsigned long)modem_sem_alloc_count,
+          (unsigned long)modem_sem_free_count,
+          (unsigned long)modem_buffer_alloc_count,
+      (unsigned long)modem_buffer_free_count);
 }
 
 W61_Status_t W61_Status(int32_t ret)

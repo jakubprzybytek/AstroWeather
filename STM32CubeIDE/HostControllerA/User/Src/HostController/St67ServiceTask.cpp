@@ -288,6 +288,8 @@ class St67ServiceTask : public Task<2560> {
     if (!finalHardwareState()) {
       fail("final-state");
     }
+    osDelay(APP_ST67_COLD_RESTART_DELAY_MS);
+    logCheckpoint("after-stabilize");
     state_ = State::Off;
   }
 
