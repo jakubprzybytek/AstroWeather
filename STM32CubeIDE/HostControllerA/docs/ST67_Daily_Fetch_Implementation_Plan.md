@@ -578,30 +578,19 @@ RX overflow and truncation were zero. Full-shutdown resource stability remains
 open, so automatic standby remains the safer fallback until the leak source
 is identified.
 
-### Phase 4 - Host network fetch, intentionally deferred
+### Phase 4 - Host network fetch
 
-Start with a deterministic small HTTP endpoint on the local network:
+Detailed HTTP client hardening, DNS and lifecycle integration, timeout and
+response policies, deterministic endpoint tests, stress gates, and the HTTPS
+follow-on track are defined in
+[`ST67_Phase_4_Implementation_Plan.md`](ST67_Phase_4_Implementation_Plan.md).
 
-1. Resolve the hostname with LwIP DNS.
-2. Use the generated host-side `HTTP_Client_Request()` or a minimal LwIP socket client.
-3. Stream response chunks into a bounded consumer; do not allocate based solely on remote `Content-Length`.
-4. Enforce DNS, connect, receive, total transaction, and maximum-response limits.
-5. Validate status code, content type, framing, and truncation handling.
-6. Close the socket before Wi-Fi disconnect.
-
-For production HTTPS:
-
-1. Add mbedTLS 3.6.x compatible with the package and define `MBEDTLS_CONFIG_FILE`.
-2. Select only required TLS algorithms and certificate parsing features.
-3. Define trust policy: pinned CA or public CA bundle, hostname verification mandatory.
-4. Provide a cryptographically appropriate entropy source.
-5. Provide certificate-time validation. SNTP requires network connectivity and itself needs a trust/bootstrap policy; a retained RTC or constrained certificate strategy may be preferable.
-6. Measure worst-case TLS heap and stack use on the STM32G0B1 before accepting HTTPS as feasible in the final image.
-
-Exit criteria:
-
-- The complete response is fetched repeatedly with bounded memory.
-- Failure at every network stage still proceeds to disconnect and the selected power state.
+Phase 4 starts with a deterministic plain-HTTP endpoint on the local network
+and the proven persistent Phase 3 lifecycle. The generated HTTP client must be
+hardened before lifecycle integration because its current response limit,
+completion, timeout, framing, and cleanup contracts are insufficient for a
+bounded daily fetch. HTTPS remains a separate resource and trust-validation
+track after plain HTTP passes.
 
 ### Phase 5 - Daily scheduler and data handoff, later scope
 
