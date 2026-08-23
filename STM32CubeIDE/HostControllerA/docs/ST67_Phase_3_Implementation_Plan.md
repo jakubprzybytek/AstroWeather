@@ -253,7 +253,7 @@ Acceptance check: at least 20 full shutdown and cold-reinitialization cycles
 pass without heap loss, task growth, stale callbacks, transport failure, or
 host reset.
 
-#### Phase 3 bench validation result (2026-08-22)
+#### Phase 3 bench validation result (2026-08-22 to 2026-08-23)
 
 One manual station lifecycle was completed successfully from a cold host
 boot using the local ignored credentials. The ST67 reported middleware 1.3.0
@@ -279,9 +279,79 @@ Resource measurements during the run were:
 | Debug service stack | 1,536 B configured, 632 B remaining |
 
 The run satisfies the single-cycle functional checks and the Phase 3 heap
-and stack margins. The 100 persistent connect/DHCP/disconnect cycles, 20
-cold shutdown/reinitialization cycles, and electrical verification of final
-`CHIP_EN` and `SPI_RDY` levels remain outstanding.
+and stack margins. Subsequent three-cycle full-shutdown validation kept
+explicit LwIP, Wi-Fi, SPI, command-handler, and modem allocation counters
+balanced, with zero outstanding pbufs, a stopped netif worker, eight tasks,
+and final `CHIP_EN=0`/`RDY=0`. The command-handler mutex cleanup removed the
+large recurring leak seen before that fix.
+
+A residual approximately 64-byte-per-cycle free-heap decline was still seen
+in an earlier repeated full-shutdown run, so R2 is not considered closed
+despite the balanced known-owner counters. The 100 persistent
+connect/DHCP/disconnect cycles, 20 cold shutdown/reinitialization cycles, and
+electrical verification of final `CHIP_EN` and `SPI_RDY` levels remain
+outstanding. The explicit compile-time R3 lifecycle mode is now implemented;
+the existing full-shutdown path remains the default while persistent and cold
+restart bench acceptance is completed.
+
+The subsequent 20-cycle cold-restart smoke capture reported `20/20` passed
+cycles, zero debug transport drops/overflows/truncations, zero pbufs at
+teardown, removed netifs, a stopped worker, and final `CHIP_EN=0`/`RDY=0`.
+Its heap values were 39,080 B at batch start, 32,680 B at batch end, and
+20,664 B minimum-ever. The aggregate task count changed from 7 to 8, so the
+no-task-growth gate remains open. Persistent three-cycle evidence and the
+formal cold-restart acceptance are still outstanding; the source default was
+restored to `SingleFullShutdown` after the smoke run.
+
+A repeated 20-cycle cold-restart run again completed `20/20` cycles without a
+reported lifecycle failure. Every cycle reached zero pbufs, removed netifs,
+a stopped worker, and `CHIP_EN=0`/`RDY=0`; task count returned to 8 after each
+teardown. Post-cycle free heap declined from 33,896 B after cycle 1 to
+27,864 B after cycle 20, with 15,744 B minimum-ever. This confirms an
+unresolved full-shutdown resource-loss trend despite balanced visible teardown
+counters. Eleven pre-existing USB `busyDrop` events did not increase; RX
+overflow and truncation were zero. The functional cold-restart path passes,
+but its resource-stability acceptance remains open.
+
+The planned 100-cycle persistent run then completed `100/100` cycles without a
+reported lifecycle failure. W6X, Wi-Fi, and host LwIP initialized once and
+remained active between iterations; all cycles passed DHCP, disconnect callback,
+link-down, and IPv4-clearing checks. The final teardown reported zero pbufs,
+removed netifs, a stopped worker, and `CHIP_EN=0`/`RDY=0`. Free heap remained
+at 23,984 B after each cycle, with 21,552 B minimum-ever; the active task count
+remained 11 and returned to 8 after teardown. Debug transport drops, RX
+overflow, and RX truncation were zero. R4 persistent acceptance passes; the
+failure-path checks, cold-restart baseline, electrical verification, and R2
+heap-stability gate remain open.
+
+An incorrect-password single-cycle failure test returned status `2 (ERROR)`
+from the bounded `connect` stage and preserved `connect/2` in the final
+aggregate result. Cleanup reached zero pbufs, removed netifs, stopped the
+worker, and `CHIP_EN=0`/`RDY=0`; debug drops, RX overflow, and RX truncation
+were zero. Free heap after cleanup was 33,896 B with 22,328 B minimum-ever.
+This failure-path case passes; the remaining R5 scenarios are not yet
+complete.
+
+A missing-credentials single-cycle failure returned
+`credentials-unavailable` with status `0` before any W6X initialization.
+Heap remained 39,080 B, minimum-ever heap remained 39,080 B, and task count
+remained 7. The final aggregate preserved the original stage and cleanup did
+not allocate or retain ST67 resources. The remaining R5 cases are not yet
+complete.
+
+An AP-unavailable single-cycle failure test returned status `2 (ERROR)` from
+the bounded `connect` stage after approximately 3.6 seconds. The primary
+result remained `connect/2`; cleanup reached zero pbufs, removed netifs,
+stopped the worker, and `CHIP_EN=0`/`RDY=0`. A later retry succeeded after the
+AP became available. No RX overflow or truncation occurred, although five
+USB `busyDrop` events were present before the lifecycle and did not increase
+during it. This failure-path case passes functionally; the remaining R5 cases
+and a clean transport-counter rerun remain open.
+
+The remaining R5 failure scenarios are intentionally deferred for now because
+they are difficult to reproduce reliably on the bench. They remain open and
+are not treated as passed; the completed failure cases are missing
+credentials, incorrect password, and AP unavailable with recovery.
 
 ## 6. Error handling
 
@@ -364,5 +434,44 @@ Phase 3 resource gates:
 | `LWIP/App/lwip_netif.h` and `lwip_netif.c` | Idempotent netif task/callback teardown |
 | `Core/Inc/FreeRTOSConfig.h` | Heap adjustment only if measurements require it |
 
-Generated files should remain untouched unless an IOC-controlled setting is
-required. HTTP, TLS, scheduling, and response handoff belong to later phases.
+
+#### Phase 3 bench validation result (2026-08-22 to 2026-08-23)
+
+One manual station lifecycle was completed successfully from a cold host
+boot using the local ignored credentials. The ST67 reported middleware 1.3.0
+and SDK 2.0.106. The observed sequence was:
+
+- `W6X_Init`, callback registration, `W6X_WiFi_Init`, and `MX_LWIP_Init`
+   completed successfully.
+- The station associated with SSID `lemo` on channel 5 at RSSI `-35`.
+- Host LwIP DHCP assigned `192.168.1.142` with netmask `255.255.255.0`,
+   gateway `192.168.1.1`, and DNS server `192.168.1.1`.
+- `W6X_WiFi_Disconnect(1)` completed, the station link went down, and
+   repeatable ST67 netif teardown returned status 0.
+- The cycle completed without transport drops, RX overflow, or RX truncation.
+
+Resource measurements during the run were:
+
+| Measurement | Result |
+|---|---:|
+| Initial free heap | 39,080 B |
+| Lowest-ever free heap | 21,896 B |
+| Post-cycle free heap | 33,720 B |
+| ST67 service stack | 2,560 B configured, 720 B remaining |
+| Debug service stack | 1,536 B configured, 632 B remaining |
+
+The run satisfies the single-cycle functional checks and the Phase 3 heap
+and stack margins. Subsequent three-cycle full-shutdown validation kept
+explicit LwIP, Wi-Fi, SPI, command-handler, and modem allocation counters
+balanced, with zero outstanding pbufs, a stopped netif worker, eight tasks,
+and final `CHIP_EN=0`/`RDY=0`. The command-handler mutex cleanup removed the
+large recurring leak seen before that fix.
+
+A residual approximately 64-byte-per-cycle free-heap decline was still seen
+in an earlier repeated full-shutdown run, so R2 is not considered closed
+despite the balanced known-owner counters. The 100 persistent
+connect/DHCP/disconnect cycles, 20 cold shutdown/reinitialization cycles, and
+electrical verification of final `CHIP_EN` and `SPI_RDY` levels remain
+outstanding. The explicit compile-time R3 lifecycle mode is now implemented;
+the existing full-shutdown path remains the default while persistent and cold
+restart bench acceptance is completed.

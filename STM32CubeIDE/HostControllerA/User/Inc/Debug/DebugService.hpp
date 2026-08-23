@@ -38,7 +38,7 @@ protected:
 private:
     DebugService();
 
-    static constexpr uint32_t kMaxLogMessageLen = 128;
+    static constexpr uint32_t kMaxLogMessageLen = 200;
     static constexpr uint32_t kMaxRxLineLen     = 96;
     static constexpr uint32_t kRxRingSize       = 256;
     static constexpr uint32_t kLogQueueDepth    = 64;
