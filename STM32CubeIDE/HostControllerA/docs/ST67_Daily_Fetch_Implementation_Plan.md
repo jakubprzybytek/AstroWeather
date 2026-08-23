@@ -454,7 +454,7 @@ validation gates are defined in
 [`ST67_Phase_3_Implementation_Plan.md`](ST67_Phase_3_Implementation_Plan.md).
 The remaining work after the successful single-cycle bench result is ordered
 in
-[`ST67_Phase_3_Remaining_Work_Plan.md`](ST67_Phase_3_Remaining_Work_Plan.md).
+[`ST67_Phase_3_Implementation_Plan.md`](ST67_Phase_3_Implementation_Plan.md).
 
 1. Store SSID/password in a product configuration boundary, not directly in generated files or source control. For initial bench testing, a local ignored configuration header is acceptable.
 2. Populate `W6X_WiFi_Connect_Opts_t` and call `W6X_WiFi_Connect()`.
