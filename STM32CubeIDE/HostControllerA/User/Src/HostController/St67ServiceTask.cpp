@@ -39,7 +39,7 @@ extern "C" void vLoggingPrintf(uint32_t logLevel,
       (logLevel <= LOG_ERROR)
           ? DebugService::Level::Error
           : (logLevel == LOG_WARN) ? DebugService::Level::Warn
-                                   : DebugService::Level::Info;
+                    : DebugService::Level::Debug;
   DebugService::instance().log(level, message);
 }
 
@@ -448,7 +448,7 @@ class St67ServiceTask : public Task<2560> {
 
   void logMemory(const char* stage) {
     DebugService::instance().logf(
-        DebugService::Level::Info,
+        DebugService::Level::Debug,
         "ST67 %s heap=%lu min=%lu tasks=%lu",
         stage,
         static_cast<unsigned long>(xPortGetFreeHeapSize()),
@@ -458,7 +458,7 @@ class St67ServiceTask : public Task<2560> {
 
         void logCheckpoint(const char* stage) {
           DebugService::instance().logf(
-          DebugService::Level::Info,
+            DebugService::Level::Debug,
           "ST67 checkpoint=%s heap=%lu min=%lu tasks=%lu pbufs=%lu running=%u sta=%u ap=%u chip=%u rdy=%u",
           stage,
           static_cast<unsigned long>(xPortGetFreeHeapSize()),
@@ -474,7 +474,7 @@ class St67ServiceTask : public Task<2560> {
 
   bool logStage(const char* stage, W6X_Status_t status, uint32_t startedAt) {
     DebugService::instance().logf(
-        (status == W6X_STATUS_OK) ? DebugService::Level::Info
+      (status == W6X_STATUS_OK) ? DebugService::Level::Debug
                                   : DebugService::Level::Error,
         "ST67 %s status=%d(%s) elapsed=%lums",
         stage,
@@ -728,7 +728,7 @@ class St67ServiceTask : public Task<2560> {
         fail("netif-stop");
       }
       DebugService::instance().logf(
-          status == 0 ? DebugService::Level::Info : DebugService::Level::Warn,
+          status == 0 ? DebugService::Level::Debug : DebugService::Level::Warn,
           "ST67 netif-stop status=%ld pbufs=%lu running=%u",
           static_cast<long>(status),
           static_cast<unsigned long>(net_if_outstanding_pbufs()),

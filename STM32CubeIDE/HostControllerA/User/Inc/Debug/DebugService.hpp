@@ -18,7 +18,7 @@
 class DebugService : public Task<1536>
 {
 public:
-    enum class Level : uint8_t { Info, Warn, Error };
+    enum class Level : uint8_t { Info, Warn, Error, Debug };
 
     static DebugService& instance();
 
@@ -51,6 +51,7 @@ private:
 
     struct LogEvent
     {
+        Level level;
         char text[kMaxLogMessageLen];
     };
 
@@ -62,8 +63,10 @@ private:
     void emitStats();
     void formatUptime(char* out, size_t outSize) const;
     bool transmit(const uint8_t* data, uint16_t len);
-    bool transmitLine(const char* text);
+    bool transmitLogEvent(const LogEvent& event);
+    bool transmitLine(const char* text, Level level = Level::Info);
     static const char* levelTag(Level level);
+    static const char* levelColor(Level level);
 
     // Message queue for log events produced by any task (drop-oldest overflow policy).
     osMessageQueueId_t logQueueHandle_;

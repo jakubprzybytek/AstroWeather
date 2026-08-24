@@ -31,7 +31,7 @@ DebugService::instance().log(DebugService::Level::Info, "connected");
 DebugService::instance().logf(DebugService::Level::Warn, "retry %lu", retryCount);
 ```
 
-`Level` values are `Info`, `Warn`, and `Error`, emitted as `INFO`, `WARN`, and `ERR`. Each log line is formatted as:
+`Level` values are `Info`, `Warn`, `Error`, and `Debug`, emitted as `INFO`, `WARN`, `ERR`, and `DEBUG`. When viewed in an ANSI-capable terminal, error records are red, warnings are yellow, and debug records are dark gray. Info records have no color. Each log line is formatted as:
 
 ```text
 [days:hours:minutes:seconds] [LEVEL] message\n
@@ -71,6 +71,8 @@ When neither incoming data nor queued logs wake the task, it times out after 5 s
 ```text
 [days:hours:minutes:seconds] [STATS] sent=N dropped=N busyDrop=N rxOverflow=N rxTrunc=N\n
 ```
+
+The periodic `[MEM]` and `[STACK]` records use the same dark-gray ANSI formatting as `Debug` logs. The `[STATS]` record remains uncolored.
 
 `sent` counts successfully transmitted log records only; it does not include echo responses or statistics lines. The other counters are cumulative since startup.
 

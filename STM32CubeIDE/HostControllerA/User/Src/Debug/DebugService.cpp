@@ -47,13 +47,26 @@ const char* DebugService::levelTag(Level level)
         case Level::Info:  return "INFO";
         case Level::Warn:  return "WARN";
         case Level::Error: return "ERR";
+        case Level::Debug: return "DEBUG";
         default:           return "?";
+    }
+}
+
+const char* DebugService::levelColor(Level level)
+{
+    switch (level)
+    {
+        case Level::Warn:  return "\x1b[33m";
+        case Level::Error: return "\x1b[31m";
+        case Level::Debug: return "\x1b[90m";
+        default:           return "";
     }
 }
 
 bool DebugService::log(Level level, const char* message)
 {
     LogEvent event;
+    event.level = level;
     char uptime[24];
     formatUptime(uptime, sizeof(uptime));
     std::snprintf(event.text, sizeof(event.text), "%s [%s] %s", uptime, levelTag(level), message);
@@ -63,6 +76,7 @@ bool DebugService::log(Level level, const char* message)
 bool DebugService::logf(Level level, const char* format, ...)
 {
     LogEvent event;
+    event.level = level;
     char uptime[24];
     formatUptime(uptime, sizeof(uptime));
     int prefixLen = std::snprintf(event.text, sizeof(event.text), "%s [%s] ", uptime, levelTag(level));
@@ -194,20 +208,40 @@ void DebugService::drainLogQueue()
     LogEvent event;
     while (logQueueHandle_ != nullptr && osMessageQueueGet(logQueueHandle_, &event, nullptr, 0) == osOK)
     {
-        if (transmitLine(event.text))
+        if (transmitLogEvent(event))
         {
             ++sentCount_;
         }
     }
 }
 
-bool DebugService::transmitLine(const char* text)
+bool DebugService::transmitLogEvent(const LogEvent& event)
 {
-    size_t len = strnlen(text, sizeof(txBuffer_) - 2);
-    memcpy(txBuffer_, text, len);
-    txBuffer_[len] = '\n';
-    txBuffer_[len + 1] = '\0';
-    return transmit(reinterpret_cast<uint8_t*>(txBuffer_), static_cast<uint16_t>(len + 1));
+    return transmitLine(event.text, event.level);
+}
+
+bool DebugService::transmitLine(const char* text, Level level)
+{
+    const char* color = levelColor(level);
+    if (color[0] == '\0')
+    {
+        size_t len = strnlen(text, sizeof(txBuffer_) - 2);
+        memcpy(txBuffer_, text, len);
+        txBuffer_[len] = '\n';
+        txBuffer_[len + 1] = '\0';
+        return transmit(reinterpret_cast<uint8_t*>(txBuffer_), static_cast<uint16_t>(len + 1));
+    }
+
+    int len = std::snprintf(txBuffer_, sizeof(txBuffer_), "%s%s\x1b[0m\n", color, text);
+    if (len <= 0)
+    {
+        return false;
+    }
+
+    const size_t transmitLen = static_cast<size_t>(len) < sizeof(txBuffer_)
+                                   ? static_cast<size_t>(len)
+                                   : sizeof(txBuffer_) - 1;
+    return transmit(reinterpret_cast<uint8_t*>(txBuffer_), static_cast<uint16_t>(transmitLen));
 }
 
 bool DebugService::transmit(const uint8_t* data, uint16_t len)
@@ -247,13 +281,13 @@ void DebugService::emitStats()
                   static_cast<unsigned long>(sentCount_), static_cast<unsigned long>(droppedCount_),
                   static_cast<unsigned long>(busyDropCount_), static_cast<unsigned long>(rxOverflowCount_),
                   static_cast<unsigned long>(rxTruncatedCount_));
-    transmitLine(line);
+    transmitLine(line, Level::Debug);
 
     std::snprintf(line, sizeof(line), "%s [MEM] heapFree=%lu heapMin=%lu",
                   uptime,
                   static_cast<unsigned long>(xPortGetFreeHeapSize()),
                   static_cast<unsigned long>(xPortGetMinimumEverFreeHeapSize()));
-    transmitLine(line);
+    transmitLine(line, Level::Debug);
 
     struct StackReportContext
     {
@@ -276,7 +310,7 @@ void DebugService::emitStats()
                       report.uptime, task.getName(),
                       static_cast<unsigned long>(task.getStackSizeBytes()),
                       static_cast<unsigned long>(remainingWords * sizeof(StackType_t)));
-        report.service->transmitLine(taskLine);
+        report.service->transmitLine(taskLine, Level::Debug);
     }, &context);
 }
 
