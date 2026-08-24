@@ -602,13 +602,50 @@ initial functional DNS/HTTP integration, but persistent fetch stress, the
 deterministic local endpoint matrix, and the remaining timeout/framing failure
 tests are still open.
 
+The persistent fetch acceptance run was completed on 2026-08-24. The
+`HttpPersistentStress` mode passed `100/100` cycles with one W6X/Wi-Fi/LwIP
+initialization, HTTP `200` responses of 83 bytes, CRC32 `b701dc37`, stable
+post-disconnect heap of `23,984 B`, minimum-ever heap of `14,680 B`, zero pbufs,
+and final `CHIP_EN=0`/`RDY=0`. Task count returned from 11 during the batch to
+8 after teardown; `rxOverflow` and `rxTrunc` stayed zero, and the pre-existing
+`busyDrop=11` count did not increase. Persistent HTTP fetch stress is accepted.
+The local endpoint matrix, deferred timeout/cancellation tests, client-owned
+data handoff, power measurements, and HTTPS remain open. Production weather
+endpoint selection and schema definition are deferred to Phase 5.
+
+An additional switch-triggered `SingleFullShutdown` run passed on 2026-08-24.
+It used the service-owned diagnostic buffer and returned HTTP `200` with
+83 bytes and CRC32 `b701dc37`. Free heap was `21,432 B` during HTTP,
+`23,984 B` after disconnect, and `33,896 B` after teardown; minimum-ever heap
+was `14,880 B`. Netifs and pbufs were fully cleaned up and final
+`CHIP_EN=0`/`RDY=0` was reached. `rxOverflow=0` and `rxTrunc=0`; the final
+`busyDrop=29` count requires a clean baseline to determine whether it changed.
+This run confirms the diagnostic lifecycle path, but does not validate a
+production application call site for the client-owned buffer API.
+
+The subsequent switch-triggered `MainLoopTask` run passed on 2026-08-24 and
+validated the production client-owned handoff. `MainLoopTask` supplied a
+static 4,096-byte buffer, called `FetchSt67Data()`, waited for completion, and
+then recalculated the returned CRC32 before processing the response. The
+result was HTTP `200`, 83 bytes, CRC32 `b701dc37`, and `crc-valid=1`.
+The service completed disconnect and full teardown before the client resumed;
+pbufs were zero and final `CHIP_EN=0`/`RDY=0` was reached. Free heap was
+39,080 B before the fetch, 33,896 B after teardown, and 14,816 B minimum-ever.
+The active task count peaked at 13, returned to 9 during teardown, and then
+returned to 8. `MainLoopTask` retained 640 B from its 1,536-byte stack at the
+final watermark. `rxOverflow=0` and `rxTrunc=0`; the pre-existing
+`busyDrop=118` count did not increase during the fetch. This closes the
+generic application call-site check; weather parsing and production endpoint
+selection remain Phase 5 work.
+
 ### Phase 5 - Daily scheduler and data handoff, later scope
 
 1. Trigger the lifecycle owner from an RTC/alarm scheduler rather than a 24-hour RTOS delay.
 2. Use a monotonic job identifier and persist last-success time if missed or duplicate fetches matter.
 3. Apply bounded retry with exponential backoff inside a daily attempt window.
-4. Hand an immutable, length-delimited response to the processing task through a queue or ownership-transfer buffer.
-5. Keep scheduling, transport, and parsing as separate components so malformed data cannot strand the radio online.
+4. Select the production weather endpoint and define its media type, maximum payload size, framing, authentication, and schema/version marker.
+5. Select the production weather endpoint and use the validated client-owned response buffer and request/result boundary. Wait for the complete lifecycle result, then process the buffer in the client; do not add a queue or processing task unless the product later requires asynchronous processing.
+6. Keep scheduling, transport, and parsing as separate components so malformed data cannot strand the radio online.
 
 ## 8. Power-mode decision
 

@@ -65,17 +65,21 @@ enum class State : uint8_t {
 
 static_assert(APP_ST67_LIFECYCLE_MODE == APP_ST67_LIFECYCLE_SINGLE_FULL_SHUTDOWN ||
                   APP_ST67_LIFECYCLE_MODE == APP_ST67_LIFECYCLE_PERSISTENT_STRESS ||
-                  APP_ST67_LIFECYCLE_MODE == APP_ST67_LIFECYCLE_COLD_RESTART_STRESS,
+          APP_ST67_LIFECYCLE_MODE == APP_ST67_LIFECYCLE_COLD_RESTART_STRESS ||
+          APP_ST67_LIFECYCLE_MODE == APP_ST67_LIFECYCLE_HTTP_PERSISTENT_STRESS,
               "Unknown ST67 lifecycle mode");
 static_assert(APP_ST67_PERSISTENT_STRESS_CYCLES > 0U,
               "Persistent stress requires at least one cycle");
 static_assert(APP_ST67_COLD_RESTART_STRESS_CYCLES > 0U,
               "Cold restart stress requires at least one cycle");
+static_assert(APP_ST67_HTTP_PERSISTENT_STRESS_CYCLES > 0U,
+              "HTTP persistent stress requires at least one cycle");
 
 enum class LifecycleMode : uint8_t {
   SingleFullShutdown = APP_ST67_LIFECYCLE_SINGLE_FULL_SHUTDOWN,
   PersistentStress = APP_ST67_LIFECYCLE_PERSISTENT_STRESS,
   ColdRestartStress = APP_ST67_LIFECYCLE_COLD_RESTART_STRESS,
+  HttpPersistentStress = APP_ST67_LIFECYCLE_HTTP_PERSISTENT_STRESS,
 };
 
 struct BatchResult {
@@ -106,6 +110,10 @@ class St67ServiceTask : public Task<2560> {
       triggerRejected_ = true;
     }
     osThreadFlagsSet(getHandle(), kFlagTrigger);
+  }
+
+  bool requestClientFetch(HostController::St67FetchRequest* request) {
+    return startClientFetch(request);
   }
 
  protected:
@@ -232,6 +240,24 @@ class St67ServiceTask : public Task<2560> {
         buffer->length < 0) {
       return -1;
     }
+    uint8_t* destination = httpPayload_;
+    uint32_t* destinationLength = &httpPayloadLength_;
+    uint32_t destinationCapacity = sizeof(httpPayload_);
+    if (clientRequest_ != nullptr) {
+      destination = clientRequest_->buffer;
+      destinationLength = &clientPayloadLength_;
+      destinationCapacity = clientRequest_->capacity;
+    }
+    if (*destinationLength > destinationCapacity ||
+        static_cast<uint32_t>(buffer->length) >
+            destinationCapacity - *destinationLength) {
+      responseTooLarge_ = true;
+      httpError_ = HTTP_CLIENT_BAD_PARAM;
+      return -1;
+    }
+    std::memcpy(&destination[*destinationLength], buffer->data,
+                static_cast<size_t>(buffer->length));
+    *destinationLength += static_cast<uint32_t>(buffer->length);
     httpReceivedBytes_ += static_cast<uint32_t>(buffer->length);
     for (int32_t index = 0; index < buffer->length; ++index) {
       if (httpPreviewLength_ < sizeof(httpPreview_) - 1U) {
@@ -304,6 +330,9 @@ class St67ServiceTask : public Task<2560> {
     httpStatus_ = HTTP_VERSION_NOT_SUPPORTED;
     httpError_ = HTTP_CLIENT_ERR;
     httpReceivedBytes_ = 0U;
+    httpPayloadLength_ = 0U;
+    clientPayloadLength_ = 0U;
+    responseTooLarge_ = false;
     httpHeaderLength_ = 0U;
     httpPreviewLength_ = 0U;
     httpPreview_[0] = '\0';
@@ -353,6 +382,20 @@ class St67ServiceTask : public Task<2560> {
         static_cast<unsigned long>(httpReceivedBytes_),
         static_cast<unsigned long>(httpCrc_ ^ 0xFFFFFFFFU),
         static_cast<unsigned long>(HAL_GetTick() - startedAt));
+    const uint32_t completedPayloadLength =
+      clientRequest_ != nullptr ? clientPayloadLength_ : httpPayloadLength_;
+    if (success && completedPayloadLength != httpReceivedBytes_) {
+      DebugService::instance().log(DebugService::Level::Error,
+                                   "ST67 http-handoff length mismatch");
+      return false;
+    }
+    if (success) {
+      DebugService::instance().logf(
+          DebugService::Level::Info,
+          "ST67 http-handoff accepted bytes=%lu crc=%08lx",
+          static_cast<unsigned long>(httpPayloadLength_),
+          static_cast<unsigned long>(httpCrc_ ^ 0xFFFFFFFFU));
+    }
       for (uint32_t offset = 0U; offset < httpPreviewLength_; offset += 64U) {
         char chunk[65];
         const uint32_t remaining = httpPreviewLength_ - offset;
@@ -364,6 +407,63 @@ class St67ServiceTask : public Task<2560> {
                       static_cast<unsigned long>(offset), chunk);
       }
     return success;
+  }
+
+  bool startClientFetch(HostController::St67FetchRequest* request) {
+    if (request == nullptr || request->buffer == nullptr ||
+        request->capacity == 0U ||
+        request->capacity > APP_ST67_HTTP_MAX_RESPONSE_BYTES ||
+        batchActive_ || clientRequest_ != nullptr) {
+      if (request != nullptr) {
+        request->result.status = (batchActive_ || clientRequest_ != nullptr)
+                                     ? HostController::St67FetchStatus::Busy
+                                     : HostController::St67FetchStatus::InvalidArgument;
+        request->completed = true;
+      }
+      return false;
+    }
+    request->result = {};
+    request->result.status = HostController::St67FetchStatus::Busy;
+    request->completed = false;
+    clientRequest_ = request;
+    osThreadFlagsSet(getHandle(), kFlagTrigger);
+    while (!request->completed) {
+      osDelay(10U);
+    }
+    return request->result.status == HostController::St67FetchStatus::Success;
+  }
+
+  void publishClientResult() {
+    if (clientRequest_ == nullptr) {
+      return;
+    }
+    HostController::St67FetchResult& result = clientRequest_->result;
+    result.httpStatus = static_cast<uint16_t>(httpStatus_);
+    result.length = 0U;
+    result.crc32 = 0U;
+    result.detail = static_cast<int32_t>(firstFailureStatus_);
+    if (firstFailureStage_ == nullptr) {
+      result.status = HostController::St67FetchStatus::Success;
+      result.length = clientPayloadLength_;
+      result.crc32 = httpCrc_ ^ 0xFFFFFFFFU;
+      result.detail = 0;
+    } else if (responseTooLarge_) {
+      result.status = HostController::St67FetchStatus::ResponseTooLarge;
+    } else if (std::strcmp(firstFailureStage_, "netif-stop") == 0 ||
+           std::strcmp(firstFailureStage_, "final-state") == 0) {
+      result.status = HostController::St67FetchStatus::CleanupFailure;
+    } else if (firstFailureStage_ != nullptr &&
+               std::strcmp(firstFailureStage_, "connect") == 0) {
+      result.status = HostController::St67FetchStatus::NetworkFailure;
+    } else if (firstFailureStage_ != nullptr &&
+               (std::strcmp(firstFailureStage_, "w6x-init") == 0 ||
+                std::strcmp(firstFailureStage_, "wifi-init") == 0)) {
+      result.status = HostController::St67FetchStatus::DriverFailure;
+    } else {
+      result.status = HostController::St67FetchStatus::HttpFailure;
+    }
+    clientRequest_->completed = true;
+    clientRequest_ = nullptr;
   }
 
   void logMemory(const char* stage) {
@@ -632,6 +732,11 @@ class St67ServiceTask : public Task<2560> {
            net_if_outstanding_pbufs() == 0U;
   }
 
+  static bool keepsNetworkStack(LifecycleMode mode) {
+    return mode == LifecycleMode::PersistentStress ||
+           mode == LifecycleMode::HttpPersistentStress;
+  }
+
   bool shutdownStack() {
     if (wifiInitialized_ && !stationDisconnected()) {
       disconnectStation();
@@ -680,13 +785,18 @@ class St67ServiceTask : public Task<2560> {
     }
     batchActive_ = true;
     osThreadFlagsClear(kFlagTrigger);
-    const LifecycleMode mode = static_cast<LifecycleMode>(APP_ST67_LIFECYCLE_MODE);
+    const bool clientJob = clientRequest_ != nullptr;
+    const LifecycleMode mode = clientJob
+                     ? LifecycleMode::SingleFullShutdown
+                     : static_cast<LifecycleMode>(APP_ST67_LIFECYCLE_MODE);
     const uint32_t requestedCycles =
         mode == LifecycleMode::SingleFullShutdown
             ? 1U
             : (mode == LifecycleMode::PersistentStress
-                   ? APP_ST67_PERSISTENT_STRESS_CYCLES
-                   : APP_ST67_COLD_RESTART_STRESS_CYCLES);
+                       ? APP_ST67_PERSISTENT_STRESS_CYCLES
+                       : (mode == LifecycleMode::HttpPersistentStress
+                         ? APP_ST67_HTTP_PERSISTENT_STRESS_CYCLES
+                         : APP_ST67_COLD_RESTART_STRESS_CYCLES));
     BatchResult result{mode, requestedCycles};
     result.startingHeap = xPortGetFreeHeapSize();
     result.lowestHeap = xPortGetMinimumEverFreeHeapSize();
@@ -704,7 +814,10 @@ class St67ServiceTask : public Task<2560> {
       ++cycleId_;
       firstFailureStage_ = nullptr;
       firstFailureStatus_ = W6X_STATUS_OK;
-      if (mode == LifecycleMode::ColdRestartStress || !initialized) {
+      if (!keepsNetworkStack(mode) && mode == LifecycleMode::ColdRestartStress) {
+        initialized = false;
+      }
+      if (!initialized) {
         if (!initializeStack(result.attemptedCycles == 1U)) {
           shutdownStack();
         } else {
@@ -712,15 +825,15 @@ class St67ServiceTask : public Task<2560> {
         }
       }
       const bool readyForIteration =
-          initialized && (mode != LifecycleMode::PersistentStress || cycle == 0U ||
+          initialized && (!keepsNetworkStack(mode) || cycle == 0U ||
                           persistentReady());
       if (!readyForIteration) {
         fail("persistent-ready");
       }
       const bool iterationPassed = readyForIteration && runStationIteration();
       const bool teardownPassed =
-          mode == LifecycleMode::PersistentStress ? true : shutdownStack();
-      if (mode != LifecycleMode::PersistentStress) {
+            keepsNetworkStack(mode) ? true : shutdownStack();
+          if (!keepsNetworkStack(mode)) {
         initialized = false;
       }
       if (iterationPassed && teardownPassed && firstFailureStage_ == nullptr) {
@@ -743,13 +856,13 @@ class St67ServiceTask : public Task<2560> {
       if (!iterationPassed || !teardownPassed) {
         break;
       }
-      if (mode == LifecycleMode::PersistentStress && cycle + 1U < requestedCycles) {
+      if (keepsNetworkStack(mode) && cycle + 1U < requestedCycles) {
         osDelay(APP_ST67_INTER_CYCLE_DELAY_MS);
       } else if (mode == LifecycleMode::ColdRestartStress && cycle + 1U < requestedCycles) {
         osDelay(APP_ST67_COLD_RESTART_DELAY_MS);
       }
     }
-    if (mode == LifecycleMode::PersistentStress) {
+    if (keepsNetworkStack(mode)) {
       const bool teardownPassed = shutdownStack();
       if (!teardownPassed && result.firstFailedCycle == 0U) {
         result.firstFailedCycle = cycleId_;
@@ -774,6 +887,7 @@ class St67ServiceTask : public Task<2560> {
         static_cast<unsigned long>(result.lowestHeap),
         static_cast<unsigned long>(result.startingTasks),
         static_cast<unsigned long>(result.endingTasks));
+      publishClientResult();
     if (triggerRejected_) {
       DebugService::instance().log(DebugService::Level::Warn,
                                    "ST67 batch trigger rejected: active");
@@ -798,6 +912,11 @@ class St67ServiceTask : public Task<2560> {
   HTTP_Status_Code_e httpStatus_ = HTTP_VERSION_NOT_SUPPORTED;
   int32_t httpError_ = HTTP_CLIENT_ERR;
   uint32_t httpReceivedBytes_ = 0U;
+  uint8_t httpPayload_[APP_ST67_HTTP_MAX_RESPONSE_BYTES]{};
+  uint32_t httpPayloadLength_ = 0U;
+  HostController::St67FetchRequest* clientRequest_ = nullptr;
+  uint32_t clientPayloadLength_ = 0U;
+  bool responseTooLarge_ = false;
   uint32_t httpHeaderLength_ = 0U;
   char httpPreview_[201]{};
   uint32_t httpPreviewLength_ = 0U;
@@ -823,6 +942,10 @@ void TriggerSt67SmokeTest() {
 
 void TriggerSt67ConnectivityCycle() {
   St67ServiceTask::instance().trigger();
+}
+
+bool FetchSt67Data(St67FetchRequest* request) {
+  return St67ServiceTask::instance().requestClientFetch(request);
 }
 
 }  // namespace HostController

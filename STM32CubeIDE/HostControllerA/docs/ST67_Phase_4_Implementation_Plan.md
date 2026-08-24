@@ -49,7 +49,30 @@ certificates, and response payloads must not be logged or committed. The
 initial endpoint configuration should contain only a non-secret host, port,
 path, expected content type, and response-size limit.
 
-### 2.1 Single-cycle integration result (2026-08-23)
+### 2.1 Phase 4 checklist
+
+The implementation increments are defined in Section 7. Status below shows
+the current extent of completion rather than treating the single successful
+fetch as full Phase 4 acceptance.
+
+| Increment | Status | Completed extent / remaining work |
+|---|---|---|
+| 4.0 Freeze the Phase 3 baseline | **Complete** | Existing lifecycle baseline retained; both Debug variants build; single-cycle resource and transport observations are recorded. |
+| 4.1 Harden the HTTP client contract | **Partial** | Required settings validation, one-request guard, response-size checks, terminal callback after cleanup, idle query, cancellation hook, header rejection, safer request sizing, and short-buffer protection are implemented. Full timeout, cancellation, framing, callback-argument, and targeted error-path validation remain open. |
+| 4.2 Add bounded DNS resolution | **Partial** | DHCP-gated IPv4 DNS resolution works in the lifecycle, including asynchronous callback signaling and bounded wait. Cache-hit/miss repeatability, late-callback protection, and DNS failure injection remain untested. |
+| 4.3 Integrate one HTTP fetch | **Partial** | Cold single-cycle, 3-cycle, and 100-cycle persistent fetches completed DNS, TCP, HTTP GET, HTTP 200 validation, 83-byte streaming, CRC32, 200-byte preview, cleanup-before-disconnect, and final teardown. The switch-triggered production call site now also exercises the client-owned handoff. |
+| 4.4 Deterministic local endpoint matrix | **On hold** | Deliberately deferred. No local scripted endpoint or route matrix has been executed; external JSONPlaceholder testing does not satisfy this increment. |
+| 4.5 Stress and resource validation | **Partial** | The dedicated `HttpPersistentStress` mode passed both `3/3` and `100/100` persistent fetch runs with stable observed resources. The failure/recovery batch and deferred fault-path analysis remain open. |
+| 4.6 Production handoff contract | **Complete for generic fetch** | The client-owned request/result API, direct writes into the caller buffer, explicit length/CRC32, post-completion validation, and discard-on-failure behavior are implemented and exercised by `MainLoopTask`. Domain parsing and production weather endpoint selection remain Phase 5 work. |
+| Phase 4 outstanding items | **In progress** | The remaining active work is diagnostic logging reduction and the power-policy decision. Production weather endpoint selection and domain parsing are moved to Phase 5; local endpoint and timeout/cancellation work remain explicitly deferred. |
+
+**Current next step:** reduce diagnostic response-preview output and complete the
+power-policy decision. The generic application call site now invokes the
+client-owned single-buffer API and processes the returned data after completion.
+Production endpoint selection and domain parsing belong to Phase 5; the local
+endpoint and timeout/cancellation work remain on hold.
+
+### 2.2 Single-cycle integration result (2026-08-23)
 
 The first integrated fetch completed successfully from a cold
 `CHIP_EN`-low start using the configured `jsonplaceholder.typicode.com`
@@ -83,6 +106,125 @@ bounded preview consumption, completion-before-disconnect, and cleanup. It
 does not close Phase 4: persistent fetch stress, deterministic local endpoint
 fault coverage, late-callback recovery, and the HTTPS track remain open. The
 full-shutdown heap trend identified in Phase 3 also remains unresolved.
+
+### 2.3 Persistent fetch smoke result (2026-08-24)
+
+The dedicated `HttpPersistentStress` mode completed `3/3` persistent fetch
+cycles against the configured JSONPlaceholder endpoint. W6X, Wi-Fi, and host
+LwIP initialized once; each cycle associated, obtained DHCP, resolved the
+hostname, fetched the HTTP response, disconnected, and returned to the
+persistent-ready boundary.
+
+Observed results:
+
+- All three responses returned HTTP `200`, `83` bytes, and CRC32
+   `b701dc37`.
+- HTTP transaction elapsed times were approximately `1350 ms`, `646 ms`,
+   and `737 ms`; the second and third DNS lookups were cache hits.
+- Free heap after each disconnect was stable at `23984 B`; minimum-ever heap
+   for the batch was `14880 B`.
+- Active task count remained `11` during the persistent cycles and returned to
+   `8` after final teardown. Pbuf count remained zero.
+- Final teardown removed both netifs, stopped the netif worker, and reached
+   `CHIP_EN=0` and `RDY=0`.
+- Debug statistics ended at `busyDrop=5`, `rxOverflow=0`, and `rxTrunc=0`;
+   the five busy drops were present before the batch and did not increase.
+- Response handoff length and CRC checks passed for every cycle. The
+   sanitized response preview was still printed on every cycle, which is
+   diagnostic behavior to reduce before the 100-cycle run.
+
+This closes the initial persistent fetch smoke gate functionally. At the time
+of this result, the 100-cycle resource gate, failure/recovery coverage, and
+the deferred local endpoint and timeout/cancellation work remained open; the
+later 100-cycle result is recorded in Section 2.4.
+
+### 2.4 Persistent fetch acceptance result (2026-08-24)
+
+The dedicated `HttpPersistentStress` mode completed `100/100` persistent fetch
+cycles against the configured JSONPlaceholder endpoint. W6X, Wi-Fi, and host
+LwIP initialized once; every cycle associated, obtained DHCP, resolved the
+hostname, fetched the HTTP response, validated the handoff, disconnected, and
+returned to the persistent-ready boundary.
+
+Observed results:
+
+- All 100 responses returned HTTP `200`, `83` bytes, and CRC32
+   `b701dc37`.
+- DNS cache hits resolved in `0-1 ms` for nearly all cycles. HTTP transaction
+   times were generally below `1.2 s`, with occasional longer responses still
+   completing successfully.
+- Free heap after every disconnect remained `23984 B`; final post-teardown
+   free heap was `33896 B`. Minimum-ever heap was `14680 B`.
+- Active task count remained `11` during the persistent batch and returned to
+   `8` after final teardown. Pbuf count remained zero.
+- Final teardown removed both netifs, stopped the netif worker, and reached
+   `CHIP_EN=0` and `RDY=0`.
+- Debug statistics ended at `busyDrop=11`, `rxOverflow=0`, and `rxTrunc=0`.
+   The 11 busy drops were present before the batch and did not increase.
+- The response handoff length and CRC checks passed on all 100 cycles. The
+   service stack retained `480 B` at the final watermark capture.
+- Diagnostic response preview logging was still enabled on every cycle and
+   remains a logging-reduction task before future long runs.
+
+This closes the Phase 4 persistent fetch stress acceptance gate. The local
+endpoint matrix, timeout/cancellation fault tests, client-owned single-buffer
+request/result API, power measurements, and HTTPS remain open. Production
+weather endpoint selection and schema definition are deferred to Phase 5.
+
+### 2.5 Latest single-cycle shutdown result (2026-08-24)
+
+The switch-triggered diagnostic path completed one additional
+`SingleFullShutdown` fetch successfully. This run used the service-owned
+diagnostic buffer, not the client-owned `FetchSt67Data()` API.
+
+Observed results:
+
+- ST67 middleware `1.3.0`, SDK `2.0.106`, module ID `C6AFDBD111400004`.
+- Wi-Fi association succeeded on channel 2 at RSSI `-39`; DHCP assigned
+   `192.168.1.142` with gateway and DNS server `192.168.1.1`.
+- DNS resolved the configured hostname to `188.114.96.11` in `406 ms`.
+- HTTP returned status `200`, with `83` response bytes and CRC32
+   `b701dc37`. The sanitized preview matched the expected JSON response.
+- Free heap was `21432 B` at the active HTTP checkpoint, `23984 B` after
+   disconnect, and `33896 B` after full teardown.
+- The batch completed with `pass=1 fail=0`. Minimum-ever free heap was
+   `14880 B`; the ST67 service stack retained `560 B` at the later idle
+   watermark.
+- Netif teardown removed both interfaces, stopped the netif worker, released
+   all pbufs, and reached `CHIP_EN=0` and `RDY=0`.
+- Debug statistics ended at `busyDrop=29`, `rxOverflow=0`, and `rxTrunc=0`.
+   The log does not establish whether all 29 busy drops predated this run, so
+   this counter should be re-baselined in a clean capture.
+
+This confirms another successful cold single-cycle transport and shutdown
+run. It does not validate the client-owned API, a production application call
+site, or the deferred fault and framing cases.
+
+### 2.6 Production client handoff result (2026-08-24)
+
+The switch-triggered `MainLoopTask` exercised the client-owned
+`FetchSt67Data()` API. `MainLoopTask` supplied a static 4,096-byte response
+buffer, waited for the service to publish the completed result, and processed
+the buffer only after the network lifecycle and teardown had finished.
+
+Observed results:
+
+- The fetch returned HTTP `200`, 83 bytes, and CRC32 `b701dc37`.
+- The caller recalculated the CRC32 from its response buffer and reported
+   `crc-valid=1`.
+- The service completed disconnect and full teardown before the caller log;
+   pbufs were zero and final `CHIP_EN=0`/`RDY=0` was reached.
+- The initial free heap was `39,080 B`, the post-teardown free heap was
+   `33,896 B`, and minimum-ever free heap was `14,816 B`.
+- Active task count reached 13 during HTTP, returned to 9 during final
+   teardown, and returned to 8 after the client task resumed.
+- `MainLoopTask` retained `640 B` of its 1,536-byte stack at the final
+   watermark. `rxOverflow=0` and `rxTrunc=0`; `busyDrop=118` did not increase
+   during the fetch.
+
+This closes the generic Phase 4 production application call-site check. The
+response is intentionally only integrity-checked here; weather schema parsing
+and production endpoint selection remain Phase 5 work.
 
 ## 3. Source-backed findings in the generated HTTP client
 
@@ -159,10 +301,25 @@ configured schemes and hosts, and repeat DNS validation for each destination.
 
 ## 5. Proposed application boundary
 
-Keep network lifecycle control in `St67ServiceTask`, but isolate transaction
-state and response consumption from Wi-Fi control. A small private fetch
-component should expose one in-flight operation and an authoritative terminal
-result.
+Keep network lifecycle control in `St67ServiceTask`, but keep response
+processing outside it. The client supplies one response buffer and a result
+record, triggers the service, and waits for the service to report that the
+entire network job has finished. The client may read and process the buffer
+only after that completion result is published.
+
+The intended ownership sequence is:
+
+```text
+client owns empty buffer
+   -> client submits buffer and waits
+   -> ST67 service owns the network lifecycle and writes the buffer
+   -> ST67 service disconnects, tears down, and publishes result
+   -> client regains read access and processes the completed buffer
+```
+
+There is one request at a time, no response queue, no buffer pool, and no
+backpressure protocol. The caller must keep the buffer and result record alive
+and must not modify the buffer until the job is complete.
 
 Suggested result model:
 
@@ -216,11 +373,11 @@ properties:
   the HTTP worker released its allocations;
 - callback data is copied or consumed synchronously and never retained.
 
-Use an application-owned bounded consumer interface. For the first increment,
-the consumer may calculate total length and CRC32 while retaining at most a
-small fixed preview for deterministic comparison. Do not allocate a buffer
-from remote `Content-Length`. Domain parsing and ownership transfer belong to
-a later increment after transport behavior is proven.
+Use a client-owned bounded response buffer. The service writes at most the
+caller-provided capacity and publishes the received length, status, and CRC32
+in the result record. Do not allocate a buffer from remote `Content-Length`.
+Domain parsing occurs in the caller after completion and is not part of
+`St67ServiceTask`.
 
 ## 6. Configuration
 
@@ -234,7 +391,7 @@ Add non-secret defaults to `Appli/App/app_config.h`:
 #define APP_ST67_HTTP_TOTAL_TIMEOUT_MS  15000U
 #define APP_ST67_HTTP_MAX_HEADER_BYTES   2048U
 #define APP_ST67_HTTP_MAX_RESPONSE_BYTES 4096U
-#define APP_ST67_HTTP_STRESS_CYCLES       100U
+#define APP_ST67_HTTP_PERSISTENT_STRESS_CYCLES 100U
 ```
 
 Provide endpoint values through a product configuration boundary with benign
@@ -414,22 +571,66 @@ reset.
 
 ### Increment 4.6 - Production handoff contract
 
-After transport stress passes:
+After transport stress passes, implement the simplest sequential caller
+boundary:
 
-1. Replace the CRC-only consumer with a fixed-capacity response object or a
-   streaming parser interface owned by the application layer.
-2. Define whether partial data is discarded or delivered with an explicit
-   failure result. Default to discard.
-3. Transfer ownership only after status, type, framing, size, and complete-body
-   checks pass.
-4. Ensure malformed application data cannot keep Wi-Fi connected or suppress
-   cleanup.
-5. Keep domain-specific parsing outside HTTP callbacks and outside the ST67
-   lifecycle owner when practical.
+1. Define a client-owned request structure containing a response buffer,
+   capacity, completion state, success/failure result, received length, HTTP
+   status, and CRC32.
+2. Expose a request function that accepts this structure, triggers
+   `St67ServiceTask`, and waits for the terminal job result. The caller must
+   retain the structure and buffer until completion.
+3. Make `St67ServiceTask` the sole owner of Wi-Fi, DNS, sockets, HTTP worker
+   coordination, disconnect, and selected module teardown.
+4. Write received bytes directly into the caller's buffer during the HTTP data
+   callback. Reject a response that exceeds the caller's capacity; never
+   allocate a replacement buffer.
+5. Publish the result only after HTTP cleanup, Wi-Fi disconnect, and the
+   selected teardown step have completed. Completion means the caller may
+   safely read the buffer.
+6. Let the caller process the buffer synchronously after a successful result.
+   The service must not parse JSON or interpret domain-specific data.
+7. Discard partial data on failure. No queue, buffer pool, or backpressure
+   mechanism is required because fetching and processing are sequential.
 
 Acceptance check: a validated immutable, length-delimited response reaches the
-consumer exactly once; failed or partial responses are never presented as a
-successful fetch.
+caller exactly once after the complete lifecycle result; failed or partial
+responses are never presented as successful data.
+
+### Phase 4 outstanding items
+
+This section lists only work that is not complete. Completed DNS, HTTP
+integration, fixed-capacity buffering, persistent stress, and shutdown results
+are recorded in Sections 2.2-2.5 and the increment status table above.
+
+#### Still to do
+
+- Remove or gate diagnostic response-preview output for long stress runs while
+  retaining the single-cycle diagnostic option. Preserve status, byte count,
+  CRC32, and lifecycle/resource records.
+- Measure active transfer, disconnected automatic-standby, and full shutdown
+  current, verify CS/RDY/CHIP_EN levels and no GPIO back-power, and record the
+  production power-policy decision using the Phase 3 resource evidence.
+- Decide whether the generic plain-HTTP result is sufficient for the Phase 4
+  release boundary; production weather endpoint selection, schema, and
+  domain-specific processing belong to Phase 5.
+
+#### Still to do, but on hold
+
+- Execute the deterministic local endpoint matrix, including fixed-length,
+  close-delimited, oversized, truncated, malformed, and framing cases.
+- Validate timeout and cancellation behavior, including connect-time limits,
+  late DNS callbacks, worker cleanup, and recovery after failure.
+- Complete failure/recovery testing for DNS, connection refusal, response
+  rejection, and network loss during an active transaction.
+- Complete the deferred HTTP framing and callback-argument hardening needed
+  before production use.
+- Evaluate authenticated HTTPS only after the generic plain-HTTP scope is
+  accepted, including trust, hostname, time, entropy, and memory validation.
+
+The on-hold items remain required for final plain-HTTP acceptance. They are
+deferred intentionally and do not invalidate the completed `100/100`
+persistent fixed-length fetch result.
 
 ## 8. Timeout and cancellation policy
 
