@@ -1,7 +1,7 @@
 #include <HostController/MainLoopTask.hpp>
 
 #include <Debug/DebugService.hpp>
-#include <St67ServiceTask.hpp>
+#include <St67HttpFetchTask.hpp>
 
 #include "app_config.h"
 

@@ -1,4 +1,4 @@
-#include <St67ServiceTask.hpp>
+#include <St67HttpFetchTask.hpp>
 
 #include <Debug/DebugService.hpp>
 #include <Utils/Task.hpp>
@@ -98,10 +98,10 @@ struct BatchResult {
   UBaseType_t endingTasks = 0U;
 };
 
-class St67ServiceTask : public Task<2560> {
+class St67HttpFetchTask : public Task<2560> {
  public:
-  static St67ServiceTask& instance() {
-    static St67ServiceTask task;
+  static St67HttpFetchTask& instance() {
+    static St67HttpFetchTask task;
     return task;
   }
 
@@ -132,7 +132,7 @@ class St67ServiceTask : public Task<2560> {
   }
 
  private:
-  St67ServiceTask() : Task<2560>("St67Service", osPriorityBelowNormal) {
+  St67HttpFetchTask() : Task<2560>("St67HttpFetch", osPriorityBelowNormal) {
     std::memset(&callbacks_, 0, sizeof(callbacks_));
   }
 
@@ -152,14 +152,14 @@ class St67ServiceTask : public Task<2560> {
   static void dnsCallback(const char* name, const ip_addr_t* address,
                           void* argument) {
     (void)name;
-    static_cast<St67ServiceTask*>(argument)->onDnsResult(address);
+    static_cast<St67HttpFetchTask*>(argument)->onDnsResult(address);
   }
 
   static void httpResultCallback(void* argument, HTTP_Status_Code_e status,
                                  uint32_t receivedBytes, uint32_t serverResult,
                                  int32_t error) {
     (void)serverResult;
-    static_cast<St67ServiceTask*>(argument)->onHttpResult(
+    static_cast<St67HttpFetchTask*>(argument)->onHttpResult(
         status, receivedBytes, error);
   }
 
@@ -169,12 +169,12 @@ class St67ServiceTask : public Task<2560> {
     (void)connection;
     (void)headerLength;
     (void)contentLength;
-    return static_cast<St67ServiceTask*>(argument)->onHttpHeaders(headers, headerLength);
+    return static_cast<St67HttpFetchTask*>(argument)->onHttpHeaders(headers, headerLength);
   }
 
   static int32_t httpDataCallback(void* argument, HTTP_buffer_t* buffer,
                                   int32_t error) {
-    return static_cast<St67ServiceTask*>(argument)->onHttpData(buffer, error);
+    return static_cast<St67HttpFetchTask*>(argument)->onHttpData(buffer, error);
   }
 
   void onWifiEvent(W6X_event_id_t eventId, void* eventArgs) {
@@ -909,8 +909,8 @@ class St67ServiceTask : public Task<2560> {
 
 namespace HostController {
 
-void StartSt67ServiceTask() {
-  St67ServiceTask::instance().start();
+void StartSt67HttpFetchTask() {
+  St67HttpFetchTask::instance().start();
 }
 
 void TriggerSt67SmokeTest() {
@@ -918,11 +918,11 @@ void TriggerSt67SmokeTest() {
 }
 
 void TriggerSt67ConnectivityCycle() {
-  St67ServiceTask::instance().trigger();
+  St67HttpFetchTask::instance().trigger();
 }
 
 bool FetchSt67Data(St67FetchRequest* request) {
-  return St67ServiceTask::instance().requestClientFetch(request);
+  return St67HttpFetchTask::instance().requestClientFetch(request);
 }
 
 }  // namespace HostController

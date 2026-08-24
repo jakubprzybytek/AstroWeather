@@ -9,7 +9,7 @@ class Led;
 // Main application loop: waits on switch-press flags (set from EXTI ISRs via
 // HAL_GPIO_EXTI_Falling_Callback) and blinks led2 for a duration specific to
 // whichever switch was pressed.
-class SwitchTask : public Task<512>
+class SwitchTask : public Task<1024>
 {
 public:
     explicit SwitchTask(Led& led2);
