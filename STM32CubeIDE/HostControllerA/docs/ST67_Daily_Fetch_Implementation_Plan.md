@@ -594,8 +594,8 @@ track after plain HTTP passes.
 
 The first single-cycle integration result was recorded on 2026-08-23. The
 configured external JSONPlaceholder endpoint resolved successfully, returned
-HTTP 200 with an 83-byte response, printed the bounded response preview, and
-completed disconnect and full shutdown with zero pbufs and final
+HTTP 200 with an 83-byte response, printed the then-enabled bounded response
+preview, and completed disconnect and full shutdown with zero pbufs and final
 `CHIP_EN=0`/`RDY=0`. The batch passed `1/1`; minimum-ever free heap was
 `15,016 B` and the ST67 service stack margin was `576 B`. This proves the
 initial functional DNS/HTTP integration, but persistent fetch stress, the
@@ -610,8 +610,10 @@ and final `CHIP_EN=0`/`RDY=0`. Task count returned from 11 during the batch to
 8 after teardown; `rxOverflow` and `rxTrunc` stayed zero, and the pre-existing
 `busyDrop=11` count did not increase. Persistent HTTP fetch stress is accepted.
 The local endpoint matrix, deferred timeout/cancellation tests, client-owned
-data handoff, power measurements, and HTTPS remain open. Production weather
-endpoint selection and schema definition are deferred to Phase 5.
+data handoff, power measurements, and HTTPS remain open at that point in the
+sequence. The client-owned handoff was validated subsequently below;
+production weather endpoint selection and schema definition are deferred to
+Phase 5.
 
 An additional switch-triggered `SingleFullShutdown` run passed on 2026-08-24.
 It used the service-owned diagnostic buffer and returned HTTP `200` with
@@ -620,8 +622,9 @@ It used the service-owned diagnostic buffer and returned HTTP `200` with
 was `14,880 B`. Netifs and pbufs were fully cleaned up and final
 `CHIP_EN=0`/`RDY=0` was reached. `rxOverflow=0` and `rxTrunc=0`; the final
 `busyDrop=29` count requires a clean baseline to determine whether it changed.
-This run confirms the diagnostic lifecycle path, but does not validate a
-production application call site for the client-owned buffer API.
+This historical run confirms the diagnostic lifecycle path, but does not
+validate the client-owned buffer API; that API is validated by the subsequent
+`MainLoopTask` result below.
 
 The subsequent switch-triggered `MainLoopTask` run passed on 2026-08-24 and
 validated the production client-owned handoff. `MainLoopTask` supplied a

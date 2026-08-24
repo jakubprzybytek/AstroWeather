@@ -213,9 +213,8 @@ class St67ServiceTask : public Task<2560> {
   }
 
   int32_t onHttpHeaders(const uint8_t* headers, uint16_t headerLength) {
-    httpHeaderLength_ = headerLength;
     if (headers == nullptr ||
-        httpHeaderLength_ > APP_ST67_HTTP_MAX_HEADER_BYTES ||
+      headerLength > APP_ST67_HTTP_MAX_HEADER_BYTES ||
         std::strstr(reinterpret_cast<const char*>(headers),
                                           "Content-Type:") == nullptr) {
       return -1;
@@ -260,12 +259,6 @@ class St67ServiceTask : public Task<2560> {
     *destinationLength += static_cast<uint32_t>(buffer->length);
     httpReceivedBytes_ += static_cast<uint32_t>(buffer->length);
     for (int32_t index = 0; index < buffer->length; ++index) {
-      if (httpPreviewLength_ < sizeof(httpPreview_) - 1U) {
-        const uint8_t value = buffer->data[index];
-        httpPreview_[httpPreviewLength_++] =
-            (value >= 32U && value <= 126U) ? static_cast<char>(value) : '.';
-        httpPreview_[httpPreviewLength_] = '\0';
-      }
       httpCrc_ ^= buffer->data[index];
       for (uint32_t bit = 0U; bit < 8U; ++bit) {
         httpCrc_ = (httpCrc_ & 1U) != 0U
@@ -333,9 +326,6 @@ class St67ServiceTask : public Task<2560> {
     httpPayloadLength_ = 0U;
     clientPayloadLength_ = 0U;
     responseTooLarge_ = false;
-    httpHeaderLength_ = 0U;
-    httpPreviewLength_ = 0U;
-    httpPreview_[0] = '\0';
     httpCrc_ = 0xFFFFFFFFU;
     HTTP_connection_t settings{};
     settings.server_name = const_cast<char*>(APP_ST67_HTTP_HOST);
@@ -393,19 +383,9 @@ class St67ServiceTask : public Task<2560> {
       DebugService::instance().logf(
           DebugService::Level::Info,
           "ST67 http-handoff accepted bytes=%lu crc=%08lx",
-          static_cast<unsigned long>(httpPayloadLength_),
+          static_cast<unsigned long>(completedPayloadLength),
           static_cast<unsigned long>(httpCrc_ ^ 0xFFFFFFFFU));
     }
-      for (uint32_t offset = 0U; offset < httpPreviewLength_; offset += 64U) {
-        char chunk[65];
-        const uint32_t remaining = httpPreviewLength_ - offset;
-        const uint32_t length = remaining < 64U ? remaining : 64U;
-        std::memcpy(chunk, &httpPreview_[offset], length);
-        chunk[length] = '\0';
-        DebugService::instance().logf(DebugService::Level::Info,
-                      "ST67 http-data offset=%lu data=\"%s\"",
-                      static_cast<unsigned long>(offset), chunk);
-      }
     return success;
   }
 
@@ -917,9 +897,6 @@ class St67ServiceTask : public Task<2560> {
   HostController::St67FetchRequest* clientRequest_ = nullptr;
   uint32_t clientPayloadLength_ = 0U;
   bool responseTooLarge_ = false;
-  uint32_t httpHeaderLength_ = 0U;
-  char httpPreview_[201]{};
-  uint32_t httpPreviewLength_ = 0U;
   uint32_t httpCrc_ = 0U;
   uint32_t cycleId_ = 0U;
   bool batchActive_ = false;

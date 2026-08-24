@@ -47,6 +47,28 @@ const char* statusName(HostController::St67FetchStatus status)
     return "unknown";
 }
 
+void printResponse(const uint8_t* data, uint32_t length)
+{
+    for (uint32_t offset = 0U; offset < length; offset += 64U)
+    {
+        char chunk[65];
+        const uint32_t remaining = length - offset;
+        const uint32_t chunkLength = remaining < 64U ? remaining : 64U;
+        for (uint32_t index = 0U; index < chunkLength; ++index)
+        {
+            const uint8_t value = data[offset + index];
+            chunk[index] = (value >= 32U && value <= 126U)
+                ? static_cast<char>(value)
+                : '.';
+        }
+        chunk[chunkLength] = '\0';
+        DebugService::instance().logf(
+            DebugService::Level::Info,
+            "MainLoopTask response offset=%lu data=\"%s\"",
+            static_cast<unsigned long>(offset), chunk);
+    }
+}
+
 }  // namespace
 
 MainLoopTask& MainLoopTask::instance()
@@ -111,6 +133,10 @@ void MainLoopTask::run()
                 "MainLoopTask response processed bytes=%lu crc-valid=%u",
                 static_cast<unsigned long>(result.length),
                 responseIntegrityValid ? 1U : 0U);
+            if (responseIntegrityValid)
+            {
+                printResponse(responseBuffer_, result.length);
+            }
         }
 
         active_ = false;

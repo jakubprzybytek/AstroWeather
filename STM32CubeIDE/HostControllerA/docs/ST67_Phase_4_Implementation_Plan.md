@@ -60,15 +60,16 @@ fetch as full Phase 4 acceptance.
 | 4.0 Freeze the Phase 3 baseline | **Complete** | Existing lifecycle baseline retained; both Debug variants build; single-cycle resource and transport observations are recorded. |
 | 4.1 Harden the HTTP client contract | **Partial** | Required settings validation, one-request guard, response-size checks, terminal callback after cleanup, idle query, cancellation hook, header rejection, safer request sizing, and short-buffer protection are implemented. Full timeout, cancellation, framing, callback-argument, and targeted error-path validation remain open. |
 | 4.2 Add bounded DNS resolution | **Partial** | DHCP-gated IPv4 DNS resolution works in the lifecycle, including asynchronous callback signaling and bounded wait. Cache-hit/miss repeatability, late-callback protection, and DNS failure injection remain untested. |
-| 4.3 Integrate one HTTP fetch | **Partial** | Cold single-cycle, 3-cycle, and 100-cycle persistent fetches completed DNS, TCP, HTTP GET, HTTP 200 validation, 83-byte streaming, CRC32, 200-byte preview, cleanup-before-disconnect, and final teardown. The switch-triggered production call site now also exercises the client-owned handoff. |
+| 4.3 Integrate one HTTP fetch | **Partial** | Cold single-cycle, 3-cycle, and 100-cycle persistent fetches completed DNS, TCP, HTTP GET, HTTP 200 validation, 83-byte streaming, CRC32, cleanup-before-disconnect, and final teardown. Earlier captures included a 200-byte diagnostic preview; that output has since been removed. The switch-triggered production call site now also exercises the client-owned handoff. |
 | 4.4 Deterministic local endpoint matrix | **On hold** | Deliberately deferred. No local scripted endpoint or route matrix has been executed; external JSONPlaceholder testing does not satisfy this increment. |
 | 4.5 Stress and resource validation | **Partial** | The dedicated `HttpPersistentStress` mode passed both `3/3` and `100/100` persistent fetch runs with stable observed resources. The failure/recovery batch and deferred fault-path analysis remain open. |
 | 4.6 Production handoff contract | **Complete for generic fetch** | The client-owned request/result API, direct writes into the caller buffer, explicit length/CRC32, post-completion validation, and discard-on-failure behavior are implemented and exercised by `MainLoopTask`. Domain parsing and production weather endpoint selection remain Phase 5 work. |
-| Phase 4 outstanding items | **In progress** | The remaining active work is diagnostic logging reduction and the power-policy decision. Production weather endpoint selection and domain parsing are moved to Phase 5; local endpoint and timeout/cancellation work remain explicitly deferred. |
+| Phase 4 outstanding items | **In progress** | The remaining active work is the power-policy decision. The service no longer logs response payloads; the current `MainLoopTask` diagnostic call site prints its validated client-owned response. Production weather endpoint selection and domain parsing are moved to Phase 5; local endpoint and timeout/cancellation work remain explicitly deferred. |
 
-**Current next step:** reduce diagnostic response-preview output and complete the
-power-policy decision. The generic application call site now invokes the
-client-owned single-buffer API and processes the returned data after completion.
+**Current next step:** complete the power-policy decision. The service keeps
+response payloads out of its logs; the current `MainLoopTask` diagnostic call
+site prints the validated client-owned response after completion. Status, byte
+count, CRC32, and lifecycle/resource records remain authoritative.
 Production endpoint selection and domain parsing belong to Phase 5; the local
 endpoint and timeout/cancellation work remain on hold.
 
@@ -163,13 +164,14 @@ Observed results:
    The 11 busy drops were present before the batch and did not increase.
 - The response handoff length and CRC checks passed on all 100 cycles. The
    service stack retained `480 B` at the final watermark capture.
-- Diagnostic response preview logging was still enabled on every cycle and
-   remains a logging-reduction task before future long runs.
+- The historical run still emitted diagnostic response previews on every cycle;
+   that preview path has since been removed from the production fetch code.
 
 This closes the Phase 4 persistent fetch stress acceptance gate. The local
-endpoint matrix, timeout/cancellation fault tests, client-owned single-buffer
-request/result API, power measurements, and HTTPS remain open. Production
-weather endpoint selection and schema definition are deferred to Phase 5.
+endpoint matrix, timeout/cancellation fault tests, power measurements, and
+HTTPS remain open. The client-owned single-buffer request/result API was
+validated subsequently in Section 2.6. Production weather endpoint selection
+and schema definition are deferred to Phase 5.
 
 ### 2.5 Latest single-cycle shutdown result (2026-08-24)
 
@@ -223,8 +225,8 @@ Observed results:
    during the fetch.
 
 This closes the generic Phase 4 production application call-site check. The
-response is intentionally only integrity-checked here; weather schema parsing
-and production endpoint selection remain Phase 5 work.
+current client prints the validated response for bench visibility; weather
+schema parsing and production endpoint selection remain Phase 5 work.
 
 ## 3. Source-backed findings in the generated HTTP client
 
@@ -601,13 +603,10 @@ responses are never presented as successful data.
 
 This section lists only work that is not complete. Completed DNS, HTTP
 integration, fixed-capacity buffering, persistent stress, and shutdown results
-are recorded in Sections 2.2-2.5 and the increment status table above.
+are recorded in Sections 2.2-2.6 and the increment status table above.
 
 #### Still to do
 
-- Remove or gate diagnostic response-preview output for long stress runs while
-  retaining the single-cycle diagnostic option. Preserve status, byte count,
-  CRC32, and lifecycle/resource records.
 - Measure active transfer, disconnected automatic-standby, and full shutdown
   current, verify CS/RDY/CHIP_EN levels and no GPIO back-power, and record the
   production power-policy decision using the Phase 3 resource evidence.
