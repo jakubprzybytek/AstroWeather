@@ -2656,6 +2656,17 @@
 		)
 		(uuid "18d13126-b5ff-4ae6-96c0-42df7b9951e3")
 	)
+	(text "Bugs:\nMissing voltage divider on input voltage sense"
+		(exclude_from_sim no)
+		(at 18.796 24.13 0)
+		(effects
+			(font
+				(size 3 3)
+			)
+			(justify left)
+		)
+		(uuid "c075d87e-5789-4f64-ab8c-35af0c662725")
+	)
 	(text "INA180AX\n-----------\nImax = 3A\nUsense(max) = 3V\nG=20  -> Rsense = 3V/20/3A = 0.05 Ohm | 0.15V drop\nG=50  -> Rsense = 0.02 Ohm            | 0.06V\nG=100 -> Rsesne = 0.01 Ohm            | 0.03V"
 		(exclude_from_sim no)
 		(at 70.104 173.482 0)
