@@ -60,6 +60,9 @@ Completed and build-checked:
 - Hardware smoke test passed: ST67 initialization, callback registration, Wi-Fi association, DHCP, SPI/RDY traffic, HTTP GET (`200`, 83 bytes), and response CRC validation all completed successfully.
 - The HTTP fetch task no longer overflows its 2560-byte stack; the observed post-request watermark was 848 bytes. HTTP transport buffers are heap-owned and were released after the request, with the batch heap returning from 39080 bytes to 39080 bytes.
 - Diagnosed and corrected repeated HTTP-request failures: single client-triggered requests now use one persistent lifecycle cycle and leave the supported ST67/lwIP infrastructure initialized. The station still disconnects after each request, but the unsupported full `W6X_DeInit()` path is no longer used between requests.
+- Hardware stress test passed: 100 persistent ST67 connectivity cycles completed with `pass=100 fail=0`; every cycle associated, obtained DHCP configuration, and disconnected without a lifecycle failure.
+- The 100-cycle run remained stable at `heap=24752`, with a low-water mark of `19080` bytes and `tasks=12` during cycles. The final report showed `heapFree=30744`, `heapMin=19080`, `busyDrop=0`, `dropped=0`, `rxOverflow=0`, and `rxTrunc=0`; observed stack margins remained healthy.
+- HTTP persistent stress test passed: with `APP_ST67_LIFECYCLE_MODE=3`, all 100 HTTP lifecycle cycles completed with `pass=100 fail=0`. Per-cycle heap remained `24752` bytes, the cycle low-water mark was `18944` bytes, and the final report showed `heapFree=30744`, `heapMin=18944`, `tasks=8/10`, and `St67HttpFetch` with `840` bytes remaining.
 
 Current build status:
 
@@ -67,10 +70,8 @@ Current build status:
 
 Still pending:
 
-- Runtime HTTP cancellation, total-timeout, malformed-response, and repeated-request validation.
-- Repeated persistent cycles and HTTP error/cleanup-path validation. Single client-triggered requests now use one persistent cycle and retain the initialized ST67/lwIP infrastructure between requests.
-- USB debug backpressure investigation: the run accumulated `busyDrop=650`; this is a cumulative diagnostic counter and does not indicate an HTTP failure.
-- Review the low `SwitchTask` stack watermark (`176` bytes remaining) and the USB CDC asynchronous transmit-buffer ownership before release.
+- Runtime HTTP cancellation, total-timeout, malformed-response, oversized-response, and unreachable-host validation.
+- USB CDC asynchronous transmit-buffer ownership review remains pending. The HTTP stress run ended with `dropped=0`, `busyDrop=13`, `rxOverflow=0`, and `rxTrunc=0`; the `busyDrop` count is debug-log backpressure, not an HTTP-cycle failure.
 
 ## Migration Inventory
 
@@ -83,8 +84,8 @@ Still pending:
 | CM0+ FreeRTOS compatibility | **Complete**: provide `xPortIsInsideInterrupt()` for FreeRTOS older than 10.6 | Existing USER configuration section in `Core/Inc/FreeRTOSConfig.h` |
 | SPI completion and RDY handling | **Complete for compile-time migration**: User-owned RDY rising-edge bridge calls `spi_on_txn_data_ready()`; hardware handshake validation remains | `User/Src/HostController/St67SpiReady.cpp` |
 | Station status | **Complete for compile-time migration**: dedicated User-owned adapter uses public W6X/lwIP interfaces; hardware validation remains | `User/Inc/HostController/St67NetworkAdapter.hpp`, `User/Src/HostController/St67NetworkAdapter.cpp` |
-| HTTP request ownership | **Runtime smoke-tested**: User-owned bounded synchronous GET returned HTTP 200 and a CRC-valid 83-byte response; transport buffers are heap-owned and released. Cancellation, total deadline, and error-path coverage remain pending | `User/Inc/HostController/HttpClient.hpp`, `User/Src/HostController/HttpClient.cpp` |
-| Network lifecycle | **Runtime fix applied**: single HTTP requests retain the supported persistent ST67/lwIP infrastructure between requests; station disconnect still occurs after each request. Extended repeated-cycle validation remains pending | `User/Src/HostController/St67NetworkSession.cpp`, `User/Src/HostController/St67HttpFetchTask.cpp`, `Appli/App/app_config.h` |
+| HTTP request ownership | **Runtime stress-tested**: User-owned bounded synchronous GET completed 100 persistent HTTP lifecycle cycles with `pass=100 fail=0`; heap returned to `30744` bytes after the run. Cancellation, total deadline, and error-path coverage remain pending | `User/Inc/HostController/HttpClient.hpp`, `User/Src/HostController/HttpClient.cpp` |
+| Network lifecycle | **Runtime validated**: the supported persistent ST67/lwIP infrastructure and repeated HTTP lifecycle completed 100 cycles with no failures or progressive heap loss; station disconnect still occurs after each request | `User/Src/HostController/St67NetworkSession.cpp`, `User/Src/HostController/St67HttpFetchTask.cpp`, `Appli/App/app_config.h` |
 | Cold restart | Defer until supported teardown is available | Revisit only after public APIs or a fully User-owned replacement are identified |
 
 ## Phase 1: Restore the Generated Hardware Baseline
@@ -115,7 +116,7 @@ The DMA-specific generated units compile successfully. The FreeRTOS compatibilit
 - `net_if_outstanding_pbufs()`
 - `MX_LWIP_DeInit()`
 
-The adapter does not reach into private generated state. DHCP transitions and repeated persistent connect/disconnect cycles still require hardware validation.
+The adapter does not reach into private generated state. Hardware validation completed 100 persistent connect/disconnect cycles with no failures.
 
 ### Persistent lifecycle policy
 
@@ -144,7 +145,7 @@ Add a User-owned HTTP implementation with the minimum behavior needed by `St67Ht
 - exactly-once completion/error notification,
 - cleanup of task, socket, TLS state, and allocated buffers on every path.
 
-**Progress:** the User-owned synchronous GET implementation is complete enough for all three firmware builds and has passed a hardware smoke test. `St67HttpFetcher.cpp` no longer calls `HTTP_Client_Cancel()` or `HTTP_Client_IsIdle()`. The client owns the socket, bounded request/response buffers, response-size checks, Content-Length validation, callback completion, and socket cleanup. Single client-triggered requests now retain the supported persistent network/lwIP infrastructure between requests after repeated DHCP failures exposed the previous full-shutdown path. External cancellation, an explicit total deadline, and runtime error-path tests remain pending.
+**Progress:** the User-owned synchronous GET implementation is complete enough for all three firmware builds and has passed both a hardware smoke test and a 100-cycle persistent HTTP stress test. `St67HttpFetcher.cpp` no longer calls `HTTP_Client_Cancel()` or `HTTP_Client_IsIdle()`. The client owns the socket, bounded request/response buffers, response-size checks, Content-Length validation, callback completion, and socket cleanup. Client-triggered requests retain the supported persistent network/lwIP infrastructure between requests after repeated DHCP failures exposed the previous full-shutdown path. External cancellation, an explicit total deadline, and runtime error-path tests remain pending.
 
 The initial implementation may support only the HTTP method and transport required by the application. HTTPS and less-used POST/PUT behavior should be added only when required by an actual caller.
 
@@ -152,7 +153,7 @@ The initial implementation may support only the HTTP method and transport requir
 
 Keep all substantive behavior in User-owned source files. Generated callbacks should only make minimal calls from existing USER blocks.
 
-**Progress:** the User-owned `HAL_GPIO_EXTI_Rising_Callback()` bridge for `ST67_RDY_Pin` now calls the public `spi_on_txn_data_ready()` hook. All three build presets pass, and hardware smoke testing confirmed successful ST67 initialization, Wi-Fi/DHCP, and HTTP traffic without the former `sem_if_ready` timeout. Extended SPI DMA and repeated-cycle validation remain pending.
+**Progress:** the User-owned `HAL_GPIO_EXTI_Rising_Callback()` bridge for `ST67_RDY_Pin` now calls the public `spi_on_txn_data_ready()` hook. All three build presets pass, and hardware smoke testing confirmed successful ST67 initialization, Wi-Fi/DHCP, and HTTP traffic without the former `sem_if_ready` timeout. A 100-cycle persistent connectivity stress test also passed; repeated HTTP transaction and error-path validation remain pending.
 
 Expected bridges include:
 
