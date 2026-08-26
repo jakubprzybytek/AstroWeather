@@ -22,6 +22,9 @@
 /* USER CODE BEGIN Includes */
 
 /* USER CODE END Includes */
+extern DMA_HandleTypeDef hdma_spi1_rx;
+
+extern DMA_HandleTypeDef hdma_spi1_tx;
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN TD */
@@ -98,7 +101,6 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     /* USER CODE END SPI1_MspInit 0 */
     /* Peripheral clock enable */
     __HAL_RCC_SPI1_CLK_ENABLE();
-    __HAL_RCC_DMA1_CLK_ENABLE();
 
     __HAL_RCC_GPIOA_CLK_ENABLE();
     /**SPI1 GPIO Configuration
@@ -113,6 +115,8 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     GPIO_InitStruct.Alternate = GPIO_AF0_SPI1;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+    /* SPI1 DMA Init */
+    /* SPI1_RX Init */
     hdma_spi1_rx.Instance = DMA1_Channel1;
     hdma_spi1_rx.Init.Request = DMA_REQUEST_SPI1_RX;
     hdma_spi1_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
@@ -126,8 +130,10 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     {
       Error_Handler();
     }
-    __HAL_LINKDMA(hspi, hdmarx, hdma_spi1_rx);
 
+    __HAL_LINKDMA(hspi,hdmarx,hdma_spi1_rx);
+
+    /* SPI1_TX Init */
     hdma_spi1_tx.Instance = DMA1_Channel2;
     hdma_spi1_tx.Init.Request = DMA_REQUEST_SPI1_TX;
     hdma_spi1_tx.Init.Direction = DMA_MEMORY_TO_PERIPH;
@@ -141,7 +147,8 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     {
       Error_Handler();
     }
-    __HAL_LINKDMA(hspi, hdmatx, hdma_spi1_tx);
+
+    __HAL_LINKDMA(hspi,hdmatx,hdma_spi1_tx);
 
     /* USER CODE BEGIN SPI1_MspInit 1 */
 
@@ -166,8 +173,6 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* hspi)
     /* USER CODE END SPI1_MspDeInit 0 */
     /* Peripheral clock disable */
     __HAL_RCC_SPI1_CLK_DISABLE();
-    HAL_DMA_DeInit(hspi->hdmarx);
-    HAL_DMA_DeInit(hspi->hdmatx);
 
     /**SPI1 GPIO Configuration
     PA1     ------> SPI1_SCK
@@ -176,6 +181,9 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* hspi)
     */
     HAL_GPIO_DeInit(GPIOA, ST67_SCK_Pin|ST67_MISO_Pin|ST67_MOSI_Pin);
 
+    /* SPI1 DMA DeInit */
+    HAL_DMA_DeInit(hspi->hdmarx);
+    HAL_DMA_DeInit(hspi->hdmatx);
     /* USER CODE BEGIN SPI1_MspDeInit 1 */
 
     /* USER CODE END SPI1_MspDeInit 1 */

@@ -52,6 +52,7 @@ set(MX_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../LWIP/App/lwip_netif.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../LWIP/App/dhcp_server_raw.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../LWIP/App/http_client.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../LWIP/App/altls_mbedtls.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../LWIP/App/sntp.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Device/App/usb_device.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Device/App/usbd_desc.c
@@ -219,10 +220,7 @@ set(MX_LINK_DIRS
 set(MX_LINK_LIBS 
     STM32_Drivers
     ${TOOLCHAIN_LINK_LIBRARIES}
-    USB_Device_Library
-	FreeRTOS
-	LwIP
-	
+    USB_Device_Library	FreeRTOS	LwIP	
 )
 # Interface library for includes and symbols
 add_library(stm32cubemx INTERFACE)

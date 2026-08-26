@@ -51,8 +51,6 @@ extern "C" {
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
-extern DMA_HandleTypeDef hdma_spi1_rx;
-extern DMA_HandleTypeDef hdma_spi1_tx;
 
 /* USER CODE BEGIN EFP */
 
@@ -71,6 +69,7 @@ extern DMA_HandleTypeDef hdma_spi1_tx;
 #define ST67_RX_GPIO_Port GPIOA
 #define ST67_RDY_Pin GPIO_PIN_4
 #define ST67_RDY_GPIO_Port GPIOA
+#define ST67_RDY_EXTI_IRQn EXTI4_15_IRQn
 #define ST67_CS_Pin GPIO_PIN_5
 #define ST67_CS_GPIO_Port GPIOA
 #define ST67_MISO_Pin GPIO_PIN_6

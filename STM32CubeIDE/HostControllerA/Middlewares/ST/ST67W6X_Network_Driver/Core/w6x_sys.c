@@ -225,12 +225,6 @@ W6X_Status_t W6X_Init(void)
   ret = W6X_STATUS_OK;
 
 _err:
-  if (ret != W6X_STATUS_OK && p_DrvObj != NULL)
-  {
-    (void)W61_DeInit(p_DrvObj);
-    p_DrvObj = NULL;
-    p_module_info = NULL;
-  }
   return ret;
 }
 

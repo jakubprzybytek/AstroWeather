@@ -109,13 +109,6 @@ static TimerHandle_t lwip_dhcp6_timer = NULL;
 
 /** Table to store stations connected to soft-AP with their MAC and assigned IP */
 static ap_sta_ipv4_entry_t *ap_sta_ipv4_table = NULL;
-static uint8_t ap_dhcp_started = 0U;
-static uint32_t lwip_netif_alloc_count = 0U;
-static uint32_t lwip_netif_free_count = 0U;
-static uint32_t lwip_timer_alloc_count = 0U;
-static uint32_t lwip_timer_free_count = 0U;
-static uint32_t lwip_ap_table_alloc_count = 0U;
-static uint32_t lwip_ap_table_free_count = 0U;
 
 /* USER CODE BEGIN PV */
 
@@ -194,7 +187,6 @@ static void ap_sta_ipv4_table_clear(void);
   */
 int32_t MX_LWIP_Init(void)
 {
-  static uint8_t tcpip_initialized = 0U;
   W6X_Net_if_cb_t net_if_cb =
   {
     .link_sta_up_fn = netif_link_sta_up_cb,
@@ -209,16 +201,7 @@ int32_t MX_LWIP_Init(void)
 #endif /* LWIP_IPV6 */
 
   /* Initialize the LwIP stack with RTOS */
-  if (tcpip_initialized == 0U)
-  {
-    tcpip_init(NULL, NULL);
-    tcpip_initialized = 1U;
-  }
-
-  if (netif_usr_list[NETIF_STA] != NULL || netif_usr_list[NETIF_AP] != NULL)
-  {
-    return 0;
-  }
+  tcpip_init(NULL, NULL);
 
   netif_usr_list[W6X_NET_IF_STA] = pvPortMalloc(sizeof(struct netif));
   if (netif_usr_list[W6X_NET_IF_STA] == NULL)
@@ -226,29 +209,19 @@ int32_t MX_LWIP_Init(void)
     return -1;
   }
   (void)memset(netif_usr_list[W6X_NET_IF_STA], 0, sizeof(struct netif));
-  ++lwip_netif_alloc_count;
 
   netif_usr_list[W6X_NET_IF_AP] = pvPortMalloc(sizeof(struct netif));
   if (netif_usr_list[W6X_NET_IF_AP] == NULL)
   {
-    vPortFree(netif_usr_list[W6X_NET_IF_STA]);
-    ++lwip_netif_free_count;
-    netif_usr_list[W6X_NET_IF_STA] = NULL;
     return -1;
   }
   (void)memset(netif_usr_list[W6X_NET_IF_AP], 0, sizeof(struct netif));
-  ++lwip_netif_alloc_count;
 
   /* Add netif for station interface */
   if (netifapi_netif_add(netif_usr_list[W6X_NET_IF_STA], NULL,
                          NULL, NULL, NULL, netif_net_init, tcpip_input) != ERR_OK)
   {
     LogError("Failed to add netif\n");
-    vPortFree(netif_usr_list[NETIF_STA]);
-    vPortFree(netif_usr_list[NETIF_AP]);
-    lwip_netif_free_count += 2U;
-    netif_usr_list[NETIF_STA] = NULL;
-    netif_usr_list[NETIF_AP] = NULL;
     return -1;
   }
   netif_usr_list[W6X_NET_IF_STA]->hwaddr_len = ETHARP_HWADDR_LEN;
@@ -264,12 +237,6 @@ int32_t MX_LWIP_Init(void)
                          NULL, NULL, NULL, NULL, netif_net_init, tcpip_input) != ERR_OK)
   {
     LogError("Failed to add netif\n");
-    (void)netifapi_netif_remove(netif_usr_list[NETIF_STA]);
-    vPortFree(netif_usr_list[NETIF_STA]);
-    vPortFree(netif_usr_list[NETIF_AP]);
-    lwip_netif_free_count += 2U;
-    netif_usr_list[NETIF_STA] = NULL;
-    netif_usr_list[NETIF_AP] = NULL;
     return -1;
   }
   netif_usr_list[W6X_NET_IF_AP]->hwaddr_len = ETHARP_HWADDR_LEN;
@@ -286,13 +253,6 @@ int32_t MX_LWIP_Init(void)
   if (net_if_init(&net_if_cb) != 0)
   {
     LogError("Failed to init the LwIP network interface\n");
-    (void)netifapi_netif_remove(netif_usr_list[NETIF_AP]);
-    (void)netifapi_netif_remove(netif_usr_list[NETIF_STA]);
-    vPortFree(netif_usr_list[NETIF_AP]);
-    vPortFree(netif_usr_list[NETIF_STA]);
-    lwip_netif_free_count += 2U;
-    netif_usr_list[NETIF_AP] = NULL;
-    netif_usr_list[NETIF_STA] = NULL;
     return -1;
   }
 
@@ -300,125 +260,6 @@ int32_t MX_LWIP_Init(void)
 
   /* USER CODE END 3 */
   return 0;
-}
-
-int32_t MX_LWIP_DeInit(void)
-{
-  LogInfo("ST67 checkpoint=lwip-enter heap=%lu min=%lu tasks=%lu pbufs=%lu running=%u sta=%u ap=%u\n",
-          (unsigned long)xPortGetFreeHeapSize(),
-          (unsigned long)xPortGetMinimumEverFreeHeapSize(),
-          (unsigned long)uxTaskGetNumberOfTasks(),
-          (unsigned long)net_if_outstanding_pbufs(),
-          (unsigned int)net_if_is_running(),
-          netif_usr_list[NETIF_STA] != NULL ? 1U : 0U,
-          netif_usr_list[NETIF_AP] != NULL ? 1U : 0U);
-  if (netif_usr_list[NETIF_STA] == NULL && netif_usr_list[NETIF_AP] == NULL)
-  {
-    return 0;
-  }
-  if (netif_usr_list[NETIF_STA] != NULL)
-  {
-    (void)netifapi_dhcp_release_and_stop(netif_usr_list[NETIF_STA]);
-    netif_set_link_down(netif_usr_list[NETIF_STA]);
-    netif_set_down(netif_usr_list[NETIF_STA]);
-  }
-  if (netif_usr_list[NETIF_AP] != NULL)
-  {
-    if (ap_dhcp_started != 0U)
-    {
-      (void)netif_link_ap_down_cb();
-    }
-    netif_set_down(netif_usr_list[NETIF_AP]);
-  }
-  (void)netif_dhcp_done(&lwip_dhcp_timer);
-    LogInfo("ST67 checkpoint=dhcp-stopped heap=%lu min=%lu tasks=%lu pbufs=%lu running=%u sta=%u ap=%u\n",
-      (unsigned long)xPortGetFreeHeapSize(),
-      (unsigned long)xPortGetMinimumEverFreeHeapSize(),
-      (unsigned long)uxTaskGetNumberOfTasks(),
-      (unsigned long)net_if_outstanding_pbufs(),
-      (unsigned int)net_if_is_running(),
-      netif_usr_list[NETIF_STA] != NULL ? 1U : 0U,
-      netif_usr_list[NETIF_AP] != NULL ? 1U : 0U);
-  if (net_if_deinit() != 0)
-  {
-    return -1;
-  }
-    LogInfo("ST67 checkpoint=netif-worker-stopped heap=%lu min=%lu tasks=%lu pbufs=%lu running=%u sta=%u ap=%u\n",
-      (unsigned long)xPortGetFreeHeapSize(),
-      (unsigned long)xPortGetMinimumEverFreeHeapSize(),
-      (unsigned long)uxTaskGetNumberOfTasks(),
-      (unsigned long)net_if_outstanding_pbufs(),
-      (unsigned int)net_if_is_running(),
-      netif_usr_list[NETIF_STA] != NULL ? 1U : 0U,
-      netif_usr_list[NETIF_AP] != NULL ? 1U : 0U);
-  if (netif_usr_list[NETIF_AP] != NULL)
-  {
-    (void)netifapi_netif_remove(netif_usr_list[NETIF_AP]);
-    vPortFree(netif_usr_list[NETIF_AP]);
-    netif_usr_list[NETIF_AP] = NULL;
-    ++lwip_netif_free_count;
-  }
-  if (netif_usr_list[NETIF_STA] != NULL)
-  {
-    (void)netifapi_netif_remove(netif_usr_list[NETIF_STA]);
-    vPortFree(netif_usr_list[NETIF_STA]);
-    netif_usr_list[NETIF_STA] = NULL;
-    ++lwip_netif_free_count;
-  }
-  ap_sta_ipv4_table_clear();
-  if (ap_sta_ipv4_table != NULL)
-  {
-    vPortFree(ap_sta_ipv4_table);
-    ap_sta_ipv4_table = NULL;
-  }
-  LogInfo("ST67 checkpoint=netif-removed heap=%lu min=%lu tasks=%lu pbufs=%lu running=%u sta=%u ap=%u\n",
-          (unsigned long)xPortGetFreeHeapSize(),
-          (unsigned long)xPortGetMinimumEverFreeHeapSize(),
-          (unsigned long)uxTaskGetNumberOfTasks(),
-          (unsigned long)net_if_outstanding_pbufs(),
-          (unsigned int)net_if_is_running(),
-          netif_usr_list[NETIF_STA] != NULL ? 1U : 0U,
-          netif_usr_list[NETIF_AP] != NULL ? 1U : 0U);
-  LogInfo("ST67 alloc lwip net=%lu/%lu tm=%lu/%lu ap=%lu/%lu\n",
-      (unsigned long)lwip_netif_alloc_count,
-      (unsigned long)lwip_netif_free_count,
-      (unsigned long)lwip_timer_alloc_count,
-      (unsigned long)lwip_timer_free_count,
-      (unsigned long)lwip_ap_table_alloc_count,
-      (unsigned long)lwip_ap_table_free_count);
-  return 0;
-}
-
-int32_t lwip_get_station_status(LwipStationStatus_t *status)
-{
-  struct netif *netif_cur;
-  if (status == NULL)
-  {
-    return -1;
-  }
-  (void)memset(status, 0, sizeof(*status));
-  netif_cur = netif_usr_list[NETIF_STA];
-  if (netif_cur == NULL)
-  {
-    return -1;
-  }
-  status->link_up = netif_is_link_up(netif_cur) ? 1U : 0U;
-  status->interface_up = netif_is_up(netif_cur) ? 1U : 0U;
-  status->address = *netif_ip4_addr(netif_cur);
-  status->netmask = *netif_ip4_netmask(netif_cur);
-  status->gateway = *netif_ip4_gw(netif_cur);
-  status->has_ipv4 = ip4_addr_isany(&status->address) ? 0U : 1U;
-#if LWIP_DNS
-  status->dns_server = *dns_getserver(0);
-#endif
-  return 0;
-}
-
-uint8_t lwip_netifs_are_removed(void)
-{
-  return (netif_usr_list[NETIF_STA] == NULL && netif_usr_list[NETIF_AP] == NULL)
-             ? 1U
-             : 0U;
 }
 
 struct netif *netif_get_interface(uint32_t link_id)
@@ -459,7 +300,6 @@ static int32_t netif_link_sta_up_cb(void)
     if (lwip_dhcp6_timer)
     {
       xTimerStart(lwip_dhcp6_timer, 0);
-      ++lwip_timer_alloc_count;
     }
   }
 #endif /* LWIP_IPV6_DHCP6 */
@@ -476,7 +316,6 @@ static int32_t netif_link_sta_up_cb(void)
     if (lwip_dhcp_timer != NULL)
     {
       xTimerStart(lwip_dhcp_timer, 0);
-      ++lwip_timer_alloc_count;
     }
   }
 #endif /* LWIP_IPV4 & LWIP_DHCP */
@@ -636,11 +475,9 @@ static int32_t netif_link_ap_up_cb(void)
   {
     return -1;
   }
-  ++lwip_ap_table_alloc_count;
   ap_sta_ipv4_table_clear();
 
   dhcpd_start(netif_usr_list[NETIF_AP], -1, -1);
-  ap_dhcp_started = 1U;
   vTaskDelay(pdMS_TO_TICKS(100));
   (void)dhcpd_status_callback_set(netif_usr_list[NETIF_AP], wifi_ap_status_callback);
 
@@ -655,18 +492,13 @@ static int32_t netif_link_ap_down_cb(void)
   }
   LogInfo("\nNetif AP : Link is down\n");
 
-  if (ap_dhcp_started != 0U)
-  {
-    dhcpd_stop(netif_usr_list[NETIF_AP]);
-    ap_dhcp_started = 0U;
-  }
+  dhcpd_stop(netif_usr_list[NETIF_AP]);
 
   ap_sta_ipv4_table_clear();
   if (ap_sta_ipv4_table != NULL)
   {
     vPortFree(ap_sta_ipv4_table);
     ap_sta_ipv4_table = NULL;
-    ++lwip_ap_table_free_count;
   }
 
   netif_set_link_down(netif_usr_list[NETIF_AP]);
@@ -685,7 +517,6 @@ static int32_t netif_dhcp_done(TimerHandle_t *dhcp_timer)
     xTimerStop(*dhcp_timer, 0);
     xTimerDelete(*dhcp_timer, 0);
     *dhcp_timer = NULL;
-    ++lwip_timer_free_count;
   }
   return 0;
 }

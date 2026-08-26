@@ -62,25 +62,6 @@ typedef enum
   */
 int32_t MX_LWIP_Init(void);
 
-/** Stop the ST67-facing netifs while keeping the host TCP/IP core alive. */
-int32_t MX_LWIP_DeInit(void);
-
-typedef struct
-{
-  uint8_t link_up;
-  uint8_t interface_up;
-  uint8_t has_ipv4;
-  ip4_addr_t address;
-  ip4_addr_t netmask;
-  ip4_addr_t gateway;
-  ip_addr_t dns_server;
-} LwipStationStatus_t;
-
-int32_t lwip_get_station_status(LwipStationStatus_t *status);
-
-/** Return nonzero when both ST67-facing netif pointers have been removed. */
-uint8_t lwip_netifs_are_removed(void);
-
 /**
   * @brief  Retrieve the network interface structure.
   * @param  link_id: Link identifier (0 for STA, 1 for AP)

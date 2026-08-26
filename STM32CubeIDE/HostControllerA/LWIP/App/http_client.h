@@ -212,12 +212,6 @@ int32_t HTTP_Client_Request(const ip_addr_t *server_addr, uint16_t port,
                             HTTP_data_cb_t data_fn,
                             const HTTP_connection_t *settings);
 
-/** Return nonzero while an HTTP request task owns a socket or buffers. */
-int32_t HTTP_Client_IsIdle(void);
-
-/** Request cancellation of the active HTTP request. */
-void HTTP_Client_Cancel(void);
-
 /* USER CODE BEGIN EF */
 
 /* USER CODE END EF */

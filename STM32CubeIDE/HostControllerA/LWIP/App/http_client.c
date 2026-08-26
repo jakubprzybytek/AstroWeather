@@ -367,19 +367,6 @@ int32_t HTTP_Client_Request(const ip_addr_t *server_addr, uint16_t port,
   struct http_request_task_obj *Obj = NULL;
   int family = AF_INET;
 
-  if ((server_addr == NULL) || (uri == NULL) || (settings == NULL) ||
-      (port == 0U) || (req_type < HTTP_REQ_TYPE_HEAD) ||
-      (req_type > HTTP_REQ_TYPE_PUT) || (http_client_active != 0))
-  {
-    return HTTP_CLIENT_BAD_PARAM;
-  }
-  if (settings->max_response_len == 0U)
-  {
-    return HTTP_CLIENT_BAD_PARAM;
-  }
-  http_client_active = 1;
-  http_client_cancelled = 0;
-
 #if (W6X_NET_IPV6_ENABLE == 1)
   if (server_addr->type == W6X_NET_IPV6)
   {
@@ -393,7 +380,6 @@ int32_t HTTP_Client_Request(const ip_addr_t *server_addr, uint16_t port,
     if (sock < 0)
     {
       LogError("Socket creation failed\n");
-      http_client_active = 0;
       return HTTP_CLIENT_ERR;
     }
   }
@@ -416,7 +402,6 @@ int32_t HTTP_Client_Request(const ip_addr_t *server_addr, uint16_t port,
     if (ssl_param == NULL)
     {
       LogError("Invalid configuration of SSL\n");
-      http_client_active = 0;
       goto _err;
     }
 #endif /* MBEDTLS_CONFIG_FILE */
@@ -425,7 +410,6 @@ int32_t HTTP_Client_Request(const ip_addr_t *server_addr, uint16_t port,
     if (sock < 0)
     {
       LogError("Socket creation failed\n");
-      http_client_active = 0;
       return HTTP_CLIENT_ERR;
     }
   }
@@ -482,7 +466,7 @@ int32_t HTTP_Client_Request(const ip_addr_t *server_addr, uint16_t port,
   {
     addr.sin_family = family;
     addr.sin_port = PP_HTONS(port);
-    addr.sin_addr.s_addr = ip_2_ip4(server_addr)->addr;
+    addr.sin_addr.s_addr = server_addr->u_addr.ip4.addr;
     if (0 != connect(sock, (struct sockaddr *)&addr, sizeof(addr)))
     {
       LogError("Socket connection failed\n");
@@ -618,18 +602,7 @@ _err:
   {
     (void)close(sock);
   }
-  http_client_active = 0;
   return HTTP_CLIENT_ERR;
-}
-
-int32_t HTTP_Client_IsIdle(void)
-{
-  return http_client_active == 0;
-}
-
-void HTTP_Client_Cancel(void)
-{
-  http_client_cancelled = 1;
 }
 
 /* USER CODE BEGIN FD */
@@ -654,9 +627,6 @@ static void HTTP_Client_task(void *arg)
   char *content_type = NULL;
   uint16_t http_version = 0;
   uint32_t offset = 0;
-  uint32_t max_response_len;
-  HTTP_result_cb_t result_cb = NULL;
-  void *result_arg = NULL;
   /* SNI max size is used for hostname since it is the same information used
    * in both instances and SNI is limited to HTTP_SNI_MAX_SIZE bytes */
   char host_name[HTTP_SNI_MAX_SIZE + 1] = {0};
@@ -664,19 +634,8 @@ static void HTTP_Client_task(void *arg)
   if ((Obj == NULL) || (Obj->sock < 0) || (Obj->uri == NULL))
   {
     LogError("Invalid input parameters\n");
-    http_client_active = 0;
     return;
   }
-
-  if (http_client_cancelled != 0)
-  {
-    error = -4;
-    goto _err;
-  }
-
-  max_response_len = Obj->settings.max_response_len;
-  result_cb = Obj->settings.result_fn;
-  result_arg = Obj->settings.callback_arg;
 
   if ((Obj->settings.server_name != NULL) && (strlen(Obj->settings.server_name) <= HTTP_SNI_MAX_SIZE))
   {
@@ -692,7 +651,7 @@ static void HTTP_Client_task(void *arg)
     else
 #endif /* W6X_NET_IPV6_ENABLE */
     {
-      (void)inet_ntop(AF_INET, (void *) ip_2_ip4(&Obj->server), host_name, INET_ADDRSTRLEN);
+      (void)inet_ntop(AF_INET, (void *) &Obj->server.u_addr.ip4, host_name, INET_ADDRSTRLEN);
     }
   }
 
@@ -711,7 +670,7 @@ static void HTTP_Client_task(void *arg)
       /* Get the length of the HTTP request */
       req_len = strlen(HTTPC_REQ_HEAD_11) + strlen(Obj->uri) + strlen(HTTP_CLIENT_AGENT) + strlen(host_name);
       /* Allocate dynamically the HTTP request based on previous result */
-      req_buffer = pvPortMalloc((size_t)req_len + 1U);
+      req_buffer = pvPortMalloc(req_len);
       if (req_buffer == NULL)
       {
         goto _err;
@@ -724,7 +683,7 @@ static void HTTP_Client_task(void *arg)
       /* Get the length of the HTTP request */
       req_len = strlen(HTTPC_REQ_11_HOST) + strlen(Obj->uri) + strlen(HTTP_CLIENT_AGENT) + strlen(host_name);
       /* Allocate dynamically the HTTP request based on previous result */
-      req_buffer = pvPortMalloc((size_t)req_len + 1U);
+      req_buffer = pvPortMalloc(req_len);
       if (req_buffer == NULL)
       {
         goto _err;
@@ -738,7 +697,7 @@ static void HTTP_Client_task(void *arg)
       req_len = strlen(HTTPC_REQ_POST_PUT_11) + strlen(Obj->uri) + strlen(HTTP_CLIENT_AGENT)
                 + strlen(host_name) + Obj->post_data_len + strlen(content_type);
       /* Allocate dynamically the HTTP request based on previous result */
-      req_buffer = pvPortMalloc((size_t)req_len + 1U);
+      req_buffer = pvPortMalloc(req_len);
       if (req_buffer == NULL)
       {
         goto _err;
@@ -754,7 +713,7 @@ static void HTTP_Client_task(void *arg)
       req_len = strlen(HTTPC_REQ_POST_PUT_11) + strlen(Obj->uri) + strlen(HTTP_CLIENT_AGENT)
                 + strlen(host_name) + Obj->post_data_len + strlen(content_type);
       /* Allocate dynamically the HTTP request based on previous result */
-      req_buffer = pvPortMalloc((size_t)req_len + 1U);
+      req_buffer = pvPortMalloc(req_len);
       if (req_buffer == NULL)
       {
         goto _err;
@@ -846,18 +805,15 @@ static void HTTP_Client_task(void *arg)
     }
   }
 
-  if ((Obj->settings.headers_done_fn != NULL) &&
-      (Obj->settings.headers_done_fn(NULL, Obj->settings.callback_arg, http_buffer.data,
-                                     offset, content_length) < 0))
+  if (Obj->settings.headers_done_fn != NULL)
   {
-    error = -3;
-    goto _err2;
+    (void)Obj->settings.headers_done_fn(NULL, Obj->settings.callback_arg, http_buffer.data,
+                                        offset, content_length);
   }
 
-  if (content_length > max_response_len)
+  if (Obj->settings.result_fn != NULL)
   {
-    error = -2;
-    goto _err2;
+    Obj->settings.result_fn(Obj->settings.callback_arg, http_status, content_length, 0, 0);
   }
 
   /* If an error occurred, No need to read data, but status code must be returned */
@@ -898,17 +854,6 @@ static void HTTP_Client_task(void *arg)
 
   while (http_buffer.length > 0U)
   {
-    if (http_client_cancelled != 0)
-    {
-      error = -4;
-      goto _err2;
-    }
-    if ((total_recv_data > (int32_t)max_response_len) ||
-        (http_buffer.length > (max_response_len - (uint32_t)total_recv_data)))
-    {
-      error = -2;
-      goto _err2;
-    }
     total_recv_data += http_buffer.length;
     /* Pass Data to callback if not NULL */
     if ((Obj->settings.recv_fn != NULL) && (Obj->settings.recv_fn(Obj->settings.recv_fn_arg, &http_buffer, 0) < 0))
@@ -922,8 +867,7 @@ static void HTTP_Client_task(void *arg)
     }
     if (content_length == 0U)
     {
-        if ((http_buffer.length >= 4U) &&
-          (strncmp((char *)&http_buffer.data[http_buffer.length - 4U], "\r\n\r\n", 4) == 0))
+      if (strncmp((char *)&http_buffer.data[http_buffer.length - 4U], "\r\n\r\n", 4) == 0)
       {
         /* The full request has been received leaving the reading loop */
         break;
@@ -958,6 +902,10 @@ _err2:
 _err:
   if (error != 0)
   {
+    if (Obj->settings.result_fn != NULL)
+    {
+      Obj->settings.result_fn(Obj->settings.callback_arg, http_status, 0, 0, -1);
+    }
     if (Obj->settings.recv_fn != NULL)
     {
       (void)Obj->settings.recv_fn(Obj->settings.callback_arg, NULL, -1);
@@ -982,12 +930,6 @@ _err:
   vPortFree(Obj->post_data.data);
   vPortFree(Obj->uri);
   vPortFree(Obj);
-  http_client_active = 0;
-  if (result_cb != NULL)
-  {
-    result_cb(result_arg, http_status, (error == 0) ? (uint32_t)total_recv_data : 0U,
-              0U, error);
-  }
   vTaskDelete(NULL);
 }
 
@@ -996,7 +938,7 @@ static int32_t HTTP_Parse_Content_Length(const uint8_t *buffer, uint32_t *conten
   int32_t ret = HTTP_CLIENT_ERR;
   uint8_t *content_len_hdr;
   uint32_t rx_data_len;
-  char *endptr;
+  uint8_t *endptr;
 
   /* Look for the Content-Length header field */
   content_len_hdr = (uint8_t *)strstr((const char *)buffer, "Content-Length: ");
@@ -1007,12 +949,8 @@ static int32_t HTTP_Parse_Content_Length(const uint8_t *buffer, uint32_t *conten
   content_len_hdr += 16U; /* Move past "Content-Length: " */
 
   /* Parse content len value */
-  if ((*content_len_hdr < '0') || (*content_len_hdr > '9'))
-  {
-    goto _err;
-  }
-  rx_data_len = strtoul((char *)content_len_hdr, &endptr, 10);
-  if ((endptr == (char *)content_len_hdr) || (*endptr != '\r'))
+  rx_data_len = strtol((char *)content_len_hdr, (char **)&endptr, 10);
+  if ((endptr == content_len_hdr) || (*endptr != '\r'))
   {
     goto _err;
   }

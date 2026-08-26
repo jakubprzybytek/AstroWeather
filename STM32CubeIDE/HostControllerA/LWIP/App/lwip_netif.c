@@ -57,8 +57,6 @@ typedef struct
 
 /** Bit indicating that AP interface has data ready to be processed */
 #define NET_IF_AP_RX_RDY        (1UL << 1U)
-#define NET_IF_STOP             (1UL << 2U)
-#define NET_IF_DRAIN_TIMEOUT_MS 1000U
 
 /* USER CODE BEGIN PD */
 
@@ -79,8 +77,6 @@ typedef struct
 
 /* Private variables ---------------------------------------------------------*/
 static TaskHandle_t netif_task_handle = NULL; /*!< Netif task handle */
-static volatile bool netif_stop_requested = false;
-static volatile uint32_t netif_outstanding_pbuf_count = 0U;
 
 /* USER CODE BEGIN PV */
 
@@ -132,13 +128,11 @@ static void netif_task(void *arg);
 /* Functions Definition ------------------------------------------------------*/
 int32_t net_if_init(W6X_Net_if_cb_t *net_if_cb)
 {
-  if ((netif_task_handle != NULL) || (net_if_cb == NULL) ||
-      (netif_outstanding_pbuf_count != 0U))
+  if ((netif_task_handle != NULL) || (net_if_cb == NULL))
   {
     return -1;
   }
 
-  netif_stop_requested = false;
   net_if_cb->rxd_sta_notify_fn = netif_sta_notify_callback;
   net_if_cb->rxd_ap_notify_fn = netif_ap_notify_callback;
 
@@ -152,59 +146,10 @@ int32_t net_if_init(W6X_Net_if_cb_t *net_if_cb)
                             NULL, NETIF_TASK_PRIORITY, &netif_task_handle))
   {
     LogError("xTaskCreate failed to create netif task\n");
-    W6X_Netif_DeInit();
     return -1;
   }
   vTaskDelay(pdMS_TO_TICKS(100));
   return 0;
-}
-
-int32_t net_if_deinit(void)
-{
-  TaskHandle_t task = netif_task_handle;
-  if (task == NULL)
-  {
-    W6X_Netif_DeInit();
-  }
-  else
-  {
-    netif_stop_requested = true;
-    W6X_Netif_DeInit();
-    (void)xTaskNotify(task, NET_IF_STOP, eSetBits);
-    const TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(1000U);
-    while (netif_task_handle != NULL && xTaskGetTickCount() < deadline)
-    {
-      vTaskDelay(pdMS_TO_TICKS(1U));
-    }
-    if (netif_task_handle != NULL)
-    {
-      return -1;
-    }
-  }
-  const TickType_t drain_deadline = xTaskGetTickCount() +
-                                    pdMS_TO_TICKS(NET_IF_DRAIN_TIMEOUT_MS);
-  while (netif_outstanding_pbuf_count != 0U &&
-         xTaskGetTickCount() < drain_deadline)
-  {
-    vTaskDelay(pdMS_TO_TICKS(1U));
-  }
-  if (netif_outstanding_pbuf_count != 0U)
-  {
-    LogError("ST67 netif pbuf drain timeout: %lu\n",
-             (unsigned long)netif_outstanding_pbuf_count);
-    return -1;
-  }
-  return 0;
-}
-
-uint8_t net_if_is_running(void)
-{
-  return (netif_task_handle != NULL) ? 1U : 0U;
-}
-
-uint32_t net_if_outstanding_pbufs(void)
-{
-  return netif_outstanding_pbuf_count;
 }
 
 err_t net_if_output(struct netif *net_if, struct pbuf *p_buf)
@@ -295,27 +240,17 @@ static void netif_pbuf_free(struct pbuf *pb)
     /* Free the driver buffer and netif_pbuf */
     (void)W6X_Netif_free(netif_pbuf->buffer);
     vPortFree(netif_pbuf);
-    if (netif_outstanding_pbuf_count != 0U)
-    {
-      --netif_outstanding_pbuf_count;
-    }
   }
 }
 
 static void netif_sta_notify_callback(void *arg)
 {
-  if (netif_task_handle != NULL && !netif_stop_requested)
-  {
-    (void)xTaskNotify(netif_task_handle, NET_IF_STA_RX_RDY, eSetBits);
-  }
+  (void)xTaskNotify(netif_task_handle, NET_IF_STA_RX_RDY, eSetBits);
 }
 
 static void netif_ap_notify_callback(void *arg)
 {
-  if (netif_task_handle != NULL && !netif_stop_requested)
-  {
-    (void)xTaskNotify(netif_task_handle, NET_IF_AP_RX_RDY, eSetBits);
-  }
+  (void)xTaskNotify(netif_task_handle, NET_IF_AP_RX_RDY, eSetBits);
 }
 
 static int32_t netif_rx_process(uint32_t link_id)
@@ -364,12 +299,11 @@ static int32_t netif_rx_process(uint32_t link_id)
     return -1;
   }
 
-  ++netif_outstanding_pbuf_count;
-
   /* Call the upper layer callback */
   if (netif_cur->input(pb, netif_cur))
   {
     LogError("Input ERROR\n");
+    (void)W6X_Netif_free(buffer);
     netif_pbuf_free(pb);
     return -1;
   }
@@ -384,13 +318,7 @@ static void netif_task(void *arg)
 
   while (true)
   {
-    (void)xTaskNotifyWait(0, NET_IF_STA_RX_RDY | NET_IF_AP_RX_RDY | NET_IF_STOP,
-                          &netif_event, portMAX_DELAY);
-    if ((netif_event & NET_IF_STOP) != 0U || netif_stop_requested)
-    {
-      netif_task_handle = NULL;
-      vTaskDelete(NULL);
-    }
+    (void)xTaskNotifyWait(0, NET_IF_STA_RX_RDY | NET_IF_AP_RX_RDY, &netif_event, portMAX_DELAY);
     do
     {
       if ((netif_event & NET_IF_STA_RX_RDY) != 0U)

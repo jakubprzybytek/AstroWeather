@@ -714,11 +714,7 @@ static void sntp_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *
 
 static void sntp_request(void *arg)
 {
-#if LWIP_IPV6
   ip_addr_t sntp_server_address = IPADDR_ANY_TYPE_INIT;
-#else
-  ip_addr_t sntp_server_address = IPADDR4_INIT(0);
-#endif
   err_t err;
   if (sntp_ctx == NULL)
   {

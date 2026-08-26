@@ -41,9 +41,6 @@ extern "C" {
 /** Maximum SPI buffer size */
 #define W61_MAX_SPI_XFER                        1520U
 
-/** SPI transfer task stack size in bytes */
-#define SPI_THREAD_STACK_SIZE                   1536U
-
 /** Enable/Disable System module logging */
 #define SYS_LOG_ENABLE                          1
 

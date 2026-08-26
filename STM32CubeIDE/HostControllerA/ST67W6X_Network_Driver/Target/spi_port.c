@@ -33,7 +33,6 @@
 
 #include "bsp_conf.h"
 #include "spi_port.h"
-#include "spi_iface.h"
 #include "logging.h"
 #include "main.h"
 
@@ -69,7 +68,8 @@
 /* Private variables ---------------------------------------------------------*/
 /** SPI transaction complete callback */
 static spi_transaction_complete_t spi_port_transaction_complete_cb = NULL;
-static volatile uint32_t spi_port_error_code = 0U;
+
+static const char spi_port_error_str[] = "SPI not initialized\n";
 
 /* USER CODE BEGIN PV */
 
@@ -99,14 +99,17 @@ int32_t spi_port_init(spi_transaction_complete_t transaction_complete_cb)
   /* USER CODE END spi_port_init_1 */
   if (NCP_SPI_HANDLE.State == HAL_SPI_STATE_RESET)
   {
+    LogError(spi_port_error_str);
     return -1;
   }
 
-  spi_port_error_code = 0U;
-  spi_port_transaction_complete_cb = transaction_complete_cb;
-
   /* Powering up the NCP using GPIO CHIP_EN */
   HAL_GPIO_WritePin(CHIP_EN_GPIO_Port, CHIP_EN_Pin, GPIO_PIN_SET);
+
+  if (transaction_complete_cb != NULL)
+  {
+    spi_port_transaction_complete_cb = transaction_complete_cb;
+  }
   /* USER CODE BEGIN spi_port_init_2 */
 
   /* USER CODE END spi_port_init_2 */
@@ -122,19 +125,10 @@ int32_t spi_port_deinit(void)
   /* USER CODE BEGIN spi_port_deinit_1 */
 
   /* USER CODE END spi_port_deinit_1 */
-  spi_port_transaction_complete_cb = NULL;
-
-  if (NCP_SPI_HANDLE.State == HAL_SPI_STATE_BUSY_TX ||
-      NCP_SPI_HANDLE.State == HAL_SPI_STATE_BUSY_RX ||
-      NCP_SPI_HANDLE.State == HAL_SPI_STATE_BUSY_TX_RX)
-  {
-    (void)HAL_SPI_Abort(&NCP_SPI_HANDLE);
-  }
-
   /* Switch off the NCP using GPIO CHIP_EN */
   HAL_GPIO_WritePin(CHIP_EN_GPIO_Port, CHIP_EN_Pin, GPIO_PIN_RESET);
 
-  spi_port_error_code = 0U;
+  spi_port_transaction_complete_cb = NULL;
   /* USER CODE BEGIN spi_port_deinit_2 */
 
   /* USER CODE END spi_port_deinit_2 */
@@ -143,17 +137,6 @@ int32_t spi_port_deinit(void)
   /* USER CODE BEGIN spi_port_deinit_End */
 
   /* USER CODE END spi_port_deinit_End */
-}
-
-int32_t spi_port_take_error(uint32_t *error_code)
-{
-  uint32_t error = spi_port_error_code;
-  spi_port_error_code = 0U;
-  if (error_code != NULL)
-  {
-    *error_code = error;
-  }
-  return (error == 0U) ? 0 : -1;
 }
 
 int32_t spi_port_transfer(void *tx_buf, void *rx_buf, uint16_t len, uint32_t timeout)
@@ -165,6 +148,7 @@ int32_t spi_port_transfer(void *tx_buf, void *rx_buf, uint16_t len, uint32_t tim
 
   if (NCP_SPI_HANDLE.State == HAL_SPI_STATE_RESET)
   {
+    LogError(spi_port_error_str);
     return -1;
   }
 
@@ -205,10 +189,9 @@ int32_t spi_port_transfer_dma(void *tx_buf, void *rx_buf, uint16_t len)
 
   if (NCP_SPI_HANDLE.State == HAL_SPI_STATE_RESET)
   {
+    LogError(spi_port_error_str);
     return -1;
   }
-
-  spi_port_error_code = 0U;
 
 #if defined (__DCACHE_PRESENT) && (__DCACHE_PRESENT == 1U)
   SCB_CleanInvalidateDCache_by_Addr(rx_buf, len);
@@ -289,10 +272,7 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
   /* USER CODE END HAL_SPI_TxCpltCallback_1 */
   if (hspi == &NCP_SPI_HANDLE)
   {
-    if (spi_port_transaction_complete_cb != NULL)
-    {
-      spi_port_transaction_complete_cb();
-    }
+    spi_port_transaction_complete_cb();
   }
   /* USER CODE BEGIN HAL_SPI_TxCpltCallback_End */
 
@@ -306,10 +286,7 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
   /* USER CODE END HAL_SPI_RxCpltCallback_1 */
   if (hspi == &NCP_SPI_HANDLE)
   {
-    if (spi_port_transaction_complete_cb != NULL)
-    {
-      spi_port_transaction_complete_cb();
-    }
+    spi_port_transaction_complete_cb();
   }
   /* USER CODE BEGIN HAL_SPI_RxCpltCallback_End */
 
@@ -323,10 +300,7 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
   /* USER CODE END HAL_SPI_TxRxCpltCallback_1 */
   if (hspi == &NCP_SPI_HANDLE)
   {
-    if (spi_port_transaction_complete_cb != NULL)
-    {
-      spi_port_transaction_complete_cb();
-    }
+    spi_port_transaction_complete_cb();
   }
   /* USER CODE BEGIN HAL_SPI_TxRxCpltCallback_End */
 
@@ -340,23 +314,11 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
   /* USER CODE END HAL_SPI_ErrorCallback_1 */
   if (hspi == &NCP_SPI_HANDLE)
   {
-    spi_port_error_code = HAL_SPI_GetError(hspi);
-    if (spi_port_transaction_complete_cb != NULL)
-    {
-      spi_port_transaction_complete_cb();
-    }
+    Error_Handler();
   }
   /* USER CODE BEGIN HAL_SPI_ErrorCallback_End */
 
   /* USER CODE END HAL_SPI_ErrorCallback_End */
-}
-
-void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
-{
-  if (GPIO_Pin == SPI_RDY_Pin)
-  {
-    (void)spi_on_txn_data_ready();
-  }
 }
 
 /* USER CODE BEGIN WFR */

@@ -45,9 +45,6 @@
 #include "w61_default_config.h"
 #include "logging.h"
 
-static uint32_t cmd_mutex_alloc_count = 0U;
-static uint32_t cmd_mutex_free_count = 0U;
-
 /* Private macros ------------------------------------------------------------*/
 /** @addtogroup ST67W61_AT_Modem_Cmd_Handler_Macros
   * @{
@@ -952,39 +949,9 @@ int32_t modem_cmd_handler_init(struct modem_cmd_handler *handler,
 
   /* Initialize command handler data members */
   data->sem_tx_lock = xSemaphoreCreateMutex();
-  if (data->sem_tx_lock != NULL) {
-    ++cmd_mutex_alloc_count;
-  }
   data->sem_parse_lock = xSemaphoreCreateMutex();
-  if (data->sem_parse_lock != NULL) {
-    ++cmd_mutex_alloc_count;
-  }
 
   return 0;
-}
-
-void modem_cmd_handler_deinit(struct modem_cmd_handler_data *data)
-{
-  if (data == NULL)
-  {
-    return;
-  }
-  if (data->sem_tx_lock != NULL)
-  {
-    vSemaphoreDelete(data->sem_tx_lock);
-    data->sem_tx_lock = NULL;
-    ++cmd_mutex_free_count;
-  }
-  if (data->sem_parse_lock != NULL)
-  {
-    vSemaphoreDelete(data->sem_parse_lock);
-    data->sem_parse_lock = NULL;
-    ++cmd_mutex_free_count;
-  }
-  LogInfo("ST67 alloc cmd=%lu/%lu out=%ld\n",
-          (unsigned long)cmd_mutex_alloc_count,
-          (unsigned long)cmd_mutex_free_count,
-          (long)(cmd_mutex_alloc_count - cmd_mutex_free_count));
 }
 
 /** @} */

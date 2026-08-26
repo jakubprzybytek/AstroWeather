@@ -128,13 +128,6 @@ int32_t spi_port_transfer(void *tx_buf, void *rx_buf, uint16_t len, uint32_t tim
 int32_t spi_port_transfer_dma(void *tx_buf, void *rx_buf, uint16_t len);
 
 /**
-  * @brief Consume the most recent asynchronous SPI error.
-  * @param error_code Optional destination for the HAL error code.
-  * @retval 0 if no error was latched, -1 if an error was consumed.
-  */
-int32_t spi_port_take_error(uint32_t *error_code);
-
-/**
   * @brief  Check if NCP requires to send a new data packet
   * @retval 1 if ready, 0 otherwise
   */

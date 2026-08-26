@@ -29,8 +29,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "cmsis_compiler.h"
-
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
 #include "queue.h"
@@ -43,11 +41,6 @@
 
 #include "spi_iface.h"
 #include "spi_port.h"
-
-static uint32_t spi_event_alloc_count = 0U;
-static uint32_t spi_event_free_count = 0U;
-static uint32_t spi_queue_alloc_count = 0U;
-static uint32_t spi_queue_free_count = 0U;
 
 /** SPI header magic code */
 #define SPI_HEADER_MAGIC_CODE           0x55AAU
@@ -164,8 +157,10 @@ static struct spi_xfer_engine xfer_engine = {0};
 /** SPI transfer trace points */
 enum
 {
+  SPI_TP_NONE = 0,
   SPI_TP_WRITE = 1,
   SPI_TP_ASSERT_CS = 2,
+  SPI_TP_SLAVE_TXN_RDY = 3,
   SPI_TP_FIRST_TXN_START = 4,
   SPI_TP_FIRST_TXN_END = 5,
   SPI_TP_SECOND_TXN_START = 6,
@@ -183,7 +178,6 @@ enum
   * @brief  Set the traffic type in the SPI buffer
   * @param  buf: Pointer to the SPI buffer
   * @param  type: Traffic type to set
-
   */
 static inline void spi_buffer_set_traffic_type(struct spi_buffer *buf, uint8_t type);
 
@@ -537,12 +531,6 @@ static int32_t spi_txrx(struct spi_xfer_engine *engine, void *tx_buf, void *rx_b
       SPI_STAT_INC(&engine->stat, wait_msg_xfer_timeouts, 1U);
       return -3;
     }
-    if (spi_port_take_error(NULL) != 0)
-    {
-      spi_err("spi txrx asynchronous error\n");
-      SPI_STAT_INC(&engine->stat, io_err, 1U);
-      return -4;
-    }
   }
 
   return 0;
@@ -587,12 +575,6 @@ static int32_t spi_rx(struct spi_xfer_engine *engine, void *rx_buf, uint16_t len
       spi_err("spi rx transaction timeouted\n");
       SPI_STAT_INC(&engine->stat, wait_msg_xfer_timeouts, 1U);
       return -3;
-    }
-    if (spi_port_take_error(NULL) != 0)
-    {
-      spi_err("spi rx asynchronous error\n");
-      SPI_STAT_INC(&engine->stat, io_err, 1U);
-      return -4;
     }
   }
 
@@ -918,7 +900,6 @@ int32_t spi_transaction_init(void)
     ret = -1;
     goto error;
   }
-  ++spi_event_alloc_count;
 
   /* Create TX queue */
   xfer_engine.txq = xQueueCreate(SPI_TXQ_LEN, sizeof(void *));
@@ -928,7 +909,6 @@ int32_t spi_transaction_init(void)
     ret = -1;
     goto error;
   }
-  ++spi_queue_alloc_count;
 
   if (spi_port_init(spi_on_transaction_complete) != 0)
   {
@@ -965,14 +945,12 @@ error:
   {
     vQueueDelete(xfer_engine.txq);
     xfer_engine.txq = NULL;
-    ++spi_queue_free_count;
   }
 
   if (xfer_engine.event != NULL)
   {
     vEventGroupDelete(xfer_engine.event);
     xfer_engine.event = NULL;
-    ++spi_event_free_count;
   }
 
   return ret;
@@ -990,13 +968,11 @@ int32_t spi_transaction_deinit(void)
   if (xfer_engine.txq != NULL)
   {
     vQueueDelete(xfer_engine.txq);
-    ++spi_queue_free_count;
   }
 
   if (xfer_engine.event != NULL)
   {
     vEventGroupDelete(xfer_engine.event);
-    ++spi_event_free_count;
   }
 
   for (int32_t i = 0; i < (int32_t)SPI_MSG_CTRL_TRAFFIC_TYPE_MAX; i++)
@@ -1004,7 +980,6 @@ int32_t spi_transaction_deinit(void)
     if (xfer_engine.rxq[i] != NULL)
     {
       vQueueDelete(xfer_engine.rxq[i]);
-      ++spi_queue_free_count;
     }
   }
 
@@ -1012,12 +987,6 @@ int32_t spi_transaction_deinit(void)
   (void)memset(&xfer_engine, 0, sizeof(struct spi_xfer_engine));
 
   (void)spi_port_deinit();
-
-  LogInfo("ST67 alloc spi evt=%lu/%lu q=%lu/%lu\n",
-      (unsigned long)spi_event_alloc_count,
-      (unsigned long)spi_event_free_count,
-      (unsigned long)spi_queue_alloc_count,
-      (unsigned long)spi_queue_free_count);
 
   return 0;
 }
@@ -1317,7 +1286,6 @@ int32_t spi_bind(unsigned char type, int32_t rxq_size)
     spi_err("Failed to create queue for type %d\r\n", type);
     return -4;
   }
-  ++spi_queue_alloc_count;
 
   /* Mark this type as bound */
   xfer_engine.rxq_bound |= (1U << (uint8_t)type);
