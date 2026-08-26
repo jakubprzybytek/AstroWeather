@@ -1,6 +1,7 @@
 #include <HostController/St67NetworkSession.hpp>
 
 #include <Debug/DebugService.hpp>
+#include <HostController/St67NetworkAdapter.hpp>
 #include <HostController/St67Runtime.hpp>
 
 #include "app_config.h"
@@ -78,15 +79,12 @@ bool credentialsValid() {
 }
 
 bool stationDisconnected(const St67Runtime& runtime) {
-  W6X_WiFi_StaStateType_e stationState = W6X_WIFI_STATE_STA_OFF;
-  if (W6X_WiFi_Station_GetState(&stationState, nullptr) != W6X_STATUS_OK ||
-      (stationState != W6X_WIFI_STATE_STA_DISCONNECTED &&
-       stationState != W6X_WIFI_STATE_STA_OFF)) {
+  (void)runtime;
+  St67StationStatus status{};
+  if (!St67GetStationStatus(&status)) {
     return false;
   }
-  struct netif* station = netif_get_interface(NETIF_STA);
-  return station != nullptr && !netif_is_link_up(station) &&
-         ip4_addr_isany_val(*netif_ip4_addr(station));
+  return status.wifiDisconnected && !status.linkUp && !status.hasIpv4;
 }
 
 bool finalHardwareState() {
@@ -97,9 +95,9 @@ bool finalHardwareState() {
 bool waitForDhcp() {
   const uint32_t deadline = HAL_GetTick() + APP_ST67_DHCP_TIMEOUT_MS;
   do {
-    struct netif* station = netif_get_interface(NETIF_STA);
-    if (station != nullptr && netif_is_link_up(station) && netif_is_up(station) &&
-        !ip4_addr_isany_val(*netif_ip4_addr(station))) {
+    St67StationStatus status{};
+    if (St67GetStationStatus(&status) && status.interfaceUp && status.linkUp &&
+        status.hasIpv4) {
       return true;
     }
     osDelay(100U);
@@ -165,8 +163,7 @@ bool St67NetworkSession::initialize(bool logModule) {
     }
     runtime_.lwipInitialized = true;
   }
-  if (netif_get_interface(NETIF_STA) == nullptr ||
-      netif_get_interface(NETIF_AP) == nullptr) {
+  if (!St67NetworkInterfacesReady()) {
     fail(runtime_, "lwip-netif");
     return false;
   }
@@ -220,8 +217,7 @@ bool St67NetworkSession::isStationDisconnected() const {
 bool St67NetworkSession::isReady() const {
   return runtime_.state == St67State::Ready && runtime_.w6xInitialized &&
          runtime_.wifiInitialized && runtime_.lwipInitialized &&
-         stationDisconnected(runtime_) && netif_get_interface(NETIF_STA) != nullptr &&
-      netif_get_interface(NETIF_AP) != nullptr;
+      stationDisconnected(runtime_) && St67NetworkInterfacesReady();
 }
 
 bool St67NetworkSession::disconnect() {

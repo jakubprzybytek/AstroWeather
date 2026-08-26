@@ -55,7 +55,7 @@ Completed and build-checked:
 - Added the Cortex-M0+ FreeRTOS 10.3.1 interrupt-context compatibility macro in the preserved USER include section of `Core/Inc/FreeRTOSConfig.h`.
 - Added `SPI_THREAD_STACK_SIZE=1536U` to the top-level target compile definitions.
 - Added the missing empty `logshell_ctrl.h` compatibility header under `User/Inc`; the generated TLS source includes this header but no current root source uses its API.
-- Replaced the removed private station-status and network-running checks in `User/Src/HostController/St67NetworkSession.cpp` with public lwIP netif accessors and made the default lifecycle persistent.
+- Replaced the removed private station-status and network-running checks with the User-owned `St67NetworkAdapter`, which uses public W6X and lwIP interfaces, and made the default lifecycle persistent.
 - `Debug-HostController`, `Debug-DisplayController`, and `Release-HostController` build successfully. `git diff --check` passes.
 
 Current build status:
@@ -64,7 +64,6 @@ Current build status:
 
 Still pending:
 
-- A dedicated User-owned station-status adapter, if the direct public-accessor implementation is to be separated from the session.
 - Runtime HTTP cancellation, total-timeout, malformed-response, and repeated-request validation.
 - Runtime verification of SPI DMA, DHCP, repeated persistent cycles, and HTTP error/cleanup paths.
 
@@ -78,7 +77,7 @@ Still pending:
 | SPI task stack | **Complete**: use the larger ST67 stack requirement | Target compile definition in top-level `CMakeLists.txt` |
 | CM0+ FreeRTOS compatibility | **Complete**: provide `xPortIsInsideInterrupt()` for FreeRTOS older than 10.6 | Existing USER configuration section in `Core/Inc/FreeRTOSConfig.h` |
 | SPI completion and RDY handling | Expose User-owned bridge functions and call them from generated hooks | `User/Src` bridge; minimal calls in existing USER blocks in `spi_port.c` and generated GPIO callback code |
-| Station status | **Partially complete**: removed custom status APIs and use public lwIP interfaces directly; dedicated adapter remains optional follow-up | `User/Src/HostController/St67NetworkSession.cpp` |
+| Station status | **Complete for compile-time migration**: dedicated User-owned adapter uses public W6X/lwIP interfaces; hardware validation remains | `User/Inc/HostController/St67NetworkAdapter.hpp`, `User/Src/HostController/St67NetworkAdapter.cpp` |
 | HTTP request ownership | **Partially complete**: User-owned bounded synchronous GET path is used by `St67HttpFetcher`; runtime cancellation and full worker contract remain | `User/Inc/HostController/HttpClient.hpp`, `User/Src/HostController/HttpClient.cpp` |
 | Network lifecycle | **Complete for compile-time migration**: default lifecycle is persistent and no longer calls private full teardown | `User/Src/HostController/St67NetworkSession.cpp`, `Appli/App/app_config.h` |
 | Cold restart | Defer until supported teardown is available | Revisit only after public APIs or a fully User-owned replacement are identified |
@@ -101,9 +100,9 @@ The DMA-specific generated units compile successfully. The FreeRTOS compatibilit
 
 ### Station status adapter
 
-Add a small User-owned adapter that combines the public `W6X_WiFi_Station_GetState()` API with `netif_get_interface(NETIF_STA)` and supported lwIP netif fields/accessors. ST documents both station-state polling and asynchronous connected, disconnected, and got-IP events.
+**Complete for compile-time migration:** `St67NetworkAdapter` combines the public `W6X_WiFi_Station_GetState()` API with `netif_get_interface(NETIF_STA)` and supported lwIP netif fields/accessors. ST documents both station-state polling and asynchronous connected, disconnected, and got-IP events.
 
-Update `St67NetworkSession.cpp` to use this adapter instead of:
+`St67NetworkSession.cpp` now uses this adapter instead of:
 
 - `lwip_get_station_status()`
 - `lwip_netifs_are_removed()`
@@ -111,11 +110,11 @@ Update `St67NetworkSession.cpp` to use this adapter instead of:
 - `net_if_outstanding_pbufs()`
 - `MX_LWIP_DeInit()`
 
-The adapter must not reach into private generated state.
+The adapter does not reach into private generated state. DHCP transitions and repeated persistent connect/disconnect cycles still require hardware validation.
 
 ### Persistent lifecycle policy
 
-Change the default application lifecycle away from `APP_ST67_LIFECYCLE_SINGLE_FULL_SHUTDOWN`. Keep the network stack initialized and support:
+**Complete for compile-time migration:** the default application lifecycle is now persistent rather than `APP_ST67_LIFECYCLE_SINGLE_FULL_SHUTDOWN`. The intended behavior is:
 
 1. connect or wait for DHCP,
 2. fetch data,
