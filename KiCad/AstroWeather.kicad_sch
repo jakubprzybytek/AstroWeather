@@ -2656,14 +2656,14 @@
 		)
 		(uuid "18d13126-b5ff-4ae6-96c0-42df7b9951e3")
 	)
-	(text "Bugs:\nMissing voltage divider on input voltage sense"
+	(text "Bugs:\nMissing voltage divider on input voltage sense\nSENSE inputs connected to non-ADC pins"
 		(exclude_from_sim no)
 		(at 18.796 24.13 0)
 		(effects
 			(font
 				(size 3 3)
 			)
-			(justify left)
+			(justify left top)
 		)
 		(uuid "c075d87e-5789-4f64-ab8c-35af0c662725")
 	)
