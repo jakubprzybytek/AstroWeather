@@ -84,23 +84,22 @@ bool stationDisconnected(const St67Runtime& runtime) {
        stationState != W6X_WIFI_STATE_STA_OFF)) {
     return false;
   }
-  LwipStationStatus_t network{};
-  return lwip_get_station_status(&network) == 0 && network.link_up == 0U &&
-         network.has_ipv4 == 0U;
+  struct netif* station = netif_get_interface(NETIF_STA);
+  return station != nullptr && !netif_is_link_up(station) &&
+         ip4_addr_isany_val(*netif_ip4_addr(station));
 }
 
 bool finalHardwareState() {
-  return lwip_netifs_are_removed() != 0U && net_if_is_running() == 0U &&
-         HAL_GPIO_ReadPin(ST67_CHIP_EN_GPIO_Port, ST67_CHIP_EN_Pin) == GPIO_PIN_RESET &&
+  return HAL_GPIO_ReadPin(ST67_CHIP_EN_GPIO_Port, ST67_CHIP_EN_Pin) == GPIO_PIN_RESET &&
          HAL_GPIO_ReadPin(ST67_RDY_GPIO_Port, ST67_RDY_Pin) == GPIO_PIN_RESET;
 }
 
 bool waitForDhcp() {
   const uint32_t deadline = HAL_GetTick() + APP_ST67_DHCP_TIMEOUT_MS;
-  LwipStationStatus_t status{};
   do {
-    if (lwip_get_station_status(&status) == 0 && status.link_up != 0U &&
-        status.interface_up != 0U && status.has_ipv4 != 0U) {
+    struct netif* station = netif_get_interface(NETIF_STA);
+    if (station != nullptr && netif_is_link_up(station) && netif_is_up(station) &&
+        !ip4_addr_isany_val(*netif_ip4_addr(station))) {
       return true;
     }
     osDelay(100U);
@@ -167,7 +166,7 @@ bool St67NetworkSession::initialize(bool logModule) {
     runtime_.lwipInitialized = true;
   }
   if (netif_get_interface(NETIF_STA) == nullptr ||
-      netif_get_interface(NETIF_AP) == nullptr || !net_if_is_running()) {
+      netif_get_interface(NETIF_AP) == nullptr) {
     fail(runtime_, "lwip-netif");
     return false;
   }
@@ -222,8 +221,7 @@ bool St67NetworkSession::isReady() const {
   return runtime_.state == St67State::Ready && runtime_.w6xInitialized &&
          runtime_.wifiInitialized && runtime_.lwipInitialized &&
          stationDisconnected(runtime_) && netif_get_interface(NETIF_STA) != nullptr &&
-         netif_get_interface(NETIF_AP) != nullptr && net_if_is_running() != 0U &&
-         net_if_outstanding_pbufs() == 0U;
+      netif_get_interface(NETIF_AP) != nullptr;
 }
 
 bool St67NetworkSession::disconnect() {
@@ -256,13 +254,6 @@ bool St67NetworkSession::disconnect() {
 bool St67NetworkSession::stop() {
   if (runtime_.wifiInitialized && !stationDisconnected(runtime_)) {
     disconnect();
-  }
-  if (runtime_.lwipInitialized) {
-    const int32_t status = MX_LWIP_DeInit();
-    if (status != 0) {
-      fail(runtime_, "netif-stop");
-    }
-    runtime_.lwipInitialized = false;
   }
   if (runtime_.wifiInitialized) {
     W6X_WiFi_DeInit();

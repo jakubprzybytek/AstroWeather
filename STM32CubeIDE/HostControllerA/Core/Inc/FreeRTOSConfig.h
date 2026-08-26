@@ -44,7 +44,11 @@
  *----------------------------------------------------------*/
 
 /* USER CODE BEGIN Includes */
-/* Section where include file can be added */
+/* Cortex-M0+ compatibility for FreeRTOS versions before 10.6. */
+#include "stm32g0xx.h"
+#if !defined(xPortIsInsideInterrupt)
+#define xPortIsInsideInterrupt() (__get_IPSR() != 0U)
+#endif
 /* USER CODE END Includes */
 
 /* Ensure definitions are only used by the compiler, and not by the assembler. */

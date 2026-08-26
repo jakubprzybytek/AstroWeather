@@ -52,6 +52,27 @@ The FreeRTOS heap is configured to 40,000 bytes, matching ST's minimum recommend
 
 The top-level `CMakeLists.txt` already discovers shared and variant-specific sources under `User/Src` and includes `User/Inc`. New User modules should therefore be picked up without modifying generated CMake files.
 
+## Migration Status (2026-08-26)
+
+Completed and build-checked:
+
+- SPI1 RX/TX DMA configuration, DMA IRQ priority, initialization order, and IRQ dispatch were already restored by CubeMX and remain unchanged.
+- Added the Cortex-M0+ FreeRTOS 10.3.1 interrupt-context compatibility macro in the preserved USER include section of `Core/Inc/FreeRTOSConfig.h`.
+- Added `SPI_THREAD_STACK_SIZE=1536U` to the top-level target compile definitions.
+- Added the missing empty `logshell_ctrl.h` compatibility header under `User/Inc`; the generated TLS source includes this header but no current root source uses its API.
+- Replaced the removed private station-status and network-running checks in `User/Src/HostController/St67NetworkSession.cpp` with public lwIP netif accessors and made the default lifecycle persistent.
+- `Debug-DisplayController` builds successfully. `git diff --check` passes.
+
+Current build status:
+
+- `Debug-HostController` and `Release-HostController` now proceed past the network-session code but remain blocked by the missing `HTTP_Client_Cancel()` and `HTTP_Client_IsIdle()` APIs.
+
+Still pending:
+
+- A dedicated User-owned station-status adapter, if the direct public-accessor implementation is to be separated from the session.
+- The User-owned HTTP request worker/boundary and HostController build completion.
+- Runtime verification of SPI DMA, DHCP, repeated persistent cycles, and HTTP error/cleanup paths.
+
 ## Migration Inventory
 
 | Area | Required action | Safe destination |
@@ -59,12 +80,12 @@ The top-level `CMakeLists.txt` already discovers shared and variant-specific sou
 | Application bootstrap | Retain `AstroWeather_Init()` and `AppVariant_Init()` integration | Existing USER blocks in `Core/Src/main.c`; implementations in `User` |
 | USB debug | Retain the CDC bridge to `DebugService_OnUsbRxData()` | Existing USER blocks in `USB_Device/App/usbd_cdc_if.c`; implementation in `User` |
 | SPI DMA | Complete: RX/TX DMA, DMA IRQs, and priority 3 regenerated and compile-checked | CubeMX `.ioc` configuration followed by regeneration |
-| SPI task stack | Use the larger ST67 stack requirement | Target compile definition in top-level `CMakeLists.txt` |
-| CM0+ FreeRTOS compatibility | Provide `xPortIsInsideInterrupt()` as documented by ST for FreeRTOS older than 10.6 | Existing USER configuration section or User-owned compatibility header included from a USER block |
+| SPI task stack | **Complete**: use the larger ST67 stack requirement | Target compile definition in top-level `CMakeLists.txt` |
+| CM0+ FreeRTOS compatibility | **Complete**: provide `xPortIsInsideInterrupt()` for FreeRTOS older than 10.6 | Existing USER configuration section in `Core/Inc/FreeRTOSConfig.h` |
 | SPI completion and RDY handling | Expose User-owned bridge functions and call them from generated hooks | `User/Src` bridge; minimal calls in existing USER blocks in `spi_port.c` and generated GPIO callback code |
-| Station status | Replace removed custom status APIs | New adapter under `User/Inc/HostController` and `User/Src/HostController` using public lwIP interfaces |
+| Station status | **Partially complete**: removed custom status APIs and use public lwIP interfaces directly; dedicated adapter remains optional follow-up | `User/Src/HostController/St67NetworkSession.cpp` |
 | HTTP request ownership | Replace dependencies on customized generated HTTP state | New User-owned HTTP wrapper/worker, then update `St67HttpFetcher.cpp` |
-| Network lifecycle | Stop depending on private full teardown | Use persistent lwIP/ST67 ownership for the initial compliant implementation |
+| Network lifecycle | **Complete for compile-time migration**: default lifecycle is persistent and no longer calls private full teardown | `User/Src/HostController/St67NetworkSession.cpp`, `Appli/App/app_config.h` |
 | Cold restart | Defer until supported teardown is available | Revisit only after public APIs or a fully User-owned replacement are identified |
 
 ## Phase 1: Restore the Generated Hardware Baseline
@@ -73,13 +94,13 @@ The top-level `CMakeLists.txt` already discovers shared and variant-specific sou
 2. Complete: restore DMA interrupt generation at priority 3.
 3. Complete: regenerate the project.
 4. Complete: verify the generated DMA mapping, HAL links, initialization order, and IRQ dispatch.
-5. Add the ST-documented `xPortIsInsideInterrupt()` compatibility definition for this Cortex-M0+ and FreeRTOS 10.3.1 configuration. This must be placed in a preserved USER section or User-owned compatibility header, not in vendor `spi_iface.c`.
-6. Add `SPI_THREAD_STACK_SIZE=1536U` as a compile definition for the HostController target in the top-level `CMakeLists.txt`. ST documents this as an overrideable driver setting; 1536 bytes is the project-specific value retained from the previously working configuration.
-7. Build the HostController and DisplayController variants before restoring higher-level behavior.
+5. **Complete:** added the ST-documented `xPortIsInsideInterrupt()` compatibility definition for this Cortex-M0+ and FreeRTOS 10.3.1 configuration in the preserved USER include section of `Core/Inc/FreeRTOSConfig.h`.
+6. **Complete:** added `SPI_THREAD_STACK_SIZE=1536U` as a compile definition for the HostController target in the top-level `CMakeLists.txt`.
+7. **Partially complete:** `Debug-DisplayController` builds successfully. Both HostController variants reach the remaining HTTP API errors and are pending the User-owned HTTP implementation.
 
 Do not manually recreate DMA handles, MSP links, IRQ forwarding, or peripheral initialization in generated files.
 
-The DMA-specific generated units compile successfully. A fresh `Debug-HostController` build currently proceeds past configuration but fails in surviving custom code because removed HTTP and network lifecycle APIs are still referenced. It also reports a missing declaration for `__get_IPSR` in `spi_iface.c`; ST's documented CM0/CM0+ `xPortIsInsideInterrupt()` compatibility definition is the intended fix. These failures are separate from the generated DMA configuration.
+The DMA-specific generated units compile successfully. The FreeRTOS compatibility and stack-size fixes are in place, and the network-session code now compiles against public lwIP APIs. Fresh `Debug-HostController` and `Release-HostController` builds remain blocked only by the removed `HTTP_Client_Cancel()` and `HTTP_Client_IsIdle()` APIs. These failures are separate from the generated DMA configuration.
 
 ## Phase 2: Remove Compile-Time Dependencies on Generated Extensions
 
