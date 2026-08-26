@@ -2,6 +2,7 @@
 
 #include "lwip/inet.h"
 #include "lwip/sockets.h"
+#include "FreeRTOS.h"
 
 #include <cstdio>
 #include <cstring>
@@ -110,19 +111,32 @@ int32_t HttpClient_Get(const ip_addr_t* serverAddress, uint16_t port,
     return HTTP_CLIENT_ERR;
   }
 
-  char request[512];
-  int requestLength = std::snprintf(
-      request, sizeof(request),
-      "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", path,
-      host);
-  if (requestLength <= 0 || static_cast<size_t>(requestLength) >= sizeof(request) ||
-      send(socketHandle, request, requestLength, 0) != requestLength) {
+  char* request = static_cast<char*>(pvPortMalloc(512U));
+  if (request == nullptr) {
     closesocket(socketHandle);
     return HTTP_CLIENT_ERR;
   }
+  int requestLength = std::snprintf(
+      request, 512U,
+      "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", path,
+      host);
+  if (requestLength <= 0 || static_cast<size_t>(requestLength) >= 512U ||
+      send(socketHandle, request, requestLength, 0) != requestLength) {
+    vPortFree(request);
+    closesocket(socketHandle);
+    return HTTP_CLIENT_ERR;
+  }
+  vPortFree(request);
 
-  uint8_t headerBuffer[kHeaderCapacity + 1U]{};
-  uint8_t chunk[kChunkCapacity];
+  uint8_t* headerBuffer = static_cast<uint8_t*>(pvPortMalloc(kHeaderCapacity + 1U));
+  uint8_t* chunk = static_cast<uint8_t*>(pvPortMalloc(kChunkCapacity));
+  if (headerBuffer == nullptr || chunk == nullptr) {
+    vPortFree(headerBuffer);
+    vPortFree(chunk);
+    closesocket(socketHandle);
+    return HTTP_CLIENT_ERR;
+  }
+  std::memset(headerBuffer, 0, kHeaderCapacity + 1U);
   uint32_t headerLength = 0U;
   uint32_t bodyOffset = 0U;
   uint32_t contentLength = 0U;
@@ -133,7 +147,7 @@ int32_t HttpClient_Get(const ip_addr_t* serverAddress, uint16_t port,
   int32_t result = HTTP_CLIENT_ERR;
 
   while (true) {
-    int32_t count = recv(socketHandle, chunk, sizeof(chunk), 0);
+    int32_t count = recv(socketHandle, chunk, kChunkCapacity, 0);
     if (count == 0) {
       if (headerComplete && !hasContentLength) {
         result = HTTP_CLIENT_SUCCESS;
@@ -193,6 +207,8 @@ int32_t HttpClient_Get(const ip_addr_t* serverAddress, uint16_t port,
   }
 
   closesocket(socketHandle);
+  vPortFree(headerBuffer);
+  vPortFree(chunk);
   if (!headerComplete || (hasContentLength && received != contentLength) ||
       result != HTTP_CLIENT_SUCCESS) {
     notifyFailure(settings, status, received);

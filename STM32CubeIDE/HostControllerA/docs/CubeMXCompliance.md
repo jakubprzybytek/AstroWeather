@@ -57,6 +57,8 @@ Completed and build-checked:
 - Added the missing empty `logshell_ctrl.h` compatibility header under `User/Inc`; the generated TLS source includes this header but no current root source uses its API.
 - Replaced the removed private station-status and network-running checks with the User-owned `St67NetworkAdapter`, which uses public W6X and lwIP interfaces, and made the default lifecycle persistent.
 - `Debug-HostController`, `Debug-DisplayController`, and `Release-HostController` build successfully. `git diff --check` passes.
+- Hardware smoke test passed: ST67 initialization, callback registration, Wi-Fi association, DHCP, SPI/RDY traffic, HTTP GET (`200`, 83 bytes), and response CRC validation all completed successfully.
+- The HTTP fetch task no longer overflows its 2560-byte stack; the observed post-request watermark was 848 bytes. HTTP transport buffers are heap-owned and were released after the request, with the batch heap returning from 39080 bytes to 39080 bytes.
 
 Current build status:
 
@@ -65,7 +67,9 @@ Current build status:
 Still pending:
 
 - Runtime HTTP cancellation, total-timeout, malformed-response, and repeated-request validation.
-- Runtime verification of SPI DMA, DHCP, repeated persistent cycles, and HTTP error/cleanup paths.
+- Repeated persistent cycles and HTTP error/cleanup-path validation. The single client-triggered cycle currently uses `mode=0` (`SingleFullShutdown`) by design.
+- USB debug backpressure investigation: the run accumulated `busyDrop=650`; this is a cumulative diagnostic counter and does not indicate an HTTP failure.
+- Review the low `SwitchTask` stack watermark (`176` bytes remaining) and the USB CDC asynchronous transmit-buffer ownership before release.
 
 ## Migration Inventory
 
@@ -76,9 +80,9 @@ Still pending:
 | SPI DMA | Complete: RX/TX DMA, DMA IRQs, and priority 3 regenerated and compile-checked | CubeMX `.ioc` configuration followed by regeneration |
 | SPI task stack | **Complete**: use the larger ST67 stack requirement | Target compile definition in top-level `CMakeLists.txt` |
 | CM0+ FreeRTOS compatibility | **Complete**: provide `xPortIsInsideInterrupt()` for FreeRTOS older than 10.6 | Existing USER configuration section in `Core/Inc/FreeRTOSConfig.h` |
-| SPI completion and RDY handling | Expose User-owned bridge functions and call them from generated hooks | `User/Src` bridge; minimal calls in existing USER blocks in `spi_port.c` and generated GPIO callback code |
+| SPI completion and RDY handling | **Complete for compile-time migration**: User-owned RDY rising-edge bridge calls `spi_on_txn_data_ready()`; hardware handshake validation remains | `User/Src/HostController/St67SpiReady.cpp` |
 | Station status | **Complete for compile-time migration**: dedicated User-owned adapter uses public W6X/lwIP interfaces; hardware validation remains | `User/Inc/HostController/St67NetworkAdapter.hpp`, `User/Src/HostController/St67NetworkAdapter.cpp` |
-| HTTP request ownership | **Partially complete**: User-owned bounded synchronous GET path is used by `St67HttpFetcher`; runtime cancellation and full worker contract remain | `User/Inc/HostController/HttpClient.hpp`, `User/Src/HostController/HttpClient.cpp` |
+| HTTP request ownership | **Runtime smoke-tested**: User-owned bounded synchronous GET returned HTTP 200 and a CRC-valid 83-byte response; transport buffers are heap-owned and released. Cancellation, total deadline, and error-path coverage remain pending | `User/Inc/HostController/HttpClient.hpp`, `User/Src/HostController/HttpClient.cpp` |
 | Network lifecycle | **Complete for compile-time migration**: default lifecycle is persistent and no longer calls private full teardown | `User/Src/HostController/St67NetworkSession.cpp`, `Appli/App/app_config.h` |
 | Cold restart | Defer until supported teardown is available | Revisit only after public APIs or a fully User-owned replacement are identified |
 
@@ -139,7 +143,7 @@ Add a User-owned HTTP implementation with the minimum behavior needed by `St67Ht
 - exactly-once completion/error notification,
 - cleanup of task, socket, TLS state, and allocated buffers on every path.
 
-**Progress:** the User-owned synchronous GET implementation is complete enough for all three firmware builds, and `St67HttpFetcher.cpp` no longer calls `HTTP_Client_Cancel()` or `HTTP_Client_IsIdle()`. It owns the socket, request buffer, response-header buffer, response-size checks, Content-Length validation, callback completion, and socket cleanup. External cancellation, an explicit total deadline, and runtime error-path tests remain pending.
+**Progress:** the User-owned synchronous GET implementation is complete enough for all three firmware builds and has passed one hardware smoke test. `St67HttpFetcher.cpp` no longer calls `HTTP_Client_Cancel()` or `HTTP_Client_IsIdle()`. The client owns the socket, bounded request/response buffers, response-size checks, Content-Length validation, callback completion, and socket cleanup. External cancellation, an explicit total deadline, and runtime error-path tests remain pending.
 
 The initial implementation may support only the HTTP method and transport required by the application. HTTPS and less-used POST/PUT behavior should be added only when required by an actual caller.
 
@@ -147,13 +151,15 @@ The initial implementation may support only the HTTP method and transport requir
 
 Keep all substantive behavior in User-owned source files. Generated callbacks should only make minimal calls from existing USER blocks.
 
+**Progress:** the User-owned `HAL_GPIO_EXTI_Rising_Callback()` bridge for `ST67_RDY_Pin` now calls the public `spi_on_txn_data_ready()` hook. All three build presets pass, and hardware smoke testing confirmed successful ST67 initialization, Wi-Fi/DHCP, and HTTP traffic without the former `sem_if_ready` timeout. Extended SPI DMA and repeated-cycle validation remain pending.
+
 Expected bridges include:
 
 - SPI transaction completion to the ST67 User-owned transport state.
 - GPIO RDY rising edge to the User-owned ST67 notification path.
 - Optional recoverable SPI error notification.
 
-The generated `spi_port.c` already provides USER blocks around SPI completion and error callbacks. Do not add duplicate HAL callback definitions outside those hooks.
+The generated `spi_port.c` already provides USER blocks around SPI completion and error callbacks. Do not add duplicate HAL callback definitions outside those hooks. The button-related falling-edge callback remains in `User/Src/SwitchTask.cpp`; the ST67 rising-edge bridge is in `User/Src/HostController/St67SpiReady.cpp`.
 
 ## Explicitly Deferred
 
@@ -228,3 +234,4 @@ Do not make cold-restart heap stability a release gate until a compliant teardow
 - The generated HTTP client does not provide the customized ownership and cancellation contract required by the current User code.
 - The existing build artifacts may contain a stale compile database; a fresh CMake build is required for trustworthy diagnostics.
 - The STM32Cube toolchain is now available on `PATH`; fresh builds should be used to replace stale build-artifact diagnostics.
+- USB CDC logging currently reports substantial cumulative `USBD_BUSY` drops under the hardware run; this affects debug observability but did not prevent the HTTP smoke test from completing.

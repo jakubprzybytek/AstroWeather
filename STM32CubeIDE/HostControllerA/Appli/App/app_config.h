@@ -44,11 +44,11 @@
 #endif
 
 #ifndef APP_ST67_HTTP_HOST
-#define APP_ST67_HTTP_HOST "jsonplaceholder.typicode.com"
+#define APP_ST67_HTTP_HOST ""
 #endif
 
 #ifndef APP_ST67_HTTP_PATH
-#define APP_ST67_HTTP_PATH "/todos/1"
+#define APP_ST67_HTTP_PATH ""
 #endif
 
 #ifndef APP_ST67_HTTP_EXPECTED_CONTENT_TYPE
