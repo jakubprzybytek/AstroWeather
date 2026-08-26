@@ -37,12 +37,7 @@ ST also states that X-CUBE-ST67W61 USER CODE section coverage is intentionally l
 
 The current tree is effectively the freshly generated `External/Clean` state. The previous customized state is represented by `External/Customized`.
 
-The regeneration removed custom lifecycle and HTTP changes. Surviving User code still references APIs that are no longer present:
-
-- `HTTP_Client_Cancel()` and `HTTP_Client_IsIdle()`
-- `MX_LWIP_DeInit()`
-- `lwip_get_station_status()` and `lwip_netifs_are_removed()`
-- `net_if_deinit()`, `net_if_is_running()`, and `net_if_outstanding_pbufs()`
+The regeneration removed custom lifecycle and HTTP changes. The User code has since been migrated away from the removed HTTP and network lifecycle APIs. HTTP now uses a User-owned synchronous GET implementation; runtime behavior and the complete cancellation contract remain to be validated.
 
 SPI1 RX/TX DMA configuration was removed by the earlier regeneration and has now been restored through CubeMX. The regenerated configuration uses DMA1 Channel 1 for SPI1 RX and DMA1 Channel 2 for SPI1 TX. Both channels use high-priority, byte-aligned, normal-mode transfers with peripheral increment disabled and memory increment enabled. DMA initialization runs before SPI1 initialization, and both IRQ handlers dispatch to the correct HAL DMA handles at interrupt priority 3.
 
@@ -61,16 +56,16 @@ Completed and build-checked:
 - Added `SPI_THREAD_STACK_SIZE=1536U` to the top-level target compile definitions.
 - Added the missing empty `logshell_ctrl.h` compatibility header under `User/Inc`; the generated TLS source includes this header but no current root source uses its API.
 - Replaced the removed private station-status and network-running checks in `User/Src/HostController/St67NetworkSession.cpp` with public lwIP netif accessors and made the default lifecycle persistent.
-- `Debug-DisplayController` builds successfully. `git diff --check` passes.
+- `Debug-HostController`, `Debug-DisplayController`, and `Release-HostController` build successfully. `git diff --check` passes.
 
 Current build status:
 
-- `Debug-HostController` and `Release-HostController` now proceed past the network-session code but remain blocked by the missing `HTTP_Client_Cancel()` and `HTTP_Client_IsIdle()` APIs.
+- All three configured build presets pass. The User-owned HTTP implementation currently uses bounded synchronous GET requests with socket send/receive timeouts.
 
 Still pending:
 
 - A dedicated User-owned station-status adapter, if the direct public-accessor implementation is to be separated from the session.
-- The User-owned HTTP request worker/boundary and HostController build completion.
+- Runtime HTTP cancellation, total-timeout, malformed-response, and repeated-request validation.
 - Runtime verification of SPI DMA, DHCP, repeated persistent cycles, and HTTP error/cleanup paths.
 
 ## Migration Inventory
@@ -84,7 +79,7 @@ Still pending:
 | CM0+ FreeRTOS compatibility | **Complete**: provide `xPortIsInsideInterrupt()` for FreeRTOS older than 10.6 | Existing USER configuration section in `Core/Inc/FreeRTOSConfig.h` |
 | SPI completion and RDY handling | Expose User-owned bridge functions and call them from generated hooks | `User/Src` bridge; minimal calls in existing USER blocks in `spi_port.c` and generated GPIO callback code |
 | Station status | **Partially complete**: removed custom status APIs and use public lwIP interfaces directly; dedicated adapter remains optional follow-up | `User/Src/HostController/St67NetworkSession.cpp` |
-| HTTP request ownership | Replace dependencies on customized generated HTTP state | New User-owned HTTP wrapper/worker, then update `St67HttpFetcher.cpp` |
+| HTTP request ownership | **Partially complete**: User-owned bounded synchronous GET path is used by `St67HttpFetcher`; runtime cancellation and full worker contract remain | `User/Inc/HostController/HttpClient.hpp`, `User/Src/HostController/HttpClient.cpp` |
 | Network lifecycle | **Complete for compile-time migration**: default lifecycle is persistent and no longer calls private full teardown | `User/Src/HostController/St67NetworkSession.cpp`, `Appli/App/app_config.h` |
 | Cold restart | Defer until supported teardown is available | Revisit only after public APIs or a fully User-owned replacement are identified |
 
@@ -96,11 +91,11 @@ Still pending:
 4. Complete: verify the generated DMA mapping, HAL links, initialization order, and IRQ dispatch.
 5. **Complete:** added the ST-documented `xPortIsInsideInterrupt()` compatibility definition for this Cortex-M0+ and FreeRTOS 10.3.1 configuration in the preserved USER include section of `Core/Inc/FreeRTOSConfig.h`.
 6. **Complete:** added `SPI_THREAD_STACK_SIZE=1536U` as a compile definition for the HostController target in the top-level `CMakeLists.txt`.
-7. **Partially complete:** `Debug-DisplayController` builds successfully. Both HostController variants reach the remaining HTTP API errors and are pending the User-owned HTTP implementation.
+7. **Complete:** `Debug-HostController`, `Debug-DisplayController`, and `Release-HostController` build successfully.
 
 Do not manually recreate DMA handles, MSP links, IRQ forwarding, or peripheral initialization in generated files.
 
-The DMA-specific generated units compile successfully. The FreeRTOS compatibility and stack-size fixes are in place, and the network-session code now compiles against public lwIP APIs. Fresh `Debug-HostController` and `Release-HostController` builds remain blocked only by the removed `HTTP_Client_Cancel()` and `HTTP_Client_IsIdle()` APIs. These failures are separate from the generated DMA configuration.
+The DMA-specific generated units compile successfully. The FreeRTOS compatibility and stack-size fixes are in place, the network-session code uses public lwIP APIs, and the HTTP fetcher uses the User-owned GET implementation. All three fresh build presets pass. Runtime validation remains outstanding.
 
 ## Phase 2: Remove Compile-Time Dependencies on Generated Extensions
 
@@ -145,7 +140,7 @@ Add a User-owned HTTP implementation with the minimum behavior needed by `St67Ht
 - exactly-once completion/error notification,
 - cleanup of task, socket, TLS state, and allocated buffers on every path.
 
-Then update `St67HttpFetcher.cpp` to call the User-owned API rather than `HTTP_Client_Cancel()` and `HTTP_Client_IsIdle()`.
+**Progress:** the User-owned synchronous GET implementation is complete enough for all three firmware builds, and `St67HttpFetcher.cpp` no longer calls `HTTP_Client_Cancel()` or `HTTP_Client_IsIdle()`. It owns the socket, request buffer, response-header buffer, response-size checks, Content-Length validation, callback completion, and socket cleanup. External cancellation, an explicit total deadline, and runtime error-path tests remain pending.
 
 The initial implementation may support only the HTTP method and transport required by the application. HTTPS and less-used POST/PUT behavior should be added only when required by an actual caller.
 

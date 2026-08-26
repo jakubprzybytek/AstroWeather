@@ -1,14 +1,12 @@
 #include <HostController/St67HttpFetcher.hpp>
 
 #include <Debug/DebugService.hpp>
+#include <HostController/HttpClient.hpp>
 #include <HostController/St67Runtime.hpp>
 
 #include "app_config.h"
 #include "lwip/dns.h"
 #include "main.h"
-
-#include "FreeRTOS.h"
-#include "task.h"
 
 #include <cstring>
 
@@ -181,28 +179,13 @@ bool St67HttpFetcher::fetch(St67FetchRequest* request) {
   settings.headers_done_fn = &httpHeadersCallback;
   settings.recv_fn = &httpDataCallback;
   settings.recv_fn_arg = &runtime_;
-  const int32_t requestStatus = HTTP_Client_Request(
-      &runtime_.dnsAddress, APP_ST67_HTTP_PORT, APP_ST67_HTTP_PATH, HTTP_REQ_TYPE_GET,
-      nullptr, 0U, nullptr, nullptr, nullptr, nullptr, &settings);
+  const int32_t requestStatus = HttpClient_Get(
+      &runtime_.dnsAddress, APP_ST67_HTTP_PORT, APP_ST67_HTTP_HOST,
+      APP_ST67_HTTP_PATH, &settings);
   if (requestStatus != HTTP_CLIENT_SUCCESS) {
     return false;
   }
-  const uint32_t flags = osThreadFlagsWait(kFlagHttp, osFlagsWaitAny,
-                                           APP_ST67_HTTP_TOTAL_TIMEOUT_MS);
-  if ((flags & kFlagHttp) == 0U) {
-    HTTP_Client_Cancel();
-    const uint32_t deadline = HAL_GetTick() + APP_ST67_HTTP_IO_TIMEOUT_MS;
-    while (!HTTP_Client_IsIdle() && static_cast<int32_t>(HAL_GetTick() - deadline) < 0) {
-      osDelay(10U);
-    }
-    return false;
-  }
-  const uint32_t cleanupDeadline = HAL_GetTick() + APP_ST67_HTTP_IO_TIMEOUT_MS;
-  while (!HTTP_Client_IsIdle() &&
-         static_cast<int32_t>(HAL_GetTick() - cleanupDeadline) < 0) {
-    osDelay(10U);
-  }
-  const bool success = HTTP_Client_IsIdle() && runtime_.httpError == 0 &&
+  const bool success = runtime_.httpError == 0 &&
                        runtime_.httpStatus >= OK && runtime_.httpStatus < 300;
   return success;
 }
