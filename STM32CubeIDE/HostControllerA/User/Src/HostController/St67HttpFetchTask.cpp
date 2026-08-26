@@ -211,12 +211,12 @@ class St67HttpFetchTask : public Task<2560> {
     osThreadFlagsClear(kFlagTrigger);
     const bool clientJob = runtime_.clientRequest != nullptr;
     const LifecycleMode mode = clientJob
-                                   ? LifecycleMode::SingleFullShutdown
-                                   : static_cast<LifecycleMode>(APP_ST67_LIFECYCLE_MODE);
+                     ? LifecycleMode::PersistentStress
+                     : static_cast<LifecycleMode>(APP_ST67_LIFECYCLE_MODE);
     const uint32_t requestedCycles =
-        mode == LifecycleMode::SingleFullShutdown
-            ? 1U
-            : mode == LifecycleMode::PersistentStress
+      clientJob
+        ? 1U
+        : mode == LifecycleMode::PersistentStress
                   ? APP_ST67_PERSISTENT_STRESS_CYCLES
                   : mode == LifecycleMode::HttpPersistentStress
                         ? APP_ST67_HTTP_PERSISTENT_STRESS_CYCLES
@@ -274,7 +274,7 @@ class St67HttpFetchTask : public Task<2560> {
         osDelay(APP_ST67_COLD_RESTART_DELAY_MS);
       }
     }
-    if (keepsNetworkStack(mode)) {
+    if (keepsNetworkStack(mode) && !clientJob) {
       const bool teardownPassed = network_.stop();
       if (!teardownPassed && result.firstFailedCycle == 0U) {
         result.firstFailedCycle = cycleId_;

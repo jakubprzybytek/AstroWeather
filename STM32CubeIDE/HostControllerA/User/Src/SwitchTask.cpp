@@ -11,7 +11,7 @@ void (*SwitchTask::s_switch1Handler)() = nullptr;
 void (*SwitchTask::s_switch2Handler)() = nullptr;
 
 SwitchTask::SwitchTask(Led& led2)
-    : Task<1024>("SwitchTask", osPriorityNormal), led2_(led2)
+    : Task<1536>("SwitchTask", osPriorityNormal), led2_(led2)
 {
     s_activeInstance = this;
 }

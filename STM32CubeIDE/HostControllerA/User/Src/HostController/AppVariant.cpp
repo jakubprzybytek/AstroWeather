@@ -10,5 +10,5 @@ void AppVariant_Init() {
   HostController::StartSt67HttpFetchTask();
   MainLoopTask::instance().start();
   SwitchTask::setSwitch1Handler(&MainLoopTask::trigger);
-  SwitchTask::setSwitch2Handler(nullptr);
+  SwitchTask::setSwitch2Handler(&HostController::TriggerSt67ConnectivityCycle);
 }

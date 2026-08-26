@@ -59,6 +59,7 @@ Completed and build-checked:
 - `Debug-HostController`, `Debug-DisplayController`, and `Release-HostController` build successfully. `git diff --check` passes.
 - Hardware smoke test passed: ST67 initialization, callback registration, Wi-Fi association, DHCP, SPI/RDY traffic, HTTP GET (`200`, 83 bytes), and response CRC validation all completed successfully.
 - The HTTP fetch task no longer overflows its 2560-byte stack; the observed post-request watermark was 848 bytes. HTTP transport buffers are heap-owned and were released after the request, with the batch heap returning from 39080 bytes to 39080 bytes.
+- Diagnosed and corrected repeated HTTP-request failures: single client-triggered requests now use one persistent lifecycle cycle and leave the supported ST67/lwIP infrastructure initialized. The station still disconnects after each request, but the unsupported full `W6X_DeInit()` path is no longer used between requests.
 
 Current build status:
 
@@ -67,7 +68,7 @@ Current build status:
 Still pending:
 
 - Runtime HTTP cancellation, total-timeout, malformed-response, and repeated-request validation.
-- Repeated persistent cycles and HTTP error/cleanup-path validation. The single client-triggered cycle currently uses `mode=0` (`SingleFullShutdown`) by design.
+- Repeated persistent cycles and HTTP error/cleanup-path validation. Single client-triggered requests now use one persistent cycle and retain the initialized ST67/lwIP infrastructure between requests.
 - USB debug backpressure investigation: the run accumulated `busyDrop=650`; this is a cumulative diagnostic counter and does not indicate an HTTP failure.
 - Review the low `SwitchTask` stack watermark (`176` bytes remaining) and the USB CDC asynchronous transmit-buffer ownership before release.
 
@@ -83,7 +84,7 @@ Still pending:
 | SPI completion and RDY handling | **Complete for compile-time migration**: User-owned RDY rising-edge bridge calls `spi_on_txn_data_ready()`; hardware handshake validation remains | `User/Src/HostController/St67SpiReady.cpp` |
 | Station status | **Complete for compile-time migration**: dedicated User-owned adapter uses public W6X/lwIP interfaces; hardware validation remains | `User/Inc/HostController/St67NetworkAdapter.hpp`, `User/Src/HostController/St67NetworkAdapter.cpp` |
 | HTTP request ownership | **Runtime smoke-tested**: User-owned bounded synchronous GET returned HTTP 200 and a CRC-valid 83-byte response; transport buffers are heap-owned and released. Cancellation, total deadline, and error-path coverage remain pending | `User/Inc/HostController/HttpClient.hpp`, `User/Src/HostController/HttpClient.cpp` |
-| Network lifecycle | **Complete for compile-time migration**: default lifecycle is persistent and no longer calls private full teardown | `User/Src/HostController/St67NetworkSession.cpp`, `Appli/App/app_config.h` |
+| Network lifecycle | **Runtime fix applied**: single HTTP requests retain the supported persistent ST67/lwIP infrastructure between requests; station disconnect still occurs after each request. Extended repeated-cycle validation remains pending | `User/Src/HostController/St67NetworkSession.cpp`, `User/Src/HostController/St67HttpFetchTask.cpp`, `Appli/App/app_config.h` |
 | Cold restart | Defer until supported teardown is available | Revisit only after public APIs or a fully User-owned replacement are identified |
 
 ## Phase 1: Restore the Generated Hardware Baseline
@@ -143,7 +144,7 @@ Add a User-owned HTTP implementation with the minimum behavior needed by `St67Ht
 - exactly-once completion/error notification,
 - cleanup of task, socket, TLS state, and allocated buffers on every path.
 
-**Progress:** the User-owned synchronous GET implementation is complete enough for all three firmware builds and has passed one hardware smoke test. `St67HttpFetcher.cpp` no longer calls `HTTP_Client_Cancel()` or `HTTP_Client_IsIdle()`. The client owns the socket, bounded request/response buffers, response-size checks, Content-Length validation, callback completion, and socket cleanup. External cancellation, an explicit total deadline, and runtime error-path tests remain pending.
+**Progress:** the User-owned synchronous GET implementation is complete enough for all three firmware builds and has passed a hardware smoke test. `St67HttpFetcher.cpp` no longer calls `HTTP_Client_Cancel()` or `HTTP_Client_IsIdle()`. The client owns the socket, bounded request/response buffers, response-size checks, Content-Length validation, callback completion, and socket cleanup. Single client-triggered requests now retain the supported persistent network/lwIP infrastructure between requests after repeated DHCP failures exposed the previous full-shutdown path. External cancellation, an explicit total deadline, and runtime error-path tests remain pending.
 
 The initial implementation may support only the HTTP method and transport required by the application. HTTPS and less-used POST/PUT behavior should be added only when required by an actual caller.
 
