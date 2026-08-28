@@ -20,11 +20,11 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "usb_device.h"
-#include <Device/SCT2xxx_c.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <AstroWeather.hpp>
+#include <Device/SCT2xxx_c.h>
 #include "task.h"
 /* USER CODE END Includes */
 
@@ -368,6 +368,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, GPIO_PIN_RESET);
@@ -377,6 +378,12 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, ST67_BOOT_Pin|SCT_LATCH_Pin|SCT_ENABLE_Pin|LED_2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(DISPLAY_2_GPIO_Port, DISPLAY_2_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, DISPLAY_5_Pin|DISPLAY_3_Pin|DISPLAY_4_Pin|DISPLAY_1_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : LED_1_Pin */
   GPIO_InitStruct.Pin = LED_1_Pin;
@@ -417,6 +424,20 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : DISPLAY_2_Pin */
+  GPIO_InitStruct.Pin = DISPLAY_2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(DISPLAY_2_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : DISPLAY_5_Pin DISPLAY_3_Pin DISPLAY_4_Pin DISPLAY_1_Pin */
+  GPIO_InitStruct.Pin = DISPLAY_5_Pin|DISPLAY_3_Pin|DISPLAY_4_Pin|DISPLAY_1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI4_15_IRQn, 3, 0);
   HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
@@ -453,7 +474,6 @@ void StartDefaultTask(void *argument)
 {
   /* init code for USB_Device */
   MX_USB_Device_Init();
-  SCT2xxx_Enable();
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
   for(;;) 

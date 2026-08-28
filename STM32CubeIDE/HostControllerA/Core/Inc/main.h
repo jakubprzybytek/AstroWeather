@@ -84,6 +84,16 @@ void Error_Handler(void);
 #define SWITCH_2_Pin GPIO_PIN_13
 #define SWITCH_2_GPIO_Port GPIOB
 #define SWITCH_2_EXTI_IRQn EXTI4_15_IRQn
+#define DISPLAY_2_Pin GPIO_PIN_15
+#define DISPLAY_2_GPIO_Port GPIOA
+#define DISPLAY_5_Pin GPIO_PIN_0
+#define DISPLAY_5_GPIO_Port GPIOD
+#define DISPLAY_3_Pin GPIO_PIN_1
+#define DISPLAY_3_GPIO_Port GPIOD
+#define DISPLAY_4_Pin GPIO_PIN_2
+#define DISPLAY_4_GPIO_Port GPIOD
+#define DISPLAY_1_Pin GPIO_PIN_3
+#define DISPLAY_1_GPIO_Port GPIOD
 #define SCT_SPI_SCK_Pin GPIO_PIN_3
 #define SCT_SPI_SCK_GPIO_Port GPIOB
 #define SCT_SPI_MOSI_Pin GPIO_PIN_5
