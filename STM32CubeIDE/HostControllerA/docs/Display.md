@@ -1,251 +1,293 @@
-Display Board - PCB version
-- Single PCB with multple led displays, driven using SCT2xxx chipt and multiplexing.
-- There are number displays and dot matrix displays
-- Each board has 5 multiplexed "columns" (for number displays: 4 digits + special dots, 5 dot rows)
-- Refresh rate should be less than 20/5 ms (20ms for cycle of 5 columns)
-- for each column cycle: send data using SPI, then latch using LATCH pin (low then high)
-- each column is driven by mosfet controlled by output pin (low to enable)
-- Has public interface that allows to set data to be displayed:
+# Display Functionality
+
+## Overview
+
+The system contains one Host Controller board and up to four Display Controller boards. Every board has the same physical display hardware:
+
+- Four multiplexed four-digit, seven-segment numeric displays.
+- One 5x21 dot-matrix display.
+- Three special indicator dots.
+- SCT2xxx LED drivers connected as one SPI daisy chain.
+- Five active-low multiplexing outputs, `DISPLAY_1_EN` through `DISPLAY_5_EN`.
+
+The Host Controller fetches application data, displays its local portion, and sends the remaining board values to Display Controllers over I2C. A Display Controller receives logical display values over I2C and renders them on its local PCB.
+
+## Software Architecture
+
+### Display
+
+`Display` exists only in the Host Controller firmware. It is the logical representation of the complete multi-board display and owns a collection of board interfaces:
+
+- One local PCB-backed Display Board.
+- Four remote buffer-backed Display Boards, one for each Display Controller.
+
+Client code accesses all boards through the same Display Board interface without needing to know whether a board is local or remote. `Display::submit()` submits the local board's logical buffer for PCB encoding and periodic SPI refresh, then sends each remote board's logical buffer to its configured I2C address.
+
+### PCB-backed Display Board
+
+The PCB-backed implementation:
+
+- Owns the SCT2xxx SPI interface, latch and enable signals, and the five multiplexing GPIOs.
+- Stores logical display values.
+- Converts logical values into PCB-specific segment and matrix bit mappings.
+- Maintains the prepared SPI refresh data.
+- Runs the local multiplexing mechanism.
+
+`AppVariant.cpp` creates this object and starts its refresh mechanism in both firmware variants. The PCB-backed Display Board invokes `HAL_TIM_Base_Start_IT(&htim2)` when its initialization or start method is called.
+
+### Buffer-backed Display Board
+
+The buffer-backed implementation exists only on the Host Controller. It stores logical board values in the I2C payload format and does not apply PCB wiring mappings. Its data is sent to a Display Controller, where the PCB-backed implementation performs the mapping.
+
+### Code Ownership
+
+All application-side display code is located under `/User`:
+
+- `/User/Device` contains low-level device implementations, such as the SCT2xxx driver.
+- `/User/Display` contains all display-related code, including Display, Display Board variants, numeric and matrix content types, encoding, refresh, and I2C display transport logic.
+
+## Public Interface
+
+Each board exposes four numeric displays indexed from `0` through `3` and five dot-matrix rows indexed from `0` through `4`.
+
+Each of the four numeric displays has its own three special indicators: L1 and L2 form the double dots used for time, and L3 is the apostrophe before the last digit. `DISPLAY_1_EN` through `DISPLAY_4_EN` select the four numeric digit positions on every numeric display. `DISPLAY_5_EN` selects the special-indicator position on every numeric display; only the three special-indicator segments are used in this position.
+
+The intended interface is:
+
+```cpp
+numeric[i].setFixed(int16_t mantissa, uint8_t precision = 0);
+numeric[i].setValue(int16_t value);
+numeric[i].setValue(float value, uint8_t precision = 0);
+numeric[i].setTime(uint8_t hour, uint8_t minute);
+numeric[i].setBlank();
+
+matrix[row].setRow(uint32_t columns);
+
+display.submit();
 ```
-displayBoard.number[col][row] = 123.4
-displayBoard.number[col][row] = 123.4
-displayBoard.number[col][row] = 12:30 // this is meant to set time, exact way of passing that to be defined
-displayBoard.dots[row] = xxxx // value representing 21 dots
+
+Only the lowest 21 bits passed to `setRow()` are used. Bit 0 drives matrix column 1 and bit 20 drives matrix column 21.
+
+Additional integer overloads may be provided. All setters convert their input to the canonical logical representation before it is stored.
+
+## Numeric Representation
+
+Each numeric display is stored as one canonical `(mantissa, flags)` pair:
+
+```cpp
+struct NumericData {
+	int16_t mantissa;
+	uint8_t flags;
+};
 ```
-- Display Board is configured using I2C address (constructor)
-- Display Board uses FreeRTOS Task to periodiacally send data through SCT device and multiplexing.
-- Display Board stores data to be displayed in format that can be immediatelly being sent to SCT. It means that value to be displayed needs to be transformed to ready-to-sent data. Such data is merged between all led displays from given PCB.
-- Transformation
--- Number displays
---- Input value needs to be split into separate digits and dots, double-dots (for times)
---- Each digit needs to be translated to byte coding A-G, DP segments. Each number display may have different wiring for each of the segments. (how to traslate? maybe first translate to normalized A-G,DP value and then translate it to fit wireing of given led display. lookup table? some bit shifting logic?)
--- Dot matrix
---- Input value representing 21 dots to be converted into 21 bits
-- Merging led displays
--- led displays are daisy-chained: two number displays (two bytes), one 5x21 dots display (three bytes, last three bits are ignored, but has to be sent), another two number displays (two bytes). It means that 7 bytes need to be sent in one multiplexing cycle 
 
-Display Board - Buffer version
-- Used by Display to store data to be sent
+### Flag Layout
 
-Desplay
-- There are multiple Display Boards connected using daisy chain. First board is in Host Controller mode that contains Wi-Fi that fetches data to display and talks with other PCBs, those in Display Controller mode. Display Controller PCBs just listens for data from Host and displays its portion of data. Controllers comunicates using I2C. Each board has unique I2C address (derived from programming pins). Host Controller also contains display.
-- Display is a virtual (logical) representation of data to be displayed, split by Display Board. Display object exist on Host Controller only, which uses one Display Board for displaying on its own PCB, and sending rest to other Display Controllers.
-- Display has collection of Display Boards object to set current values to display. One Display Board object drives led displays from current PCB, other contain buffers to be sent to other PCBs.
-- Display is built (instatiated) by creating objects for Display Boards (I2C addresses are know ap front)
-- Display exposes boards through public interface so that client code can set new values to be displayed
-- Display exposes method for sending buffered data to Display Controllers. It go trough Display Boards (buffer version) and sends the data to the proper I2C address.
+| Bits | Meaning |
+|---|---|
+| 0-1 | Mode: `0 = Blank`, `1 = Value`, `2 = Time`, `3 = Error` |
+| 2-3 | Decimal precision: `0 = none`, `1 = one digit`, `2 = two digits`, `3 = three digits` after the decimal point |
+| 4 | Double dots enabled |
+| 5-7 | Reserved; always written as zero |
 
-Host Controller
-- Display object
-- Display Board - PCB version
-- Four Display Boards - Buffer version
-- Display can send data to Display Controllers
+Invalid combinations, including a decimal precision in Time or Error mode, must be rejected or normalized before storage. Error mode ignores the mantissa and decimal/double-dot modifiers.
 
-Disply Controller
-- Receives data from Host Controller
-- Display Board - PCB version
+### Fixed-point Values
 
-Outstanding implementation issues
-- Hardware mapping must be documented before implementation:
-	- Define the seven-byte shift-register order on the daisy chain.
-	- Define the bit assigned to every A-G, DP, and double-dot segment.
-	- Define the bit order and orientation of the 5x21 dot matrix.
-	- Define which physical column drives each number digit, special-dot group, and dot-matrix row.
-	- Define whether each SCT output and each display column is active-high or active-low.
+For Value mode, the displayed mathematical value is:
 
-Clarification:
-Mappings:
-first led display
-a - 2 (segment a is on second bit) 
-b - 1
-c - 4
-d - 3
-e - 6
-f - 0
-g - 7
-DP - 5
+```text
+mantissa / 10^precision
+```
 
-second led display
-a - 5
-b - 6
-c - 1
-d - 3
-e - 2
-f - 7
-g - 4
-DP - 0
+The decimal precision is encoded in flag bits 2-3. The sign is encoded by a negative mantissa and consumes the leftmost display position. Leading zeroes are blank for normal numeric values.
 
-led dot matrix
-1 - 0
-2 - 1
-3 - 2
-4 - 3
-...
-21 - 20
-bits 21-23 are not used, but need to be sent to align to 3 bytes. value doesn't matter, could be zeros
+Examples:
 
-third led display
-a - 0
-b - 1
-c - 3
-d - 6
-e - 5
-f - 2
-g - 7
-DP - 4
+| Method | Stored mantissa | Precision | Display |
+|---|---:|---:|---|
+| `setFixed(1234, 0)` | 1234 | 0 | `1234` |
+| `setFixed(1234, 1)` | 1234 | 1 | `123.4` |
+| `setFixed(1234, 2)` | 1234 | 2 | `12.34` |
+| `setFixed(1234, 3)` | 1234 | 3 | `1.234` |
+| `setFixed(-999, 0)` | -999 | 0 | `-999` |
+| `setFixed(-999, 1)` | -999 | 1 | `-99.9` |
 
-fourth led display
-a - 0
-b - 1
-c - 7
-d - 4
-e - 5
-f - 2
-g - 3
-DP - 6
+The four display positions allow four positive digits or a minus sign and three digits. Values that do not fit after applying the sign and decimal precision are invalid.
 
-all led displays
-DISPLAY_1 - DISPLAY_4 drives column X
-DISPLAY_5 drives special dots: L1 and L2 (two dots between second and third digit for dividing hour and minuts), L3 (apostrophe before fourth digit). L1 has the same mapping as 'a' segment, L1 same as 'b' segment, L3 same as 'c' segment.
+### Float Input
 
-dot matrix display
-DISPLAY_1 to DISPLAY_5 drives rows
-data sent to SCT drives columns
+The float overload is an input convenience only. It converts the input to fixed point by rounding `value * 10^precision` to the nearest integer, validates the result, and stores only `(mantissa, flags)`. Float values are never stored in the refresh state or transmitted over I2C.
 
-DISPLAY_X are driven low
-SCT values are driven with '1's
+The conversion must reject NaN, infinity, unsupported precision, and values that do not fit the display. Integer and fixed-point overloads are preferred when exact decimal behavior matters.
 
-- Confirm SCT2xxx electrical and timing requirements from the datasheet and schematic:
-	- SPI clock polarity, clock phase, bit order, and maximum frequency.
-	- Required latch idle state and active edge. The current text says low then high, while the existing SCT driver currently pulses high then low.
-	- Whether all seven bytes must be shifted before one latch operation.
-	- Output-enable timing during shifting and column changes to prevent ghosting.
+### Time and Blank Modes
 
-Clarification:
-- current setup is confirmed to be working. later, spead will be increased. it may stay low for now
-- Existing SCT driver confirmed to be working correctly
-- yes, all 7 bytes to be shifted before latching
-- disable displays duing shifting (thorugh putting DISPLAY_x high)
+`setTime(hour, minute)` accepts hours and minutes from `00` through `99` and stores:
 
-- Define the refresh timing precisely. The current requirement of "less than 20/5 ms" should be replaced with a frame period, slot period, minimum refresh rate, and permitted jitter. For example: five slots, 4 ms per slot, 20 ms per frame, at least 50 Hz.
+```text
+mantissa = hour * 100 + minute
+mode = Time
+double dots = enabled
+```
 
-Clarification:
-- one requirement - entire multiplexing cycle should be done with at least with 50 Hz refrasze rate
-Each digit from number display and dot matrix row should be activated for one fifth of entire cycle period
+Time mode always renders four digits as `HHMM`, including leading zeroes. For example, `setTime(3, 7)` stores mantissa `307` and displays `03:07`.
 
-- Define the refresh sequence for one slot, including disabling the active column, shifting seven bytes, latching, selecting the next column, and enabling it.
+`setBlank()` stores mantissa `0`, sets Blank mode, and clears all modifier flags. Blank mode turns off every segment regardless of the mantissa.
 
-Clarification:
-1. Disable previous slot: DISPLAY_x
-2. shift 7 bytes for current slot
-3. latch
-4. Enable current slot: DISPLAY_y
-5. Idle for 4/5ms
+If a setter receives an invalid value, it stores Error mode. Error mode renders only segment D on each of the four digits of that numeric display. It does not require an additional flag bit because mode value `3` is used for Error. The error pattern is also transported as the normal `(mantissa, flags)` pair.
 
+## Logical Board Buffer
 
-- Define the public C++ data model and indexing. Specify what `number[col][row]` means, and replace illustrative assignments such as `12:30` with typed operations or a precise value representation.
+A board's transport-level logical buffer contains 27 bytes:
 
-clarification
-- ok, drop [col][row]. let's use:
-numeric[i].setValue(x, p) - for real numbers (x) with precision (p) - where to place decimal-point: 0 - no decimal points / only integers, 1 - one decimal number, 2 - two decimal numbers. p is 0 by default
-numeric[i].setTime(uint8_t hour, uint8_t minute) - for times
-i - index from 0 to 3, for four led number displays
-matrix[j].setRow(x) - x is 32 bit variable first 21 bits are driving columns
-j - row index, from 0 to 5 
+| Offset | Size | Content |
+|---:|---:|---|
+| 0 | 3 | Numeric display 1: mantissa and flags |
+| 3 | 3 | Numeric display 2: mantissa and flags |
+| 6 | 15 | Five dot-matrix rows, three bytes per 21-bit row |
+| 21 | 3 | Numeric display 3: mantissa and flags |
+| 24 | 3 | Numeric display 4: mantissa and flags |
 
-Numeric input and internal storage
-- The public interface may accept several input types, but every accepted value is converted to one canonical fixed-point representation before display encoding.
-- Canonical numeric storage:
-	- `int16_t mantissa`: the displayed number with its decimal point removed.
-	- `uint8_t flags`: display mode and segment modifiers.
-	- The displayed value for a numeric value is `mantissa / 10^precision`, where `precision` is decoded from `flags`.
-- Recommended flag layout:
-	- Bits 0-1: display mode: `0 = Blank`, `1 = Value`, `2 = Time`, `3 = reserved`.
-	- Bits 2-3: decimal position: `0 = none`, `1 = after the first digit`, `2 = after the second digit`, `3 = after the third digit`.
-	- Bit 4: double dots enabled, used by time display.
-	- Bits 5-7: reserved and written as zero.
-- A blank display is represented by `mantissa = 0` and mode `Blank`; the formatter must turn off all segments regardless of the mantissa value.
-- A time is represented by `mantissa = hour * 100 + minute`, mode `Time`, and the double-dot flag. Time formatting always renders four positions as `HHMM`, so values such as `03:07` retain both leading zeroes.
-- The internal representation should be separated into two layers:
-	- Logical state: four numeric-display contents and six dot-matrix row values.
-	- Prepared frame: five multiplexed columns, with seven bytes per column. Each byte contains the already mapped SCT output bits for the four numeric displays, special dots, and dot matrix.
-- Input methods update the `(mantissa, flags)` logical state, validate it, encode the affected display content, merge all content into a new prepared frame, and publish that frame atomically. The refresh task only reads the published prepared frame; it does not perform float conversion, decimal formatting, or segment mapping in the refresh loop.
-- The prepared frame layout follows the physical chain for every multiplexed column: first numeric display, second numeric display, dot matrix (three bytes), third numeric display, and fourth numeric display. It therefore contains `5 * 7 = 35` bytes. The three unused dot-matrix bits must be written as zero.
-- The segment mappings from the hardware clarification are encoder configuration tables, not part of the public numeric API. The encoder first creates normalized A-G, DP, and special-dot segment values, then applies the per-display bit mappings before merging the seven output bytes.
-- Recommended methods:
-	- `setFixed(int16_t mantissa, uint8_t precision = 0)` for exact values already expressed in fixed-point form; this method converts `precision` into the decimal-position flags.
-	- `setValue(int16_t value)` or another suitable signed integer overload for whole numbers.
-	- `setValue(float value, uint8_t precision = 0)` for convenient real-number input.
-	- `setTime(uint8_t hour, uint8_t minute)` for time values; this converts the inputs to `mantissa = hour * 100 + minute` and time flags.
-	- `setBlank()` to set mode `Blank` and clear all display modifiers.
-- The float overload must convert deterministically by rounding `value * 10^precision` to the nearest integer mantissa, then validating the resulting mantissa and display fit. It must reject NaN, infinity, unsupported precision, and values that do not fit the four-digit display. It must also define the behavior of exact half-way values and negative zero.
-- The float overload is an input convenience only. The display task and I2C buffer must store and transmit the canonical `(mantissa, flags)` pair or the resulting encoded display bytes, never a float.
-- Example conversions:
-	- `setValue(1234, 0)` stores `mantissa = 1234` and Value/no-decimal flags, then displays `1234`.
-	- `setValue(123.4f, 1)` stores `mantissa = 1234` and Value/decimal-after-first-digit flags, then displays `123.4`.
-	- `setValue(12.34f, 2)` stores `mantissa = 1234` and Value/decimal-after-second-digit flags, then displays `12.34`.
-	- `setFixed(-999, 1)` stores `mantissa = -999` and Value/decimal-after-first-digit flags, then displays `-99.9`.
-	- `setTime(3, 7)` stores `mantissa = 307` and Time/double-dots flags, then displays `03:07`.
-	- `setBlank()` stores `mantissa = 0` and Blank flags.
-- Integer and fixed-point overloads should be preferred in firmware paths where exact decimal behavior matters. Float input is appropriate for configuration or application values, provided the caller supplies the intended precision.
+This buffer contains logical values, not SPI-ready PCB data. Matrix bits 21 through 23 are unused and must be zero.
 
-- Define formatting behavior for numeric values:
-	- Supported range and precision.
-	- Decimal-point placement.
-	- Leading zero and blank handling.
-	- Negative values and overflow.
-	- Invalid time values and unsupported values.
+## PCB Encoding
 
-Clarification
-- for numerical value range is limited by 4 digits: 4 digit positive numbers, 3 digit negative numbers
-- decimail-point depends on precision parameter (p)
-- leading zeros are blank
-- negative values proceded with minus symbol (g-segment)
-- hours and minuts: from 00 to 99
+The PCB encoder converts the logical board state into a prepared frame containing five multiplexing slots of seven SPI bytes, for a total of 35 bytes.
 
-- Define the prepared-buffer layout and ownership. State whether the buffer contains one column, one complete five-column frame, or all 35 bytes, and how local and remote boards share the encoder logic.
+For each slot, the seven bytes are defined in physical order from the first to the last device in the daisy chain:
 
-Clarification:
-- buffer contains internal storage for every led display: numerical display - mantissa and flags (3 bytes), dot matrix - 5*3 bytes
-- it doesn't map into ready to send to SPI data
-- Display Board (PCB version) on Display Controller will take those values and then map according to wireing
+1. Numeric display 1.
+2. Numeric display 2.
+3. Dot matrix byte 1.
+4. Dot matrix byte 2.
+5. Dot matrix byte 3.
+6. Numeric display 3.
+7. Numeric display 4.
 
-- Define update synchronization. Updates must not produce mixed frames while the refresh task reads the buffer. Specify whether double buffering is used and when a new frame becomes visible.
+Because the last device must be transmitted first, the SPI transfer order is the reverse of that physical listing. The exact wire order is:
 
-clarification
-- display is being refreshed 20 times per second. if one frame is currupted then the next one would be fixed. if there is no strong need for better synchronisation, it can be ignored for now
+1. Numeric display 4 byte.
+2. Numeric display 3 byte.
+3. Dot matrix byte 3, with logical matrix bits 21 through 23 set to zero because matrix columns use only bits 0 through 20. The byte's serialized bit order is still MSB first.
+4. Dot matrix byte 2.
+5. Dot matrix byte 1.
+6. Numeric display 2.
+7. Numeric display 1.
 
-- Define the I2C transport protocol:
-	- Address derivation, valid address range, and reserved addresses.
-	- Command or message type, protocol version, payload length, byte order, and checksum if needed.
-	- Whether I2C carries logical values or prepared display bytes.
-	- Atomic update behavior on the Display Controller.
-	- Timeout, retry, malformed-packet, offline-board, and partial-transfer behavior.
+The receiver/encoder on a Display Controller uses the same named physical order, so the transmit and receive ends agree without relying on C++ struct layout. The SPI peripheral is configured MSB first, so each byte is sent bit 7 first and no bit reversal is required.
 
-Clarification
-- Each board has three pins that could be used for programming I2C address. It is possible to short them to ground, Vcc or left floating. It allows to establish 3 state logic to every pin, meaning 3 pow 3 different addresses (27). This value could be added to some predefined base address establishing specific I2C address.
-- I2C message: 1 byte to establish command and data format and then buffered data for given Display Board: first number display (mantissa, flags), second number display, dot matrix (5 times 3 bytes), third number display, fourth number display.
-- currently, there will be only one command / data format: 0x01 indicating 'set display board values as described above'
-- I2C carries logical values
-- no need for atomic update on Display Controller
-- very basic error handling if any. no return data for now (Display Controller don't respond with success / ack message)
+Reversing the seven byte positions cannot be achieved by the MSB-first setting: MSB-first controls bit order inside each byte, not the order of bytes in the transfer. No bit reversal or other bit-level computation is required. The encoder can write the seven-byte prepared slot directly in wire order, or transmit a physical-order array using reverse indices. Because the transfer is only seven bytes, either approach is acceptable; the chosen implementation must not reverse bits inside the bytes.
 
+The encoder first creates normalized A-G and DP segment values, then applies the wiring table for the corresponding numeric display. An SCT output value of `1` turns on the connected LED output.
 
-- I2C is not currently enabled in the STM32 HAL configuration. The `.ioc` must define the I2C peripheral, pins, timing, interrupts or DMA if required, and controller/slave roles before code implementation.
+### Numeric Segment Wiring
 
-clarification
-- it is enabled now. check it
+| Segment | Display 1 bit | Display 2 bit | Display 3 bit | Display 4 bit |
+|---|---:|---:|---:|---:|
+| A | 2 | 5 | 0 | 0 |
+| B | 1 | 6 | 1 | 1 |
+| C | 4 | 1 | 3 | 7 |
+| D | 3 | 3 | 6 | 4 |
+| E | 6 | 2 | 5 | 5 |
+| F | 0 | 7 | 2 | 2 |
+| G | 7 | 4 | 7 | 3 |
+| DP | 5 | 0 | 4 | 6 |
 
-- Define task lifecycle and ownership:
-	- Which object creates and starts the FreeRTOS refresh task.
-	- Which object owns SPI, latch, enable, and column GPIO access.
-	- How Host Controller and Display Controller variants instantiate and initialize their board objects.
+### Multiplexing Mapping
 
-clarification
-- AppVariant.cpp will create Display Board (PCB variant) object that inits and start that task
-- Display Board (PCB) own SPI and other pins
+- `DISPLAY_1_EN` through `DISPLAY_4_EN` select numeric digit positions 1 through 4 and dot-matrix rows 1 through 4.
+- `DISPLAY_5_EN` selects the special-indicator position for numeric displays and dot-matrix row 5. Only L1, L2, and L3 are populated in the numeric-display position selected by `DISPLAY_5_EN`.
+- All `DISPLAY_x_EN` outputs are active-low: drive them high to disable and low to enable.
+- The numeric minus sign uses segment G.
+- On each numeric display, special indicators L1 and L2 are the two dots between the second and third digits; L3 is the apostrophe before the fourth digit.
+- L1 uses the numeric display's segment-A mapping, L2 uses segment-B mapping, and L3 uses segment-C mapping while `DISPLAY_5_EN` is active.
+- L3 is not currently exposed through the public interface and remains off unless future API support is added.
+- Dot-matrix columns 1 through 21 map directly to SCT bits 0 through 20. Bits 21 through 23 are zero.
 
+## Refresh Operation
 
-- Add acceptance tests with exact expected output bytes. At minimum, cover a digit on every display position, decimal and double-dot segments, representative dot-matrix patterns, blanking, frame updates, and I2C transfer errors.
+A complete multiplexing frame consists of five slots. The complete frame rate must be at least 50 Hz, giving a maximum nominal slot period of 4 ms. SPI transfer and latch time are part of that slot period; the active dwell time is the remaining portion.
 
-Both variants of Dispaly Boards have the same interface. Client code uses them both withing knowing which version it is
+Each slot is processed in this order:
+
+1. Drive the previously active `DISPLAY_x_EN` output high to disable it.
+2. Shift all seven bytes for the next slot without latching between bytes.
+3. Pulse the SCT latch using the sequence already confirmed by the existing SCT driver.
+4. Drive the next `DISPLAY_x_EN` output low to enable it.
+5. Keep the slot active until the next 4 ms deadline.
+
+The current SPI mode, latch sequence, and low SPI speed have been confirmed on hardware. SPI speed may be increased later after hardware verification.
+
+The preferred scheduling design is TIM2 providing the 250 Hz slot cadence and a high-priority refresh task performing the short seven-byte SPI transaction. The timer interrupt should only signal the task and must not call blocking SPI functions. SPI DMA may replace the blocking task-level transfer later if measured jitter or CPU use requires it.
+
+TIM2 configuration for the initial 250 Hz slot trigger, assuming the current 16 MHz internal timer clock:
+
+- Prescaler: `15999`, giving a 1 kHz counter clock.
+- Auto-reload period: `3`, giving an update event every 4 counter ticks, or 250 Hz.
+- Counter mode: up-counting.
+- Clock division: divide by 1.
+- Auto-reload preload: disabled initially.
+- Enable the TIM2 update interrupt and its NVIC entry in CubeMX.
+- Start TIM2 with interrupt generation after the display refresh mechanism has been initialized.
+
+The update ISR should clear or dispatch the TIM2 update event through the HAL callback and signal the refresh task. Do not use the TIM2 HAL time base for the RTOS tick; TIM1 currently provides the HAL time base.
+
+Current project status: the `.ioc` and generated `main.c` already contain TIM2 with internal clock, prescaler `15999`, and period `3`. The TIM2 update interrupt/NVIC entry, `TIM2_IRQHandler`, display-task signal path, and `HAL_TIM_Base_Start_IT(&htim2)` call are not yet present and must be added before the display refresh can use TIM2.
+
+Logical-to-segment conversion is performed when display state changes, not in the periodic refresh loop. The refresh mechanism reads only prepared slot bytes.
+
+The initial implementation may update prepared data without double buffering. A concurrent update may produce one mixed frame, which is accepted for the first version because the following frame corrects it. Double buffering can be added if testing shows visible artifacts.
+
+## I2C Transport
+
+I2C1 is enabled in the CubeMX configuration on PA9/SCL and PA10/SDA using 7-bit addressing. The Host Controller acts as controller/master, and each Display Controller acts as target/slave.
+
+Each message contains 28 bytes. The payload has one explicit byte order used by both I2C sender and receiver:
+
+| Offset | Size | Content |
+|---:|---:|---|
+| 0 | 1 | Command |
+| 1 | 27 | Logical board buffer |
+
+The 27-byte logical payload is serialized in this order: numeric display 1, numeric display 2, matrix rows 0 through 4, numeric display 3, and numeric display 4. Each numeric value occupies three bytes: mantissa low byte, mantissa high byte, and flags. Each matrix row occupies three bytes in little-endian order, with bit 0 in the first byte's least-significant bit. The unused bits 21 through 23 are zero. The same serialization is used when packing on the Host Controller and unpacking on the Display Controller.
+
+Command `0x01` means "set display board values" using the logical buffer format defined above. The Display Controller checks this first command/format byte and processes the message only when it is a known value. `0x01` is currently the only known command. Unknown commands are ignored. For command `0x01`, the Display Controller replaces its local logical values and performs its own PCB-specific encoding. There is no application-level response or success message in the initial protocol; normal I2C ACK/NACK behavior still applies.
+
+Each Display Controller has three address-programming pins, named `ADDR_1` through `ADDR_3`. Each pin can be tied to ground, tied to VCC, or left floating, providing 27 possible ternary board IDs. The Display Controller derives its 7-bit I2C slave address from these pins using `0x10 + board_id`, giving addresses `0x10` through `0x2A`.
+
+The Host Controller does not derive these addresses from its own pins. It instantiates one buffer-backed Display Board for each Display Controller and passes that controller's I2C address to the buffer-backed board constructor. The Host-side board objects therefore retain their configured addresses and use them when `Display::submit()` sends the logical buffers.
+
+Address detection uses two reads for each pin:
+
+1. Configure the pin as a digital input with an internal pull-down and read it. HIGH means VCC. LOW means either ground or floating.
+2. For pins that read LOW, switch to an internal pull-up and read again. LOW means a strong external ground connection; HIGH means floating.
+
+The three detected states are mapped deterministically to a board ID from `0` through `26`. The exact state-to-bit ordering must be shared by Host and Display Controller firmware.
+
+The Display Controller checks the first received byte before processing the payload. It reacts only to known commands; currently command `0x01` is the only valid command. Unknown commands and messages with an invalid length are ignored, and the previous logical display state is retained. Initial transport error handling may be limited to detecting HAL/I2C transfer failure and retaining the previous display state.
+
+## Variant Lifecycle
+
+### Host Controller
+
+`AppVariant.cpp` creates and starts:
+
+- The local PCB-backed Display Board and its refresh mechanism.
+- The top-level `Display` containing the local board and four remote buffer-backed boards.
+- Client code calls `Display::submit()` after it has finished updating all local and remote board objects. `submit()` submits the local logical buffer to the PCB-backed board for encoding and periodic SPI refresh, then sends each remote logical buffer to its configured I2C address.
+
+### Display Controller
+
+`AppVariant.cpp` creates and starts:
+
+- One PCB-backed Display Board and its refresh mechanism.
+- I2C target reception for command `0x01`.
+
+## Remaining Implementation Work
+
+1. Complete Display Controller I2C target configuration in code. The Host Controller `.ioc` configures I2C1 for transmissions; the Display Controller must reconfigure I2C1 as a target/slave using its runtime address and install the receive/listen callbacks.
+2. Add the TIM2 update interrupt/NVIC entry, `TIM2_IRQHandler`, and refresh-task signal path. TIM2 is already configured for 250 Hz, and the PCB-backed Display Board must call `HAL_TIM_Base_Start_IT(&htim2)` from its initialization or start method. TIM1 currently provides the HAL time base and must remain separate.
+3. Define retry and offline-board behavior for `Display::submit()` when an I2C transfer fails. The call itself and its ordering across all boards are defined above.
+4. Implement and test complete-message reception so an incomplete 28-byte I2C message never partially modifies visible logical state, even though full refresh-frame double buffering is deferred. Command filtering for unknown format bytes is defined above.
+5. Add acceptance tests for numeric formatting, every per-display segment mapping, decimal points, negative values, Error mode, time leading zeroes and double dots, blanking, all matrix rows and boundary bits, seven-byte SPI order, I2C serialization, command filtering, malformed messages, and transfer failures.

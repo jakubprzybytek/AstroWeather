@@ -90,16 +90,16 @@ void Error_Handler(void);
 #define SWITCH_2_EXTI_IRQn EXTI4_15_IRQn
 #define ADDR_2_Pin GPIO_PIN_14
 #define ADDR_2_GPIO_Port GPIOB
-#define DISPLAY_2_Pin GPIO_PIN_15
-#define DISPLAY_2_GPIO_Port GPIOA
-#define DISPLAY_5_Pin GPIO_PIN_0
-#define DISPLAY_5_GPIO_Port GPIOD
-#define DISPLAY_3_Pin GPIO_PIN_1
-#define DISPLAY_3_GPIO_Port GPIOD
-#define DISPLAY_4_Pin GPIO_PIN_2
-#define DISPLAY_4_GPIO_Port GPIOD
-#define DISPLAY_1_Pin GPIO_PIN_3
-#define DISPLAY_1_GPIO_Port GPIOD
+#define DISPLAY_2_EN_Pin GPIO_PIN_15
+#define DISPLAY_2_EN_GPIO_Port GPIOA
+#define DISPLAY_5_EN_Pin GPIO_PIN_0
+#define DISPLAY_5_EN_GPIO_Port GPIOD
+#define DISPLAY_3_EN_Pin GPIO_PIN_1
+#define DISPLAY_3_EN_GPIO_Port GPIOD
+#define DISPLAY_4_EN_Pin GPIO_PIN_2
+#define DISPLAY_4_EN_GPIO_Port GPIOD
+#define DISPLAY_1_EN_Pin GPIO_PIN_3
+#define DISPLAY_1_EN_GPIO_Port GPIOD
 #define SCT_SPI_SCK_Pin GPIO_PIN_3
 #define SCT_SPI_SCK_GPIO_Port GPIOB
 #define SCT_SPI_MOSI_Pin GPIO_PIN_5
@@ -108,6 +108,8 @@ void Error_Handler(void);
 #define SCT_LATCH_GPIO_Port GPIOB
 #define SCT_ENABLE_Pin GPIO_PIN_7
 #define SCT_ENABLE_GPIO_Port GPIOB
+#define LOW_POWER_EN_Pin GPIO_PIN_8
+#define LOW_POWER_EN_GPIO_Port GPIOB
 #define LED_2_Pin GPIO_PIN_9
 #define LED_2_GPIO_Port GPIOB
 
