@@ -13,6 +13,7 @@ public:
             GPIO_TypeDef* latchPort,
             uint16_t latchPin);
 
+    HAL_StatusTypeDef send(const uint8_t* data, uint16_t size);
     HAL_StatusTypeDef send(uint8_t value);
     void enable();
     void disable();

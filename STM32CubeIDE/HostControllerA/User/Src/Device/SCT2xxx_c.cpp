@@ -15,6 +15,11 @@ extern "C" HAL_StatusTypeDef SCT2xxx_Send(uint8_t value)
     return sct2xxx.send(value);
 }
 
+extern "C" HAL_StatusTypeDef SCT2xxx_SendBuffer(const uint8_t* data, uint16_t size)
+{
+    return sct2xxx.send(data, size);
+}
+
 extern "C" void SCT2xxx_Enable(void)
 {
     sct2xxx.enable();
