@@ -1,6 +1,5 @@
 #include <Display/PcbDisplayBoard.hpp>
 #include <Display/DisplayCodec.hpp>
-#include <Debug/DebugService.hpp>
 
 namespace Display {
 
@@ -47,22 +46,6 @@ void PcbDisplayBoard::run()
         if (driver_.send(&frame_[nextSlot * kBytesPerSlot], kBytesPerSlot) == HAL_OK) {
             HAL_GPIO_WritePin(enablePorts_[nextSlot], enablePins_[nextSlot], GPIO_PIN_RESET);
             activeSlot_ = nextSlot;
-            if (activeSlot_ == 0U) {
-                const uint32_t now = HAL_GetTick();
-                if (cycleMeasurementStarted_) {
-                    const uint32_t cycleMs = now - cycleStartedAt_;
-                    ++completedCycles_;
-                    if ((completedCycles_ % 50U) == 0U) {
-                        DebugService::instance().logf(
-                            DebugService::Level::Info,
-                            "Display refresh cycle: %lu ms",
-                            static_cast<unsigned long>(cycleMs));
-                    }
-                } else {
-                    cycleMeasurementStarted_ = true;
-                }
-                cycleStartedAt_ = now;
-            }
         }
     }
 }

@@ -24,7 +24,6 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <AstroWeather.hpp>
-#include <Device/SCT2xxx_c.h>
 #include "task.h"
 /* USER CODE END Includes */
 
@@ -284,7 +283,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -589,7 +588,6 @@ void StartDefaultTask(void *argument)
   for(;;) 
   {
     osDelay(1000);
-    // SCT2xxx_Send(0xAA);
   }
   /* USER CODE END 5 */
 }

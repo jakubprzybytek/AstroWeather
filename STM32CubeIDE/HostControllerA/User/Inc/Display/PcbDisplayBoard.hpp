@@ -34,9 +34,6 @@ private:
     std::array<uint16_t, kSlotCount> enablePins_;
     PreparedFrame frame_{};
     uint8_t activeSlot_ = 0;
-    uint32_t cycleStartedAt_ = 0;
-    uint32_t completedCycles_ = 0;
-    bool cycleMeasurementStarted_ = false;
 };
 
 } // namespace Display
