@@ -2,7 +2,6 @@
 #include <Debug/DebugService.hpp>
 
 #include <task.h>
-#include <Debug/DebugServiceBridge.h>
 
 #include "usbd_cdc_if.h"
 #include "main.h" // HAL_GetTick
@@ -20,11 +19,8 @@ DebugService& DebugService::instance()
 DebugService::DebugService()
     : Task<1536>("DebugService", osPriorityNormal),
       logQueueHandle_(nullptr), logQueueCb_{}, logQueueStorage_{},
-      rxRing_{}, rxHead_(0), rxTail_(0),
-      rxLine_{}, rxLineLen_(0), rxLineTruncated_(false),
       txBuffer_{},
-      sentCount_(0), droppedCount_(0), busyDropCount_(0),
-      rxOverflowCount_(0), rxTruncatedCount_(0)
+    sentCount_(0), droppedCount_(0), busyDropCount_(0)
 {
 }
 
@@ -94,6 +90,11 @@ bool DebugService::logf(Level level, const char* format, ...)
     return enqueueLogEvent(event);
 }
 
+bool DebugService::sendLine(const char* message)
+{
+    return log(Level::Info, message);
+}
+
 bool DebugService::enqueueLogEvent(const LogEvent& event)
 {
     if (logQueueHandle_ == nullptr)
@@ -123,59 +124,6 @@ bool DebugService::enqueueLogEvent(const LogEvent& event)
     return false;
 }
 
-void DebugService::onUsbRxData(const uint8_t* data, uint32_t len)
-{
-    for (uint32_t i = 0; i < len; ++i)
-    {
-        if ((rxHead_ - rxTail_) >= kRxRingSize)
-        {
-            ++rxOverflowCount_;
-            continue;
-        }
-        rxRing_[rxHead_ % kRxRingSize] = data[i];
-        ++rxHead_;
-    }
-
-    osThreadFlagsSet(getHandle(), kFlagRxData);
-}
-
-void DebugService::drainRxRing()
-{
-    while (rxTail_ != rxHead_)
-    {
-        uint8_t byte = rxRing_[rxTail_ % kRxRingSize];
-        ++rxTail_;
-        handleRxByte(byte);
-    }
-}
-
-void DebugService::handleRxByte(uint8_t byte)
-{
-    if (byte == '\r')
-    {
-        return;
-    }
-
-    if (byte == '\n')
-    {
-        rxLine_[rxLineLen_] = '\0';
-        dispatchLine();
-        rxLineLen_ = 0;
-        rxLineTruncated_ = false;
-        return;
-    }
-
-    if (rxLineLen_ < (kMaxRxLineLen - 1))
-    {
-        rxLine_[rxLineLen_++] = static_cast<char>(byte);
-    }
-    else if (!rxLineTruncated_)
-    {
-        rxLineTruncated_ = true;
-        ++rxTruncatedCount_;
-    }
-}
-
 void DebugService::formatUptime(char* out, size_t outSize) const
 {
     uint32_t totalSeconds = HAL_GetTick() / 1000U;
@@ -189,18 +137,6 @@ void DebugService::formatUptime(char* out, size_t outSize) const
     std::snprintf(out, outSize, "[%lu:%02lu:%02lu:%02lu]",
                   static_cast<unsigned long>(days), static_cast<unsigned long>(hours),
                   static_cast<unsigned long>(minutes), static_cast<unsigned long>(seconds));
-}
-
-void DebugService::dispatchLine()
-{
-    char uptime[24];
-    formatUptime(uptime, sizeof(uptime));
-
-    int len = std::snprintf(txBuffer_, sizeof(txBuffer_), "%s: %s\n", uptime, rxLine_);
-    if (len > 0)
-    {
-        transmit(reinterpret_cast<uint8_t*>(txBuffer_), static_cast<uint16_t>(len));
-    }
 }
 
 void DebugService::drainLogQueue()
@@ -276,11 +212,10 @@ void DebugService::emitStats()
 
     char line[96];
     std::snprintf(line, sizeof(line),
-                  "%s [STATS] sent=%lu dropped=%lu busyDrop=%lu rxOverflow=%lu rxTrunc=%lu",
+                  "%s [STATS] sent=%lu dropped=%lu busyDrop=%lu",
                   uptime,
                   static_cast<unsigned long>(sentCount_), static_cast<unsigned long>(droppedCount_),
-                  static_cast<unsigned long>(busyDropCount_), static_cast<unsigned long>(rxOverflowCount_),
-                  static_cast<unsigned long>(rxTruncatedCount_));
+                  static_cast<unsigned long>(busyDropCount_));
     transmitLine(line, Level::Debug);
 
     std::snprintf(line, sizeof(line), "%s [MEM] heapFree=%lu heapMin=%lu",
@@ -318,7 +253,7 @@ void DebugService::run()
 {
     for (;;)
     {
-        uint32_t flags = osThreadFlagsWait(kFlagRxData | kFlagLogQueued, osFlagsWaitAny, kStatsPeriodMs);
+        uint32_t flags = osThreadFlagsWait(kFlagLogQueued, osFlagsWaitAny, kStatsPeriodMs);
 
         if (flags == osFlagsErrorTimeout)
         {
@@ -329,15 +264,7 @@ void DebugService::run()
         {
             continue;
         }
-        if ((flags & kFlagRxData) != 0U)
-        {
-            drainRxRing();
-        }
         drainLogQueue();
     }
 }
 
-extern "C" void DebugService_OnUsbRxData(const uint8_t* data, uint32_t len)
-{
-    DebugService::instance().onUsbRxData(data, len);
-}

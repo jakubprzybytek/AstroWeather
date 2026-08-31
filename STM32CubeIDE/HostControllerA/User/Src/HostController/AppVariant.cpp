@@ -1,5 +1,6 @@
 #include <AppVariant.hpp>
 #include <Debug/DebugService.hpp>
+#include <Console/ConsoleService.hpp>
 #include <Device/SCT2xxx.hpp>
 #include <Display/BufferedDisplayBoard.hpp>
 #include <Display/Display.hpp>
@@ -15,8 +16,6 @@
 extern SPI_HandleTypeDef hspi3;
 extern I2C_HandleTypeDef hi2c1;
 extern TIM_HandleTypeDef htim2;
-
-namespace {
 
 SCT2xxx localSct(
     &hspi3,
@@ -42,11 +41,11 @@ Display::Display display(
     localBoard,
     {&remoteBoard1, &remoteBoard2, &remoteBoard3, &remoteBoard4});
 
-} // namespace
-
 void AppVariant_Init() {
   DebugService::instance().init();
   DebugService::instance().start();
+  ConsoleService::instance().init(&display);
+  ConsoleService::instance().start();
     localBoard.start();
 
     display.local().numeric(0).setFixed(1234, 2);
