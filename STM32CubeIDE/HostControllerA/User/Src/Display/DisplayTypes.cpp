@@ -6,6 +6,17 @@
 namespace Display {
 namespace {
 
+constexpr uint8_t kSegmentA = 1U << 0U;
+constexpr uint8_t kSegmentB = 1U << 1U;
+constexpr uint8_t kSegmentD = 1U << 3U;
+constexpr uint8_t kSegmentG = 1U << 6U;
+
+constexpr uint8_t kDigits[] = {
+    0x3FU, 0x06U, 0x5BU, 0x4FU, 0x66U,
+    0x6DU, 0x7DU, 0x07U, 0x7FU, 0x6FU,
+};
+constexpr uint8_t kMinus = kSegmentG;
+
 bool fits(int16_t mantissa, uint8_t precision)
 {
     if (precision > kMaxPrecision || mantissa == std::numeric_limits<int16_t>::min()) {
@@ -19,8 +30,7 @@ bool fits(int16_t mantissa, uint8_t precision)
 
 void NumericDisplay::setError()
 {
-    data_.mantissa = 0;
-    data_.flags = static_cast<uint8_t>(NumericMode::Error);
+    data_.slots.fill(kSegmentD);
 }
 
 void NumericDisplay::setFixed(int16_t mantissa, uint8_t precision)
@@ -29,9 +39,25 @@ void NumericDisplay::setFixed(int16_t mantissa, uint8_t precision)
         setError();
         return;
     }
-    data_.mantissa = mantissa;
-    data_.flags = static_cast<uint8_t>(NumericMode::Value) |
-                  static_cast<uint8_t>(precision << 2U);
+    data_.slots.fill(0U);
+    int32_t magnitude = mantissa;
+    const bool negative = magnitude < 0;
+    if (negative) {
+        magnitude = -magnitude;
+        data_.slots[0] = kMinus;
+    }
+    const uint8_t digitCount = negative ? 3U : 4U;
+    for (uint8_t position = negative ? 1U : 0U; position < 4U; ++position) {
+        const uint8_t digit = static_cast<uint8_t>(digitCount - 1U - position);
+        const uint32_t divisor = digit == 0U ? 1U :
+            digit == 1U ? 10U : digit == 2U ? 100U : 1000U;
+        const uint8_t number = static_cast<uint8_t>((magnitude / divisor) % 10);
+        const bool leading = number == 0U && magnitude < static_cast<int32_t>(divisor * 10U);
+        data_.slots[position] = leading ? 0U : kDigits[number];
+        if (precision != 0U && position == static_cast<uint8_t>(3U - precision)) {
+            data_.slots[position] |= 0x80U;
+        }
+    }
 }
 
 void NumericDisplay::setValue(int16_t value)
@@ -67,14 +93,16 @@ void NumericDisplay::setTime(uint8_t hour, uint8_t minute)
         setError();
         return;
     }
-    data_.mantissa = static_cast<int16_t>(hour * 100U + minute);
-    data_.flags = static_cast<uint8_t>(NumericMode::Time) | kDoubleDotsMask;
+    data_.slots[0] = kDigits[hour / 10U];
+    data_.slots[1] = kDigits[hour % 10U];
+    data_.slots[2] = kDigits[minute / 10U];
+    data_.slots[3] = kDigits[minute % 10U];
+    data_.slots[4] = kSegmentA | kSegmentB;
 }
 
 void NumericDisplay::setBlank()
 {
-    data_.mantissa = 0;
-    data_.flags = static_cast<uint8_t>(NumericMode::Blank);
+    data_.slots.fill(0U);
 }
 
 } // namespace Display

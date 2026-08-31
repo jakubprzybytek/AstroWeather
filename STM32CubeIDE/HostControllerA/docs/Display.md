@@ -72,35 +72,38 @@ Additional integer overloads may be provided. All setters convert their input to
 
 ## Numeric Representation
 
-Each numeric display is stored as one canonical `(mantissa, flags)` pair:
+Each numeric display is stored as five normalized segment bytes, one for each multiplexing slot:
 
 ```cpp
-struct NumericData {
-	int16_t mantissa;
-	uint8_t flags;
+struct NumericSegments {
+    std::array<uint8_t, 5> slots;
 };
 ```
 
-### Flag Layout
+For slots 0 through 3, each byte uses this normalized bit layout:
 
-| Bits | Meaning |
-|---|---|
-| 0-1 | Mode: `0 = Blank`, `1 = Value`, `2 = Time`, `3 = Error` |
-| 2-3 | Decimal precision: `0 = none`, `1 = one digit`, `2 = two digits`, `3 = three digits` after the decimal point |
-| 4 | Double dots enabled |
-| 5-7 | Reserved; always written as zero |
+| Bit | Segment |
+|---:|---|
+| 0 | A |
+| 1 | B |
+| 2 | C |
+| 3 | D |
+| 4 | E |
+| 5 | F |
+| 6 | G |
+| 7 | DP |
 
-Invalid combinations, including a decimal precision in Time or Error mode, must be rejected or normalized before storage. Error mode ignores the mantissa and decimal/double-dot modifiers.
+Slot 4 is the special-indicator position. Its normalized A, B, and C bits represent L1, L2, and L3. The remaining bits are unused for the current hardware. `setSegments()` can be used for custom glyphs and other non-numeric content.
 
 ### Fixed-point Values
 
-For Value mode, the displayed mathematical value is:
+For values set through the numeric convenience API, the displayed mathematical value is:
 
 ```text
 mantissa / 10^precision
 ```
 
-The decimal precision is encoded in flag bits 2-3. The sign is encoded by a negative mantissa and consumes the leftmost display position. Leading zeroes are blank for normal numeric values.
+The sign consumes the leftmost display position and leading zeroes are blank for normal numeric values. The resulting segments are stored directly in the normalized slot bytes.
 
 Examples:
 
@@ -117,39 +120,39 @@ The four display positions allow four positive digits or a minus sign and three 
 
 ### Float Input
 
-The float overload is an input convenience only. It converts the input to fixed point by rounding `value * 10^precision` to the nearest integer, validates the result, and stores only `(mantissa, flags)`. Float values are never stored in the refresh state or transmitted over I2C.
+The float overload is an input convenience only. It converts the input to fixed point by rounding `value * 10^precision` to the nearest integer, validates the result, and stores only normalized segment bytes. Float values are never stored in the refresh state or transmitted over I2C.
 
 The conversion must reject NaN, infinity, unsupported precision, and values that do not fit the display. Integer and fixed-point overloads are preferred when exact decimal behavior matters.
 
 ### Time and Blank Modes
 
-`setTime(hour, minute)` accepts hours and minutes from `00` through `99` and stores:
+`setTime(hour, minute)` accepts hours and minutes from `00` through `99` and stores four normalized digit slots plus L1 and L2 in the indicator slot:
 
 ```text
-mantissa = hour * 100 + minute
-mode = Time
-double dots = enabled
+slots[0..3] = HHMM
+slots[4].A = L1 = enabled
+slots[4].B = L2 = enabled
 ```
 
 Time mode always renders four digits as `HHMM`, including leading zeroes. For example, `setTime(3, 7)` stores mantissa `307` and displays `03:07`.
 
-`setBlank()` stores mantissa `0`, sets Blank mode, and clears all modifier flags. Blank mode turns off every segment regardless of the mantissa.
+`setBlank()` clears all five slot bytes.
 
-If a setter receives an invalid value, it stores Error mode. Error mode renders only segment D on each of the four digits of that numeric display. It does not require an additional flag bit because mode value `3` is used for Error. The error pattern is also transported as the normal `(mantissa, flags)` pair.
+If a setter receives an invalid value, it stores the error pattern: segment D enabled in each of the four digit slots and the indicator slot blank.
 
 ## Logical Board Buffer
 
-A board's transport-level logical buffer contains 27 bytes:
+A board's transport-level logical buffer contains 35 bytes:
 
 | Offset | Size | Content |
 |---:|---:|---|
-| 0 | 3 | Numeric display 1: mantissa and flags |
-| 3 | 3 | Numeric display 2: mantissa and flags |
-| 6 | 15 | Five dot-matrix rows, three bytes per 21-bit row |
-| 21 | 3 | Numeric display 3: mantissa and flags |
-| 24 | 3 | Numeric display 4: mantissa and flags |
+| 0 | 5 | Numeric display 1: five normalized segment slots |
+| 5 | 5 | Numeric display 2: five normalized segment slots |
+| 10 | 15 | Five dot-matrix rows, three bytes per 21-bit row |
+| 25 | 5 | Numeric display 3: five normalized segment slots |
+| 30 | 5 | Numeric display 4: five normalized segment slots |
 
-This buffer contains logical values, not SPI-ready PCB data. Matrix bits 21 through 23 are unused and must be zero.
+This buffer contains normalized logical segments, not SPI-ready PCB data. Matrix bits 21 through 23 are unused and must be zero.
 
 ## PCB Encoding
 
@@ -179,7 +182,7 @@ The receiver/encoder on a Display Controller uses the same named physical order,
 
 Reversing the seven byte positions cannot be achieved by the MSB-first setting: MSB-first controls bit order inside each byte, not the order of bytes in the transfer. No bit reversal or other bit-level computation is required. The encoder can write the seven-byte prepared slot directly in wire order, or transmit a physical-order array using reverse indices. Because the transfer is only seven bytes, either approach is acceptable; the chosen implementation must not reverse bits inside the bytes.
 
-The encoder first creates normalized A-G and DP segment values, then applies the wiring table for the corresponding numeric display. An SCT output value of `1` turns on the connected LED output.
+The encoder reads normalized A-G and DP segment values, then applies the wiring table for the corresponding numeric display. An SCT output value of `1` turns on the connected LED output.
 
 ### Numeric Segment Wiring
 
@@ -243,14 +246,14 @@ The initial implementation may update prepared data without double buffering. A 
 
 I2C1 is enabled in the CubeMX configuration on PA9/SCL and PA10/SDA using 7-bit addressing. The Host Controller acts as controller/master, and each Display Controller acts as target/slave.
 
-Each message contains 28 bytes. The payload has one explicit byte order used by both I2C sender and receiver:
+Each message contains 36 bytes. The payload has one explicit byte order used by both I2C sender and receiver:
 
 | Offset | Size | Content |
 |---:|---:|---|
 | 0 | 1 | Command |
-| 1 | 27 | Logical board buffer |
+| 1 | 35 | Logical board buffer |
 
-The 27-byte logical payload is serialized in this order: numeric display 1, numeric display 2, matrix rows 0 through 4, numeric display 3, and numeric display 4. Each numeric value occupies three bytes: mantissa low byte, mantissa high byte, and flags. Each matrix row occupies three bytes in little-endian order, with bit 0 in the first byte's least-significant bit. The unused bits 21 through 23 are zero. The same serialization is used when packing on the Host Controller and unpacking on the Display Controller.
+The 35-byte logical payload is serialized in this order: numeric display 1, numeric display 2, matrix rows 0 through 4, numeric display 3, and numeric display 4. Each numeric display occupies five bytes, one normalized segment byte for each multiplexing slot. Each matrix row occupies three bytes in little-endian order, with bit 0 in the first byte's least-significant bit. The unused bits 21 through 23 are zero. The same serialization is used when packing on the Host Controller and unpacking on the Display Controller.
 
 Command `0x01` means "set display board values" using the logical buffer format defined above. The Display Controller checks this first command/format byte and processes the message only when it is a known value. `0x01` is currently the only known command. Unknown commands are ignored. For command `0x01`, the Display Controller replaces its local logical values and performs its own PCB-specific encoding. There is no application-level response or success message in the initial protocol; normal I2C ACK/NACK behavior still applies.
 
