@@ -6,6 +6,7 @@
     "cmake.preferredGenerators": [
         "Ninja"
     ],
+    "cmake.ctestPath": "C:\\Progs\\msys64\\ucrt64\\bin\\ctest.exe",
     "stm32cube-ide-clangd.path": "cube",
     "stm32cube-ide-clangd.arguments": [
         "starm-clangd",

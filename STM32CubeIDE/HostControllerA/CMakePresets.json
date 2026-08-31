@@ -53,6 +53,21 @@
             "cacheVariables": {
                 "FIRMWARE_VARIANT": "DisplayController"
             }
+        },
+        {
+            "name": "NativeTests",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/native-tests-local",
+            "environment": {
+                "MSYSTEM": "UCRT64",
+                "PATH": "C:\\Progs\\msys64\\ucrt64\\bin;C:\\Progs\\msys64\\usr\\bin;$penv{PATH}"
+            },
+            "cacheVariables": {
+                "BUILD_NATIVE_TESTS": "ON",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_COMPILER": "C:/Progs/msys64/ucrt64/bin/c++.exe",
+                "CMAKE_MAKE_PROGRAM": "C:/Progs/msys64/ucrt64/bin/ninja.exe"
+            }
         }
     ],
     "buildPresets": [
@@ -71,6 +86,14 @@
         {
             "name": "Release-DisplayController",
             "configurePreset": "Release-DisplayController"
+        },
+        {
+            "name": "NativeTests",
+            "configurePreset": "NativeTests",
+            "environment": {
+                "MSYSTEM": "UCRT64",
+                "PATH": "C:\\Progs\\msys64\\ucrt64\\bin;C:\\Progs\\msys64\\usr\\bin;$penv{PATH}"
+            }
         }
     ]
 }

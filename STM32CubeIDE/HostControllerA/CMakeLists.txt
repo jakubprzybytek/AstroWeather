@@ -8,12 +8,11 @@ cmake_minimum_required(VERSION 3.22)
 #
 
 # Setup compiler settings
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
+
+option(BUILD_NATIVE_TESTS "Build host-side unit tests" OFF)
 
 
 # Define the build type
@@ -28,8 +27,21 @@ set(CMAKE_PROJECT_NAME HostControllerA)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 # Core project settings
-project(${CMAKE_PROJECT_NAME})
+if(BUILD_NATIVE_TESTS)
+    project(${CMAKE_PROJECT_NAME} LANGUAGES CXX)
+else()
+    set(CMAKE_C_STANDARD 11)
+    set(CMAKE_C_STANDARD_REQUIRED ON)
+    set(CMAKE_C_EXTENSIONS ON)
+    project(${CMAKE_PROJECT_NAME})
+endif()
 message("Build type: " ${CMAKE_BUILD_TYPE})
+
+if(BUILD_NATIVE_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+    return()
+endif()
 
 # Select which firmware image to build out of this single project.
 # Each variant produces its own binary (see User/Src/<variant> and User/Inc/<variant>).

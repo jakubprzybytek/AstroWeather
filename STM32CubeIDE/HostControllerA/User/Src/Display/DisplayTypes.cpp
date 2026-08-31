@@ -31,6 +31,7 @@ bool fits(int16_t mantissa, uint8_t precision)
 void NumericDisplay::setError()
 {
     data_.slots.fill(kSegmentD);
+    data_.slots[4] = 0U;
 }
 
 void NumericDisplay::setFixed(int16_t mantissa, uint8_t precision)
@@ -48,11 +49,12 @@ void NumericDisplay::setFixed(int16_t mantissa, uint8_t precision)
     }
     const uint8_t digitCount = negative ? 3U : 4U;
     for (uint8_t position = negative ? 1U : 0U; position < 4U; ++position) {
-        const uint8_t digit = static_cast<uint8_t>(digitCount - 1U - position);
+        const uint8_t digit = static_cast<uint8_t>(3U - position);
         const uint32_t divisor = digit == 0U ? 1U :
             digit == 1U ? 10U : digit == 2U ? 100U : 1000U;
         const uint8_t number = static_cast<uint8_t>((magnitude / divisor) % 10);
-        const bool leading = number == 0U && magnitude < static_cast<int32_t>(divisor * 10U);
+        const bool leading = divisor != 1U && number == 0U &&
+                             magnitude < static_cast<int32_t>(divisor * 10U);
         data_.slots[position] = leading ? 0U : kDigits[number];
         if (precision != 0U && position == static_cast<uint8_t>(3U - precision)) {
             data_.slots[position] |= 0x80U;
