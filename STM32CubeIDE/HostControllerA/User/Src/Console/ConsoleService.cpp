@@ -113,7 +113,11 @@ void ConsoleService::reply(const char* format, ...)
 void ConsoleService::execute(const char* line)
 {
     if (std::strcmp(line, "help") == 0) {
-        reply("OK commands=help,status,display set,display time,display blank");
+        reply("OK 'help' - show commands, example: 'help'");
+        reply("OK 'status' - show system status, example: 'status'");
+        reply("OK 'display set' - set value and precision, example: 'display set 0 1234 2'");
+        reply("OK 'display time' - set hour and minute, example: 'display time 0 12:34'");
+        reply("OK 'display blank' - clear a display, example: 'display blank 0'");
         return;
     }
     if (std::strcmp(line, "status") == 0) {

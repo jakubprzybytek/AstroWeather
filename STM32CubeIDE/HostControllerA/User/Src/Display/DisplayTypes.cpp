@@ -45,9 +45,8 @@ void NumericDisplay::setFixed(int16_t mantissa, uint8_t precision)
     const bool negative = magnitude < 0;
     if (negative) {
         magnitude = -magnitude;
-        data_.slots[0] = kMinus;
     }
-    const uint8_t digitCount = negative ? 3U : 4U;
+    uint8_t firstDigitPosition = 4U;
     for (uint8_t position = negative ? 1U : 0U; position < 4U; ++position) {
         const uint8_t digit = static_cast<uint8_t>(3U - position);
         const uint32_t divisor = digit == 0U ? 1U :
@@ -56,9 +55,15 @@ void NumericDisplay::setFixed(int16_t mantissa, uint8_t precision)
         const bool leading = divisor != 1U && number == 0U &&
                              magnitude < static_cast<int32_t>(divisor * 10U);
         data_.slots[position] = leading ? 0U : kDigits[number];
+        if (negative && !leading && firstDigitPosition == 4U) {
+            firstDigitPosition = position;
+        }
         if (precision != 0U && position == static_cast<uint8_t>(3U - precision)) {
             data_.slots[position] |= 0x80U;
         }
+    }
+    if (negative) {
+        data_.slots[static_cast<uint8_t>(firstDigitPosition - 1U)] = kMinus;
     }
 }
 
