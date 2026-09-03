@@ -1,6 +1,6 @@
 #include <St67HttpFetchTask.hpp>
 
-#include <Debug/DebugService.hpp>
+#include <Debug/LogService.hpp>
 #include <HostController/St67HttpFetcher.hpp>
 #include <HostController/St67NetworkSession.hpp>
 #include <HostController/St67Runtime.hpp>
@@ -29,11 +29,11 @@ extern "C" void vLoggingPrintf(uint32_t logLevel,
   va_start(arguments, format);
   std::vsnprintf(message, sizeof(message), format, arguments);
   va_end(arguments);
-  const DebugService::Level level =
-      logLevel <= LOG_ERROR ? DebugService::Level::Error
-                            : logLevel == LOG_WARN ? DebugService::Level::Warn
-                                                   : DebugService::Level::Debug;
-  DebugService::instance().log(level, message);
+  const LogService::Level level =
+      logLevel <= LOG_ERROR ? LogService::Level::Error
+                            : logLevel == LOG_WARN ? LogService::Level::Warn
+                                                   : LogService::Level::Debug;
+  LogService::instance().log(level, message);
 }
 
 namespace HostController {
@@ -188,9 +188,9 @@ class St67HttpFetchTask : public Task<2560> {
   }
 
   void logFinalResult(uint32_t cycleId) {
-    DebugService::instance().logf(
-        runtime_.firstFailureStage == nullptr ? DebugService::Level::Info
-                                               : DebugService::Level::Error,
+    LogService::instance().logf(
+        runtime_.firstFailureStage == nullptr ? LogService::Level::Info
+                                               : LogService::Level::Error,
         "ST67 cycle=%lu result=%s stage=%s status=%d heap=%lu min=%lu tasks=%lu",
         static_cast<unsigned long>(cycleId),
         runtime_.firstFailureStage == nullptr ? "complete" : "fault",
@@ -285,8 +285,8 @@ class St67HttpFetchTask : public Task<2560> {
     }
     result.endingHeap = xPortGetFreeHeapSize();
     result.endingTasks = uxTaskGetNumberOfTasks();
-    DebugService::instance().logf(
-        result.failedCycles == 0U ? DebugService::Level::Info : DebugService::Level::Error,
+    LogService::instance().logf(
+        result.failedCycles == 0U ? LogService::Level::Info : LogService::Level::Error,
         "ST67 batch-final mode=%u pass=%lu fail=%lu first=%lu stage=%s status=%d heap=%lu/%lu min=%lu tasks=%lu/%lu",
         static_cast<unsigned int>(mode), static_cast<unsigned long>(result.passedCycles),
         static_cast<unsigned long>(result.failedCycles),
@@ -300,7 +300,7 @@ class St67HttpFetchTask : public Task<2560> {
         static_cast<unsigned long>(result.endingTasks));
     publishClientResult(runtime_);
     if (triggerRejected_) {
-      DebugService::instance().log(DebugService::Level::Warn,
+      LogService::instance().log(LogService::Level::Warn,
                                    "ST67 batch trigger rejected: active");
       triggerRejected_ = false;
     }

@@ -2,7 +2,7 @@
 
 #include <Utils/Led.hpp>
 
-#include <Debug/DebugService.hpp>
+#include <Debug/LogService.hpp>
 
 #include "main.h"
 
@@ -28,13 +28,13 @@ void SwitchTask::setSwitch2Handler(void (*handler)())
 
 void SwitchTask::onSwitch1Pressed()
 {
-    DebugService::instance().logf(DebugService::Level::Info, "SWITCH_1 press");
+    LogService::instance().logf(LogService::Level::Info, "SWITCH_1 press");
     osThreadFlagsSet(getHandle(), kFlagSwitch1);
 }
 
 void SwitchTask::onSwitch2Pressed()
 {
-    DebugService::instance().logf(DebugService::Level::Info, "SWITCH_2 press");
+    LogService::instance().logf(LogService::Level::Info, "SWITCH_2 press");
     osThreadFlagsSet(getHandle(), kFlagSwitch2);
 }
 

@@ -1,7 +1,8 @@
 #include <Sensors/CurrentSenseTask.hpp>
 #include <Sensors/CurrentSenseConversion.hpp>
 
-#include <Debug/DebugService.hpp>
+#include <Debug/LogService.hpp>
+#include <Display/Display.hpp>
 
 #include "main.h"
 
@@ -22,6 +23,11 @@ CurrentSenseTask& CurrentSenseTask::instance()
 CurrentSenseTask::CurrentSenseTask()
     : Task<2048>("CurrentSense", osPriorityBelowNormal)
 {
+}
+
+void CurrentSenseTask::setDisplay(Display::Display* display)
+{
+    display_ = display;
 }
 
 CurrentSenseTask::Sample CurrentSenseTask::readSample()
@@ -55,8 +61,8 @@ void CurrentSenseTask::run()
 {
     if (HAL_ADCEx_Calibration_Start(&hadc1) != HAL_OK)
     {
-        DebugService::instance().log(
-            DebugService::Level::Error,
+        LogService::instance().log(
+            LogService::Level::Error,
             "CurrentSense ADC calibration failed");
     }
 
@@ -69,8 +75,15 @@ void CurrentSenseTask::run()
         const Sample sample = readSample();
         if (sample.valid)
         {
-            DebugService::instance().logf(
-                DebugService::Level::Debug,
+            if (display_ != nullptr)
+            {
+                display_->local().numeric(0U).setValue(
+                    static_cast<int16_t>(sample.currentMilliAmps));
+                display_->submit();
+            }
+
+            LogService::instance().logf(
+                LogService::Level::Debug,
                 "CurrentSense raw=%lu current_mA=%lu temp_raw=%lu vref_raw=%lu",
                 static_cast<unsigned long>(sample.raw),
                 static_cast<unsigned long>(sample.currentMilliAmps),
@@ -79,8 +92,8 @@ void CurrentSenseTask::run()
         }
         else
         {
-            DebugService::instance().log(
-                DebugService::Level::Error,
+            LogService::instance().log(
+                LogService::Level::Error,
                 "CurrentSense ADC conversion failed");
         }
 

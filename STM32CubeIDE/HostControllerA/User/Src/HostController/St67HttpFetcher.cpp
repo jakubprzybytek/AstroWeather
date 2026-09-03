@@ -1,6 +1,6 @@
 #include <HostController/St67HttpFetcher.hpp>
 
-#include <Debug/DebugService.hpp>
+#include <Debug/LogService.hpp>
 #include <HostController/HttpClient.hpp>
 #include <HostController/St67Runtime.hpp>
 
@@ -149,14 +149,14 @@ bool St67HttpFetcher::fetch(St67FetchRequest* request) {
       std::strlen(APP_ST67_HTTP_PATH) == 0U || APP_ST67_HTTP_PATH[0] != '/' ||
       std::strchr(APP_ST67_HTTP_PATH, '\r') != nullptr ||
       std::strchr(APP_ST67_HTTP_PATH, '\n') != nullptr) {
-    DebugService::instance().log(DebugService::Level::Error,
+    LogService::instance().log(LogService::Level::Error,
                                  "ST67 fetch-config invalid");
     return false;
   }
   const uint32_t startedAt = HAL_GetTick();
   if (!resolveHost(runtime_) || !IP_IS_V4(&runtime_.dnsAddress) ||
       ip4_addr_get_u32(ip_2_ip4(&runtime_.dnsAddress)) == 0U) {
-    DebugService::instance().logf(DebugService::Level::Error,
+    LogService::instance().logf(LogService::Level::Error,
                                   "ST67 dns failed elapsed=%lums",
                                   static_cast<unsigned long>(HAL_GetTick() - startedAt));
     return false;

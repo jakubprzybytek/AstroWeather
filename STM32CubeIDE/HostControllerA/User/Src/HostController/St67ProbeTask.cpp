@@ -1,6 +1,6 @@
 #include <St67ProbeTask.hpp>
 
-#include <Debug/DebugService.hpp>
+#include <Debug/LogService.hpp>
 #include <Utils/Task.hpp>
 
 #include "main.h"
@@ -130,7 +130,7 @@ class St67ProbeTask : public Task<2048> {
     uint32_t rdyAssertWaitMs = 0U;
     if (!waitForRdy(GPIO_PIN_SET, readyTimeoutMs, rdyAssertWaitMs)) {
       HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_RESET);
-      DebugService::instance().logf(DebugService::Level::Error,
+      LogService::instance().logf(LogService::Level::Error,
                                     "ST67 SPI RDY assert timeout after %lums",
                                     static_cast<unsigned long>(rdyAssertWaitMs));
       return false;
@@ -143,7 +143,7 @@ class St67ProbeTask : public Task<2048> {
                                                        kTransferTimeoutMs);
     if (status != HAL_OK) {
       HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_RESET);
-      DebugService::instance().logf(DebugService::Level::Error,
+      LogService::instance().logf(LogService::Level::Error,
                                     "ST67 SPI frame transfer failed: status=%d",
                                     static_cast<int>(status));
       return false;
@@ -158,7 +158,7 @@ class St67ProbeTask : public Task<2048> {
       uint32_t rdyDeassertWaitMs = 0U;
       (void)waitForRdy(GPIO_PIN_RESET, kTransferTimeoutMs, rdyDeassertWaitMs);
       HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_RESET);
-      DebugService::instance().logf(DebugService::Level::Error,
+      LogService::instance().logf(LogService::Level::Error,
                                     "ST67 SPI invalid peer header: %02x %02x %02x %02x %02x %02x %02x %02x, RDY=%u, waited=%lums",
                                     rxFrame[0],
                                     rxFrame[1],
@@ -170,7 +170,7 @@ class St67ProbeTask : public Task<2048> {
                                     rxFrame[7],
                                     (rdy == GPIO_PIN_SET) ? 1U : 0U,
                                     static_cast<unsigned long>(rdyDeassertWaitMs));
-      DebugService::instance().logf(DebugService::Level::Error,
+      LogService::instance().logf(LogService::Level::Error,
                                     "ST67 peer did not drive MISO (magic=0x%04x len=%u)",
                                     peerMagic,
                                     peerLength);
@@ -196,7 +196,7 @@ class St67ProbeTask : public Task<2048> {
                                        kTransferTimeoutMs);
       if (status != HAL_OK) {
         HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_RESET);
-        DebugService::instance().logf(DebugService::Level::Error,
+        LogService::instance().logf(LogService::Level::Error,
                                       "ST67 SPI payload transfer failed: status=%d",
                                       static_cast<int>(status));
         return false;
@@ -208,14 +208,14 @@ class St67ProbeTask : public Task<2048> {
     uint32_t rdyDeassertWaitMs = 0U;
     if (!waitForRdy(GPIO_PIN_RESET, kTransferTimeoutMs, rdyDeassertWaitMs)) {
       HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_RESET);
-      DebugService::instance().logf(DebugService::Level::Error,
+      LogService::instance().logf(LogService::Level::Error,
                                     "ST67 SPI RDY deassert timeout after %lums",
                                     static_cast<unsigned long>(rdyDeassertWaitMs));
       return false;
     }
 
     HAL_GPIO_WritePin(ST67_CS_GPIO_Port, ST67_CS_Pin, GPIO_PIN_RESET);
-    DebugService::instance().logf(DebugService::Level::Info,
+    LogService::instance().logf(LogService::Level::Info,
                                   "ST67 SPI transfer stats: assert=%lums deassert=%lums txData=%uB rxData=%uB wire=%uB",
                                   static_cast<unsigned long>(rdyAssertWaitMs),
                                   static_cast<unsigned long>(rdyDeassertWaitMs),
@@ -242,7 +242,7 @@ class St67ProbeTask : public Task<2048> {
 
     uint32_t chipDisabledRdyWaitMs = 0U;
     if (!waitForRdy(GPIO_PIN_RESET, 100U, chipDisabledRdyWaitMs)) {
-      DebugService::instance().logf(DebugService::Level::Error,
+      LogService::instance().logf(LogService::Level::Error,
                                     "ST67 RDY remains high with CHIP_EN=0 after %lums; check RDY wiring or module power",
                                     static_cast<unsigned long>(chipDisabledRdyWaitMs));
       return false;
@@ -261,7 +261,7 @@ class St67ProbeTask : public Task<2048> {
       }
     }
     response[responseLen] = '\0';
-    DebugService::instance().logf(DebugService::Level::Info,
+    LogService::instance().logf(LogService::Level::Info,
                                   "ST67 startup: '%s'", response);
     modulePowered_ = true;
     return true;
@@ -288,7 +288,7 @@ class St67ProbeTask : public Task<2048> {
       }
       ++atTransmitCount;
       response[responseLen] = '\0';
-      DebugService::instance().logf(DebugService::Level::Info,
+      LogService::instance().logf(LogService::Level::Info,
                                     "ST67 AT tx attempt %lu/%lu: responseLen=%u, rx='%s'",
                                     static_cast<unsigned long>(atTransmitCount),
                                     static_cast<unsigned long>(kAtCommandRetries),
@@ -300,11 +300,11 @@ class St67ProbeTask : public Task<2048> {
     }
 
     if (std::strstr(reinterpret_cast<const char*>(response), "OK") != nullptr) {
-      DebugService::instance().logf(DebugService::Level::Info,
+      LogService::instance().logf(LogService::Level::Info,
                                     "ST67 SPI AT probe OK after %lu transmit(s): '%s'",
                                     static_cast<unsigned long>(atTransmitCount), response);
     } else {
-      DebugService::instance().logf(DebugService::Level::Warn,
+      LogService::instance().logf(LogService::Level::Warn,
                                     "ST67 SPI AT probe no OK after %lu transmit(s), rx='%s'",
                                     static_cast<unsigned long>(atTransmitCount), response);
     }
@@ -330,7 +330,7 @@ class St67ProbeTask : public Task<2048> {
         return;
       }
       response[responseLen] = '\0';
-      DebugService::instance().logf(DebugService::Level::Info, "ST67 CWMODE=1: '%s'", response);
+      LogService::instance().logf(LogService::Level::Info, "ST67 CWMODE=1: '%s'", response);
       if (std::strstr(reinterpret_cast<const char*>(response), "OK") == nullptr) {
         return;
       }
@@ -380,7 +380,7 @@ class St67ProbeTask : public Task<2048> {
       }
 
       const uint32_t apCount = countOccurrences(cwlapBuffer_, "+CWLAP:");
-      DebugService::instance().logf(DebugService::Level::Info,
+      LogService::instance().logf(LogService::Level::Info,
                                     "ST67 CWLAP attempt %lu/%lu: %lu read(s), terminated=%u, %lu AP(s)",
                                     static_cast<unsigned long>(scanAttempt),
                                     static_cast<unsigned long>(kCwlapScanRetries),
@@ -397,7 +397,7 @@ class St67ProbeTask : public Task<2048> {
                                       : std::strlen(line);
         if (std::strncmp(line, "+CWLAP:", 7U) == 0) {
           ++printedApCount;
-          DebugService::instance().logf(DebugService::Level::Info,
+          LogService::instance().logf(LogService::Level::Info,
                                         "ST67 AP %lu: %.*s",
                                         static_cast<unsigned long>(printedApCount),
                                         static_cast<int>(lineLength),
@@ -410,7 +410,7 @@ class St67ProbeTask : public Task<2048> {
       }
 
       if (!terminated) {
-        DebugService::instance().logf(DebugService::Level::Warn,
+        LogService::instance().logf(LogService::Level::Warn,
                                       "ST67 CWLAP result truncated; read=%lu buffer=%lu",
                                       static_cast<unsigned long>(readCount),
                                       static_cast<unsigned long>(sizeof(cwlapBuffer_) - 1U));
@@ -420,7 +420,7 @@ class St67ProbeTask : public Task<2048> {
         return;
       }
       if (scanAttempt < kCwlapScanRetries) {
-        DebugService::instance().logf(DebugService::Level::Warn,
+        LogService::instance().logf(LogService::Level::Warn,
                                       "ST67 CWLAP returned no APs; retrying scan");
         osDelay(100U);
       }

@@ -1,5 +1,5 @@
 #include <Debug/BlinkingLed.hpp>
-// #include <Debug/DebugService.hpp>
+// #include <Debug/LogService.hpp>
 
 BlinkingLed::BlinkingLed(GPIO_TypeDef *port, uint16_t pin, uint32_t periodMs,
                          const char *name)
@@ -12,7 +12,7 @@ void BlinkingLed::init() {
 void BlinkingLed::run() {
   for (;;) {
     HAL_GPIO_TogglePin(port_, pin_);
-    // DebugService::instance().logf(DebugService::Level::Info, "%s toggled", getName());
+    // LogService::instance().logf(LogService::Level::Info, "%s toggled", getName());
     osDelay(periodMs_);
   }
 }

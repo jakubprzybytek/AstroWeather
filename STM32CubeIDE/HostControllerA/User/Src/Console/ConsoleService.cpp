@@ -1,6 +1,6 @@
 #include <Console/ConsoleService.hpp>
 
-#include <Debug/DebugService.hpp>
+#include <Debug/LogService.hpp>
 
 #include "cmsis_os2.h"
 
@@ -107,7 +107,7 @@ void ConsoleService::reply(const char* format, ...)
     va_start(arguments, format);
     std::vsnprintf(message, sizeof(message), format, arguments);
     va_end(arguments);
-    DebugService::instance().sendLine(message);
+    LogService::instance().sendLine(message);
 }
 
 void ConsoleService::execute(const char* line)

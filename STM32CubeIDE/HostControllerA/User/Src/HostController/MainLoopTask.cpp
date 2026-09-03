@@ -1,6 +1,6 @@
 #include <HostController/MainLoopTask.hpp>
 
-#include <Debug/DebugService.hpp>
+#include <Debug/LogService.hpp>
 #include <St67HttpFetchTask.hpp>
 
 #include "app_config.h"
@@ -62,8 +62,8 @@ void printResponse(const uint8_t* data, uint32_t length)
                 : '.';
         }
         chunk[chunkLength] = '\0';
-        DebugService::instance().logf(
-            DebugService::Level::Info,
+        LogService::instance().logf(
+            LogService::Level::Info,
             "MainLoopTask response offset=%lu data=\"%s\"",
             static_cast<unsigned long>(offset), chunk);
     }
@@ -87,7 +87,7 @@ void MainLoopTask::trigger()
     MainLoopTask& task = instance();
     if (task.active_)
     {
-        DebugService::instance().log(DebugService::Level::Warn,
+        LogService::instance().log(LogService::Level::Warn,
                                      "MainLoopTask trigger ignored: active");
         return;
     }
@@ -114,8 +114,8 @@ void MainLoopTask::run()
         const bool fetchSucceeded = HostController::FetchSt67Data(&request);
 
         const HostController::St67FetchResult& result = request.result;
-        DebugService::instance().logf(
-            fetchSucceeded ? DebugService::Level::Info : DebugService::Level::Error,
+        LogService::instance().logf(
+            fetchSucceeded ? LogService::Level::Info : LogService::Level::Error,
             "MainLoopTask fetch status=%s http=%u bytes=%lu crc=%08lx detail=%ld",
             statusName(result.status),
             static_cast<unsigned int>(result.httpStatus),
@@ -127,9 +127,9 @@ void MainLoopTask::run()
         {
             const bool responseIntegrityValid =
                 calculateCrc32(responseBuffer_, result.length) == result.crc32;
-            DebugService::instance().logf(
-                responseIntegrityValid ? DebugService::Level::Info
-                                       : DebugService::Level::Error,
+            LogService::instance().logf(
+                responseIntegrityValid ? LogService::Level::Info
+                                       : LogService::Level::Error,
                 "MainLoopTask response processed bytes=%lu crc-valid=%u",
                 static_cast<unsigned long>(result.length),
                 responseIntegrityValid ? 1U : 0U);

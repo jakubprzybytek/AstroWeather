@@ -4,10 +4,16 @@
 
 #include <cstdint>
 
+namespace Display {
+class Display;
+}
+
 class CurrentSenseTask : public Task<2048>
 {
 public:
     static CurrentSenseTask& instance();
+
+    void setDisplay(Display::Display* display);
 
 protected:
     void run() override;
@@ -25,4 +31,6 @@ private:
     CurrentSenseTask();
 
     Sample readSample();
+
+    Display::Display* display_ = nullptr;
 };

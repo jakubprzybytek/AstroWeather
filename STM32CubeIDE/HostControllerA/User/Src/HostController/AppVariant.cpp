@@ -1,5 +1,5 @@
 #include <AppVariant.hpp>
-#include <Debug/DebugService.hpp>
+#include <Debug/LogService.hpp>
 #include <Console/ConsoleService.hpp>
 #include <Device/SCT2xxx.hpp>
 #include <Display/BufferedDisplayBoard.hpp>
@@ -43,15 +43,13 @@ Display::Display display(
     {&remoteBoard1, &remoteBoard2, &remoteBoard3, &remoteBoard4});
 
 void AppVariant_Init() {
-  DebugService::instance().init();
-  DebugService::instance().start();
+  LogService::instance().init();
+  LogService::instance().start();
+  CurrentSenseTask::instance().setDisplay(&display);
   CurrentSenseTask::instance().start();
   ConsoleService::instance().init(&display);
   ConsoleService::instance().start();
     localBoard.start();
-
-    display.local().numeric(0).setFixed(1234, 2);
-    display.submit();
 
   HostController::StartSt67HttpFetchTask();
   MainLoopTask::instance().start();

@@ -1,6 +1,6 @@
 #include <HostController/St67NetworkSession.hpp>
 
-#include <Debug/DebugService.hpp>
+#include <Debug/LogService.hpp>
 #include <HostController/St67NetworkAdapter.hpp>
 #include <HostController/St67Runtime.hpp>
 
@@ -62,9 +62,9 @@ void errorCallback(W6X_Status_t status, char const* functionName) {
 
 bool logStage(St67Runtime& runtime, const char* stage, W6X_Status_t status,
               uint32_t startedAt) {
-  DebugService::instance().logf(
-      status == W6X_STATUS_OK ? DebugService::Level::Debug
-                              : DebugService::Level::Error,
+  LogService::instance().logf(
+      status == W6X_STATUS_OK ? LogService::Level::Debug
+                              : LogService::Level::Error,
       "ST67 %s status=%d(%s) elapsed=%lums", stage, static_cast<int>(status),
       W6X_StatusToStr(status),
       static_cast<unsigned long>(HAL_GetTick() - startedAt));
@@ -133,7 +133,7 @@ bool St67NetworkSession::initialize(bool logModule) {
       fail(runtime_, "module-info");
       return false;
     }
-    DebugService::instance().logf(DebugService::Level::Info,
+    LogService::instance().logf(LogService::Level::Info,
                                   "ST67 module=%s sdk=%u.%u.%u.%u",
                                   moduleInfo->ModuleID.ModuleName,
                                   moduleInfo->SDK_Version.Major,
@@ -196,7 +196,7 @@ bool St67NetworkSession::open() {
     disconnect();
     return false;
   }
-  DebugService::instance().logf(DebugService::Level::Info,
+  LogService::instance().logf(LogService::Level::Info,
                                 "ST67 connected ssid=%s channel=%lu rssi=%ld",
                                 connection.SSID,
                                 static_cast<unsigned long>(connection.Channel),
