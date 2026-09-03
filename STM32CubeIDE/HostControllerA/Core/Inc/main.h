@@ -80,6 +80,8 @@ void Display_PcbTimerElapsed(TIM_HandleTypeDef *timer);
 #define ST67_MOSI_GPIO_Port GPIOA
 #define ST67_BOOT_Pin GPIO_PIN_1
 #define ST67_BOOT_GPIO_Port GPIOB
+#define CURRENT_SENSE_Pin GPIO_PIN_2
+#define CURRENT_SENSE_GPIO_Port GPIOB
 #define ADDR_0_Pin GPIO_PIN_10
 #define ADDR_0_GPIO_Port GPIOB
 #define ADDR_1_Pin GPIO_PIN_11

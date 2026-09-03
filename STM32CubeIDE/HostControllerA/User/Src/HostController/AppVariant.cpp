@@ -6,6 +6,7 @@
 #include <Display/Display.hpp>
 #include <Display/PcbDisplayBoard.hpp>
 #include <HostController/MainLoopTask.hpp>
+#include <Sensors/CurrentSenseTask.hpp>
 #include <St67HttpFetchTask.hpp>
 #include <SwitchTask.hpp>
 
@@ -44,6 +45,7 @@ Display::Display display(
 void AppVariant_Init() {
   DebugService::instance().init();
   DebugService::instance().start();
+  CurrentSenseTask::instance().start();
   ConsoleService::instance().init(&display);
   ConsoleService::instance().start();
     localBoard.start();
