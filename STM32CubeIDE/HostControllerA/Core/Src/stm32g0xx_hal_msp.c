@@ -76,18 +76,6 @@ void HAL_MspInit(void)
   /* PendSV_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(PendSV_IRQn, 3, 0);
 
-  /** Configure the internal voltage reference buffer voltage scale
-  */
-  HAL_SYSCFG_VREFBUF_VoltageScalingConfig(SYSCFG_VREFBUF_VOLTAGE_SCALE1);
-
-  /** Enable the Internal Voltage Reference buffer
-  */
-  HAL_SYSCFG_EnableVREFBUF();
-
-  /** Configure the internal voltage reference buffer high impedance mode
-  */
-  HAL_SYSCFG_VREFBUF_HighImpedanceConfig(SYSCFG_VREFBUF_HIGH_IMPEDANCE_DISABLE);
-
   /** Disable the internal Pull-Up in Dead Battery pins of UCPD peripheral
   */
   HAL_SYSCFG_StrobeDBattpinsConfig(SYSCFG_CFGR1_UCPD1_STROBE | SYSCFG_CFGR1_UCPD2_STROBE);

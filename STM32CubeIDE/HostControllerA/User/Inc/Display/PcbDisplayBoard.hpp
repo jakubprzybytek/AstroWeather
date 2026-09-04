@@ -2,6 +2,7 @@
 
 #include <Display/DisplayBoard.hpp>
 #include <Device/SCT2xxx.hpp>
+#include <Utils/Mutex.hpp>
 #include <Utils/Task.hpp>
 
 #include "main.h"
@@ -34,6 +35,7 @@ private:
     std::array<uint16_t, kSlotCount> enablePins_;
     PreparedFrame frame_{};
     uint8_t activeSlot_ = 0;
+    Mutex frameMutex_;
 };
 
 } // namespace Display

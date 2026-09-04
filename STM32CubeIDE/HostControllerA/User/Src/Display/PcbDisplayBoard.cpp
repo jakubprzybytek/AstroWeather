@@ -24,6 +24,7 @@ void PcbDisplayBoard::start()
 
 void PcbDisplayBoard::submit()
 {
+    MutexGuard guard(frameMutex_);
     encodePcb(state_, frame_);
 }
 
@@ -43,6 +44,7 @@ void PcbDisplayBoard::run()
         }
         HAL_GPIO_WritePin(enablePorts_[activeSlot_], enablePins_[activeSlot_], GPIO_PIN_SET);
         const uint8_t nextSlot = static_cast<uint8_t>((activeSlot_ + 1U) % kSlotCount);
+        MutexGuard guard(frameMutex_);
         if (driver_.send(&frame_[nextSlot * kBytesPerSlot], kBytesPerSlot) == HAL_OK) {
             HAL_GPIO_WritePin(enablePorts_[nextSlot], enablePins_[nextSlot], GPIO_PIN_RESET);
             activeSlot_ = nextSlot;

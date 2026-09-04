@@ -2656,7 +2656,7 @@
 		)
 		(uuid "18d13126-b5ff-4ae6-96c0-42df7b9951e3")
 	)
-	(text "Bugs:\nMissing voltage divider on input voltage sense\nSENSE inputs connected to non-ADC pins\nVref shorted to GND"
+	(text "Bugs:\nMissing voltage divider on input voltage sense\nSENSE inputs connected to non-ADC pins\nVref shorted to GND - fix by connecting to Vdd"
 		(exclude_from_sim no)
 		(at 18.796 24.13 0)
 		(effects
