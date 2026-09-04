@@ -18,11 +18,11 @@ void expectEqual(uint32_t actual, uint32_t expected, const char* caseName)
 void testNominalVdda()
 {
     expectEqual(CurrentSense::rawToMilliAmps(0U), 0U, "current zero");
-    expectEqual(CurrentSense::rawToMilliAmps(255U), 62U,
+    expectEqual(CurrentSense::rawToMilliAmps(255U), 82U,
                 "current 255 counts");
-    expectEqual(CurrentSense::rawToMilliAmps(511U), 124U,
+    expectEqual(CurrentSense::rawToMilliAmps(511U), 164U,
                 "current 511 counts");
-    expectEqual(CurrentSense::rawToMilliAmps(4095U), 1000U,
+    expectEqual(CurrentSense::rawToMilliAmps(4095U), 1320U,
                 "current full scale");
 }
 

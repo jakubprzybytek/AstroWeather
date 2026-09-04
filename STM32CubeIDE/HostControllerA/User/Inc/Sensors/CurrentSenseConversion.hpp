@@ -5,7 +5,7 @@
 namespace CurrentSense {
 
 constexpr uint32_t rawToMilliAmps(uint32_t raw,
-                                  uint32_t referenceMilliVolts = 2500U)
+                                  uint32_t referenceMilliVolts = 3300U)
 {
     constexpr uint32_t kAdcMaxValue = 4095U;
     constexpr uint32_t kSenseScaleMilliVoltsPerAmp = 2500U;

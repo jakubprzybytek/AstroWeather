@@ -26,6 +26,8 @@ private:
         uint32_t currentMilliAmps;
         uint32_t temperatureRaw;
         uint32_t vrefIntRaw;
+        uint32_t referenceMilliVolts;
+        int32_t temperatureCelsius;
     };
 
     CurrentSenseTask();
