@@ -54,6 +54,15 @@ describe("GET /astro/{configId}", () => {
     expect(typeof body.moon.alwaysDown).toBe("boolean");
   });
 
+  test("returns 200 for sharm-el-sheikh", async () => {
+    const response = await fetch(`${BASE_URL}/astro/sharm-el-sheikh`);
+
+    expect(response.status).toBe(200);
+    const body: AstroResponse = await response.json();
+    expect(body.configId).toBe("sharm-el-sheikh");
+    expect(body.timezone).toBe("Africa/Cairo");
+  });
+
   test("returns non-200 when configId path parameter is missing", async () => {
     const response = await fetch(`${BASE_URL}/astro/`);
 

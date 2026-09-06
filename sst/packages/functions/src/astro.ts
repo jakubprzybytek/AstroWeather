@@ -10,6 +10,11 @@ const LOCATIONS = {
     latitude: 51.1079,
     longitude: 17.0385,
     timezone: "Europe/Warsaw"
+  },
+  "sharm-el-sheikh": {
+    latitude: 27.9158,
+    longitude: 34.33,
+    timezone: "Africa/Cairo"
   }
 } as const;
 

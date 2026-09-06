@@ -9,10 +9,12 @@
     "remove": "sst remove",
     "test": "vitest run --project unit",
     "test:integration": "sst shell -- vitest run --project integration",
+    "test:web": "vitest run --project web",
     "test:all": "vitest run"
   },
   "devDependencies": {
     "@types/suncalc": "^1.9.2",
+    "jsdom": "^30.0.1",
     "vitest": "^4.1.4"
   },
   "dependencies": {
