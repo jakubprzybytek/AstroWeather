@@ -64,12 +64,13 @@ sst/
 
 ## Vitest Projects
 
-`vitest.config.ts` declares two named projects. The `--project` flag selects which suite to run:
+`vitest.config.ts` declares three named projects. The `--project` flag selects which suite to run:
 
 | npm script | Vitest project | Include pattern | Target environment |
 |---|---|---|---|
 | `npm run test` | `unit` | `packages/**/src/**/*.test.ts` | local (no network) |
 | `npm run test:integration` | `integration` | `packages/**/tests/integration/**/*.test.ts` | local `sst dev` or deployed stage via `API_URL` |
+| `npm run test:web` | `web` | `packages/web/src/**/*.test.tsx` | jsdom |
 | `npm run test:all` | _(all)_ | all patterns above | — |
 
 ## CI Usage
@@ -81,6 +82,16 @@ sst/
 | Post-deploy (production) | `API_URL=$PROD_URL npm run test:integration` | Smoke test after production deploy |
 
 `API_URL` is injected as a CI secret / environment variable. When running locally without setting `API_URL`, tests fall back to `http://localhost:3000`.
+
+### Web tests
+
+The web project uses React Testing Library with the jsdom environment. API
+requests are stubbed with Vitest, so component tests do not require SST or a
+running API. Run them with:
+
+```bash
+npm run test:web
+```
 
 ## Writing Unit Tests
 
@@ -195,4 +206,3 @@ const handler = createHandler(fakeSunCalc);
 
 **Pros**: zero coupling to Vitest mocking machinery; dependency is explicit in the API; trivially testable.  
 **Cons**: changes the production API surface; requires refactoring the handler signature.
-

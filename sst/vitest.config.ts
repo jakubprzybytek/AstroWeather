@@ -17,7 +17,15 @@ export default defineConfig({
           testTimeout: 15000
         }
       },
-
+      {
+        plugins: [],
+        test: {
+          name: "web",
+          include: ["packages/web/src/**/*.test.tsx"],
+          environment: "jsdom",
+          setupFiles: ["packages/web/src/test-setup.ts"]
+        }
+      }
     ]
   }
 });

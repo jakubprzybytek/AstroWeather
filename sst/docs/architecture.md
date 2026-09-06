@@ -43,6 +43,23 @@ AstroWeather is a serverless API built on **AWS** using the **SST (Serverless St
 4. Lambda computes times using `suncalc.getTimes()` and `suncalc.getMoonTimes()`.
 5. Lambda returns the JSON response.
 
+## Web UI
+
+The React/TypeScript web UI lives in `packages/web` and is hosted by an SST
+`StaticSite` component backed by S3 and CloudFront. At build time, SST injects
+the API URL as `VITE_API_URL`. The browser calls API Gateway, which invokes the
+Lambda and returns the sun and moon data for the selected location.
+
+The project structure is:
+
+```text
+sst/
+├── packages/functions/   # API Lambda handlers
+├── packages/web/         # Vite + React UI
+├── docs/                 # Architecture and testing documentation
+└── sst.config.ts         # API and StaticSite infrastructure
+```
+
 ## Implementation Steps
 1. Initialize SST project in the `sst` folder.
 2. Install `suncalc` and `@types/suncalc`.
