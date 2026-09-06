@@ -1,14 +1,6 @@
 import { Card, Table } from "react-bootstrap";
 import type { AstroResponse } from "../types";
-
-export function formatTime(value: string | null, timezone: string) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: timezone
-  }).format(new Date(value));
-}
+import { formatTime } from "../time";
 
 export function AstroResults({ data }: { data: AstroResponse }) {
   const moonNote = data.moon.alwaysUp
