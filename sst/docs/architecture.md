@@ -95,6 +95,15 @@ weather data for night X"):
   Lambda (long or no TTL).
 - **Weather**: EventBridge Scheduler triggers a Lambda every N minutes/hours per
   location, upserting `NIGHT#...#WEATHER` items for the next few nights.
+- Meteosource is the first evaluated weather supplier; see
+  [Meteosource Weather Supplier Evaluation](meteosource-weather-supplier.md) for
+  live API results, plan limits, integration guidance, and the proposed weather
+  item shape.
+- Clear Outside was evaluated as a supplementary, astronomy-specific source
+  (observing-condition rating, Bortle estimate, dark-sky windows) obtained via
+  HTML scraping rather than an API; see
+  [Clear Outside Supplier Evaluation](clearoutside-weather-supplier.md) for
+  feasibility, risks, and integration guidance.
 - **Aurora forecast**: separate scheduled Lambda with its own polling interval;
   shorter TTL since forecasts go stale quickly.
 
