@@ -1,37 +1,63 @@
 # AstroWeather API Architecture
 
 ## Overview
-AstroWeather is a serverless API built on **AWS** using the **SST (Serverless Stack)** framework. The primary goal is to provide sunrise, sunset, moonrise, and moonset times for a specific location identified by a configuration ID.
+AstroWeather is a serverless API built on **AWS** using the **SST (Serverless Stack)** framework. The API presents a single view of forecast data for a configured location, including astronomical events, weather forecasts, northern lights (aurora) forecasts, and additional data sources as they are added.
+
+The API response is organized by night. Each night can contain an `astro` section, a `weather` section, an `auroraForecast` section, and other service sections in the future. Clients do not need to call a separate endpoint for each data source.
 
 ## Core Components
 ### 1. API Gateway (SST `Api`)
-- **Endpoint**: `GET /astro/{configId}`
-- **Input**: `configId` (path parameter)
-- **Output**: JSON payload containing astronomical rise/set times.
+- **Endpoint**: `GET /astro/{configurationId}`
+- **Input**: `configurationId` (path parameter)
+- **Output**: JSON payload containing the available astronomical, weather, aurora, and related forecast data for the configured location, grouped by night.
 
 ### 2. Lambda Function
-- **Handler**: Processes the `configId`.
-- **Logic**: 
-  - Retrieves location data (latitude, longitude, timezone).
-  - Calculates astronomical data using the **`suncalc`** library.
-  - Returns formatted JSON.
+- **Handler**: Processes the `configurationId` and assembles the response.
+- **Logic**:
+  - Resolves the configuration and its location data (latitude, longitude, timezone).
+  - Reads or calculates the available data for the requested nights.
+  - Merges the independent service records into one formatted JSON response.
 
-### 3. Data Storage
-- **Phase 1 (Current)**: Hardcoded mapping within the Lambda or a shared constant file.
-  ```typescript
-  const locations = {
-    "krakow-home": { lat: 50.0647, lon: 19.9450, tz: "Europe/Warsaw" }
-  };
-  ```
-- **Phase 2 (Future)**: **Amazon DynamoDB** table to store configuration profiles indexed by `configId`, plus the nightly data described below.
+### 3. Configuration and location
 
-## Nightly Data Architecture (Phase 2)
+The public identifier is currently called `configurationId` rather than
+`locationId`. At present, a configuration contains only a location, so
+`locationId` would be a valid and simpler name. `configurationId` is retained
+because the profile can later include settings that are not properties of a
+location, such as units, forecast horizon, enabled data sources, or presentation
+preferences. This keeps the API contract open to those additions without
+renaming the path parameter later.
 
-The API will expand beyond astro rise/set times to also serve **weather forecasts**
-and **northern lights (aurora) forecasts** for tonight and the next few nights.
-These sources update on different schedules and paces, so the persistence design
-has to split data **by night** and **by service** while still allowing a single
-fast read per night.
+For now, configurations are deliberately simple and are hardcoded in a shared
+global configuration file as a JSON object. The object maps each identifier to
+its location and timezone:
+
+```typescript
+const configurations = {
+  "krakow-home": {
+    location: { lat: 50.0647, lon: 19.9450, tz: "Europe/Warsaw" }
+  }
+};
+```
+
+The configuration collection can eventually be managed with CRUD operations,
+with profiles stored independently from the nightly forecast records. That is
+not required for the current implementation; keeping the configuration in one
+global JSON object is sufficient while the model and API are being established.
+
+### 4. Data Storage
+
+**Amazon DynamoDB** stores the nightly data described below. Configuration
+profiles remain in the shared global JSON object for now; they can be moved to
+DynamoDB when CRUD management is needed.
+
+## Nightly Data Architecture
+
+The API serves astronomical events, weather forecasts, northern lights (aurora)
+forecasts, and other available services for tonight and the next few nights.
+These sources update at different schedules and paces, so persistence is split
+**by night** and **by service** while the API still provides a single fast read
+per location.
 
 ### Defining a "night"
 
@@ -80,7 +106,8 @@ writes independently without clobbering the others:
   days past the night; DynamoDB auto-deletes stale items, keeping the table small.
 - **Merge at read time**: the API Lambda queries the night range, groups items
   by `nightId`, and assembles one JSON response per night with keys `astro`,
-  `weather`, `auroraForecast`, even though the writes are fully decoupled.
+  `weather`, `auroraForecast`, and any additional service keys, even though the
+  writes are fully decoupled.
 
 **Optional GSI** for maintenance/backfill jobs (e.g. "find locations missing
 weather data for night X"):
@@ -111,25 +138,13 @@ Each writer is a small, independent Lambda + schedule, matching the existing
 SST/Lambda-per-concern style and keeping blast radius small if one upstream API
 changes or breaks.
 
-### Alternatives considered
-
-- **S3 + JSON files**: viable, but weaker query semantics (no native range query
-  across nights/services without prefix listing) and manual TTL cleanup. Could
-  complement DynamoDB for large blobs (e.g. weather radar images), storing a
-  pointer in DynamoDB and the blob in S3.
-- **RDS/Aurora**: unnecessary relational overhead and always-on cost/connection
-  management that fights the serverless model.
-- **Timestream**: built for high-cardinality time-series metrics/analytics, not
-  per-night structured lookups; more complexity than needed for a handful of
-  nights per location.
-
 ## Technical Stack
 - **Infrastructure as Code**: SST (v3/Ion or v2)
 - **Runtime**: Node.js / TypeScript
 - **Library**: `suncalc`
 - **Cloud Provider**: AWS
 
-## Project Structure (Proposed)
+## Project Structure
 - `sst/stacks/`: Infrastructure definitions.
 - `sst/packages/functions/src/`: Lambda handler code.
 - `sst/docs/`: Documentation.
@@ -137,16 +152,18 @@ changes or breaks.
 ## Data Flow
 1. Client calls `GET /astro/krakow-home`.
 2. API Gateway triggers the Lambda.
-3. Lambda looks up `krakow-home` coordinates.
-4. Lambda computes times using `suncalc.getTimes()` and `suncalc.getMoonTimes()`.
-5. Lambda returns the JSON response.
+3. Lambda resolves the `krakow-home` configuration and its location.
+4. The Lambda reads or computes the available astro, weather, aurora, and other
+  service data for the requested night range.
+5. The Lambda returns one JSON response grouped by night.
 
 ## Web UI
 
 The React/TypeScript web UI lives in `packages/web` and is hosted by an SST
 `StaticSite` component backed by S3 and CloudFront. At build time, SST injects
 the API URL as `VITE_API_URL`. The browser calls API Gateway, which invokes the
-Lambda and returns the sun and moon data for the selected location.
+Lambda and returns the unified nightly data for the selected configuration and
+location.
 
 The project structure is:
 
@@ -157,9 +174,3 @@ sst/
 ├── docs/                 # Architecture and testing documentation
 └── sst.config.ts         # API and StaticSite infrastructure
 ```
-
-## Implementation Steps
-1. Initialize SST project in the `sst` folder.
-2. Install `suncalc` and `@types/suncalc`.
-3. Create a Lambda handler that parses `configId`, looks up location, and calls `suncalc`.
-4. Set up the SST API stack.

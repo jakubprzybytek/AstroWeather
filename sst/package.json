@@ -7,8 +7,10 @@
     "dev": "sst dev",
     "deploy": "sst deploy",
     "remove": "sst remove",
-    "test": "vitest run --project unit",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run --project unit",
     "test:integration": "sst shell -- vitest run --project integration",
+    "test:clearoutside": "RUN_LIVE_SCRAPE=1 sst shell -- vitest run --project integration --disableConsoleIntercept packages/functions/tests/integration/clearoutside.integration.test.ts",
     "test:web": "vitest run --project web",
     "test:all": "vitest run"
   },
@@ -18,6 +20,7 @@
     "vitest": "^4.1.4"
   },
   "dependencies": {
+    "node-html-parser": "^9.0.4",
     "sst": "^4.7.9",
     "suncalc": "^1.9.0"
   }
