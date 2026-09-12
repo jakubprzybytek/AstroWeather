@@ -1,6 +1,7 @@
 import { parse } from "node-html-parser";
 
 export type ClearOutsideHour = {
+  hour: number;
   timestampUtc: string;
   temperatureC: number | null;
   cloudCoverTotalPct: number | null;
@@ -140,6 +141,7 @@ export function parseClearOutside(html: string): ClearOutsideNight[] {
         );
 
         return {
+          hour,
           timestampUtc: toUtcTimestamp(formatDate(nightDate), hour, header.utcOffsetMinutes),
           temperatureC: parseNumber(rows[0][hourIndex].textContent),
           cloudCoverTotalPct: parseNumber(rows[1][hourIndex].textContent),

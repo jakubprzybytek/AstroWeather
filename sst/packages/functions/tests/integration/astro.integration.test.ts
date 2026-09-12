@@ -4,7 +4,7 @@ import { Resource } from "sst";
 const BASE_URL = Resource.AstroApi.url;
 
 type AstroResponse = {
-  configId: string;
+  configurationId: string;
   timezone: string;
   sun: {
     rise: string | null;
@@ -24,8 +24,8 @@ function isIsoStringOrNull(value: unknown): value is string | null {
   return !Number.isNaN(Date.parse(value));
 }
 
-describe("GET /astro/{configId}", () => {
-  test("returns 404 for an unknown configId", async () => {
+describe("GET /astro/{configurationId}", () => {
+  test("returns 404 for an unknown configurationId", async () => {
     const response = await fetch(`${BASE_URL}/astro/unknown-place`);
 
     expect(response.status).toBe(404);
@@ -42,7 +42,7 @@ describe("GET /astro/{configId}", () => {
 
     const body: AstroResponse = await response.json();
 
-    expect(body.configId).toBe("krakow-home");
+    expect(body.configurationId).toBe("krakow-home");
     expect(body.timezone).toBe("Europe/Warsaw");
 
     expect(isIsoStringOrNull(body.sun.rise)).toBe(true);
@@ -59,11 +59,11 @@ describe("GET /astro/{configId}", () => {
 
     expect(response.status).toBe(200);
     const body: AstroResponse = await response.json();
-    expect(body.configId).toBe("sharm-el-sheikh");
+    expect(body.configurationId).toBe("sharm-el-sheikh");
     expect(body.timezone).toBe("Africa/Cairo");
   });
 
-  test("returns non-200 when configId path parameter is missing", async () => {
+  test("returns non-200 when configurationId path parameter is missing", async () => {
     const response = await fetch(`${BASE_URL}/astro/`);
 
     expect(response.status).not.toBe(200);

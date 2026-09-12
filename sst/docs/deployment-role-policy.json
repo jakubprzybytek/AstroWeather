@@ -17,7 +17,8 @@
         "apigateway:GET",
         "apigateway:PATCH",
         "apigateway:POST",
-        "apigateway:PUT"
+        "apigateway:PUT",
+        "apigateway:TagResource"
       ],
       "Resource": "arn:aws:apigateway:*::/*"
     },
@@ -32,6 +33,7 @@
         "lambda:GetFunction",
         "lambda:GetFunctionConfiguration",
         "lambda:GetFunctionCodeSigningConfig",
+        "lambda:GetPolicy",
         "lambda:ListVersionsByFunction",
         "lambda:PublishVersion",
         "lambda:RemovePermission",
@@ -53,6 +55,7 @@
         "iam:DetachRolePolicy",
         "iam:GetRole",
         "iam:ListAttachedRolePolicies",
+        "iam:ListInstanceProfilesForRole",
         "iam:ListRolePolicies",
         "iam:PutRolePolicy",
         "iam:TagRole",
@@ -76,9 +79,12 @@
       "Effect": "Allow",
       "Action": [
         "logs:CreateLogGroup",
+        "logs:CreateLogDelivery",
+        "logs:DeleteLogDelivery",
         "logs:DeleteLogGroup",
         "logs:DeleteRetentionPolicy",
         "logs:DescribeLogGroups",
+        "logs:ListLogDeliveries",
         "logs:ListTagsForResource",
         "logs:PutRetentionPolicy",
         "logs:TagResource",
@@ -164,6 +170,7 @@
         "cloudfront:ListKeyValueStores",
         "cloudfront:UpdateKeyValueStore",
         "cloudfront-keyvaluestore:DescribeKeyValueStore",
+        "cloudfront-keyvaluestore:ListKeys",
         "cloudfront-keyvaluestore:UpdateKeys"
       ],
       "Resource": "*"

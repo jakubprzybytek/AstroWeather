@@ -1,24 +1,7 @@
 import SunCalc from "suncalc";
+import { configurations } from "./configurations";
 
-const LOCATIONS = {
-  "krakow-home": {
-    latitude: 50.0647,
-    longitude: 19.945,
-    timezone: "Europe/Warsaw"
-  },
-  "wroclaw": {
-    latitude: 51.1079,
-    longitude: 17.0385,
-    timezone: "Europe/Warsaw"
-  },
-  "sharm-el-sheikh": {
-    latitude: 27.9158,
-    longitude: 34.33,
-    timezone: "Africa/Cairo"
-  }
-} as const;
-
-type LocationId = keyof typeof LOCATIONS;
+type ConfigurationId = keyof typeof configurations;
 
 function toIsoOrNull(value?: Date | null) {
   if (!value || Number.isNaN(value.getTime())) {
@@ -28,14 +11,14 @@ function toIsoOrNull(value?: Date | null) {
   return value.toISOString();
 }
 
-function isLocationId(value: string): value is LocationId {
-  return value in LOCATIONS;
+function isConfigurationId(value: string): value is ConfigurationId {
+  return value in configurations;
 }
 
-export const handler = async (event: { pathParameters?: { configId?: string } }) => {
-  const configId = event.pathParameters?.configId;
+export const handler = async (event: { pathParameters?: { configurationId?: string } }) => {
+  const configurationId = event.pathParameters?.configurationId;
 
-  if (!configId || !isLocationId(configId)) {
+  if (!configurationId || !isConfigurationId(configurationId)) {
     return {
       statusCode: 404,
       headers: {
@@ -47,10 +30,10 @@ export const handler = async (event: { pathParameters?: { configId?: string } })
     };
   }
 
-  const location = LOCATIONS[configId];
+  const location = configurations[configurationId].location;
   const now = new Date();
-  const sunTimes = SunCalc.getTimes(now, location.latitude, location.longitude);
-  const moonTimes = SunCalc.getMoonTimes(now, location.latitude, location.longitude);
+  const sunTimes = SunCalc.getTimes(now, location.lat, location.lon);
+  const moonTimes = SunCalc.getMoonTimes(now, location.lat, location.lon);
 
   return {
     statusCode: 200,
@@ -58,8 +41,8 @@ export const handler = async (event: { pathParameters?: { configId?: string } })
       "content-type": "application/json"
     },
     body: JSON.stringify({
-      configId,
-      timezone: location.timezone,
+      configurationId,
+      timezone: location.tz,
       sun: {
         rise: toIsoOrNull(sunTimes.sunrise),
         set: toIsoOrNull(sunTimes.sunset)

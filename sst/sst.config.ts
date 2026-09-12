@@ -11,12 +11,13 @@ export default $config({
   async run() {
     const api = new sst.aws.ApiGatewayV2("AstroApi", {
       cors: {
-        allowMethods: ["GET"],
+        allowMethods: ["GET", "POST"],
         allowOrigins: ["*"]
       }
     });
 
-    api.route("GET /astro/{configId}", "packages/functions/src/astro.handler");
+    api.route("GET /astro/{configurationId}", "packages/functions/src/astro.handler");
+    api.route("POST /tools/clearoutside", "packages/functions/src/clearoutside.handler");
 
     const web = new sst.aws.StaticSite("AstroWeb", {
       path: "packages/web",

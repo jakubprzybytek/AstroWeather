@@ -165,6 +165,13 @@ the API URL as `VITE_API_URL`. The browser calls API Gateway, which invokes the
 Lambda and returns the unified nightly data for the selected configuration and
 location.
 
+The UI also exposes helper tools independently from the main astronomy view.
+The first tool is Clearoutside, backed by `POST /tools/clearoutside`. It accepts
+either a configured `configurationId` or direct latitude/longitude coordinates,
+resolves the final coordinates, fetches and parses the server-rendered
+Clearoutside forecast in Lambda, and returns normalized hourly nights to the
+browser.
+
 The project structure is:
 
 ```text

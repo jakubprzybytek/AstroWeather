@@ -15,6 +15,7 @@ describe("parseClearOutside", () => {
     expect(night.nightId).toBe("2026-09-11");
     expect(night.hours).toHaveLength(24);
     expect(night.hours[0]).toEqual({
+      hour: 12,
       timestampUtc: "2026-09-11T09:00:00.000Z",
       temperatureC: 36,
       cloudCoverTotalPct: 0,

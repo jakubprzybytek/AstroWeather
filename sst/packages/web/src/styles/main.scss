@@ -4,3 +4,45 @@
 body {
   min-width: 320px;
 }
+
+.app-tabs {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.app-tabs__nav {
+  flex: 0 0 11rem;
+  position: sticky;
+  top: 1.5rem;
+}
+
+.app-tabs__nav .nav-link {
+  text-align: left;
+  width: 100%;
+}
+
+.app-tabs__panels {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (max-width: 767.98px) {
+  .app-tabs {
+    display: block;
+  }
+
+  .app-tabs__nav {
+    position: static;
+    flex-direction: row !important;
+    margin-bottom: 1.5rem;
+  }
+
+  .app-tabs__nav .nav-item {
+    flex: 1 1 0;
+  }
+
+  .app-tabs__nav .nav-link {
+    text-align: center;
+  }
+}
