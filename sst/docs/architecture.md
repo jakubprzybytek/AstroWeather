@@ -51,6 +51,19 @@ global JSON object is sufficient while the model and API are being established.
 profiles remain in the shared global JSON object for now; they can be moved to
 DynamoDB when CRUD management is needed.
 
+The `ForecastData` table uses `pk` and `sk` as its primary key and `expireAt`
+as its DynamoDB TTL attribute. The scheduled Clearoutside writer stores one
+`SKY_CONDITIONS` item per configuration and forecast night:
+
+```text
+PK = LOC#<configurationId>
+SK = NIGHT#<nightId>#SKY_CONDITIONS
+```
+
+Each item contains the configuration identifier, coordinates, normalized hourly
+Clearoutside fields, `fetchedAt`, and an `expireAt` timestamp 72 hours after
+the last hourly forecast value. Raw Clearoutside HTML is never persisted.
+
 ## Nightly Data Architecture
 
 The API serves astronomical events, weather forecasts, northern lights (aurora)
@@ -133,6 +146,14 @@ weather data for night X"):
   feasibility, risks, and integration guidance.
 - **Aurora forecast**: separate scheduled Lambda with its own polling interval;
   shorter TTL since forecasts go stale quickly.
+
+- **Clearoutside sky conditions**: the `ClearOutsideIngestion` EventBridge
+  Scheduler invokes a Lambda every six hours. It processes the configured
+  locations sequentially with a five-second gap between requests, parses the
+  complete server-rendered page before writing, and upserts
+  `NIGHT#...#SKY_CONDITIONS` items. A failed location is logged and does not
+  block other locations; the invocation still fails after all locations are
+  attempted so the scheduler can retry it.
 
 Each writer is a small, independent Lambda + schedule, matching the existing
 SST/Lambda-per-concern style and keeping blast radius small if one upstream API

@@ -154,15 +154,57 @@ export function parseClearOutside(html: string): ClearOutsideNight[] {
 }
 
 export async function fetchClearOutsideHtml(latitude: number, longitude: number): Promise<string> {
-  const response = await fetch(`https://clearoutside.com/forecast/${latitude}/${longitude}`, {
-    headers: {
-      "user-agent": "AstroWeather/0.1 (weather forecast research)"
-    }
-  });
+  const url = `https://clearoutside.com/forecast/${latitude}/${longitude}`;
+  const maxAttempts = 2;
 
-  if (!response.ok) {
-    throw new Error(`Clear Outside request failed with HTTP ${response.status}`);
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    let response: Response;
+
+    try {
+      response = await fetch(url, {
+        headers: {
+          "user-agent": "AstroWeather/0.1 (weather forecast research)"
+        },
+        signal: controller.signal
+      });
+    } catch (cause) {
+      clearTimeout(timeout);
+      if (attempt === maxAttempts - 1) {
+        throw cause;
+      }
+
+      await retryDelay(attempt);
+      continue;
   }
 
-  return response.text();
+    clearTimeout(timeout);
+
+    if (response.ok) {
+      return response.text();
+    }
+
+    if (response.status === 429) {
+      const retryAfter = response.headers.get("retry-after");
+      const retryAfterMessage = retryAfter ? `; retry after ${retryAfter}` : "";
+      throw new Error(`Clear Outside request failed with HTTP 429${retryAfterMessage}`);
+    }
+
+    if (response.status < 500 || attempt === maxAttempts - 1) {
+      throw new Error(`Clear Outside request failed with HTTP ${response.status}`);
+    }
+
+    await retryDelay(attempt);
+  }
+
+  throw new Error("Clear Outside request failed");
+}
+
+function retryDelay(attempt: number): Promise<void> {
+  const baseDelay = Math.min(2_000, 250 * 2 ** attempt);
+
+  return new Promise((resolve) => {
+    setTimeout(resolve, baseDelay + Math.floor(Math.random() * 100));
+  });
 }

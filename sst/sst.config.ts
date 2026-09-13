@@ -9,6 +9,15 @@ export default $config({
     };
   },
   async run() {
+    const forecastData = new sst.aws.Dynamo("ForecastData", {
+      fields: {
+        pk: "string",
+        sk: "string"
+      },
+      primaryIndex: { hashKey: "pk", rangeKey: "sk" },
+      ttl: "expireAt"
+    });
+
     const api = new sst.aws.ApiGatewayV2("AstroApi", {
       cors: {
         allowMethods: ["GET", "POST"],
@@ -18,6 +27,16 @@ export default $config({
 
     api.route("GET /astro/{configurationId}", "packages/functions/src/astro.handler");
     api.route("POST /tools/clearoutside", "packages/functions/src/clearoutside.handler");
+
+    new sst.aws.CronV2("ClearOutsideIngestion", {
+      schedule: "rate(6 hours)",
+      retries: 1,
+      function: {
+        handler: "packages/functions/src/jobs/clearoutside-weather.handler",
+        link: [forecastData],
+        timeout: "2 minutes"
+      }
+    });
 
     const web = new sst.aws.StaticSite("AstroWeb", {
       path: "packages/web",
@@ -32,7 +51,8 @@ export default $config({
 
     return {
       apiUrl: api.url,
-      siteUrl: web.url
+      siteUrl: web.url,
+      forecastDataTableName: forecastData.name
     };
   }
 });

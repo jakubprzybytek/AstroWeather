@@ -47,6 +47,43 @@ Runs both suites in a single command:
 npm run test:all
 ```
 
+### Scheduled Clearoutside ingestion
+
+The scheduled writer is unit-tested without AWS or network access through its
+injected fetch, parser, clock, configuration, and storage dependencies. The
+focused tests cover deterministic DynamoDB keys and TTL values, successful
+writes for every configured location, no writes after a fetch or parse failure,
+continuation after one location fails, and the final invocation failure signal.
+
+Run the focused tests with:
+
+```bash
+npx vitest run \
+  packages/functions/src/weather/clearoutside-storage.test.ts \
+  packages/functions/src/jobs/clearoutside-weather.test.ts \
+  packages/functions/src/weather/clearoutside.test.ts
+```
+
+The deployed `ClearOutsideIngestion` schedule runs every six hours with one
+retry. For a manual staging check, identify the generated Lambda from the SST
+deployment output or AWS Console, invoke it with `{}`, and inspect CloudWatch
+for one structured success or failure record per configuration followed by the
+completion summary.
+
+The table name is returned as the `forecastDataTableName` stack output. Query
+one location with:
+
+```bash
+aws dynamodb query \
+  --table-name <forecastDataTableName> \
+  --key-condition-expression "pk = :pk" \
+  --expression-attribute-values '{":pk":{"S":"LOC#krakow-home"}}'
+```
+
+Verify that returned items use the `NIGHT#<nightId>#SKY_CONDITIONS` sort-key
+format, contain numeric `expireAt` values and normalized `hours`, and contain no
+raw HTML. A failed scrape should leave the previous item unchanged.
+
 ## Project Structure
 
 ```
