@@ -12,12 +12,5 @@ export const configurations = {
       lon: 17.0385,
       tz: "Europe/Warsaw"
     }
-  },
-  "sharm-el-sheikh": {
-    location: {
-      lat: 27.9158,
-      lon: 34.33,
-      tz: "Africa/Cairo"
-    }
   }
 } as const;

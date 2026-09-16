@@ -20,7 +20,7 @@ export type ClearOutsideIngestionDependencies = {
   log?: (message: string, details: Record<string, unknown>) => void;
 };
 
-const LOCATION_REQUEST_GAP_MS = 5_000;
+const LOCATION_REQUEST_GAP_MS = 1_000;
 
 export type ClearOutsideIngestionSummary = {
   succeeded: string[];

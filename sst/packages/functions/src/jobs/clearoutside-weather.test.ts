@@ -45,7 +45,7 @@ describe("ingestClearOutside", () => {
       coordinates: { latitude: 50, longitude: 20 },
       fetchedAt: "2026-09-13T06:00:00.000Z"
     }));
-    expect(deps.waitBetweenLocations).toHaveBeenCalledWith(5_000);
+    expect(deps.waitBetweenLocations).toHaveBeenCalledWith(1_000);
   });
 
   test("continues after one location fails and throws after all attempts", async () => {

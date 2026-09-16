@@ -30,7 +30,7 @@ export default $config({
 
     new sst.aws.CronV2("ClearOutsideIngestion", {
       schedule: "rate(6 hours)",
-      retries: 1,
+        retries: 0,
       function: {
         handler: "packages/functions/src/jobs/clearoutside-weather.handler",
         link: [forecastData],
