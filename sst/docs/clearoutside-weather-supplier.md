@@ -139,7 +139,7 @@ documented weather API:
 4. Store results using the same nightly DynamoDB pattern as other sources:
 
    ```text
-   PK = LOC#krakow-home
+  PK = LOC#krakow
    SK = NIGHT#2026-09-10#SKY_CONDITIONS
    ```
 

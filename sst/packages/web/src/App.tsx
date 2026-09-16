@@ -1,9 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Card, Container, Nav, Spinner } from "react-bootstrap";
-import { fetchAstro } from "./api";
+import { fetchAstro, fetchConfigurations } from "./api";
 import { AstroResults } from "./components/AstroResults";
 import { ConfigSelect } from "./components/ConfigSelect";
-import type { AstroResponse } from "./types";
+import type { AstroResponse, Configuration } from "./types";
 import { ClearOutsideTool } from "./components/ClearOutsideTool";
 
 export default function App() {
@@ -13,6 +13,16 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const requestId = useRef(0);
   const [view, setView] = useState<"main" | "clearoutside">("main");
+  const [configurations, setConfigurations] = useState<Configuration[]>([]);
+  const [configurationsLoading, setConfigurationsLoading] = useState(true);
+  const [configurationsError, setConfigurationsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void fetchConfigurations()
+      .then(setConfigurations)
+      .catch((cause) => setConfigurationsError(cause instanceof Error ? cause.message : "Unable to load configurations"))
+      .finally(() => setConfigurationsLoading(false));
+  }, []);
 
   async function submit() {
     const currentRequest = ++requestId.current;
@@ -32,7 +42,7 @@ export default function App() {
   }
 
   return (
-    <Container className="py-5">
+    <Container className="app-container py-5">
       <div className="app-tabs">
         <Nav variant="pills" className="app-tabs__nav flex-column" role="tablist" aria-label="Application sections">
           <Nav.Item>
@@ -71,19 +81,25 @@ export default function App() {
                 <Card.Title as="h1">AstroWeather</Card.Title>
                 <Card.Text>Check today&apos;s sun and moon times.</Card.Text>
                 <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-                  <ConfigSelect value={selectedId} onChange={setSelectedId} />
+                  <ConfigSelect
+                    value={selectedId}
+                    onChange={setSelectedId}
+                    configurations={configurations}
+                    disabled={configurationsLoading}
+                  />
                   <Button className="mt-3" type="submit" disabled={!selectedId || loading}>
                     {loading && <Spinner animation="border" size="sm" className="me-2" />}
                     {loading ? "Loading…" : "Submit"}
                   </Button>
                 </form>
                 {error && <Alert className="mt-4 mb-0" variant="danger">{error}</Alert>}
+                {configurationsError && <Alert className="mt-4 mb-0" variant="danger">{configurationsError}</Alert>}
                 {data && <AstroResults data={data} />}
               </Card.Body>
             </Card>
           </div>}
           {view === "clearoutside" && <div id="clearoutside-panel" role="tabpanel" aria-labelledby="clearoutside-tab">
-            <ClearOutsideTool />
+            <ClearOutsideTool configurations={configurations} />
           </div>}
         </div>
       </div>

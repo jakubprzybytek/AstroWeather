@@ -7,6 +7,8 @@ The API response is organized by night. Each night can contain an `astro` sectio
 
 ## Core Components
 ### 1. API Gateway (SST `Api`)
+- **Endpoint**: `GET /configurations`
+  - **Output**: JSON array of public configuration identifiers and labels for UI selectors.
 - **Endpoint**: `GET /astro/{configurationId}`
 - **Input**: `configurationId` (path parameter)
 - **Output**: JSON payload containing the available astronomical, weather, aurora, and related forecast data for the configured location, grouped by night.
@@ -34,7 +36,10 @@ its location and timezone:
 
 ```typescript
 const configurations = {
-  "krakow-home": {
+  "wroclaw": {
+    location: { lat: 51.1079, lon: 17.0385, tz: "Europe/Warsaw" }
+  },
+  "krakow": {
     location: { lat: 50.0647, lon: 19.9450, tz: "Europe/Warsaw" }
   }
 };
@@ -103,12 +108,12 @@ writes independently without clobbering the others:
 
 | PK | SK | attributes |
 |---|---|---|
-| `LOC#krakow-home` | `NIGHT#2026-09-10#ASTRO` | sun/moon rise-set, `fetchedAt`, `ttl` |
-| `LOC#krakow-home` | `NIGHT#2026-09-10#WEATHER` | forecast blob, `fetchedAt`, `ttl` |
-| `LOC#krakow-home` | `NIGHT#2026-09-10#AURORA` | kp-index/forecast, `fetchedAt`, `ttl` |
-| `LOC#krakow-home` | `NIGHT#2026-09-11#ASTRO` | … |
+| `LOC#krakow` | `NIGHT#2026-09-10#ASTRO` | sun/moon rise-set, `fetchedAt`, `ttl` |
+| `LOC#krakow` | `NIGHT#2026-09-10#WEATHER` | forecast blob, `fetchedAt`, `ttl` |
+| `LOC#krakow` | `NIGHT#2026-09-10#AURORA` | kp-index/forecast, `fetchedAt`, `ttl` |
+| `LOC#krakow` | `NIGHT#2026-09-11#ASTRO` | … |
 
-- **By-night split**: `Query(PK = LOC#krakow-home, SK begins_with "NIGHT#2026-09-10")`
+- **By-night split**: `Query(PK = LOC#krakow, SK begins_with "NIGHT#2026-09-10")`
   returns all services for one night in a single call. A range query
   (`SK between "NIGHT#2026-09-10" and "NIGHT#2026-09-14"`) returns "tonight +
   next few nights" in one query, since ISO dates sort correctly as strings.
@@ -127,7 +132,7 @@ weather data for night X"):
 
 | GSI1PK | GSI1SK |
 |---|---|
-| `SERVICE#WEATHER` | `NIGHT#2026-09-10#LOC#krakow-home` |
+| `SERVICE#WEATHER` | `NIGHT#2026-09-10#LOC#krakow` |
 
 ### Write path (independent cadence per source)
 
@@ -171,9 +176,9 @@ changes or breaks.
 - `sst/docs/`: Documentation.
 
 ## Data Flow
-1. Client calls `GET /astro/krakow-home`.
+1. Client calls `GET /astro/krakow`.
 2. API Gateway triggers the Lambda.
-3. Lambda resolves the `krakow-home` configuration and its location.
+3. Lambda resolves the `krakow` configuration and its location.
 4. The Lambda reads or computes the available astro, weather, aurora, and other
   service data for the requested night range.
 5. The Lambda returns one JSON response grouped by night.
@@ -187,6 +192,9 @@ Lambda and returns the unified nightly data for the selected configuration and
 location.
 
 The UI also exposes helper tools independently from the main astronomy view.
+It loads the configuration list from `GET /configurations` and uses that list
+for every configuration selector, so configuration identifiers and labels have
+one backend source of truth.
 The first tool is Clearoutside, backed by `POST /tools/clearoutside`. It accepts
 either a configured `configurationId` or direct latitude/longitude coordinates,
 resolves the final coordinates, fetches and parses the server-rendered

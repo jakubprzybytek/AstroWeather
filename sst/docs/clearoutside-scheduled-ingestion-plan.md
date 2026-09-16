@@ -252,7 +252,7 @@ DynamoDB inspection, and expected CloudWatch log fields.
 ## Acceptance Criteria
 
 - The deployed schedule is enabled and runs every six hours.
-- One invocation attempts `krakow-home`, `wroclaw`, and `sharm-el-sheikh`.
+- One invocation attempts `wroclaw` and `krakow`.
 - Every valid parsed night is stored under its deterministic key.
 - Re-running the handler updates existing keys instead of creating duplicates.
 - A fetch or parse failure produces no writes for that location and does not

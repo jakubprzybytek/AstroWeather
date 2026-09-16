@@ -64,6 +64,12 @@
       "Resource": "*"
     },
     {
+      "Sid": "DescribeDynamoDbTables",
+      "Effect": "Allow",
+      "Action": "dynamodb:DescribeTable",
+      "Resource": "*"
+    },
+    {
       "Sid": "PassLambdaExecutionRole",
       "Effect": "Allow",
       "Action": "iam:PassRole",

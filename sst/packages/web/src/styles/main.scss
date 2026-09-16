@@ -5,6 +5,10 @@ body {
   min-width: 320px;
 }
 
+.app-container {
+  max-width: 1400px;
+}
+
 .app-tabs {
   display: flex;
   align-items: flex-start;

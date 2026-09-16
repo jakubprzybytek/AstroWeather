@@ -77,7 +77,7 @@ one location with:
 aws dynamodb query \
   --table-name <forecastDataTableName> \
   --key-condition-expression "pk = :pk" \
-  --expression-attribute-values '{":pk":{"S":"LOC#krakow-home"}}'
+  --expression-attribute-values '{":pk":{"S":"LOC#krakow"}}'
 ```
 
 Verify that returned items use the `NIGHT#<nightId>#SKY_CONDITIONS` sort-key
@@ -168,7 +168,7 @@ const BASE_URL = process.env.API_URL ?? "http://localhost:3000";
 
 describe("GET /astro/:configId", () => {
   it("returns 200 for a known configId", async () => {
-    const res = await fetch(`${BASE_URL}/astro/krakow-home`);
+    const res = await fetch(`${BASE_URL}/astro/krakow`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty("sun.rise");

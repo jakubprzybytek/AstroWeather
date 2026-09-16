@@ -25,6 +25,7 @@ export default $config({
       }
     });
 
+    api.route("GET /configurations", "packages/functions/src/configurations-handler.handler");
     api.route("GET /astro/{configurationId}", "packages/functions/src/astro.handler");
     api.route("POST /tools/clearoutside", "packages/functions/src/clearoutside.handler");
 

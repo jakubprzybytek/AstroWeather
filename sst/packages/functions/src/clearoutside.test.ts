@@ -15,12 +15,12 @@ describe("clearoutside handler", () => {
     fetchHtmlMock.mockResolvedValue("html");
     parseMock.mockReturnValue([{ nightId: "2026-09-11", hours: [] }]);
 
-    const response = await handler({ body: JSON.stringify({ configurationId: "krakow-home" }) });
+    const response = await handler({ body: JSON.stringify({ configurationId: "krakow" }) });
 
     expect(response.statusCode).toBe(200);
     expect(fetchHtmlMock).toHaveBeenCalledWith(50.0647, 19.945);
     expect(JSON.parse(response.body)).toMatchObject({
-      configurationId: "krakow-home",
+      configurationId: "krakow",
       coordinates: { latitude: 50.0647, longitude: 19.945 }
     });
   });
@@ -38,7 +38,7 @@ describe("clearoutside handler", () => {
   test("rejects ambiguous or invalid input", async () => {
     expect((await handler({ body: JSON.stringify({}) })).statusCode).toBe(400);
     expect((await handler({ body: JSON.stringify({ configurationId: "missing" }) })).statusCode).toBe(404);
-    expect((await handler({ body: JSON.stringify({ configurationId: "krakow-home", latitude: 1, longitude: 2 }) })).statusCode).toBe(400);
+    expect((await handler({ body: JSON.stringify({ configurationId: "krakow", latitude: 1, longitude: 2 }) })).statusCode).toBe(400);
     expect((await handler({ body: JSON.stringify({ latitude: 100, longitude: 2 }) })).statusCode).toBe(400);
   });
 });

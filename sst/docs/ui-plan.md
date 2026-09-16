@@ -9,13 +9,13 @@ TypeScript and React.
 - **Infrastructure**: one `sst.aws.ApiGatewayV2` component named `AstroApi`.
 - **Endpoint**: `GET /astro/{configId}` → `packages/functions/src/astro.handler`.
 - **Behaviour of the endpoint** (`packages/functions/src/astro.ts`):
-  - `configId` is looked up in a hardcoded `LOCATIONS` map (`krakow-home`, `wroclaw`),
+  - `configId` is looked up in the backend configuration list (`wroclaw`, `krakow`),
     each entry holding `latitude`, `longitude`, `timezone`.
   - Unknown / missing id → `404` with `{ "message": "Configuration not found" }`.
   - Known id → `200` with:
     ```json
     {
-      "configId": "krakow-home",
+      "configId": "krakow",
       "timezone": "Europe/Warsaw",
       "sun":  { "rise": "ISO|null", "set": "ISO|null" },
       "moon": { "rise": "ISO|null", "set": "ISO|null",
@@ -96,7 +96,7 @@ changes are needed:
 2. **New location** — add `sharm-el-sheikh`
    (lat `27.9158`, lon `34.3300`, timezone `Africa/Cairo`) to the `LOCATIONS` map in
    `packages/functions/src/astro.ts`, so the second dropdown option resolves.
-   Note the existing Kraków entry's id is `krakow-home` — the UI must send that exact id.
+  Note the Kraków entry's id is `krakow` — the UI must send that exact id.
 
 No response-shape changes: the UI consumes the payload as-is.
 
@@ -114,7 +114,7 @@ No response-shape changes: the UI consumes the payload as-is.
 
 - **Layout**: React-Bootstrap `Container` + `Row`/`Col`, page inside a `Card`.
 - **Dropdown**: React-Bootstrap `Form.Select` with options built from `locations.ts`:
-  `{ id: "krakow-home", label: "Kraków" }`, `{ id: "sharm-el-sheikh", label: "Sharm El Sheikh" }`.
+  `{ id: "wroclaw", label: "Wrocław" }`, `{ id: "krakow", label: "Kraków" }`.
   Adding a location later means one entry in this array plus one in the Lambda map.
 - **Submit button**: React-Bootstrap `Button type="submit"`, disabled while no selection is
   made and while a request is in flight; the form submits via `onSubmit` so Enter works too.

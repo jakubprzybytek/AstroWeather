@@ -1,11 +1,10 @@
 import { useRef, useState } from "react";
 import { Alert, Button, Card, Form, Spinner } from "react-bootstrap";
 import { fetchClearOutside, type ClearOutsideInput } from "../api";
-import { locations } from "../locations";
-import type { ClearOutsideResponse } from "../types";
+import type { ClearOutsideResponse, Configuration } from "../types";
 import { ClearOutsideResults } from "./ClearOutsideResults";
 
-export function ClearOutsideTool() {
+export function ClearOutsideTool({ configurations }: { configurations: Configuration[] }) {
   const [mode, setMode] = useState<"configuration" | "coordinates">("configuration");
   const [configurationId, setConfigurationId] = useState("");
   const [latitude, setLatitude] = useState("");
@@ -62,7 +61,7 @@ export function ClearOutsideTool() {
               <Form.Label>Configuration</Form.Label>
               <Form.Select value={configurationId} onChange={(event) => setConfigurationId(event.target.value)}>
                 <option value="">Choose a configuration</option>
-                {locations.map((location) => <option key={location.id} value={location.id}>{location.label}</option>)}
+                {configurations.map((configuration) => <option key={configuration.id} value={configuration.id}>{configuration.label}</option>)}
               </Form.Select>
             </Form.Group>
           ) : (

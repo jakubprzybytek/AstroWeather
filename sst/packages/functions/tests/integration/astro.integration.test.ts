@@ -34,15 +34,15 @@ describe("GET /astro/{configurationId}", () => {
     expect(body).toEqual({ message: "Configuration not found" });
   });
 
-  test("returns 200 with correct shape for krakow-home", async () => {
-    const response = await fetch(`${BASE_URL}/astro/krakow-home`);
+  test("returns 200 with correct shape for krakow", async () => {
+    const response = await fetch(`${BASE_URL}/astro/krakow`);
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/json");
 
     const body: AstroResponse = await response.json();
 
-    expect(body.configurationId).toBe("krakow-home");
+    expect(body.configurationId).toBe("krakow");
     expect(body.timezone).toBe("Europe/Warsaw");
 
     expect(isIsoStringOrNull(body.sun.rise)).toBe(true);
@@ -67,5 +67,18 @@ describe("GET /astro/{configurationId}", () => {
     const response = await fetch(`${BASE_URL}/astro/`);
 
     expect(response.status).not.toBe(200);
+  });
+});
+
+describe("GET /configurations", () => {
+  test("returns public configuration metadata", async () => {
+    const response = await fetch(`${BASE_URL}/configurations`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(await response.json()).toEqual([
+      { id: "wroclaw", label: "Wrocław" },
+      { id: "krakow", label: "Kraków" }
+    ]);
   });
 });

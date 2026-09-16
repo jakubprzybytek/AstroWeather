@@ -1,3 +1,8 @@
+export type Configuration = {
+  id: string;
+  label: string;
+};
+
 export type AstroResponse = {
   configId: string;
   timezone: string;

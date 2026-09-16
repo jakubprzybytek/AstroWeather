@@ -155,7 +155,7 @@ transitions can make local wall-clock times ambiguous or cause a night to have
 Use the shared nightly table described in the architecture document:
 
 ```text
-PK = LOC#krakow-home
+PK = LOC#krakow
 SK = NIGHT#2026-09-10#WEATHER
 ```
 

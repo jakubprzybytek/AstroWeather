@@ -26,16 +26,16 @@ const night = {
 describe("toClearOutsideItem", () => {
   test("maps a night to a deterministic item with a TTL", () => {
     const item = toClearOutsideItem(
-      "krakow-home",
+      "krakow",
       { latitude: 50.0647, longitude: 19.945 },
       night,
       "2026-09-13T06:00:00.000Z"
     );
 
     expect(item).toEqual({
-      pk: "LOC#krakow-home",
+      pk: "LOC#krakow",
       sk: "NIGHT#2026-09-11#SKY_CONDITIONS",
-      configurationId: "krakow-home",
+      configurationId: "krakow",
       nightId: "2026-09-11",
       service: "skyConditions",
       coordinates: { latitude: 50.0647, longitude: 19.945 },
