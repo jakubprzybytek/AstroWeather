@@ -151,7 +151,7 @@ client. Operational details belong in structured Lambda logs.
 2. The first night is selected using the location's timezone and local-noon
    boundary; the next five night identifiers are consecutive local dates.
 3. Every display block contains the complete, fixed-order record set defined in
-   `api-payload.md` and all matrices contain exactly 21 valid characters.
+   `api-payload.md`; each matrix is either `?` or exactly 21 valid characters.
 4. Available, unexpired `#WEATHER` records supply the matching nights' minimum
    and maximum temperatures.
 5. Expired, out-of-range, and other service records are not returned as weather.
