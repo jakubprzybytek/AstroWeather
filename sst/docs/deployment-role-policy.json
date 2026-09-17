@@ -115,6 +115,27 @@
       }
     },
     {
+      "Sid": "PassSchedulerExecutionRole",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "scheduler.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "ManageEventBridgeScheduler",
+      "Effect": "Allow",
+      "Action": [
+        "scheduler:CreateSchedule",
+        "scheduler:GetSchedule",
+        "scheduler:UpdateSchedule"
+      ],
+      "Resource": "*"
+    },
+    {
       "Sid": "ManageLambdaLogs",
       "Effect": "Allow",
       "Action": [
