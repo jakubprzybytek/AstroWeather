@@ -1,6 +1,7 @@
 #include <Console/ConsoleService.hpp>
 
 #include <Debug/LogService.hpp>
+#include <Sensors/CurrentSenseTask.hpp>
 
 #include "cmsis_os2.h"
 
@@ -118,10 +119,22 @@ void ConsoleService::execute(const char* line)
         reply("OK 'display set' - set value and precision, example: 'display set 0 1234 2'");
         reply("OK 'display time' - set hour and minute, example: 'display time 0 12:34'");
         reply("OK 'display blank' - clear a display, example: 'display blank 0'");
+        reply("OK 'adc on' - enable current-sense readout logging, example: 'adc on'");
+        reply("OK 'adc off' - disable current-sense readout logging, example: 'adc off'");
         return;
     }
     if (std::strcmp(line, "status") == 0) {
         reply("OK status=ready");
+        return;
+    }
+    if (std::strcmp(line, "adc on") == 0) {
+        CurrentSenseTask::instance().setLoggingEnabled(true);
+        reply("OK adc=on");
+        return;
+    }
+    if (std::strcmp(line, "adc off") == 0) {
+        CurrentSenseTask::instance().setLoggingEnabled(false);
+        reply("OK adc=off");
         return;
     }
 

@@ -31,6 +31,11 @@ void CurrentSenseTask::setDisplay(Display::Display* display)
     display_ = display;
 }
 
+void CurrentSenseTask::setLoggingEnabled(bool enabled)
+{
+    loggingEnabled_ = enabled;
+}
+
 CurrentSenseTask::Sample CurrentSenseTask::readSample()
 {
     if (HAL_ADC_Start(&hadc1) != HAL_OK)
@@ -90,15 +95,18 @@ void CurrentSenseTask::run()
                 display_->submit();
             }
 
-            LogService::instance().logf(
-                LogService::Level::Debug,
-                "CurrentSense raw=%lu current_mA=%lu temp_raw=%lu temp_C=%ld vref_raw=%lu vdda_mV=%lu",
-                static_cast<unsigned long>(sample.raw),
-                static_cast<unsigned long>(sample.currentMilliAmps),
-                static_cast<unsigned long>(sample.temperatureRaw),
-                static_cast<long>(sample.temperatureCelsius),
-                static_cast<unsigned long>(sample.vrefIntRaw),
-                static_cast<unsigned long>(sample.referenceMilliVolts));
+            if (loggingEnabled_)
+            {
+                LogService::instance().logf(
+                    LogService::Level::Debug,
+                    "CurrentSense raw=%lu current_mA=%lu temp_raw=%lu temp_C=%ld vref_raw=%lu vdda_mV=%lu",
+                    static_cast<unsigned long>(sample.raw),
+                    static_cast<unsigned long>(sample.currentMilliAmps),
+                    static_cast<unsigned long>(sample.temperatureRaw),
+                    static_cast<long>(sample.temperatureCelsius),
+                    static_cast<unsigned long>(sample.vrefIntRaw),
+                    static_cast<unsigned long>(sample.referenceMilliVolts));
+            }
         }
         else
         {

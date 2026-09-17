@@ -14,6 +14,7 @@ public:
     static CurrentSenseTask& instance();
 
     void setDisplay(Display::Display* display);
+    void setLoggingEnabled(bool enabled);
 
 protected:
     void run() override;
@@ -35,4 +36,5 @@ private:
     Sample readSample();
 
     Display::Display* display_ = nullptr;
+    volatile bool loggingEnabled_ = false;
 };
