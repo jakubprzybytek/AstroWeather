@@ -17,9 +17,11 @@ For a valid `configurationId`, the main endpoint returns:
 - the configuration identifier;
 - six observing nights, starting with the current night in the configuration's
   local timezone;
-- available minimum and maximum temperature for each night;
 - local sunset and next-day sunrise times for each night;
-- fixed-size hourly sun and moon state matrices for each night.
+- fixed-size hourly sun, moon, cloud, and thunderstorm state matrices for each
+   night;
+- the supported display board identifier for each night;
+- available maximum and minimum temperature for each night;
 
 An observing night is the local-noon-to-local-noon window already used by
 weather ingestion. Its `nightId` is the local calendar date on which the window
@@ -41,14 +43,20 @@ and clients do not need a migration period or a second route.
 
 The endpoint is consumed by an STM32-based device without a JSON parser. A
 successful request returns `text/plain; charset=utf-8` using the versioned ASCII
-`key=value` protocol defined in [api-payload.txt](api-payload.txt).
+`key=value` protocol defined in [api-payload.md](api-payload.md).
 
-The response contains a short header followed by six fixed-order display
-blocks. Each block contains the local `nightId`, sunset and sunrise times,
-fixed-size sun and moon matrices, and the available weather summary. Required
-records remain present when source data is missing and use documented sentinel
-values, allowing firmware to parse the response without dynamic allocation or
-a general-purpose document parser.
+The response contains the `protocol=1` and `configurationId` header records,
+followed by six fixed-order display blocks. Each block contains, in order,
+`display`, `board`, `nightId`, `numerical_0`, `numerical_1`, `matrix_0` through
+`matrix_3`, `numerical_3`, and `numerical_4`. `numerical_0` and `numerical_1`
+are sunset and sunrise; `matrix_0` through `matrix_3` are sun, moon, cloud,
+and thunderstorm state; and `numerical_3` and `numerical_4` are maximum and
+minimum temperature. `board` is `num4x4_matrix5x21` in version 1.
+
+Records remain present when a source is missing or fails and use the payload
+sentinel `?` for all unavailable times, weather values, and matrix slots. There is no
+`displayCount`, `matrix_4`, `numerical_2`, or end marker in version 1. The wire
+format has no blank lines or comments.
 
 Error responses use the same line protocol and stable machine-readable error
 identifiers. HTTP status codes remain authoritative.
@@ -73,9 +81,17 @@ belongs to the following local date. Moon events are included when they occur
 within the same local-noon-to-local-noon window.
 
 Sunset and sunrise are serialized as local `HH:MM` values. An event that does
-not occur is represented by `--:--`. Sun and moon state are sampled for the
-fixed local-hour slots defined by the embedded payload protocol. This handles
-always-up and always-down cases without separate boolean fields.
+not occur is represented by `?`. Sun and moon state are sampled for the
+21 local-hour slots: 14:00 through 10:00 on the following date. The
+11:00-12:00 interval is not displayed. Sun and moon state is sampled at each
+slot midpoint. The server emits the same 21 wall-clock slots across DST
+transitions and maps each local-hour midpoint to the appropriate instant.
+
+`matrix_2` is on when total cloud coverage is at least 10 percent, and
+`matrix_3` is on when a thunderstorm is predicted. An available matrix contains
+exactly 21 characters, each `*`, `.`, or `?`; a matrix row with no available
+source data is represented by the single `?` character. Within an available
+row, `?` represents an unavailable individual slot.
 
 ### Weather
 
@@ -92,28 +108,38 @@ Only `#WEATHER` records are part of the main API.
 DynamoDB TTL removal is asynchronous. The reader must exclude an item when
 `expireAt` is at or before the request time, even if DynamoDB has not deleted it
 yet. Temperature extrema are calculated only from hourly values within the
-requested observing night.
+requested observing night. The maximum is serialized in `numerical_3` and the
+minimum in `numerical_4`, each with one decimal place.
 
-### Partial availability
+### Graceful degradation
 
-Astronomy calculation does not depend on weather availability. A missing or
-expired weather record must not fail the whole request. The display block is
-still returned with `-` for its weather-derived numerical values.
+Astronomy and weather are assembled independently. Missing, expired, or failed
+weather retrieval must not prevent available astronomy from being returned.
+The affected weather matrix slots and weather-derived numerical values use `?`.
 
-The endpoint returns all six display blocks even when weather is available for
-fewer nights. This gives firmware a predictable payload and avoids optional
-records or variable block shapes.
+Likewise, an astronomy calculation failure must not prevent available weather
+from being returned. The affected sunset and sunrise values and sun or moon
+matrix slots use `?`.
 
-An unexpected DynamoDB or astronomy calculation failure returns an error rather
-than silently presenting a complete-looking but unreliable response.
+The endpoint always returns all six display blocks with the complete fixed
+record shape. It returns `500` only when it cannot assemble a trustworthy
+protocol response at all; a failure isolated to astronomy or weather returns
+`200` with sentinels only for the unavailable fields. Failures are logged with
+their source and affected nights.
+
+### Rate limiting and caching
+
+API Gateway limits the API to a burst of one request and a steady-state rate of
+one request per second. Requests beyond these limits are throttled by API
+Gateway. The API does not currently emit cache headers or use response caching.
 
 ## Errors
 
 | Status | Body | When |
 |---|---|---|
-| `200` | Forecast response | The configuration exists, including when some weather is unavailable |
+| `200` | Forecast response | The configuration exists, including when astronomy or weather is partly unavailable |
 | `404` | `error=configuration_not_found` response | The identifier is missing or unknown |
-| `500` | `error=forecast_unavailable` response | The endpoint cannot reliably assemble the response |
+| `500` | `error=forecast_unavailable` response | No trustworthy protocol response can be assembled |
 
 The API does not expose upstream errors, AWS details, or stack traces to the
 client. Operational details belong in structured Lambda logs.
@@ -125,18 +151,21 @@ client. Operational details belong in structured Lambda logs.
 2. The first night is selected using the location's timezone and local-noon
    boundary; the next five night identifiers are consecutive local dates.
 3. Every display block contains the complete, fixed-order record set defined in
-   `api-payload.txt` and all matrices contain exactly 22 valid characters.
+   `api-payload.md` and all matrices contain exactly 21 valid characters.
 4. Available, unexpired `#WEATHER` records supply the matching nights' minimum
    and maximum temperatures.
 5. Expired, out-of-range, and other service records are not returned as weather.
-6. Missing weather does not remove a display block; its weather numerical
-   values use the documented unavailable sentinel.
+6. Missing or failed weather does not remove a display block or available
+   astronomy; its numerical values and unavailable matrix rows or slots use
+   `?`.
 7. An unknown configuration returns the versioned text error payload with
    status `404`.
-8. Unit tests cover the local-noon boundary, six-night range, item grouping,
-   expired-item filtering, missing weather, matrix encoding, sentinels, and
-   serialization order.
-9. An integration test verifies the deployed route for one known and one
+8. Failed astronomy does not remove a display block or available weather; its
+   times and unavailable sun or moon matrix rows or slots use `?`.
+9. Unit tests cover the local-noon boundary, six-night range, item grouping,
+   expired-item filtering, independent astronomy and weather failures, matrix
+   encoding, sentinels, and serialization order.
+10. An integration test verifies the deployed route for one known and one
    unknown configuration.
 
 ## Non-goals
@@ -146,20 +175,6 @@ client. Operational details belong in structured Lambda logs.
 - Configuration CRUD or accepting arbitrary coordinates.
 - Adding aurora or additional forecast services in this story.
 - Guaranteeing that weather exists for every requested night.
-
-## Decisions Still Needed
-
-1. **Third matrix:** define the displayed meaning and source of `matrix_2`.
-2. **Physical slot count:** confirm that the display has 22 LEDs for local
-   14:00 through 11:00; the original sketch's count and examples did not match
-   that interval.
-3. **Matrix sampling:** confirm midpoint sampling for partial-hour sun and moon
-   transitions.
-4. **DST fallback:** decide how the repeated local hour maps to one physical LED
-   slot when an observing night crosses the end of daylight saving time.
-5. **Caching:** decide whether the API response needs HTTP cache headers and,
-   if so, the maximum acceptable staleness relative to the six-hour weather
-   ingestion schedule.
 
 ## Client Impact
 

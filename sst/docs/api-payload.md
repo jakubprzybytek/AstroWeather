@@ -48,14 +48,14 @@ numerical_4=8.9
 display=2
 board=num4x4_matrix5x21
 nightId=2026-09-19
-numerical_0=--:--
-numerical_1=--:--
-matrix_0=?????????????????????
-matrix_1=?????????????????????
-matrix_2=?????????????????????
-matrix_3=?????????????????????
-numerical_3=-
-numerical_4=-
+numerical_0=?
+numerical_1=?
+matrix_0=?
+matrix_1=?
+matrix_2=?
+matrix_3=?
+numerical_3=?
+numerical_4=?
 
 display=3
 board=num4x4_matrix5x21
@@ -109,6 +109,9 @@ Framing and parsing rules
 - Header records occur once and in the documented order.
 - A display=<index> record starts a display block. It is followed by that
   block's records in the documented order.
+- Each matrix record contains either 21 slot characters or the single `?`
+  character when the entire matrix row is unavailable. Within a 21-character
+  row, `?` marks an unavailable individual slot.
 - A successful response always has six display blocks, with display indexes 0
   to 5. There is no displayCount or end marker in version 1.
 - The device must reject the update if the protocol version is unsupported, a
@@ -140,10 +143,10 @@ nightId
   Local date in YYYY-MM-DD format for the noon-to-noon observing night.
 
 numerical_0
-  Local sunset time in HH:MM, or --:-- when no sunset occurs.
+  Local sunset time in HH:MM, or ? when no sunset occurs.
 
 numerical_1
-  Local sunrise time in HH:MM, or --:-- when no sunrise occurs. This is normally
+  Local sunrise time in HH:MM, or ? when no sunrise occurs. This is normally
   the morning after nightId.
 
 matrix_0
@@ -169,11 +172,11 @@ numerical_2
 
 numerical_3
   Maximum temperature during the observing night, in degrees Celsius, with one
-  decimal place. A hyphen means weather is unavailable.
+  decimal place. A question mark means weather is unavailable.
 
 numerical_4
   Minimum temperature during the observing night, in degrees Celsius, with one
-  decimal place. A hyphen means weather is unavailable.
+  decimal place. A question mark means weather is unavailable.
 
 Numerical display formats
 -------------------------
@@ -183,7 +186,8 @@ Every numerical display supports these value formats:
 - integer values from `-999` through `9999`;
 - fixed-precision numbers from `-999.9` through `999.9`, with a smallest
   representable increment of `0.001`;
-- times in `HH:MM` format.
+- times in `HH:MM` format;
+- `?` for unavailable data.
 
 The payload carries values, not segment bitmaps. The server must emit values
 within these supported ranges and formats.
@@ -192,18 +196,20 @@ For this protocol:
 
 - `numerical_0` and `numerical_1` contain local sunset and sunrise times;
 - `numerical_3` and `numerical_4` contain temperatures with one decimal place.
-- `numerical_0` and `numerical_1` use the missing-value sentinel `--:--` when
+- `numerical_0` and `numerical_1` use the missing-value sentinel `?` when
   the corresponding astronomical event is unavailable.
-- `numerical_3` and `numerical_4` use the missing-value sentinel `-` when
+- `numerical_3` and `numerical_4` use the missing-value sentinel `?` when
   weather is unavailable.
 
 Matrix encoding
 ---------------
 
-For board `num4x4_matrix5x21`, each matrix has exactly 21 characters, one per
-LED. Character index 0 represents local 14:00-15:00 on `nightId`. Subsequent
-indexes represent consecutive full hours. Character index 20 represents local
-10:00-11:00 on the following date. The 11:00-12:00 interval is not displayed.
+For board `num4x4_matrix5x21`, each available matrix row has exactly 21
+characters, one per LED. A fully unavailable matrix row is represented by the
+single `?` character. Character index 0 represents local 14:00-15:00 on
+`nightId`. Subsequent indexes represent consecutive full hours. Character
+index 20 represents local 10:00-11:00 on the following date. The 11:00-12:00
+interval is not displayed.
 
 In physical LED numbering, LED 1 maps to character index 0 and LED 21 maps to
 character index 20.
@@ -232,12 +238,17 @@ Missing data
 All records remain present even when data is unavailable, preserving a fixed
 parser and six-block response:
 
-- missing rise or set time: --:--
-- missing numerical weather value: -
-- unavailable matrix slot: ?
+- missing rise or set time: ?
+- missing numerical weather value: ?
+- unavailable matrix row: `?`
+- unavailable matrix slot in an otherwise available row: `?`
 
-An astronomy calculation failure fails the request. Missing or expired weather
-does not fail it; weather-derived fields use their unavailable sentinels.
+Astronomy and weather degrade independently. An astronomy calculation failure
+does not discard available weather; affected times and sun or moon slots use
+their unavailable sentinels. Missing, expired, or failed weather retrieval does
+not discard available astronomy; weather-derived fields use their unavailable
+sentinels. The server fails the request only when it cannot assemble a
+trustworthy protocol response at all.
 
 Errors
 ------
@@ -248,8 +259,9 @@ protocol=1
 error=configuration_not_found
 
 HTTP status remains authoritative: 404 for an unknown configuration and 500
-for an assembly failure. Error values are stable ASCII identifiers, not human
-messages.
+when no trustworthy protocol response can be assembled. A failure isolated to
+astronomy or weather returns 200 with unavailable sentinels for the affected
+fields. Error values are stable ASCII identifiers, not human messages.
 
 Implementation assessment
 -------------------------

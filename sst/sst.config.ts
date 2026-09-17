@@ -88,6 +88,14 @@ export default $config({
         name: domain.api,
         dns: route53Dns()
       },
+      transform: {
+        stage: {
+          defaultRouteSettings: {
+            throttlingBurstLimit: 1,
+            throttlingRateLimit: 1
+          }
+        }
+      },
       cors: {
         allowMethods: ["GET", "POST"],
         allowOrigins: [
