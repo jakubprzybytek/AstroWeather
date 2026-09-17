@@ -28,7 +28,8 @@ numerical_0=20:30
 numerical_1=05:59
 matrix_0=******........*******
 matrix_1=****.......**********
-matrix_2=.....................
+matrix_2=.....**********......
+matrix_3=......*..............
 numerical_3=18.5
 numerical_4=9.2
 
@@ -39,7 +40,8 @@ numerical_0=20:28
 numerical_1=06:01
 matrix_0=******........*******
 matrix_1=???????********......
-matrix_2=.....................
+matrix_2=...****************..
+matrix_3=..............*......
 numerical_3=17.8
 numerical_4=8.9
 
@@ -51,6 +53,7 @@ numerical_1=--:--
 matrix_0=?????????????????????
 matrix_1=?????????????????????
 matrix_2=?????????????????????
+matrix_3=?????????????????????
 numerical_3=-
 numerical_4=-
 
@@ -62,6 +65,7 @@ numerical_1=06:04
 matrix_0=******........*******
 matrix_1=.....................
 matrix_2=.....................
+matrix_3=.....................
 numerical_3=16.4
 numerical_4=7.5
 
@@ -73,6 +77,7 @@ numerical_1=06:06
 matrix_0=******........*******
 matrix_1=.....................
 matrix_2=.....................
+matrix_3=.....................
 numerical_3=15.9
 numerical_4=6.8
 
@@ -84,6 +89,7 @@ numerical_1=06:07
 matrix_0=******........*******
 matrix_1=.....................
 matrix_2=.....................
+matrix_3=.....................
 numerical_3=15.2
 numerical_4=6.1
 ```
@@ -104,11 +110,11 @@ Framing and parsing rules
 - A display=<index> record starts a display block. It is followed by that
   block's records in the documented order.
 - A successful response always has six display blocks, with display indexes 0
-  to 5, and a final end=1 record. There is no displayCount record in version 1.
+  to 5. There is no displayCount or end marker in version 1.
 - The device must reject the update if the protocol version is unsupported, a
   required record is malformed or absent, the board is unsupported, display
-  indexes are not consecutive, or end=1 is not received. It should retain its
-  previous complete forecast.
+  indexes are not consecutive, or the HTTP body ends before all required
+  records are received. It should retain its previous complete forecast.
 - configurationId is restricted by server configuration identifiers and does
   not require escaping.
 
@@ -147,8 +153,15 @@ matrix_1
   Moon state by local-hour slot.
 
 matrix_2
-  Reserved until its displayed meaning is defined. The server must not be
-  implemented with an assumed meaning for this field.
+  Total cloud coverage by local-hour slot. A slot is on when total cloud
+  coverage is greater than or equal to 10 percent.
+
+matrix_3
+  Thunderstorm prediction by local-hour slot.
+
+matrix_4
+  Unused in version 1 and omitted from the response. It is reserved for a
+  future matrix channel.
 
 numerical_2
   Unused in version 1. It is intentionally absent and reserved for the physical
@@ -161,6 +174,28 @@ numerical_3
 numerical_4
   Minimum temperature during the observing night, in degrees Celsius, with one
   decimal place. A hyphen means weather is unavailable.
+
+Numerical display formats
+-------------------------
+
+Every numerical display supports these value formats:
+
+- integer values from `-999` through `9999`;
+- fixed-precision numbers from `-999.9` through `999.9`, with a smallest
+  representable increment of `0.001`;
+- times in `HH:MM` format.
+
+The payload carries values, not segment bitmaps. The server must emit values
+within these supported ranges and formats.
+
+For this protocol:
+
+- `numerical_0` and `numerical_1` contain local sunset and sunrise times;
+- `numerical_3` and `numerical_4` contain temperatures with one decimal place.
+- `numerical_0` and `numerical_1` use the missing-value sentinel `--:--` when
+  the corresponding astronomical event is unavailable.
+- `numerical_3` and `numerical_4` use the missing-value sentinel `-` when
+  weather is unavailable.
 
 Matrix encoding
 ---------------
@@ -185,6 +220,12 @@ an hour. All time calculations use the configuration's timezone, including DST
 transitions. The protocol still emits 21 wall-clock slots on a DST transition;
 the server maps each labeled local-hour midpoint to the appropriate instant.
 
+For weather matrices, each slot uses the weather record for its corresponding
+hour. In `matrix_2`, `*` means total cloud coverage is at least 10 percent and
+`.` means it is below 10 percent. In `matrix_3`, `*` means a thunderstorm is
+predicted and `.` means none is predicted. In either matrix, `?` means the
+weather record or that hourly value is unavailable.
+
 Missing data
 ------------
 
@@ -205,7 +246,6 @@ Errors also use text/plain and a small parseable body:
 
 protocol=1
 error=configuration_not_found
-end=1
 
 HTTP status remains authoritative: 404 for an unknown configuration and 500
 for an assembly failure. Error values are stable ASCII identifiers, not human
@@ -221,10 +261,9 @@ can parse one bounded line at a time using a small fixed buffer and does not nee
 to hold the entire response in RAM.
 
 HTTPS/TCP and HTTP Content-Length already provide transport integrity. The
-end=1 marker lets the device reject a syntactically truncated body, so an
-application checksum is not required unless payloads are transported outside
-HTTP later.
+device can reject a syntactically truncated body when the received byte count
+does not match Content-Length or when required records are missing, so an
+application end marker or checksum is not required while payloads remain inside
+HTTP.
 
-The endpoint can be implemented with the current line protocol. Before server
-and firmware implementations are frozen, the meaning and source of `matrix_2`
-must be defined.
+The endpoint can be implemented with the current line protocol.
