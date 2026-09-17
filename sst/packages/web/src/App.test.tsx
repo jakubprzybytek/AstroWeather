@@ -43,6 +43,26 @@ describe("AstroWeather app", () => {
     expect(await screen.findByText("The moon is always above the horizon.")).toBeInTheDocument();
   });
 
+  test("defaults to Wrocław when submitted without changing the location", async () => {
+    fetchMock
+      .mockResolvedValueOnce(configurationsResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        configId: "wroclaw",
+        timezone: "Europe/Warsaw",
+        sun: { rise: "2026-09-06T04:00:00.000Z", set: "2026-09-06T17:00:00.000Z" },
+        moon: { rise: null, set: null, alwaysUp: true, alwaysDown: false }
+      }), { status: 200 }));
+
+    render(<App />);
+    await screen.findByRole("option", { name: "Wrocław" });
+    expect(screen.getByLabelText("Location")).toHaveValue("wroclaw");
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/astro/wroclaw")
+    ));
+  });
+
   test("renders API errors", async () => {
     fetchMock
       .mockResolvedValueOnce(configurationsResponse())

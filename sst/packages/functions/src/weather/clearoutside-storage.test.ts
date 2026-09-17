@@ -34,7 +34,7 @@ describe("toClearOutsideItem", () => {
 
     expect(item).toEqual({
       pk: "LOC#krakow",
-      sk: "NIGHT#2026-09-11#SKY_CONDITIONS",
+      sk: "NIGHT#2026-09-11#WEATHER",
       configurationId: "krakow",
       nightId: "2026-09-11",
       service: "skyConditions",

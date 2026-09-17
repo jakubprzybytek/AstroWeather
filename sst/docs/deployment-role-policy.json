@@ -66,7 +66,41 @@
     {
       "Sid": "DescribeDynamoDbTables",
       "Effect": "Allow",
-      "Action": "dynamodb:DescribeTable",
+      "Action": [
+        "dynamodb:CreateTable",
+        "dynamodb:DescribeContinuousBackups",
+        "dynamodb:DescribeTable",
+        "dynamodb:DescribeTimeToLive",
+        "dynamodb:ListTagsOfResource",
+        "dynamodb:TagResource",
+        "dynamodb:UpdateContinuousBackups",
+        "dynamodb:UpdateTimeToLive"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "RequestAcmCertificates",
+      "Effect": "Allow",
+      "Action": [
+        "acm:AddTagsToCertificate",
+        "acm:DescribeCertificate",
+        "acm:ListTagsForCertificate",
+        "acm:RequestCertificate"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "LookupRoute53HostedZones",
+      "Effect": "Allow",
+      "Action": [
+        "route53:ChangeResourceRecordSets",
+        "route53:GetChange",
+        "route53:GetHostedZone",
+        "route53:ListHostedZones",
+        "route53:ListTagsForResource",
+        "route53:ListHostedZonesByName",
+        "route53:ListResourceRecordSets"
+      ],
       "Resource": "*"
     },
     {

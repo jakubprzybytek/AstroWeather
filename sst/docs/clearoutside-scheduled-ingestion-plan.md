@@ -29,7 +29,7 @@ Clearoutside fields. Those are separate follow-up changes.
 | Schedule | SST `CronV2` with `rate(6 hours)` |
 | Request order | Process locations sequentially with a 5-second gap between locations |
 | Forecast horizon | Store every complete parsed night, currently seven |
-| Table key | `pk = LOC#<configurationId>`, `sk = NIGHT#<nightId>#SKY_CONDITIONS` |
+| Table key | `pk = LOC#<configurationId>`, `sk = NIGHT#<nightId>#WEATHER` |
 | Write model | One complete `Put` per night; deterministic keys make retries idempotent |
 | TTL | `expireAt` is 72 hours after the final hourly timestamp in the item |
 | Fetch/parse failure | Write nothing for that location and retain previous items |
@@ -134,7 +134,7 @@ scheduler retry or next run.
 ```typescript
 type ClearOutsideItem = {
   pk: `LOC#${string}`;
-  sk: `NIGHT#${string}#SKY_CONDITIONS`;
+  sk: `NIGHT#${string}#WEATHER`;
   configurationId: string;
   nightId: string;
   service: "skyConditions";
@@ -229,7 +229,7 @@ responses. Keep the saved HTML fixture as the parser regression test.
 
 Update `docs/architecture.md` with:
 
-- the concrete `SKY_CONDITIONS` service;
+- the concrete Clear Outside weather service;
 - the DynamoDB item shape;
 - the six-hour writer;
 - per-location failure isolation.

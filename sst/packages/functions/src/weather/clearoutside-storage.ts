@@ -45,7 +45,7 @@ export function toClearOutsideItem(
 
   return {
     pk: `LOC#${configurationId}`,
-    sk: `NIGHT#${night.nightId}#SKY_CONDITIONS`,
+    sk: `NIGHT#${night.nightId}#WEATHER`,
     configurationId,
     nightId: night.nightId,
     service: "skyConditions",

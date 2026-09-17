@@ -7,7 +7,7 @@ import type { AstroResponse, Configuration } from "./types";
 import { ClearOutsideTool } from "./components/ClearOutsideTool";
 
 export default function App() {
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState("wroclaw");
   const [data, setData] = useState<AstroResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

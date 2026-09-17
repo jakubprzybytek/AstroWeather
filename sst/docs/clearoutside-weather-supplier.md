@@ -140,7 +140,7 @@ documented weather API:
 
    ```text
   PK = LOC#krakow
-   SK = NIGHT#2026-09-10#SKY_CONDITIONS
+  SK = NIGHT#2026-09-10#WEATHER
    ```
 
 5. Cache aggressively and keep polling frequency low to reduce legal/ethical

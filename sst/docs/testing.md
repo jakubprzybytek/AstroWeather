@@ -80,7 +80,7 @@ aws dynamodb query \
   --expression-attribute-values '{":pk":{"S":"LOC#krakow"}}'
 ```
 
-Verify that returned items use the `NIGHT#<nightId>#SKY_CONDITIONS` sort-key
+Verify that returned items use the `NIGHT#<nightId>#WEATHER` sort-key
 format, contain numeric `expireAt` values and normalized `hours`, and contain no
 raw HTML. A failed scrape should leave the previous item unchanged.
 

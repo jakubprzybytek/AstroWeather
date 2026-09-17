@@ -58,11 +58,11 @@ DynamoDB when CRUD management is needed.
 
 The `ForecastData` table uses `pk` and `sk` as its primary key and `expireAt`
 as its DynamoDB TTL attribute. The scheduled Clearoutside writer stores one
-`SKY_CONDITIONS` item per configuration and forecast night:
+weather item per configuration and forecast night:
 
 ```text
 PK = LOC#<configurationId>
-SK = NIGHT#<nightId>#SKY_CONDITIONS
+SK = NIGHT#<nightId>#WEATHER
 ```
 
 Each item contains the configuration identifier, coordinates, normalized hourly
@@ -156,7 +156,7 @@ weather data for night X"):
   Scheduler invokes a Lambda every six hours. It processes the configured
   locations sequentially with a five-second gap between requests, parses the
   complete server-rendered page before writing, and upserts
-  `NIGHT#...#SKY_CONDITIONS` items. A failed location is logged and does not
+  `NIGHT#...#WEATHER` items. A failed location is logged and does not
   block other locations; the invocation still fails after all locations are
   attempted so the scheduler can retry it.
 
@@ -190,6 +190,14 @@ The React/TypeScript web UI lives in `packages/web` and is hosted by an SST
 the API URL as `VITE_API_URL`. The browser calls API Gateway, which invokes the
 Lambda and returns the unified nightly data for the selected configuration and
 location.
+
+In deployed stages, the web UI uses an app-specific custom domain. Production is
+available at `https://astroweather.albedoonline.com`, with the API at
+`https://api.astroweather.albedoonline.com`. Other stages use the stage name as
+the first label, for example `https://int.astroweather.albedoonline.com` and
+`https://api.int.astroweather.albedoonline.com`. SST manages the ACM certificates
+and Route 53 records in the `albedoonline.com` hosted zone. The API allows the
+matching web origin plus the local Vite development origins.
 
 The UI also exposes helper tools independently from the main astronomy view.
 It loads the configuration list from `GET /configurations` and uses that list
