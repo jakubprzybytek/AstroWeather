@@ -67,18 +67,26 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 )
 
 # Add sources to executable
-# Sources under User/Src/HostController and User/Src/DisplayController are variant-specific;
-# everything else under User/Src is shared by both firmware images.
+# Sources under User/Src/HostController and User/Src/DisplayController are variant-specific.
+# User/Src/WiFi is also HostController-only; everything else is shared by both images.
 file(GLOB_RECURSE USER_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/User/Src/*.c
     ${CMAKE_CURRENT_SOURCE_DIR}/User/Src/*.cpp
 )
-list(FILTER USER_SOURCES EXCLUDE REGEX "/User/Src/(HostController|DisplayController)/")
+list(FILTER USER_SOURCES EXCLUDE REGEX "/User/Src/(HostController|DisplayController|WiFi)/")
 
 file(GLOB_RECURSE USER_SOURCES_VARIANT CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/User/Src/${FIRMWARE_VARIANT}/*.c
     ${CMAKE_CURRENT_SOURCE_DIR}/User/Src/${FIRMWARE_VARIANT}/*.cpp
 )
+
+if(FIRMWARE_VARIANT STREQUAL "HostController")
+    file(GLOB_RECURSE WIFI_SOURCES CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/User/Src/WiFi/*.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/User/Src/WiFi/*.cpp
+    )
+    list(APPEND USER_SOURCES_VARIANT ${WIFI_SOURCES})
+endif()
 
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${USER_SOURCES}
