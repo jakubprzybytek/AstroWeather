@@ -3,7 +3,9 @@
 ## Overview
 AstroWeather is a serverless API built on **AWS** using the **SST (Serverless Stack)** framework. The API presents a single view of forecast data for a configured location, including astronomical events, weather forecasts, northern lights (aurora) forecasts, and additional data sources as they are added.
 
-The API response is organized by night. Each night can contain an `astro` section, a `weather` section, an `auroraForecast` section, and other service sections in the future. Clients do not need to call a separate endpoint for each data source.
+The main API response is a fixed six-display text protocol. Each display combines
+astronomy and weather fields for one observing night, while clients do not need
+to call a separate endpoint for each data source.
 
 ## Core Components
 ### 1. API Gateway (SST `Api`)
@@ -11,14 +13,16 @@ The API response is organized by night. Each night can contain an `astro` sectio
   - **Output**: JSON array of public configuration identifiers and labels for UI selectors.
 - **Endpoint**: `GET /astro/{configurationId}`
 - **Input**: `configurationId` (path parameter)
-- **Output**: JSON payload containing the available astronomical, weather, aurora, and related forecast data for the configured location, grouped by night.
+- **Output**: `text/plain; charset=utf-8` version 1 payload containing six fixed
+  display blocks with astronomical and weather fields.
 
 ### 2. Lambda Function
 - **Handler**: Processes the `configurationId` and assembles the response.
 - **Logic**:
   - Resolves the configuration and its location data (latitude, longitude, timezone).
   - Reads or calculates the available data for the requested nights.
-  - Merges the independent service records into one formatted JSON response.
+  - Merges independent astronomy and weather data into one fixed text response,
+    using sentinels when a source is unavailable.
 
 ### 3. Configuration and location
 
@@ -122,10 +126,9 @@ writes independently without clobbering the others:
   never conflict and a stale/failing source doesn't block the others.
 - **Freshness/TTL**: each item carries a `ttl` attribute (epoch seconds) a few
   days past the night; DynamoDB auto-deletes stale items, keeping the table small.
-- **Merge at read time**: the API Lambda queries the night range, groups items
-  by `nightId`, and assembles one JSON response per night with keys `astro`,
-  `weather`, `auroraForecast`, and any additional service keys, even though the
-  writes are fully decoupled.
+- **Merge at read time**: the API Lambda queries the weather night range and
+  assembles the six fixed display blocks, even though source writes are fully
+  decoupled.
 
 **Optional GSI** for maintenance/backfill jobs (e.g. "find locations missing
 weather data for night X"):
@@ -181,7 +184,8 @@ changes or breaks.
 3. Lambda resolves the `krakow` configuration and its location.
 4. The Lambda reads or computes the available astro, weather, aurora, and other
   service data for the requested night range.
-5. The Lambda returns one JSON response grouped by night.
+5. The Lambda returns the versioned six-display text payload. The web UI shows
+  that response body verbatim for inspection; the embedded client parses it.
 
 ## Web UI
 

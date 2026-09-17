@@ -56,7 +56,7 @@ minimum temperature. `board` is `num4x4_matrix5x21` in version 1.
 Records remain present when a source is missing or fails and use the payload
 sentinel `?` for all unavailable times, weather values, and matrix slots. There is no
 `displayCount`, `matrix_4`, `numerical_2`, or end marker in version 1. The wire
-format has no blank lines or comments.
+format has one empty row between display blocks and no comments.
 
 Error responses use the same line protocol and stable machine-readable error
 identifiers. HTTP status codes remain authoritative.

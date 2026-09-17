@@ -15,13 +15,11 @@ export async function fetchConfigurations(): Promise<Configuration[]> {
 
 export async function fetchAstro(configId: string): Promise<AstroResponse> {
   const response = await fetch(`${apiUrl}/astro/${encodeURIComponent(configId)}`);
-  const body = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(typeof body.message === "string" ? body.message : "Unable to load astronomy data");
-  }
-
-  return body as AstroResponse;
+  return {
+    status: response.status,
+    contentType: response.headers.get("content-type") ?? "",
+    body: await response.text()
+  };
 }
 
 export type ClearOutsideInput =

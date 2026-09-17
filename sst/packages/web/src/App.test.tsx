@@ -25,12 +25,10 @@ describe("AstroWeather app", () => {
   test("submits the selected location and renders results", async () => {
     fetchMock
       .mockResolvedValueOnce(configurationsResponse())
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-      configId: "krakow",
-      timezone: "Europe/Warsaw",
-      sun: { rise: "2026-09-06T04:00:00.000Z", set: "2026-09-06T17:00:00.000Z" },
-      moon: { rise: null, set: null, alwaysUp: true, alwaysDown: false }
-      }), { status: 200 }));
+      .mockResolvedValueOnce(new Response("protocol=1\nconfigurationId=krakow\n", {
+        status: 200,
+        headers: { "content-type": "text/plain; charset=utf-8" }
+      }));
 
     render(<App />);
       await screen.findByRole("option", { name: "Kraków" });
@@ -40,7 +38,10 @@ describe("AstroWeather app", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/astro/krakow")
     ));
-    expect(await screen.findByText("The moon is always above the horizon.")).toBeInTheDocument();
+    const responseTitle = await screen.findByText("API response");
+    expect(responseTitle.parentElement?.querySelector("pre")?.textContent)
+      .toBe("protocol=1\nconfigurationId=krakow\n");
+    expect(screen.getByText(/HTTP 200/)).toBeInTheDocument();
   });
 
   test("defaults to Wrocław when submitted without changing the location", async () => {
@@ -66,14 +67,19 @@ describe("AstroWeather app", () => {
   test("renders API errors", async () => {
     fetchMock
       .mockResolvedValueOnce(configurationsResponse())
-      .mockResolvedValueOnce(new Response(JSON.stringify({ message: "Configuration not found" }), { status: 404 }));
+      .mockResolvedValueOnce(new Response("protocol=1\nerror=configuration_not_found\n", {
+        status: 404,
+        headers: { "content-type": "text/plain; charset=utf-8" }
+      }));
 
     render(<App />);
     await screen.findByRole("option", { name: "Kraków" });
     fireEvent.change(screen.getByLabelText("Location"), { target: { value: "krakow" } });
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
 
-    expect(await screen.findByText("Configuration not found")).toBeInTheDocument();
+    const responseTitle = await screen.findByText("API response");
+    expect(responseTitle.parentElement?.querySelector("pre")?.textContent)
+      .toBe("protocol=1\nerror=configuration_not_found\n");
   });
 
   test("opens Clearoutside and renders hourly risk indicators", async () => {

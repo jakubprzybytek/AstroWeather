@@ -2,65 +2,43 @@ import { describe, test, expect } from "vitest";
 import { Resource } from "sst";
 
 const BASE_URL = Resource.AstroApi.url;
-
-type AstroResponse = {
-  configurationId: string;
-  timezone: string;
-  sun: {
-    rise: string | null;
-    set: string | null;
-  };
-  moon: {
-    rise: string | null;
-    set: string | null;
-    alwaysUp: boolean;
-    alwaysDown: boolean;
-  };
-};
-
-function isIsoStringOrNull(value: unknown): value is string | null {
-  if (value === null) return true;
-  if (typeof value !== "string") return false;
-  return !Number.isNaN(Date.parse(value));
-}
+const displayKeys = [
+  "display", "board", "nightId", "numerical_0", "numerical_1",
+  "matrix_0", "matrix_1", "matrix_2", "matrix_3", "numerical_3", "numerical_4"
+];
 
 describe("GET /astro/{configurationId}", () => {
-  test("returns 404 for an unknown configurationId", async () => {
+  test("returns the six-display text protocol for a known configuration", async () => {
+    const response = await fetch(`${BASE_URL}/astro/krakow`);
+    const body = await response.text();
+    const lines = body.split("\n");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/plain");
+    expect(lines[0]).toBe("protocol=1");
+    expect(lines[1]).toBe("configurationId=krakow");
+    expect(lines[2]).toBe("");
+    expect(lines[3]).toBe("display=0");
+    expect(body).toContain("\n\ndisplay=1");
+
+    expect(lines.filter((line) => line.startsWith("display="))).toEqual([
+      "display=0", "display=1", "display=2", "display=3", "display=4", "display=5"
+    ]);
+    for (let display = 0; display < 6; display += 1) {
+      const start = lines.indexOf(`display=${display}`);
+      expect(lines.slice(start, start + displayKeys.length).map((line) => line.split("=", 1)[0]))
+        .toEqual(displayKeys);
+      const matrices = lines.slice(start + 5, start + 9).map((line) => line.split("=", 2)[1]);
+      expect(matrices.every((value) => value === "?" || /^[*.?]{21}$/.test(value))).toBe(true);
+    }
+  });
+
+  test("returns the versioned error payload for an unknown configuration", async () => {
     const response = await fetch(`${BASE_URL}/astro/unknown-place`);
 
     expect(response.status).toBe(404);
-
-    const body = await response.json();
-    expect(body).toEqual({ message: "Configuration not found" });
-  });
-
-  test("returns 200 with correct shape for krakow", async () => {
-    const response = await fetch(`${BASE_URL}/astro/krakow`);
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toContain("application/json");
-
-    const body: AstroResponse = await response.json();
-
-    expect(body.configurationId).toBe("krakow");
-    expect(body.timezone).toBe("Europe/Warsaw");
-
-    expect(isIsoStringOrNull(body.sun.rise)).toBe(true);
-    expect(isIsoStringOrNull(body.sun.set)).toBe(true);
-
-    expect(isIsoStringOrNull(body.moon.rise)).toBe(true);
-    expect(isIsoStringOrNull(body.moon.set)).toBe(true);
-    expect(typeof body.moon.alwaysUp).toBe("boolean");
-    expect(typeof body.moon.alwaysDown).toBe("boolean");
-  });
-
-  test("returns 200 for sharm-el-sheikh", async () => {
-    const response = await fetch(`${BASE_URL}/astro/sharm-el-sheikh`);
-
-    expect(response.status).toBe(200);
-    const body: AstroResponse = await response.json();
-    expect(body.configurationId).toBe("sharm-el-sheikh");
-    expect(body.timezone).toBe("Africa/Cairo");
+    expect(response.headers.get("content-type")).toContain("text/plain");
+    expect(await response.text()).toBe("protocol=1\nerror=configuration_not_found\n");
   });
 
   test("returns non-200 when configurationId path parameter is missing", async () => {

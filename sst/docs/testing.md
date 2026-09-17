@@ -167,11 +167,13 @@ import { describe, it, expect } from "vitest";
 const BASE_URL = process.env.API_URL ?? "http://localhost:3000";
 
 describe("GET /astro/:configId", () => {
-  it("returns 200 for a known configId", async () => {
+  it("returns the six-display text payload", async () => {
     const res = await fetch(`${BASE_URL}/astro/krakow`);
+    const body = await res.text();
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toHaveProperty("sun.rise");
+    expect(res.headers.get("content-type")).toContain("text/plain");
+    expect(body).toContain("protocol=1\nconfigurationId=krakow\n");
+    expect(body.match(/^display=/gm)).toHaveLength(6);
   });
 });
 ```

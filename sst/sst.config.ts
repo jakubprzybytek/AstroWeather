@@ -107,7 +107,10 @@ export default $config({
     });
 
     api.route("GET /configurations", "packages/functions/src/configurations-handler.handler");
-    api.route("GET /astro/{configurationId}", "packages/functions/src/astro.handler");
+    api.route("GET /astro/{configurationId}", {
+      handler: "packages/functions/src/astro.handler",
+      link: [forecastData]
+    });
     api.route("POST /tools/clearoutside", "packages/functions/src/clearoutside.handler");
 
     new sst.aws.CronV2("ClearOutsideIngestion", {

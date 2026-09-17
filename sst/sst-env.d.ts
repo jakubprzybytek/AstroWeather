@@ -6,18 +6,6 @@
 
 declare module "sst" {
   export interface Resource {
-    "AstroApi": {
-      "type": "sst.aws.ApiGatewayV2"
-      "url": string
-    }
-    "AstroWeb": {
-      "type": "sst.aws.StaticSite"
-      "url": string
-    }
-    "ForecastData": {
-      "name": string
-      "type": "sst.aws.Dynamo"
-    }
   }
 }
 

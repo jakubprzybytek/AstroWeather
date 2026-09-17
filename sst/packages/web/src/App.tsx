@@ -34,7 +34,7 @@ export default function App() {
       if (currentRequest === requestId.current) setData(result);
     } catch (cause) {
       if (currentRequest === requestId.current) {
-        setError(cause instanceof Error ? cause.message : "Unable to load astronomy data");
+        setError(cause instanceof Error ? cause.message : "Unable to load API response");
       }
     } finally {
       if (currentRequest === requestId.current) setLoading(false);

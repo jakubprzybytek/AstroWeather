@@ -102,7 +102,9 @@ Framing and parsing rules
 
 - Each record is key=value followed by LF (0x0A). A parser may discard a
   preceding CR (0x0D) to tolerate CRLF.
-- There are no comments, spaces, quoted strings, escaped values, or blank lines
+- There are no comments, spaces, quoted strings, or escaped values. One empty
+  row follows the header records, before `display=0`, and separates each
+  display block.
   on the wire.
 - Split each record at the first equals sign. Unknown keys must be ignored so
   fields can be added in a later protocol version.
