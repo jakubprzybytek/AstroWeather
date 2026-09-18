@@ -36,37 +36,49 @@ void CurrentSenseTask::setLoggingEnabled(bool enabled)
     loggingEnabled_ = enabled;
 }
 
+void CurrentSenseTask::notifyAdcComplete()
+{
+    osThreadFlagsSet(getHandle(), kAdcCompleteFlag);
+}
+
+void CurrentSenseTask::notifyAdcError()
+{
+    osThreadFlagsSet(getHandle(), kAdcErrorFlag);
+}
+
 CurrentSenseTask::Sample CurrentSenseTask::readSample()
 {
-    if (HAL_ADC_Start(&hadc1) != HAL_OK)
+    osThreadFlagsClear(kAdcCompleteFlag | kAdcErrorFlag);
+
+    if (HAL_ADC_Start_DMA(
+            &hadc1, reinterpret_cast<uint32_t*>(adcValues_), kAdcSequenceLength) !=
+        HAL_OK)
     {
         return {false, 0U, 0U, 0U, 0U, 0U, 0};
     }
 
-    uint32_t values[kAdcSequenceLength] = {0U, 0U, 0U};
-    for (uint32_t index = 0U; index < kAdcSequenceLength; ++index)
-    {
-        if (HAL_ADC_PollForConversion(&hadc1, 10U) != HAL_OK)
-        {
-            HAL_ADC_Stop(&hadc1);
-            return {false, 0U, 0U, 0U, 0U, 0U, 0};
-        }
+    const uint32_t flags = osThreadFlagsWait(
+        kAdcCompleteFlag | kAdcErrorFlag, osFlagsWaitAny, 10U);
+    HAL_ADC_Stop_DMA(&hadc1);
 
-        values[index] = HAL_ADC_GetValue(&hadc1);
+    if ((flags & osFlagsError) != 0U ||
+        (flags & kAdcErrorFlag) != 0U ||
+        (flags & kAdcCompleteFlag) == 0U)
+    {
+        return {false, 0U, 0U, 0U, 0U, 0U, 0U};
     }
 
-    HAL_ADC_Stop(&hadc1);
-
     const uint32_t referenceMilliVolts =
-        values[2] == 0U
+        adcValues_[2] == 0U
             ? kNominalReferenceMilliVolts
-            : __HAL_ADC_CALC_VREFANALOG_VOLTAGE(values[2], ADC_RESOLUTION_12B);
+            : __HAL_ADC_CALC_VREFANALOG_VOLTAGE(
+                  adcValues_[2], ADC_RESOLUTION_12B);
     const int32_t temperatureCelsius = __HAL_ADC_CALC_TEMPERATURE(
-        referenceMilliVolts, values[1], ADC_RESOLUTION_12B);
+        referenceMilliVolts, adcValues_[1], ADC_RESOLUTION_12B);
     const uint32_t currentMilliAmps = CurrentSense::rawToMilliAmps(
-        values[0], referenceMilliVolts);
+        adcValues_[0], referenceMilliVolts);
 
-    return {true, values[0], currentMilliAmps, values[1], values[2],
+    return {true, adcValues_[0], currentMilliAmps, adcValues_[1], adcValues_[2],
             referenceMilliVolts, temperatureCelsius};
 }
 
@@ -116,5 +128,21 @@ void CurrentSenseTask::run()
         }
 
         osDelayUntil(nextWake);
+    }
+}
+
+extern "C" void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+{
+    if (hadc == &hadc1)
+    {
+        CurrentSenseTask::instance().notifyAdcComplete();
+    }
+}
+
+extern "C" void HAL_ADC_ErrorCallback(ADC_HandleTypeDef* hadc)
+{
+    if (hadc == &hadc1)
+    {
+        CurrentSenseTask::instance().notifyAdcError();
     }
 }

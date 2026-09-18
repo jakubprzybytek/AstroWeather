@@ -15,6 +15,8 @@ public:
 
     void setDisplay(Display::Display* display);
     void setLoggingEnabled(bool enabled);
+    void notifyAdcComplete();
+    void notifyAdcError();
 
 protected:
     void run() override;
@@ -35,6 +37,10 @@ private:
 
     Sample readSample();
 
+    static constexpr uint32_t kAdcCompleteFlag = 1U << 0U;
+    static constexpr uint32_t kAdcErrorFlag = 1U << 1U;
+
+    alignas(uint32_t) uint16_t adcValues_[3] = {0U, 0U, 0U};
     Display::Display* display_ = nullptr;
     volatile bool loggingEnabled_ = false;
 };
