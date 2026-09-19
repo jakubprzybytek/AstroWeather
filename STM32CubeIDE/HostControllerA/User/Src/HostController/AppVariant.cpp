@@ -1,4 +1,5 @@
 #include <AppVariant.hpp>
+#include <Console/AstroCommand.hpp>
 #include <Console/ConsoleService.hpp>
 #include <Debug/LogService.hpp>
 #include <Device/SCT2xxx.hpp>
@@ -6,9 +7,11 @@
 #include <Display/Display.hpp>
 #include <Display/PcbDisplayBoard.hpp>
 #include <HostController/MainLoopTask.hpp>
+#include <HostController/AstroDataRefreshTask.hpp>
 #include <Sensors/CurrentSenseTask.hpp>
 #include <St67HttpFetchTask.hpp>
-#include <SwitchTask.hpp>
+#include <Utils/Led.hpp>
+#include <Utils/SwitchInput.hpp>
 
 #include "main.h"
 
@@ -32,9 +35,13 @@ Display::BufferedDisplayBoard remoteBoard1(hi2c1, 0x10U);
 Display::BufferedDisplayBoard remoteBoard2(hi2c1, 0x11U);
 Display::BufferedDisplayBoard remoteBoard3(hi2c1, 0x12U);
 Display::BufferedDisplayBoard remoteBoard4(hi2c1, 0x13U);
+Display::BufferedDisplayBoard remoteBoard5(hi2c1, 0x14U);
 
 Display::Display display(localBoard, {&remoteBoard1, &remoteBoard2,
-                                      &remoteBoard3, &remoteBoard4});
+                                      &remoteBoard3, &remoteBoard4,
+                                      &remoteBoard5});
+
+Led led2(LED_2_GPIO_Port, LED_2_Pin);
 
 void AppVariant_Init() {
   LogService::instance().init();
@@ -46,7 +53,11 @@ void AppVariant_Init() {
   localBoard.start();
 
   HostController::StartSt67HttpFetchTask();
+  HostController::AstroDataRefreshTask::instance().init(&display);
+  HostController::AstroDataRefreshTask::instance().start();
+  MainLoopTask::instance().init(led2);
   MainLoopTask::instance().start();
-  SwitchTask::setSwitch1Handler(&MainLoopTask::trigger);
-  SwitchTask::setSwitch2Handler(&HostController::TriggerSt67ConnectivityCycle);
+  Utils::SwitchInput::instance().attach(
+      MainLoopTask::instance().getHandle(), MainLoopTask::kEventSwitch1,
+      MainLoopTask::kEventSwitch2);
 }

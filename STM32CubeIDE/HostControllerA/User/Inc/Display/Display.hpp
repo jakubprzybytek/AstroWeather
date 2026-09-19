@@ -12,7 +12,7 @@ namespace Display {
 // only method that requires mutual exclusion between client tasks.
 class Display {
 public:
-    Display(DisplayBoard& local, const std::array<DisplayBoard*, 4>& remote)
+    Display(DisplayBoard& local, const std::array<DisplayBoard*, 5>& remote)
         : local_(local), remote_(remote) {}
 
     DisplayBoard& local() { return local_; }
@@ -21,7 +21,7 @@ public:
 
 private:
     DisplayBoard& local_;
-    std::array<DisplayBoard*, 4> remote_;
+    std::array<DisplayBoard*, 5> remote_;
     Mutex submitMutex_;
 };
 

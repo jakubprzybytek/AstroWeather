@@ -16,6 +16,7 @@ constexpr uint8_t kLogicalPayloadSize =
 constexpr uint8_t kI2cMessageSize = 1U + kLogicalPayloadSize;
 constexpr uint8_t kMaxPrecision = 3;
 constexpr uint32_t kMatrixMask = (1UL << kMatrixColumnCount) - 1UL;
+constexpr uint8_t kSegmentDp = 1U << 7U;
 
 struct NumericSegments {
     std::array<uint8_t, kSlotCount> slots{};

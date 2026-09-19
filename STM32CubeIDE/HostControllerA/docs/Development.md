@@ -10,7 +10,7 @@ Run commands from the repository root:
 D:/Workspace/AstroWeather/STM32CubeIDE/HostControllerA
 ```
 
-The following commands must be available in the Bash environment:
+The following commands should be available in the Bash environment:
 
 ```bash
 command -v cmake
@@ -21,7 +21,18 @@ command -v arm-none-eabi-objcopy
 command -v arm-none-eabi-size
 ```
 
-This project uses the STM32CubeIDE-bundled tools. If CMake or Ninja is not on `PATH`, add their `tools/bin` directories for the current shell. The exact versioned directory names can differ between STM32CubeIDE installations. For example:
+This project uses the STM32CubeIDE-bundled tools. On the current workstation,
+the ARM GNU tools are on `PATH`, but `cmake`, `ninja`, and `ctest` are not.
+Use the bundled Cube CMake executable when needed:
+
+```bash
+CUBE_CMAKE="/c/Users/jakub/.vscode/extensions/stmicroelectronics.stm32cube-ide-build-cmake-1.46.0-win32-x64/resources/cube-cmake/win32/x86_64/cube-cmake.exe"
+"$CUBE_CMAKE" --preset Debug-HostController
+"$CUBE_CMAKE" --build --preset Debug-HostController
+```
+
+On another installation, add the CMake and Ninja `tools/bin` directories for
+the current shell. The exact versioned directory names can differ. For example:
 
 ```bash
 export PATH="/c/Program Files/ST/STM32CubeIDE_2.0.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.cmake.win32_1.1.0.202409170845/tools/bin:$PATH"
@@ -94,7 +105,17 @@ cmake --build --preset NativeTests
 ctest --test-dir build/native-tests-local --output-on-failure
 ```
 
-A successful test run should report both `numeric_display_tests` and `current_sense_conversion_tests` as passing.
+A successful test run should report `astro_data_parser_tests`,
+`numeric_display_tests`, `display_codec_tests`, and
+`current_sense_conversion_tests` as passing. If `ctest` is unavailable, run
+the generated executables directly:
+
+```bash
+./build/native-tests-local/tests/astro_data_parser_tests.exe
+./build/native-tests-local/tests/numeric_display_tests.exe
+./build/native-tests-local/tests/display_codec_tests.exe
+./build/native-tests-local/tests/current_sense_conversion_tests.exe
+```
 
 ## Flash and Start Debugging
 
@@ -124,7 +145,14 @@ Use any of these methods:
 - Click the red square **Stop** button in the Debug toolbar.
 - Run **Debug: Stop** from the Command Palette.
 
-Stop the existing session before pressing F5 again. If a session is still running, VS Code displays an `already running` confirmation and offers to start another instance. Normally choose **Cancel**, stop the old session, and then start F5 again. Multiple debug instances should not be used against the same ST-LINK probe.
+Stop the existing session before pressing F5 again. The reliable sequence is
+**Debug: Stop**, followed by F5. Starting F5 while an old session is active
+can show an `already running` confirmation; do not start a second debug
+instance against the same ST-LINK probe.
+
+The VS Code command `workbench.action.debug.start` is the programmatic
+equivalent of F5. To restart cleanly, invoke `workbench.action.debug.stop`
+first, then `workbench.action.debug.start`.
 
 ### Command-line flashing
 
@@ -134,7 +162,14 @@ The project does not define a custom flash target. A standalone STM32CubeProgram
 STM32_Programmer_CLI -c port=SWD -w build/Debug-HostController/HostControllerA.elf -v -rst
 ```
 
-`STM32_Programmer_CLI.exe` was not present in the installation locations checked for this workspace, so use the VS Code ST-LINK launch unless the CLI is installed separately and added to `PATH`. Do not substitute a serial COM port for `port=SWD`; flashing uses the ST-LINK SWD connection.
+The CLI is installed on the current workstation at:
+
+```text
+C:/Program Files/ST/STM32Cube/STM32CubeProgrammer/bin/STM32_Programmer_CLI
+```
+
+Do not substitute a serial COM port for `port=SWD`; flashing uses the ST-LINK
+SWD connection.
 
 ## Communicate with the Device
 
@@ -142,7 +177,9 @@ The HostController firmware exposes a USB CDC virtual COM port for logs, telemet
 
 ### Connection settings
 
-- Find the assigned port in Windows Device Manager, for example `COM5`.
+- Find the assigned port in Windows Device Manager. In the verified setup,
+  `COM4` is the active USB Serial Device carrying the firmware console;
+  `COM3` is the ST-LINK virtual COM port and produced no application output.
 - Baud rate is ignored by USB CDC; `115200` is a conventional value.
 - Send lines terminated with `\n` or `\r\n`.
 - Only one application can hold the COM port at a time. Close VS Code Serial Monitor before running a Python capture, and close the Python process before opening Serial Monitor.
@@ -164,7 +201,7 @@ Use this pattern for reproducible validation. Change `PORT`, `DURATION`, and the
 import serial
 import time
 
-PORT = "COM5"
+PORT = "COM4"
 BAUD = 115200
 DURATION = 15
 SEND_AT = 3
@@ -205,6 +242,7 @@ status
 display set <index> <value> <precision>
 display time <index> <HH:MM>
 display blank <index>
+astro refresh
 adc on
 adc off
 ```
@@ -225,6 +263,30 @@ Logs have this form:
 ```
 
 When the device has been inactive for approximately five seconds, it emits periodic `[STATS]`, `[MEM]`, and `[STACK]` telemetry. These records can be interleaved with command responses.
+
+Verified USB CDC command sequence on `COM4`:
+
+```text
+astro refresh
+astro refresh
+```
+
+The first command returns immediately with:
+
+```text
+OK astro-refresh=started
+```
+
+The second command, while the first refresh is active, returns:
+
+```text
+ERR astro-refresh-busy
+```
+
+The refresh then reports asynchronous ST67/network results through the log.
+Successful command-path testing was observed; a separate run failed at ST67
+initialization with `sem_if_ready not received`, so that transport failure is
+distinct from console-trigger validation.
 
 ## Validation Checklist
 

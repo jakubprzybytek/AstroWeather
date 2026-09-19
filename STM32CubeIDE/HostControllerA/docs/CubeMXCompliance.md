@@ -161,7 +161,7 @@ Expected bridges include:
 - GPIO RDY rising edge to the User-owned ST67 notification path.
 - Optional recoverable SPI error notification.
 
-The generated `spi_port.c` already provides USER blocks around SPI completion and error callbacks. Do not add duplicate HAL callback definitions outside those hooks. The button-related falling-edge callback remains in `User/Src/SwitchTask.cpp`; the ST67 rising-edge bridge is in `User/Src/HostController/St67SpiReady.cpp`.
+The generated `spi_port.c` already provides USER blocks around SPI completion and error callbacks. Do not add duplicate HAL callback definitions outside those hooks. The button-related falling-edge callback is owned by `User/Src/Utils/SwitchInput.cpp`; the ST67 rising-edge bridge is in `User/Src/HostController/St67SpiReady.cpp`.
 
 ## Explicitly Deferred
 

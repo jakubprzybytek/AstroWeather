@@ -196,7 +196,7 @@ enum class RefreshRequestResult : uint8_t {
     Unavailable,
 };
 
-class AstroDataRefreshTask : public Task<1536> {
+class AstroDataRefreshTask : public Task<2048> {
 public:
     static AstroDataRefreshTask& instance();
     void init(Display::Display* display);
@@ -244,9 +244,9 @@ Requirements:
   before a later remote fails; log the failed board and continue submitting the
   remaining boards.
 
-The initial stack allocation can remain 1536 bytes because that is the current
-`MainLoopTask` allocation. Tune it only from measured high-water marks after
-the parser is present.
+The refresh task starts at 2048 bytes because raw and per-field diagnostic
+logging substantially increases caller stack use. Tune it only from measured
+high-water marks after hardware logging is stable.
 
 ### 5.4 Astro domain model and parser
 
@@ -547,7 +547,7 @@ Before the refactor, `SwitchTask` and `MainLoopTask` reserve 3072 bytes of task
 stack in total. A reasonable initial target is:
 
 - `MainLoopTask`: 1024 bytes.
-- `AstroDataRefreshTask`: 1536 bytes.
+- `AstroDataRefreshTask`: 2048 bytes.
 - `SwitchInput`: no task stack or control block.
 
 This reduces those task stacks by 512 bytes while adding the dedicated workflow

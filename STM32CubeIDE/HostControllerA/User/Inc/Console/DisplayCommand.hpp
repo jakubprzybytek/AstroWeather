@@ -7,6 +7,7 @@ namespace Console {
 enum class CommandResult {
     NotHandled,
     Ok,
+    Busy,
     Unavailable,
     InvalidArgument,
 };

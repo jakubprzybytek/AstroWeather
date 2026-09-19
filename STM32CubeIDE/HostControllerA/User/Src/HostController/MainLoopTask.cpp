@@ -1,75 +1,9 @@
 #include <HostController/MainLoopTask.hpp>
 
+#include <HostController/AstroDataRefreshTask.hpp>
 #include <Debug/LogService.hpp>
 #include <St67HttpFetchTask.hpp>
-
-#include "app_config.h"
-
-namespace {
-
-uint32_t calculateCrc32(const uint8_t* data, uint32_t length)
-{
-    uint32_t crc = 0xFFFFFFFFU;
-    for (uint32_t index = 0U; index < length; ++index)
-    {
-        crc ^= data[index];
-        for (uint32_t bit = 0U; bit < 8U; ++bit)
-        {
-            crc = (crc & 1U) != 0U
-                ? (crc >> 1U) ^ 0xEDB88320U
-                : (crc >> 1U);
-        }
-    }
-    return crc ^ 0xFFFFFFFFU;
-}
-
-const char* statusName(HostController::St67FetchStatus status)
-{
-    switch (status)
-    {
-    case HostController::St67FetchStatus::Success:
-        return "success";
-    case HostController::St67FetchStatus::Busy:
-        return "busy";
-    case HostController::St67FetchStatus::InvalidArgument:
-        return "invalid-argument";
-    case HostController::St67FetchStatus::DriverFailure:
-        return "driver-failure";
-    case HostController::St67FetchStatus::NetworkFailure:
-        return "network-failure";
-    case HostController::St67FetchStatus::HttpFailure:
-        return "http-failure";
-    case HostController::St67FetchStatus::ResponseTooLarge:
-        return "response-too-large";
-    case HostController::St67FetchStatus::CleanupFailure:
-        return "cleanup-failure";
-    }
-    return "unknown";
-}
-
-void printResponse(const uint8_t* data, uint32_t length)
-{
-    for (uint32_t offset = 0U; offset < length; offset += 64U)
-    {
-        char chunk[65];
-        const uint32_t remaining = length - offset;
-        const uint32_t chunkLength = remaining < 64U ? remaining : 64U;
-        for (uint32_t index = 0U; index < chunkLength; ++index)
-        {
-            const uint8_t value = data[offset + index];
-            chunk[index] = (value >= 32U && value <= 126U)
-                ? static_cast<char>(value)
-                : '.';
-        }
-        chunk[chunkLength] = '\0';
-        LogService::instance().logf(
-            LogService::Level::Info,
-            "MainLoopTask response offset=%lu data=\"%s\"",
-            static_cast<unsigned long>(offset), chunk);
-    }
-}
-
-}  // namespace
+#include <Utils/Led.hpp>
 
 MainLoopTask& MainLoopTask::instance()
 {
@@ -82,63 +16,42 @@ MainLoopTask::MainLoopTask()
 {
 }
 
-void MainLoopTask::trigger()
+void MainLoopTask::init(Led& led)
 {
-    MainLoopTask& task = instance();
-    if (task.active_)
-    {
-        LogService::instance().log(LogService::Level::Warn,
-                                     "MainLoopTask trigger ignored: active");
-        return;
-    }
-
-    task.active_ = true;
-    osThreadFlagsSet(task.getHandle(), kFlagRun);
+    led_ = &led;
 }
 
 void MainLoopTask::run()
 {
     for (;;)
     {
-        const uint32_t flags = osThreadFlagsWait(kFlagRun, osFlagsWaitAny,
+        const uint32_t flags = osThreadFlagsWait(kEventSwitch1 | kEventSwitch2,
+                                                 osFlagsWaitAny,
                                                  osWaitForever);
         if ((flags & osFlagsError) != 0U)
         {
-            active_ = false;
             continue;
         }
-
-        HostController::St67FetchRequest request{};
-        request.buffer = responseBuffer_;
-        request.capacity = sizeof(responseBuffer_);
-        const bool fetchSucceeded = HostController::FetchSt67Data(&request);
-
-        const HostController::St67FetchResult& result = request.result;
-        LogService::instance().logf(
-            fetchSucceeded ? LogService::Level::Info : LogService::Level::Error,
-            "MainLoopTask fetch status=%s http=%u bytes=%lu crc=%08lx detail=%ld",
-            statusName(result.status),
-            static_cast<unsigned int>(result.httpStatus),
-            static_cast<unsigned long>(result.length),
-            static_cast<unsigned long>(result.crc32),
-            static_cast<long>(result.detail));
-
-        if (fetchSucceeded)
+        if ((flags & kEventSwitch1) != 0U)
         {
-            const bool responseIntegrityValid =
-                calculateCrc32(responseBuffer_, result.length) == result.crc32;
-            LogService::instance().logf(
-                responseIntegrityValid ? LogService::Level::Info
-                                       : LogService::Level::Error,
-                "MainLoopTask response processed bytes=%lu crc-valid=%u",
-                static_cast<unsigned long>(result.length),
-                responseIntegrityValid ? 1U : 0U);
-            if (responseIntegrityValid)
+            LogService::instance().log(LogService::Level::Info,
+                                       "MainLoopTask SWITCH_1 press");
+            if (led_ != nullptr)
             {
-                printResponse(responseBuffer_, result.length);
+                led_->blink(250U);
             }
+            HostController::AstroDataRefreshTask::instance().requestRefresh(
+                HostController::RefreshTrigger::Switch1);
         }
-
-        active_ = false;
+        if ((flags & kEventSwitch2) != 0U)
+        {
+            LogService::instance().log(LogService::Level::Info,
+                                       "MainLoopTask SWITCH_2 press");
+            if (led_ != nullptr)
+            {
+                led_->blink(50U);
+            }
+            HostController::TriggerSt67ConnectivityCycle();
+        }
     }
 }

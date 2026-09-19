@@ -1,16 +1,20 @@
 #pragma once
 
-#include "app_config.h"
 #include <Utils/Task.hpp>
 
 #include <cstdint>
+
+class Led;
 
 class MainLoopTask : public Task<1536>
 {
 public:
     static MainLoopTask& instance();
 
-    static void trigger();
+    static constexpr uint32_t kEventSwitch1 = 1U << 0;
+    static constexpr uint32_t kEventSwitch2 = 1U << 1;
+
+    void init(Led& led);
 
 protected:
     void run() override;
@@ -18,8 +22,5 @@ protected:
 private:
     MainLoopTask();
 
-    static constexpr uint32_t kFlagRun = 1u << 0;
-
-    uint8_t responseBuffer_[APP_ST67_HTTP_MAX_RESPONSE_BYTES]{};
-    volatile bool active_ = false;
+    Led* led_ = nullptr;
 };

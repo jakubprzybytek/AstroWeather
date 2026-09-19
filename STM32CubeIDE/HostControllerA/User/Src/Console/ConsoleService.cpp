@@ -1,6 +1,9 @@
 #include <Console/ConsoleService.hpp>
 
 #include <Console/AdcCommand.hpp>
+#if defined(FIRMWARE_VARIANT_HostController)
+#include <Console/AstroCommand.hpp>
+#endif
 #include <Console/DisplayCommand.hpp>
 #include <Debug/LogService.hpp>
 
@@ -110,6 +113,9 @@ void ConsoleService::execute(const char* line)
         reply("OK 'display time' - set hour and minute, example: 'display time 0 12:34'");
         reply("OK 'display blank' - clear a display, example: 'display blank 0'");
         reply("OK 'display matrix' - set binary pixels, example: 'display matrix 0 010101010101101100110'");
+    #if defined(FIRMWARE_VARIANT_HostController)
+        reply("OK 'astro refresh' - fetch and publish astro data, example: 'astro refresh'");
+    #endif
         reply("OK 'adc on' - enable current-sense readout logging, example: 'adc on'");
         reply("OK 'adc off' - disable current-sense readout logging, example: 'adc off'");
         return;
@@ -118,6 +124,25 @@ void ConsoleService::execute(const char* line)
         reply("OK status=ready");
         return;
     }
+#if defined(FIRMWARE_VARIANT_HostController)
+    const Console::CommandResult astroResult = Console::handleAstroCommand(line);
+    if (astroResult == Console::CommandResult::Ok) {
+        reply("OK astro-refresh=started");
+        return;
+    }
+    if (astroResult == Console::CommandResult::Busy) {
+        reply("ERR astro-refresh-busy");
+        return;
+    }
+    if (astroResult == Console::CommandResult::Unavailable) {
+        reply("ERR astro-refresh-unavailable");
+        return;
+    }
+    if (astroResult == Console::CommandResult::InvalidArgument) {
+        reply("ERR invalid-argument");
+        return;
+    }
+#endif
     const Console::CommandResult adcResult = Console::handleAdcCommand(line);
     if (adcResult == Console::CommandResult::Ok) {
         reply(std::strcmp(line, "adc on") == 0 ? "OK adc=on" : "OK adc=off");
