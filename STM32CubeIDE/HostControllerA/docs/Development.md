@@ -1,0 +1,244 @@
+# Development Workflow
+
+This document is the practical build, flash, debug, and device-communication guide for HostControllerA. It is written so that a developer or AI agent can build the firmware, program the board, exercise the USB CDC interface, and collect evidence that a change works.
+
+## Prerequisites
+
+Run commands from the repository root:
+
+```text
+D:/Workspace/AstroWeather/STM32CubeIDE/HostControllerA
+```
+
+The following commands must be available in the Bash environment:
+
+```bash
+command -v cmake
+command -v ninja
+command -v arm-none-eabi-gcc
+command -v arm-none-eabi-g++
+command -v arm-none-eabi-objcopy
+command -v arm-none-eabi-size
+```
+
+This project uses the STM32CubeIDE-bundled tools. If CMake or Ninja is not on `PATH`, add their `tools/bin` directories for the current shell. The exact versioned directory names can differ between STM32CubeIDE installations. For example:
+
+```bash
+export PATH="/c/Program Files/ST/STM32CubeIDE_2.0.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.cmake.win32_1.1.0.202409170845/tools/bin:$PATH"
+export PATH="/c/Program Files/ST/STM32CubeIDE_2.0.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.ninja.win32_1.1.0.202511131536/tools/bin:$PATH"
+```
+
+The ARM GNU tools must also be on `PATH`. Confirm the toolchain before configuring a firmware build:
+
+```bash
+arm-none-eabi-gcc --version
+cmake --version
+ninja --version
+```
+
+For serial validation, install `pyserial` once if needed:
+
+```bash
+python -m pip install --quiet pyserial
+```
+
+A connected ST-LINK probe and a USB cable are required for flashing and USB CDC communication. The board's USB CDC port and ST-LINK connection may be separate interfaces.
+
+## Build Firmware
+
+The CMake presets select the firmware variant and build type. Configure and build the desired preset:
+
+```bash
+# Debug HostController
+cmake --preset Debug-HostController
+cmake --build --preset Debug-HostController
+
+# Debug DisplayController
+cmake --preset Debug-DisplayController
+cmake --build --preset Debug-DisplayController
+
+# Release HostController
+cmake --preset Release-HostController
+cmake --build --preset Release-HostController
+
+# Release DisplayController
+cmake --preset Release-DisplayController
+cmake --build --preset Release-DisplayController
+```
+
+The primary firmware artifact is an ELF file:
+
+```text
+build/Debug-HostController/HostControllerA.elf
+build/Debug-DisplayController/HostControllerA.elf
+build/Release-HostController/HostControllerA.elf
+build/Release-DisplayController/HostControllerA.elf
+```
+
+For a quick post-build check:
+
+```bash
+test -f build/Debug-HostController/HostControllerA.elf
+arm-none-eabi-size build/Debug-HostController/HostControllerA.elf
+```
+
+A successful build should leave the ELF present and print the flash/RAM usage summary. The linker script is `STM32G0B1xx_FLASH.ld` and the firmware target is an STM32G0B1 Cortex-M0+ image.
+
+### Native tests
+
+Native tests use the `NativeTests` preset and do not require a board:
+
+```bash
+cmake --preset NativeTests
+cmake --build --preset NativeTests
+ctest --test-dir build/native-tests-local --output-on-failure
+```
+
+A successful test run should report both `numeric_display_tests` and `current_sense_conversion_tests` as passing.
+
+## Flash and Start Debugging
+
+The repository has a VS Code launch configuration named **HostController Debug** in `.vscode/launch.json`. It uses the `stlinkgdbtarget` adapter, runs the STM32 debug-launch pre-build command, and programs/debugs:
+
+```text
+build/Debug-HostController/HostControllerA.elf
+```
+
+To build, flash, and start a debug session:
+
+1. Connect the ST-LINK probe and power the board.
+2. Open the repository root in VS Code.
+3. Select **HostController Debug** in Run and Debug.
+4. Press `F5`.
+5. Wait for the ST-LINK connection and program-download messages in the Debug Console.
+
+The F5 launch is the preferred flashing method for this repository because it uses the configured ST-LINK debug adapter and the correct ELF/symbol file. It also rebuilds through the configured `preBuild` command.
+
+The configured launch file currently provides F5 entries for HostController Debug and HostController Release only. DisplayController has build presets but no corresponding launch entry in `.vscode/launch.json`.
+
+### Stop a debug session
+
+Use any of these methods:
+
+- Press `Shift+F5`.
+- Click the red square **Stop** button in the Debug toolbar.
+- Run **Debug: Stop** from the Command Palette.
+
+Stop the existing session before pressing F5 again. If a session is still running, VS Code displays an `already running` confirmation and offers to start another instance. Normally choose **Cancel**, stop the old session, and then start F5 again. Multiple debug instances should not be used against the same ST-LINK probe.
+
+### Command-line flashing
+
+The project does not define a custom flash target. A standalone STM32CubeProgrammer command would normally be:
+
+```bash
+STM32_Programmer_CLI -c port=SWD -w build/Debug-HostController/HostControllerA.elf -v -rst
+```
+
+`STM32_Programmer_CLI.exe` was not present in the installation locations checked for this workspace, so use the VS Code ST-LINK launch unless the CLI is installed separately and added to `PATH`. Do not substitute a serial COM port for `port=SWD`; flashing uses the ST-LINK SWD connection.
+
+## Communicate with the Device
+
+The HostController firmware exposes a USB CDC virtual COM port for logs, telemetry, healthcheck echoes, and console commands. The DisplayController variant does not start the HostController debug service.
+
+### Connection settings
+
+- Find the assigned port in Windows Device Manager, for example `COM5`.
+- Baud rate is ignored by USB CDC; `115200` is a conventional value.
+- Send lines terminated with `\n` or `\r\n`.
+- Only one application can hold the COM port at a time. Close VS Code Serial Monitor before running a Python capture, and close the Python process before opening Serial Monitor.
+
+### Interactive monitor
+
+The `eclipse-cdt.serial-monitor` extension can be used for manual checks:
+
+1. Open the Command Palette.
+2. Run **Serial Monitor: Start Monitoring**.
+3. Select the board's COM port and any baud rate, such as `115200`.
+4. Send `help` followed by Enter.
+
+### Scripted capture
+
+Use this pattern for reproducible validation. Change `PORT`, `DURATION`, and the command as needed:
+
+```python
+import serial
+import time
+
+PORT = "COM5"
+BAUD = 115200
+DURATION = 15
+SEND_AT = 3
+
+with serial.Serial(PORT, BAUD, timeout=0.2) as ser:
+    start = time.monotonic()
+    sent = False
+    data = bytearray()
+
+    while time.monotonic() - start < DURATION:
+        elapsed = time.monotonic() - start
+        if not sent and elapsed >= SEND_AT:
+            ser.write(b"help\r\n")
+            ser.flush()
+            sent = True
+        chunk = ser.read(256)
+        if chunk:
+            data.extend(chunk)
+
+print(data.decode(errors="replace"))
+```
+
+Run a saved capture script with:
+
+```bash
+python capture.py
+```
+
+For a one-off command, `python -c` is also suitable, but a temporary script is easier for an AI or developer to inspect and reproduce. Do not commit throwaway capture scripts unless they become an intentional project tool.
+
+### Useful commands
+
+The command set can change; send `help` first. Current commands include:
+
+```text
+help
+status
+display set <index> <value> <precision>
+display time <index> <HH:MM>
+display blank <index>
+adc on
+adc off
+```
+
+Every completed input line produces an echo similar to:
+
+```text
+[0:00:01:23]: received text
+```
+
+Logs have this form:
+
+```text
+[days:hours:minutes:seconds] [INFO] message
+[days:hours:minutes:seconds] [WARN] message
+[days:hours:minutes:seconds] [ERR] message
+[days:hours:minutes:seconds] [DEBUG] message
+```
+
+When the device has been inactive for approximately five seconds, it emits periodic `[STATS]`, `[MEM]`, and `[STACK]` telemetry. These records can be interleaved with command responses.
+
+## Validation Checklist
+
+Use the narrowest checks appropriate to the change:
+
+1. Confirm the relevant source change is in `User/` or an intended user-code section.
+2. Configure and build the affected preset.
+3. Confirm the expected ELF exists and run `arm-none-eabi-size` on it.
+4. Stop any old debug session, then press F5 with **HostController Debug** selected.
+5. Confirm the Debug Console reports a successful ST-LINK connection and program download.
+6. Identify the USB CDC COM port and capture startup output.
+7. Send `help\r\n` and verify an echo/command response.
+8. Send `status\r\n` or the command relevant to the change and retain the output.
+9. For communication changes, leave the capture running long enough to observe the five-second telemetry behavior and any warnings/errors.
+10. Stop the debug session before disconnecting the probe or reopening the COM port in another tool.
+
+For a change that affects only host-side logic, run the native CTest suite as well. For a firmware behavior change, the build plus a programmed-board serial capture is the minimum meaningful validation.

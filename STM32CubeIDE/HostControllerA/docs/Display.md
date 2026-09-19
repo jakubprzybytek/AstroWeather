@@ -48,7 +48,7 @@ All application-side display code is located under `/User`:
 
 ## Public Interface
 
-Each board exposes four numeric displays indexed from `0` through `3` and five dot-matrix rows indexed from `0` through `4`.
+Each board exposes four numeric displays indexed from `0` through `3` and five dot-matrix rows indexed from `0` through `4`. Matrix row `0` is the top row and matrix row `4` is the bottom row.
 
 Each of the four numeric displays has its own three special indicators: L1 and L2 form the double dots used for time, and L3 is the apostrophe before the last digit. `DISPLAY_1_EN` through `DISPLAY_4_EN` select the four numeric digit positions on every numeric display. `DISPLAY_5_EN` selects the special-indicator position on every numeric display; only the three special-indicator segments are used in this position.
 

@@ -31,7 +31,8 @@ void encodePcb(const LogicalBoardState& state, PreparedFrame& frame)
         output[0] = mapSegments(state.numeric[3].slots[slot], 3U);
         output[1] = mapSegments(state.numeric[2].slots[slot], 2U);
         if (slot < kMatrixRowCount) {
-            const uint32_t row = state.matrix[slot] & kMatrixMask;
+            const uint8_t logicalRow = static_cast<uint8_t>(kMatrixRowCount - 1U - slot);
+            const uint32_t row = state.matrix[logicalRow] & kMatrixMask;
             output[2] = static_cast<uint8_t>(row >> 16U);
             output[3] = static_cast<uint8_t>(row >> 8U);
             output[4] = static_cast<uint8_t>(row);
