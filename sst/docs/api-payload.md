@@ -30,8 +30,8 @@ matrix_0=******........*******
 matrix_1=****.......**********
 matrix_2=.....**********......
 matrix_3=......*..............
-numerical_3=18.5
-numerical_4=9.2
+numerical_2=18.5
+numerical_3=9.2
 
 display=1
 board=num4x4_matrix5x21
@@ -42,8 +42,8 @@ matrix_0=******........*******
 matrix_1=???????********......
 matrix_2=...****************..
 matrix_3=..............*......
-numerical_3=17.8
-numerical_4=8.9
+numerical_2=17.8
+numerical_3=8.9
 
 display=2
 board=num4x4_matrix5x21
@@ -54,8 +54,8 @@ matrix_0=?
 matrix_1=?
 matrix_2=?
 matrix_3=?
+numerical_2=?
 numerical_3=?
-numerical_4=?
 
 display=3
 board=num4x4_matrix5x21
@@ -66,8 +66,8 @@ matrix_0=******........*******
 matrix_1=.....................
 matrix_2=.....................
 matrix_3=.....................
-numerical_3=16.4
-numerical_4=7.5
+numerical_2=16.4
+numerical_3=7.5
 
 display=4
 board=num4x4_matrix5x21
@@ -78,8 +78,8 @@ matrix_0=******........*******
 matrix_1=.....................
 matrix_2=.....................
 matrix_3=.....................
-numerical_3=15.9
-numerical_4=6.8
+numerical_2=15.9
+numerical_3=6.8
 
 display=5
 board=num4x4_matrix5x21
@@ -90,8 +90,8 @@ matrix_0=******........*******
 matrix_1=.....................
 matrix_2=.....................
 matrix_3=.....................
-numerical_3=15.2
-numerical_4=6.1
+numerical_2=15.2
+numerical_3=6.1
 ```
 
 This example illustrates the syntax only. Its values are not a coherent
@@ -169,14 +169,10 @@ matrix_4
   future matrix channel.
 
 numerical_2
-  Unused in version 1. It is intentionally absent and reserved for the physical
-  display channel with that number.
-
-numerical_3
   Maximum temperature during the observing night, in degrees Celsius, with one
   decimal place. A question mark means weather is unavailable.
 
-numerical_4
+numerical_3
   Minimum temperature during the observing night, in degrees Celsius, with one
   decimal place. A question mark means weather is unavailable.
 
@@ -197,10 +193,10 @@ within these supported ranges and formats.
 For this protocol:
 
 - `numerical_0` and `numerical_1` contain local sunset and sunrise times;
-- `numerical_3` and `numerical_4` contain temperatures with one decimal place.
+- `numerical_2` and `numerical_3` contain temperatures with one decimal place.
 - `numerical_0` and `numerical_1` use the missing-value sentinel `?` when
   the corresponding astronomical event is unavailable.
-- `numerical_3` and `numerical_4` use the missing-value sentinel `?` when
+- `numerical_2` and `numerical_3` use the missing-value sentinel `?` when
   weather is unavailable.
 
 Matrix encoding

@@ -76,6 +76,11 @@ Every Display Board has a pending logical state containing:
 
 Calls to `setFixed()`, `setValue()`, `setTime()`, `setBlank()`, and `setRow()` update only pending state. They do not start I2C or alter the active SPI frame.
 
+Setters are intentionally unsynchronized. The astro refresh, console, and
+temporary current-sense clients may overwrite each other's pending values; the
+last update to a field wins, and a later submission may contain fields supplied
+by different clients. This is accepted diagnostic/development behavior.
+
 `Display::submit()` forms one application-level commit point:
 
 1. Call the local PCB-backed board's `submit()`, which encodes its pending state into the prepared 35-byte SPI frame.
@@ -91,6 +96,10 @@ Expose the same setters through a common `DisplayBoard` abstraction. The abstrac
 - `BufferedDisplayBoard::submit()` serializes command `0x01` and transmits it over I2C.
 
 Use static object ownership. Do not allocate boards or RTOS objects dynamically.
+
+`Display::submit()` serializes the SPI/I2C transfer sequence with its mutex. Do
+not extend that mutex to setters or introduce a transaction-level update API
+unless a future product requirement needs all-or-nothing display frames.
 
 ### Buffer formats
 

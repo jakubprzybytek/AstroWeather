@@ -124,11 +124,11 @@ step and validates the complete model before emitting any response body.
 - Add a serializer that emits exactly this order with LF endings and one empty
   row between display blocks: `protocol`, `configurationId`, then for displays 0 through 5 `display`,
   `board`, `nightId`, `numerical_0`, `numerical_1`, `matrix_0` through `matrix_3`,
-  `numerical_3`, and `numerical_4`.
+  `numerical_2`, and `numerical_3`.
 - Reject invalid identifiers, non-ASCII values, non-consecutive displays,
   malformed dates/times/numbers, unsupported board values, and invalid matrix
   lengths or characters before serialization. Do not emit `displayCount`,
-  `numerical_2`, `matrix_4`, comments, or an end marker.
+  `matrix_4`, comments, or an end marker.
 - Serialize errors through one helper as:
 
   ```text

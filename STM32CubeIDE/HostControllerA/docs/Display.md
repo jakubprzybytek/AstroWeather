@@ -21,7 +21,7 @@ The Host Controller fetches application data, displays its local portion, and se
 - One local PCB-backed Display Board.
 - Four remote buffer-backed Display Boards, one for each Display Controller.
 
-Client code accesses all boards through the same Display Board interface without needing to know whether a board is local or remote. `Display::submit()` submits the local board's logical buffer for PCB encoding and periodic SPI refresh, then sends each remote board's logical buffer to its configured I2C address.
+Client code accesses all boards through the same Display Board interface without needing to know whether a board is local or remote. `Display::submit()` submits the local board's logical buffer for PCB encoding and periodic SPI refresh, then sends each remote board's logical buffer to its configured I2C address. It serializes SPI/I2C transfer sequences; setters remain unsynchronized, so concurrent clients intentionally use last-writer-wins pending state.
 
 ### PCB-backed Display Board
 
@@ -240,7 +240,7 @@ Current project status: the `.ioc` and generated `main.c` already contain TIM2 w
 
 Logical-to-segment conversion is performed when display state changes, not in the periodic refresh loop. The refresh mechanism reads only prepared slot bytes.
 
-The initial implementation may update prepared data without double buffering. A concurrent update may produce one mixed frame, which is accepted for the first version because the following frame corrects it. Double buffering can be added if testing shows visible artifacts.
+The initial implementation may update prepared data without double buffering. A concurrent update may produce one mixed frame, which is accepted for the first version because the following frame corrects it. Likewise, clients may update pending logical state concurrently without setter synchronization: the most recent update to a field wins, and a submission may combine fields from different clients. `Display::submit()` serializes the resulting SPI/I2C transfer sequence. Double buffering or transaction-level state locking can be added later only if a product requirement needs a coherent all-or-nothing frame.
 
 ## I2C Transport
 
@@ -278,7 +278,7 @@ The Display Controller checks the first received byte before processing the payl
 
 - The local PCB-backed Display Board and its refresh mechanism.
 - The top-level `Display` containing the local board and four remote buffer-backed boards.
-- Client code calls `Display::submit()` after it has finished updating all local and remote board objects. `submit()` submits the local logical buffer to the PCB-backed board for encoding and periodic SPI refresh, then sends each remote logical buffer to its configured I2C address.
+- Client code calls `Display::submit()` after it has finished updating all local and remote board objects. Setters are intentionally unsynchronized, so independent clients may overwrite pending fields; the last update to each field wins. `submit()` serializes the hardware transfer sequence, submits the local logical buffer to the PCB-backed board for encoding and periodic SPI refresh, then sends each remote logical buffer to its configured I2C address.
 
 ### Display Controller
 

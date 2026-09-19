@@ -52,7 +52,7 @@
 #endif
 
 #ifndef APP_ST67_HTTP_EXPECTED_CONTENT_TYPE
-#define APP_ST67_HTTP_EXPECTED_CONTENT_TYPE "application/json"
+#define APP_ST67_HTTP_EXPECTED_CONTENT_TYPE "text/plain; charset=utf-8"
 #endif
 
 #endif /* APP_CONFIG_H */

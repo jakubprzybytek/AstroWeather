@@ -48,14 +48,14 @@ successful request returns `text/plain; charset=utf-8` using the versioned ASCII
 The response contains the `protocol=1` and `configurationId` header records,
 followed by six fixed-order display blocks. Each block contains, in order,
 `display`, `board`, `nightId`, `numerical_0`, `numerical_1`, `matrix_0` through
-`matrix_3`, `numerical_3`, and `numerical_4`. `numerical_0` and `numerical_1`
+`matrix_3`, `numerical_2`, and `numerical_3`. `numerical_0` and `numerical_1`
 are sunset and sunrise; `matrix_0` through `matrix_3` are sun, moon, cloud,
-and thunderstorm state; and `numerical_3` and `numerical_4` are maximum and
+and thunderstorm state; and `numerical_2` and `numerical_3` are maximum and
 minimum temperature. `board` is `num4x4_matrix5x21` in version 1.
 
 Records remain present when a source is missing or fails and use the payload
 sentinel `?` for all unavailable times, weather values, and matrix slots. There is no
-`displayCount`, `matrix_4`, `numerical_2`, or end marker in version 1. The wire
+`displayCount`, `matrix_4`, or end marker in version 1. The wire
 format has one empty row between display blocks and no comments.
 
 Error responses use the same line protocol and stable machine-readable error
@@ -108,8 +108,8 @@ Only `#WEATHER` records are part of the main API.
 DynamoDB TTL removal is asynchronous. The reader must exclude an item when
 `expireAt` is at or before the request time, even if DynamoDB has not deleted it
 yet. Temperature extrema are calculated only from hourly values within the
-requested observing night. The maximum is serialized in `numerical_3` and the
-minimum in `numerical_4`, each with one decimal place.
+requested observing night. The maximum is serialized in `numerical_2` and the
+minimum in `numerical_3`, each with one decimal place.
 
 ### Graceful degradation
 
