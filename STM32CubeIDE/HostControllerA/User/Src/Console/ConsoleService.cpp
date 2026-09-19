@@ -1,24 +1,14 @@
 #include <Console/ConsoleService.hpp>
 
+#include <Console/AdcCommand.hpp>
+#include <Console/DisplayCommand.hpp>
 #include <Debug/LogService.hpp>
-#include <Sensors/CurrentSenseTask.hpp>
 
 #include "cmsis_os2.h"
 
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
-#include <limits>
-
-namespace {
-
-enum class DisplayCommandStatus : uint8_t {
-    Ok,
-    Unavailable,
-    InvalidArgument,
-};
-
-} // namespace
 
 ConsoleService& ConsoleService::instance()
 {
@@ -119,6 +109,7 @@ void ConsoleService::execute(const char* line)
         reply("OK 'display set' - set value and precision, example: 'display set 0 1234 2'");
         reply("OK 'display time' - set hour and minute, example: 'display time 0 12:34'");
         reply("OK 'display blank' - clear a display, example: 'display blank 0'");
+        reply("OK 'display matrix' - set binary pixels, example: 'display matrix 0 010101010101101100110'");
         reply("OK 'adc on' - enable current-sense readout logging, example: 'adc on'");
         reply("OK 'adc off' - disable current-sense readout logging, example: 'adc off'");
         return;
@@ -127,68 +118,25 @@ void ConsoleService::execute(const char* line)
         reply("OK status=ready");
         return;
     }
-    if (std::strcmp(line, "adc on") == 0) {
-        CurrentSenseTask::instance().setLoggingEnabled(true);
-        reply("OK adc=on");
+    const Console::CommandResult adcResult = Console::handleAdcCommand(line);
+    if (adcResult == Console::CommandResult::Ok) {
+        reply(std::strcmp(line, "adc on") == 0 ? "OK adc=on" : "OK adc=off");
         return;
     }
-    if (std::strcmp(line, "adc off") == 0) {
-        CurrentSenseTask::instance().setLoggingEnabled(false);
-        reply("OK adc=off");
-        return;
-    }
-
-    unsigned int index = 0U;
-    int value = 0;
-    unsigned int precision = 0U;
-    unsigned int hour = 0U;
-    unsigned int minute = 0U;
-    DisplayCommandStatus status = DisplayCommandStatus::InvalidArgument;
-
-    if (std::sscanf(line, "display set %u %d %u", &index, &value, &precision) == 3) {
-        const int32_t magnitude = value < 0 ? -static_cast<int32_t>(value) : value;
-        const bool valueValid = value >= std::numeric_limits<int16_t>::min() &&
-                                value <= std::numeric_limits<int16_t>::max() &&
-                                value != std::numeric_limits<int16_t>::min() &&
-                                (value < 0 ? magnitude <= 999 : magnitude <= 9999);
-        if (display_ != nullptr && index < Display::kNumericDisplayCount &&
-            precision <= Display::kMaxPrecision && valueValid) {
-            display_->local().numeric(static_cast<uint8_t>(index)).setFixed(
-                static_cast<int16_t>(value), static_cast<uint8_t>(precision));
-            display_->submit();
-            status = DisplayCommandStatus::Ok;
-        } else if (display_ == nullptr) {
-            status = DisplayCommandStatus::Unavailable;
-        }
-    } else if (std::sscanf(line, "display time %u %u:%u", &index, &hour, &minute) == 3) {
-        if (display_ != nullptr && index < Display::kNumericDisplayCount &&
-            hour <= 99U && minute <= 99U) {
-            display_->local().numeric(static_cast<uint8_t>(index)).setTime(
-                static_cast<uint8_t>(hour), static_cast<uint8_t>(minute));
-            display_->submit();
-            status = DisplayCommandStatus::Ok;
-        } else if (display_ == nullptr) {
-            status = DisplayCommandStatus::Unavailable;
-        }
-    } else if (std::sscanf(line, "display blank %u", &index) == 1) {
-        if (display_ != nullptr && index < Display::kNumericDisplayCount) {
-            display_->local().numeric(static_cast<uint8_t>(index)).setBlank();
-            display_->submit();
-            status = DisplayCommandStatus::Ok;
-        } else if (display_ == nullptr) {
-            status = DisplayCommandStatus::Unavailable;
-        }
-    } else {
+    if (adcResult != Console::CommandResult::NotHandled) {
         reply("ERR invalid-command");
         return;
     }
 
-    if (status == DisplayCommandStatus::Ok) {
+    const Console::CommandResult displayResult = Console::handleDisplayCommand(line, display_);
+    if (displayResult == Console::CommandResult::Ok) {
         reply("OK display");
-    } else if (status == DisplayCommandStatus::Unavailable) {
+    } else if (displayResult == Console::CommandResult::Unavailable) {
         reply("ERR display-unavailable");
-    } else {
+    } else if (displayResult == Console::CommandResult::InvalidArgument) {
         reply("ERR invalid-argument");
+    } else {
+        reply("ERR invalid-command");
     }
 }
 
