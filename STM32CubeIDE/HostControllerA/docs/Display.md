@@ -2,7 +2,7 @@
 
 ## Overview
 
-The system contains one Host Controller board and up to four Display Controller boards. Every board has the same physical display hardware:
+The system contains one Host Controller board and up to five Display Controller boards. Every board has the same physical display hardware:
 
 - Four multiplexed four-digit, seven-segment numeric displays.
 - One 5x21 dot-matrix display.
@@ -19,7 +19,7 @@ The Host Controller fetches application data, displays its local portion, and se
 `Display` exists only in the Host Controller firmware. It is the logical representation of the complete multi-board display and owns a collection of board interfaces:
 
 - One local PCB-backed Display Board.
-- Four remote buffer-backed Display Boards, one for each Display Controller.
+- Five remote buffer-backed Display Boards, one for each Display Controller.
 
 Client code accesses all boards through the same Display Board interface without needing to know whether a board is local or remote. `Display::submit()` submits the local board's logical buffer for PCB encoding and periodic SPI refresh, then sends each remote board's logical buffer to its configured I2C address. It serializes SPI/I2C transfer sequences; setters remain unsynchronized, so concurrent clients intentionally use last-writer-wins pending state.
 
@@ -60,6 +60,7 @@ numeric[i].setValue(int16_t value);
 numeric[i].setValue(float value, uint8_t precision = 0);
 numeric[i].setTime(uint8_t hour, uint8_t minute);
 numeric[i].setBlank();
+numeric[i].setSegments(NumericSegments{...});
 
 matrix[row].setRow(uint32_t columns);
 
@@ -69,6 +70,14 @@ display.submit();
 Only the lowest 21 bits passed to `setRow()` are used. Bit 0 drives matrix column 1 and bit 20 drives matrix column 21.
 
 Additional integer overloads may be provided. All setters convert their input to the canonical logical representation before it is stored.
+
+`setSegments(const NumericSegments&)` accepts five normalized A-G/DP masks: the
+first four control visible digits and the fifth controls special indicators.
+Raw segment input uses logical segment masks, not PCB-specific encoded bit
+positions. Application code represents unavailable numeric API data with the
+decimal-point segment in each of the first four slots and zero in the fifth,
+producing four dots. This is distinct from the normal validation error pattern,
+which uses segment D in the first four slots to produce four underscores.
 
 ## Numeric Representation
 
@@ -277,7 +286,7 @@ The Display Controller checks the first received byte before processing the payl
 `AppVariant.cpp` creates and starts:
 
 - The local PCB-backed Display Board and its refresh mechanism.
-- The top-level `Display` containing the local board and four remote buffer-backed boards.
+- The top-level `Display` containing the local board and five remote buffer-backed boards.
 - Client code calls `Display::submit()` after it has finished updating all local and remote board objects. Setters are intentionally unsynchronized, so independent clients may overwrite pending fields; the last update to each field wins. `submit()` serializes the hardware transfer sequence, submits the local logical buffer to the PCB-backed board for encoding and periodic SPI refresh, then sends each remote logical buffer to its configured I2C address.
 
 ### Display Controller

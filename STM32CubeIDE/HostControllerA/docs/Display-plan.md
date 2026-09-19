@@ -133,16 +133,20 @@ This removes reverse copying from the periodic refresh path. SPI remains MSB fir
 2. Define constants for four numeric displays, five matrix rows, 21 matrix columns, five slots, seven bytes per slot, 27 payload bytes, and 28 command bytes.
 3. Define `NumericMode`, flag masks/shifts, `NumericData`, logical board state, prepared slot/frame types, and I2C byte-array types.
 4. Implement numeric setters or a `NumericDisplay` proxy that writes into a referenced `NumericData`.
-5. Implement a matrix-row proxy that masks input to 21 bits.
-6. Implement these conversions:
+5. Retain the public five-slot `setSegments(const NumericSegments&)` interface
+   for custom glyphs and explicit special-indicator control.
+6. Expose normalized segment masks needed by clients, including the decimal-
+   point mask used for the four-dot unavailable-data pattern.
+7. Implement a matrix-row proxy that masks input to 21 bits.
+8. Implement these conversions:
    - Integer to Value mode with precision zero.
    - Fixed mantissa plus precision to Value mode.
    - Float to rounded fixed mantissa plus precision.
    - Hour/minute to Time mode and `HHMM` mantissa.
    - Blank and Error modes.
-7. Enforce fitting rules for sign, four display positions, and precision.
-8. Invalid input stores Error mode and setters return no status.
-9. Normalize negative zero to zero through ordinary numeric comparison/conversion; add no special display state.
+9. Enforce fitting rules for sign, four display positions, and precision.
+10. Invalid input stores Error mode and setters return no status.
+11. Normalize negative zero to zero through ordinary numeric comparison/conversion; add no special display state.
 
 ### Validation
 
@@ -153,6 +157,9 @@ Add host-side tests for:
 - Values that cease to fit after rounding.
 - NaN and infinity.
 - Blank and Error flags.
+- Five-slot raw segment patterns, including special-indicator control.
+- Four decimal-point masks plus a blank fifth slot producing the unavailable-
+   data pattern.
 - `setTime(3, 7)` becoming mantissa `307` in Time mode.
 - Matrix values masking bits 21 through 31.
 
@@ -292,7 +299,7 @@ A local board continuously displays a submitted static frame at 50 Hz without vi
 2. Validate constructor addresses are between `0x10` and `0x2A` and do not duplicate another configured remote board.
 3. Store pending logical state through the common board setters.
 4. Implement `submit()` by serializing command `0x01` and transmitting exactly 28 bytes to the constructor-provided address.
-5. Add `Display` with one local PCB-backed board and four remote buffer-backed boards.
+5. Add `Display` with one local PCB-backed board and five remote buffer-backed boards.
 6. Expose board access without transferring ownership or permitting null entries.
 7. Implement `Display::submit()` in stable board order: local board first, then each remote board.
 8. Continue submitting later remote boards if one I2C transfer fails; retain enough result information internally for diagnostics even though setters return no status.
@@ -307,7 +314,8 @@ A local board continuously displays a submitted static frame at 50 Hz without vi
 Update `User/Src/HostController/AppVariant.cpp` to statically create:
 
 - One local `PcbDisplayBoard`.
-- Four `BufferedDisplayBoard` objects with explicitly supplied slave addresses.
+- Five `BufferedDisplayBoard` objects with explicitly supplied slave addresses
+   `0x10` through `0x14`.
 - One `Display` containing those boards.
 
 Start the local board refresh mechanism during variant initialization. Client application code performs all setters and then calls `Display::submit()`.
@@ -374,8 +382,8 @@ A Display Controller derives its address, receives complete command `0x01` messa
 
 ### Tasks
 
-1. Exercise one Host Controller with one Display Controller before adding all four remotes.
-2. Add four remote board addresses and verify each board receives only its own payload.
+1. Exercise one Host Controller with one Display Controller before adding all five remotes.
+2. Add five remote board addresses and verify each board receives only its own payload.
 3. Test simultaneous changes to all numeric displays and matrix rows followed by one `Display::submit()`.
 4. Measure refresh behavior while Host networking, USB CDC, and debug logging are active.
 5. Verify startup and recovery behavior when:

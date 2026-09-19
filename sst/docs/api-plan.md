@@ -123,8 +123,8 @@ step and validates the complete model before emitting any response body.
   and affected night identifiers, while preserving data from the other source.
 - Add a serializer that emits exactly this order with LF endings and one empty
   row between display blocks: `protocol`, `configurationId`, then for displays 0 through 5 `display`,
-  `board`, `nightId`, `numerical_0`, `numerical_1`, `matrix_0` through `matrix_3`,
-  `numerical_2`, and `numerical_3`.
+  `board`, `nightId`, `numeric_0`, `numeric_1`, `matrix_0` through `matrix_3`,
+  `numeric_2`, and `numeric_3`.
 - Reject invalid identifiers, non-ASCII values, non-consecutive displays,
   malformed dates/times/numbers, unsupported board values, and invalid matrix
   lengths or characters before serialization. Do not emit `displayCount`,

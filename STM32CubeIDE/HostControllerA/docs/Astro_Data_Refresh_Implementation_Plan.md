@@ -47,6 +47,13 @@ task owns the complete user-visible update, not just transport.
 - `Display::submit()` currently has no result and remote-board submission is
   disabled. Those limitations must be resolved before a refresh can report
   authoritative multi-board publication success.
+- The API returns six display blocks. `Display` currently contains one local
+  board and four remote boards, so a fifth remote board must be added before
+  the complete response can be published.
+
+The authoritative wire contract is maintained in
+`../../../sst/docs/api.md` and `../../../sst/docs/api-payload.md`. Protocol
+version 1 is a bounded ASCII `key=value` format, not JSON.
 
 No peripheral, pin, or CubeMX configuration change is required for this
 refactor.
@@ -232,7 +239,10 @@ Requirements:
   ```
 
 - Start and completion logs include trigger source and stage-specific status.
-- A failed refresh leaves the last successfully published display state intact.
+- Fetch, integrity, or parse failure leaves the current display state intact.
+  A hardware submission failure may update the local board and some remotes
+  before a later remote fails; log the failed board and continue submitting the
+  remaining boards.
 
 The initial stack allocation can remain 1536 bytes because that is the current
 `MainLoopTask` allocation. Tune it only from measured high-water marks after
@@ -242,20 +252,87 @@ the parser is present.
 
 Keep transport bytes separate from application data:
 
-- `AstroData` contains only validated domain values needed by display mapping.
+- `AstroData` contains exactly six validated board models, corresponding to
+  `display=0` through `display=5`.
 - `AstroDataParser` is pure C++ without HAL or RTOS dependencies.
 - Parsing writes into a temporary `AstroData` and publishes it only after the
   entire payload validates.
-- Define explicit outcomes such as malformed JSON, missing field, invalid type,
-  out-of-range value, and unsupported schema version.
-- Do not parse JSON with substring searches. Select a bounded JSON parser after
-  measuring code and RAM cost, or use an already available structured parser if
-  one is introduced elsewhere in the project.
-- Fix the production endpoint schema, units, ranges, timestamp policy, and
-  display-field mapping before implementing this phase.
+- Parse the version 1 ASCII `key=value` protocol incrementally by lines. Accept
+  LF and CRLF, split known records at the first `=`, and do not allocate.
+- Require `protocol=1`, six consecutive display indexes, the supported
+  `board=num4x4_matrix5x21` value, every required record in contract order, and
+  a complete final display block.
+- Recognize `configurationId` as a required header record but ignore its value.
+  Do not compare it with the requested identifier. Bound its value to 20 ASCII
+  characters so the parser can use a fixed line buffer.
+- Recognize each `nightId` record in the required position but do not parse or
+  validate its date value.
+- Ignore unknown keys as required for forward compatibility. Unknown records do
+  not replace or satisfy required records.
+- Parse available times from the contract's `HH:MM` form into hour and minute
+  components, then pass them to `NumericDisplay::setTime()`. Do not duplicate
+  display range or representability rules in the parser; `NumericDisplay`
+  decides whether the parsed value can be shown and uses its normal error
+  pattern when it cannot.
+- Parse available temperatures from the contract's signed decimal form, then
+  pass the value to `NumericDisplay::setValue(value, 1U)`. Reject malformed or
+  unconvertible text, but leave range, rounding, and representability decisions
+  to `NumericDisplay`.
+- Validate each matrix as exactly 21 characters from `*`, `.`, and `?`, or the
+  single unavailable-row sentinel `?`.
+- Define explicit outcomes for malformed lines, unsupported protocol or board,
+  missing/out-of-order records, invalid display indexes, invalid time,
+  invalid temperature, invalid matrix, response truncation, and trailing
+  incomplete data.
+
+Version 1 maps each API display block directly to one physical board:
+
+```text
+display=0 -> local board
+display=1 -> remote board 0
+display=2 -> remote board 1
+display=3 -> remote board 2
+display=4 -> remote board 3
+display=5 -> remote board 4
+```
+
+The numeric records map directly to the four firmware numeric indexes:
+
+```text
+numeric_0 -> numeric(0): sunset
+numeric_1 -> numeric(1): sunrise
+numeric_2 -> numeric(2): maximum temperature
+numeric_3 -> numeric(3): minimum temperature
+```
+
+There is no `numeric_4` in protocol version 1.
+
+Map `matrix_0` through `matrix_3` directly to matrix rows 0 through 3. Clear
+matrix row 4 because it is reserved and absent in version 1. Map both a whole
+row `?` and individual `?` slots to LEDs off; the matrix has no separate error
+indication.
+
+For numeric `?` values, render a distinct unavailable pattern consisting of
+the decimal-point segment on all four visible digits. Use the existing five-slot
+raw segment interface:
+
+```cpp
+NumericSegments unavailable{{kSegmentDp, kSegmentDp, kSegmentDp,
+                             kSegmentDp, 0U}};
+numeric.setSegments(unavailable);
+```
+
+The fifth slot remains zero because it controls the extra indicators. Expose the
+normalized decimal-point mask through the display interface instead of
+duplicating its value in the astro mapping. The parser/domain model must retain
+whether a numeric value was available so publication can choose between the
+ordinary typed setter and this segment pattern. A protocol `?` is valid
+unavailable data, not a parser failure. Malformed or unconvertible numerical
+text still rejects the payload.
 
 Add native fixture tests for valid payloads, each required-field failure,
-numeric boundaries, oversized input, and unchanged output on failure.
+time and temperature boundaries, six-board ordering, missing-data rendering,
+oversized input, and unchanged output on failure.
 
 ### 5.5 Display submission policy
 
@@ -277,6 +354,11 @@ nothing display frames would be the reason to revisit that policy.
 Change display submission to return a result once remote transmission is
 enabled. The refresh remains active until local and remote submission finishes,
 and its final log distinguishes parse success from publication failure.
+
+Extend `Display` from four to five remote board pointers. Add the fifth static
+`BufferedDisplayBoard` in HostController composition at address `0x14`, after
+the existing `0x10` through `0x13` boards. Preserve stable submission order and
+continue submitting later boards if an earlier remote transfer fails.
 
 ### 5.6 Console command
 
@@ -381,21 +463,30 @@ Exit criteria:
 
 ### Phase 4: Add parsing and display publication
 
-1. Freeze the endpoint payload contract and create `AstroData`.
-2. Implement and native-test `AstroDataParser`.
-3. Implement astro-to-display mapping using the existing setter APIs.
-4. Call `Display::submit()` after mapping the validated model.
-5. Publish only a fully validated model and retain old content after failure.
+1. Treat `sst/docs/api.md` and `sst/docs/api-payload.md` as the version 1
+  endpoint contract and create `AstroData` for six boards.
+2. Implement and native-test the bounded line-oriented `AstroDataParser`.
+3. Expose the normalized decimal-point mask and test the four-dot unavailable
+  pattern through the existing five-slot `setSegments()` API.
+4. Extend `Display` and HostController composition to one local plus five remote
+  boards.
+5. Implement astro-to-display mapping using the existing setter APIs.
+6. Call `Display::submit()` after mapping the validated model.
+7. Publish only a fully validated model and retain old content after a parser or
+  transport failure.
 
 Exit criteria:
 
 - Parser fixtures pass without firmware dependencies.
+- All six payload blocks map to the local board and five remote boards in order.
+- Numeric `?` values render four decimal points; matrix `?` values render off.
 - Concurrent producers may overwrite pending fields; `Display::submit()` still
   prevents overlapping SPI/I2C transfer sequences.
 - One successful refresh updates its intended local and remote fields, subject
   to the documented last-writer-wins policy.
 - Fetch, validation, parse, and publication failures are distinguishable in
-  logs and do not leave a partially updated logical display.
+  logs. Fetch, validation, and parse failures do not modify display state;
+  publication failures report any partially submitted board set.
 
 ### Phase 5: Harden and document
 
@@ -411,6 +502,14 @@ Exit criteria:
 ### Native tests
 
 - Valid and invalid astro payload fixtures.
+- Exact protocol record ordering, missing records, unsupported protocol/board,
+  truncated body, and unknown-key handling.
+- Time parsing and forwarding to `setTime()`, including values that the display
+  accepts or converts to its normal error pattern.
+- Temperature parsing and forwarding to `setValue(value, 1U)`, including values
+  that the display converts to its normal error pattern.
+- `configurationId` values up to 20 characters and ignored `nightId` values.
+- Numerical and matrix unavailable-value rendering.
 - Parser boundary values and unchanged output on failure.
 - Exact `astro refresh` command matching and rejection of extra arguments.
 - Astro-to-display mapping against expected logical board state.
@@ -434,10 +533,13 @@ Exit criteria:
 4. Start from the console and press switch 1; observe the same busy behavior.
 5. Press switch 2 during network fetch and verify its action starts promptly.
 6. Run `help`, `status`, ADC, and manual display commands during refresh.
-7. Inject fetch, CRC, malformed-payload, and display-submit failures; verify
-   the worker returns to idle and the previous display state remains intact.
+7. Inject fetch, CRC, and malformed-payload failures; verify the worker returns
+  to idle and the previous display state remains intact. Inject a remote
+  display-submit failure and verify it is reported without preventing later
+  remote submissions.
 8. Verify task count drops by one after removing `SwitchTask` and record stack
    and minimum-ever heap margins.
+9. Verify one local and five remote board updates, including I2C address `0x14`.
 
 ## 9. Resource Expectation
 

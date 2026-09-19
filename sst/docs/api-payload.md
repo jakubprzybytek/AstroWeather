@@ -24,74 +24,74 @@ configurationId=krakow
 display=0
 board=num4x4_matrix5x21
 nightId=2026-09-17
-numerical_0=20:30
-numerical_1=05:59
+numeric_0=20:30
+numeric_1=05:59
 matrix_0=******........*******
 matrix_1=****.......**********
 matrix_2=.....**********......
 matrix_3=......*..............
-numerical_2=18.5
-numerical_3=9.2
+numeric_2=18.5
+numeric_3=9.2
 
 display=1
 board=num4x4_matrix5x21
 nightId=2026-09-18
-numerical_0=20:28
-numerical_1=06:01
+numeric_0=20:28
+numeric_1=06:01
 matrix_0=******........*******
 matrix_1=???????********......
 matrix_2=...****************..
 matrix_3=..............*......
-numerical_2=17.8
-numerical_3=8.9
+numeric_2=17.8
+numeric_3=8.9
 
 display=2
 board=num4x4_matrix5x21
 nightId=2026-09-19
-numerical_0=?
-numerical_1=?
+numeric_0=?
+numeric_1=?
 matrix_0=?
 matrix_1=?
 matrix_2=?
 matrix_3=?
-numerical_2=?
-numerical_3=?
+numeric_2=?
+numeric_3=?
 
 display=3
 board=num4x4_matrix5x21
 nightId=2026-09-20
-numerical_0=20:23
-numerical_1=06:04
+numeric_0=20:23
+numeric_1=06:04
 matrix_0=******........*******
 matrix_1=.....................
 matrix_2=.....................
 matrix_3=.....................
-numerical_2=16.4
-numerical_3=7.5
+numeric_2=16.4
+numeric_3=7.5
 
 display=4
 board=num4x4_matrix5x21
 nightId=2026-09-21
-numerical_0=20:21
-numerical_1=06:06
+numeric_0=20:21
+numeric_1=06:06
 matrix_0=******........*******
 matrix_1=.....................
 matrix_2=.....................
 matrix_3=.....................
-numerical_2=15.9
-numerical_3=6.8
+numeric_2=15.9
+numeric_3=6.8
 
 display=5
 board=num4x4_matrix5x21
 nightId=2026-09-22
-numerical_0=20:18
-numerical_1=06:07
+numeric_0=20:18
+numeric_1=06:07
 matrix_0=******........*******
 matrix_1=.....................
 matrix_2=.....................
 matrix_3=.....................
-numerical_2=15.2
-numerical_3=6.1
+numeric_2=15.2
+numeric_3=6.1
 ```
 
 This example illustrates the syntax only. Its values are not a coherent
@@ -144,10 +144,10 @@ display
 nightId
   Local date in YYYY-MM-DD format for the noon-to-noon observing night.
 
-numerical_0
+numeric_0
   Local sunset time in HH:MM, or ? when no sunset occurs.
 
-numerical_1
+numeric_1
   Local sunrise time in HH:MM, or ? when no sunrise occurs. This is normally
   the morning after nightId.
 
@@ -168,18 +168,18 @@ matrix_4
   Unused in version 1 and omitted from the response. It is reserved for a
   future matrix channel.
 
-numerical_2
+numeric_2
   Maximum temperature during the observing night, in degrees Celsius, with one
   decimal place. A question mark means weather is unavailable.
 
-numerical_3
+numeric_3
   Minimum temperature during the observing night, in degrees Celsius, with one
   decimal place. A question mark means weather is unavailable.
 
-Numerical display formats
+Numeric display formats
 -------------------------
 
-Every numerical display supports these value formats:
+Every numeric display supports these value formats:
 
 - integer values from `-999` through `9999`;
 - fixed-precision numbers from `-999.9` through `999.9`, with a smallest
@@ -192,11 +192,11 @@ within these supported ranges and formats.
 
 For this protocol:
 
-- `numerical_0` and `numerical_1` contain local sunset and sunrise times;
-- `numerical_2` and `numerical_3` contain temperatures with one decimal place.
-- `numerical_0` and `numerical_1` use the missing-value sentinel `?` when
+- `numeric_0` and `numeric_1` contain local sunset and sunrise times;
+- `numeric_2` and `numeric_3` contain temperatures with one decimal place.
+- `numeric_0` and `numeric_1` use the missing-value sentinel `?` when
   the corresponding astronomical event is unavailable.
-- `numerical_2` and `numerical_3` use the missing-value sentinel `?` when
+- `numeric_2` and `numeric_3` use the missing-value sentinel `?` when
   weather is unavailable.
 
 Matrix encoding

@@ -3,8 +3,8 @@ import { Resource } from "sst";
 
 const BASE_URL = Resource.AstroApi.url;
 const displayKeys = [
-  "display", "board", "nightId", "numerical_0", "numerical_1",
-  "matrix_0", "matrix_1", "matrix_2", "matrix_3", "numerical_2", "numerical_3"
+  "display", "board", "nightId", "numeric_0", "numeric_1",
+  "matrix_0", "matrix_1", "matrix_2", "matrix_3", "numeric_2", "numeric_3"
 ];
 
 describe("GET /astro/{configurationId}", () => {

@@ -1,7 +1,7 @@
 import type { ForecastDisplay } from "./types";
 
 const BOARD = "num4x4_matrix5x21";
-const DISPLAY_KEYS = ["display", "board", "nightId", "numerical_0", "numerical_1", "matrix_0", "matrix_1", "matrix_2", "matrix_3", "numerical_2", "numerical_3"] as const;
+const DISPLAY_KEYS = ["display", "board", "nightId", "numeric_0", "numeric_1", "matrix_0", "matrix_1", "matrix_2", "matrix_3", "numeric_2", "numeric_3"] as const;
 
 function validMatrix(value: string): boolean {
   return value === "?" || (value.length === 21 && /^[*.?]+$/.test(value));
@@ -24,10 +24,10 @@ export function serializeForecast(configurationId: string, displays: ForecastDis
     if (index > 0) lines.push("");
     const values: Record<typeof DISPLAY_KEYS[number], string | number> = {
       display: display.display, board: display.board, nightId: display.nightId,
-      numerical_0: display.sunset, numerical_1: display.sunrise,
+      numeric_0: display.sunset, numeric_1: display.sunrise,
       matrix_0: display.sun, matrix_1: display.moon, matrix_2: display.cloud,
-      matrix_3: display.thunderstorm, numerical_2: display.maximumTemperature,
-      numerical_3: display.minimumTemperature
+      matrix_3: display.thunderstorm, numeric_2: display.maximumTemperature,
+      numeric_3: display.minimumTemperature
     };
     lines.push(...DISPLAY_KEYS.map((key) => `${key}=${values[key]}`));
   }

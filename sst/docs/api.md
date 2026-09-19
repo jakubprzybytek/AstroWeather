@@ -47,10 +47,10 @@ successful request returns `text/plain; charset=utf-8` using the versioned ASCII
 
 The response contains the `protocol=1` and `configurationId` header records,
 followed by six fixed-order display blocks. Each block contains, in order,
-`display`, `board`, `nightId`, `numerical_0`, `numerical_1`, `matrix_0` through
-`matrix_3`, `numerical_2`, and `numerical_3`. `numerical_0` and `numerical_1`
+`display`, `board`, `nightId`, `numeric_0`, `numeric_1`, `matrix_0` through
+`matrix_3`, `numeric_2`, and `numeric_3`. `numeric_0` and `numeric_1`
 are sunset and sunrise; `matrix_0` through `matrix_3` are sun, moon, cloud,
-and thunderstorm state; and `numerical_2` and `numerical_3` are maximum and
+and thunderstorm state; and `numeric_2` and `numeric_3` are maximum and
 minimum temperature. `board` is `num4x4_matrix5x21` in version 1.
 
 Records remain present when a source is missing or fails and use the payload
@@ -108,14 +108,14 @@ Only `#WEATHER` records are part of the main API.
 DynamoDB TTL removal is asynchronous. The reader must exclude an item when
 `expireAt` is at or before the request time, even if DynamoDB has not deleted it
 yet. Temperature extrema are calculated only from hourly values within the
-requested observing night. The maximum is serialized in `numerical_2` and the
-minimum in `numerical_3`, each with one decimal place.
+requested observing night. The maximum is serialized in `numeric_2` and the
+minimum in `numeric_3`, each with one decimal place.
 
 ### Graceful degradation
 
 Astronomy and weather are assembled independently. Missing, expired, or failed
 weather retrieval must not prevent available astronomy from being returned.
-The affected weather matrix slots and weather-derived numerical values use `?`.
+The affected weather matrix slots and weather-derived numeric values use `?`.
 
 Likewise, an astronomy calculation failure must not prevent available weather
 from being returned. The affected sunset and sunrise values and sun or moon
@@ -156,7 +156,7 @@ client. Operational details belong in structured Lambda logs.
    and maximum temperatures.
 5. Expired, out-of-range, and other service records are not returned as weather.
 6. Missing or failed weather does not remove a display block or available
-   astronomy; its numerical values and unavailable matrix rows or slots use
+   astronomy; its numeric values and unavailable matrix rows or slots use
    `?`.
 7. An unknown configuration returns the versioned text error payload with
    status `404`.
