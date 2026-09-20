@@ -183,6 +183,9 @@ The HostController firmware exposes a USB CDC virtual COM port for logs, telemet
 - Baud rate is ignored by USB CDC; `115200` is a conventional value.
 - Send lines terminated with `\n` or `\r\n`.
 - Only one application can hold the COM port at a time; see [Console CLI tool](#console-cli-tool).
+- The port sometimes vanishes or refuses to open, particularly after repeated
+  flashing; see
+  [COM port disappears or will not open](#com-port-disappears-or-will-not-open).
 
 ### Interactive monitor
 
@@ -270,6 +273,93 @@ print(data.decode(errors="replace"))
 
 Do not commit throwaway one-off scripts written this way; extend
 `tools/astro_console.py` instead if the capability is worth keeping.
+
+### COM port disappears or will not open
+
+The STM32 USB CDC port intermittently stops working, most often after repeated
+flash and reset cycles. This is a known issue with the ST USB device stack
+rather than a fault in this firmware. Typical symptoms:
+
+- `python tools/astro_console.py list` still lists the port, but opening it
+  fails with `could not open port 'COM4': FileNotFoundError(2, ...)`.
+- The port appears in Device Manager but is missing from
+  `HKLM\HARDWARE\DEVICEMAP\SERIALCOMM`, which is the authoritative list of
+  active serial devices.
+- The device reports `CM_PROB_FAILED_START`.
+
+The open failure is `FileNotFoundError` (the device is gone), not
+`PermissionError` (another application holds the port). For the latter, close
+the other holder instead; see [Console CLI tool](#console-cli-tool).
+
+#### First, confirm the firmware is still running
+
+Do this before power cycling anything. A lost port and a hung or crash-looping
+firmware look identical from the host, and the remedies are different. Read the
+FreeRTOS tick counter twice over SWD: if it advances, the scheduler is alive and
+the problem is on the Windows side.
+
+```bash
+# The address changes between builds, so resolve it from the ELF.
+arm-none-eabi-nm build/Debug-HostController/HostControllerA.elf | grep " xTickCount"
+
+STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x4
+STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x4
+```
+
+`mode=HOTPLUG` attaches without resetting, so the running firmware is left
+undisturbed. A value that increases between the two reads shows the scheduler is
+running. A value far larger than a few seconds also rules out a reset loop,
+since the counter would otherwise keep restarting from zero.
+
+#### Recover the port
+
+In order of escalation:
+
+1. **Hardware reset.** Usually sufficient, and the quickest option:
+
+   ```bash
+   STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -hardRst
+   ```
+
+   A software reset (`-rst`) often is *not* enough. It does not always drop the
+   USB connection long enough for Windows to tear the device down and
+   re-enumerate it.
+
+2. **Unplug and reconnect the USB cable.** Forces a full re-enumeration.
+
+3. **Restart the device node**, from an *elevated* PowerShell:
+
+   ```powershell
+   $id = (Get-PnpDevice -PresentOnly |
+          Where-Object { $_.InstanceId -like '*VID_0483&PID_5740*' }).InstanceId
+   Disable-PnpDevice -InstanceId $id -Confirm:$false
+   Enable-PnpDevice  -InstanceId $id -Confirm:$false
+   ```
+
+   Without elevation these fail with `Generic failure`.
+
+Confirm recovery with:
+
+```powershell
+Get-PnpDevice -PresentOnly | Where-Object { $_.InstanceId -like '*VID_0483&PID_5740*' } |
+    Select-Object Status, Problem, FriendlyName
+```
+
+`Status: OK` and `Problem: CM_PROB_NONE` mean the port is usable again. The port
+should also reappear under `SERIALCOMM`:
+
+```powershell
+Get-ItemProperty 'HKLM:\HARDWARE\DEVICEMAP\SERIALCOMM'
+```
+
+#### Reduce how often it happens
+
+- Wait a few seconds after a flash or reset before reopening the port.
+  Enumeration is not instant, and opening during that window is what most often
+  leaves the device node in the failed state.
+- Close `astro_console.py`, Serial Monitor, or any other holder of the port
+  before flashing.
+- Prefer `-hardRst` over `-rst` when a reset is needed as part of flashing.
 
 ### Useful commands
 
