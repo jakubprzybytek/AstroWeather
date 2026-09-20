@@ -2,6 +2,7 @@
 #include <Console/AstroCommand.hpp>
 #include <Console/ConsoleService.hpp>
 #include <Debug/LogService.hpp>
+#include <Device/Eeprom24AA01.hpp>
 #include <Device/SCT2xxx.hpp>
 #include <Display/BufferedDisplayBoard.hpp>
 #include <Display/Display.hpp>
@@ -41,6 +42,8 @@ Display::Display display(localBoard, {&remoteBoard1, &remoteBoard2,
                                       &remoteBoard3, &remoteBoard4,
                                       &remoteBoard5});
 
+Device::Eeprom24AA01 settingsEeprom(hi2c1);
+
 Led led2(LED_2_GPIO_Port, LED_2_Pin);
 
 void AppVariant_Init() {
@@ -49,6 +52,7 @@ void AppVariant_Init() {
   CurrentSenseTask::instance().setDisplay(&display);
   CurrentSenseTask::instance().start();
   ConsoleService::instance().init(&display);
+  ConsoleService::instance().setEeprom(&settingsEeprom);
   ConsoleService::instance().start();
   localBoard.start();
 

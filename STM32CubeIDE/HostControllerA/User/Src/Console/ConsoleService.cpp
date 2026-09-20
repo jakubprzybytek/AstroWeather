@@ -5,6 +5,7 @@
 #include <Console/AstroCommand.hpp>
 #endif
 #include <Console/DisplayCommand.hpp>
+#include <Console/EepromCommand.hpp>
 #include <Debug/LogService.hpp>
 
 #include "cmsis_os2.h"
@@ -23,7 +24,7 @@ ConsoleService::ConsoleService()
     : Task<2048>("ConsoleService", osPriorityNormal),
       commandQueueHandle_(nullptr), commandQueueCb_{}, commandQueueStorage_{},
       rxRing_{}, rxHead_(0U), rxTail_(0U), line_{}, lineLength_(0U),
-    lineTruncated_(false), display_(nullptr)
+    lineTruncated_(false), display_(nullptr), eeprom_(nullptr)
 {
 }
 
@@ -37,6 +38,11 @@ void ConsoleService::init(Display::Display* display)
     attr.mq_mem = commandQueueStorage_;
     attr.mq_size = sizeof(commandQueueStorage_);
     commandQueueHandle_ = osMessageQueueNew(kCommandQueueDepth, sizeof(CommandLine), &attr);
+}
+
+void ConsoleService::setEeprom(Device::Eeprom24AA01* eeprom)
+{
+    eeprom_ = eeprom;
 }
 
 void ConsoleService::onUsbRxData(const uint8_t* data, uint32_t len)
@@ -120,6 +126,11 @@ void ConsoleService::execute(const char* line)
         reply("OK 'adc log off' - disable current-sense readout logging, example: 'adc log off'");
         reply("OK 'adc display on' - enable current-sense readout on display, example: 'adc display on'");
         reply("OK 'adc display off' - disable current-sense readout on display, example: 'adc display off'");
+        reply("OK 'eeprom probe' - check the settings EEPROM responds, example: 'eeprom probe'");
+        reply("OK 'eeprom dump' - hex dump the whole EEPROM, example: 'eeprom dump'");
+        reply("OK 'eeprom read' - hex dump a range, example: 'eeprom read 0 16'");
+        reply("OK 'eeprom write' - write hex bytes, example: 'eeprom write 0 A55A01'");
+        reply("OK 'eeprom erase' - fill the EEPROM with 0xFF, example: 'eeprom erase'");
         return;
     }
     if (std::strcmp(line, "status") == 0) {
@@ -160,6 +171,19 @@ void ConsoleService::execute(const char* line)
     }
     if (adcResult != Console::CommandResult::NotHandled) {
         reply("ERR invalid-command");
+        return;
+    }
+
+    const Console::CommandResult eepromResult = Console::handleEepromCommand(line, eeprom_);
+    if (eepromResult == Console::CommandResult::Ok) {
+        return;
+    }
+    if (eepromResult == Console::CommandResult::Unavailable) {
+        reply("ERR eeprom-unavailable");
+        return;
+    }
+    if (eepromResult == Console::CommandResult::InvalidArgument) {
+        reply("ERR invalid-argument");
         return;
     }
 

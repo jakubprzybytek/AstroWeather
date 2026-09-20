@@ -215,7 +215,16 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* hi2c)
     /* Peripheral clock enable */
     __HAL_RCC_I2C1_CLK_ENABLE();
     /* USER CODE BEGIN I2C1_MspInit 1 */
-
+    /* This board has no external I2C pull-up resistors fitted, so SCL/SDA can
+       never be released high. Fall back to the MCU's internal pull-ups (~40k).
+       This is out of I2C spec and only holds up because MX_I2C1_Init slows SCL
+       right down; fit real 4.7k resistors and drop both workarounds. */
+    GPIO_InitStruct.Pin = GPIO_PIN_9 | GPIO_PIN_10;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF6_I2C1;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
     /* USER CODE END I2C1_MspInit 1 */
 
   }

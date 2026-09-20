@@ -108,9 +108,15 @@ void testSetTime() {
 
   display.setTime(3, 7);
   expectEqual(data,
-              {kDigits[0], kDigits[3], kDigits[0], kDigits[7],
+              {0U, kDigits[3], kDigits[0], kDigits[7],
                static_cast<uint8_t>(kA | kB)},
-              "time");
+              "single-digit hour");
+
+  display.setTime(23, 7);
+  expectEqual(data,
+              {kDigits[2], kDigits[3], kDigits[0], kDigits[7],
+               static_cast<uint8_t>(kA | kB)},
+              "two-digit hour");
 
   display.setTime(100, 0);
   expectEqual(data, {kD, kD, kD, kD, 0U}, "invalid time");

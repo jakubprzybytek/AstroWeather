@@ -182,7 +182,7 @@ The HostController firmware exposes a USB CDC virtual COM port for logs, telemet
   `COM3` is the ST-LINK virtual COM port and produced no application output.
 - Baud rate is ignored by USB CDC; `115200` is a conventional value.
 - Send lines terminated with `\n` or `\r\n`.
-- Only one application can hold the COM port at a time. Close VS Code Serial Monitor before running a Python capture, and close the Python process before opening Serial Monitor.
+- Only one application can hold the COM port at a time; see [Console CLI tool](#console-cli-tool).
 
 ### Interactive monitor
 
@@ -193,9 +193,53 @@ The `eclipse-cdt.serial-monitor` extension can be used for manual checks:
 3. Select the board's COM port and any baud rate, such as `115200`.
 4. Send `help` followed by Enter.
 
-### Scripted capture
+### Console CLI tool
 
-Use this pattern for reproducible validation. Change `PORT`, `DURATION`, and the command as needed:
+`tools/astro_console.py` wraps the connect/send/read pattern below into a
+reusable CLI, so ad-hoc capture scripts don't need to be rewritten for each
+check. It requires `pyserial` (see Prerequisites). Run it from the
+`HostControllerA` repository root.
+
+By default it auto-detects the console port by excluding any port whose
+description contains `ST-LINK`/`STLink` (the ST-LINK virtual COM port), and
+picks the remaining single candidate. Pass `--port COM4` (before the
+subcommand) to override auto-detection, or if more than one non-ST-LINK port
+is present.
+
+List candidate ports:
+
+```bash
+python tools/astro_console.py list
+```
+
+Send one or more commands and print the response (waits `--wait` seconds,
+default `2`, after each):
+
+```bash
+python tools/astro_console.py send help
+python tools/astro_console.py send "adc log on" "adc log off"
+```
+
+Open an interactive shell: typed lines are sent as commands, device output
+streams live, `Ctrl+C` exits:
+
+```bash
+python tools/astro_console.py shell
+```
+
+Capture device output for a fixed duration, optionally sending a command
+partway through and writing the result to a file instead of stdout:
+
+```bash
+python tools/astro_console.py capture --duration 20 --command "astro refresh" --output capture.txt
+```
+
+Only one application can hold the COM port at a time. Close VS Code Serial
+Monitor or any other terminal (e.g. HTerm) before running this tool, and
+stop the tool before opening the port elsewhere.
+
+For anything the CLI doesn't cover, the same connect/send/read pattern can be
+scripted directly with `pyserial`:
 
 ```python
 import serial
@@ -224,13 +268,8 @@ with serial.Serial(PORT, BAUD, timeout=0.2) as ser:
 print(data.decode(errors="replace"))
 ```
 
-Run a saved capture script with:
-
-```bash
-python capture.py
-```
-
-For a one-off command, `python -c` is also suitable, but a temporary script is easier for an AI or developer to inspect and reproduce. Do not commit throwaway capture scripts unless they become an intentional project tool.
+Do not commit throwaway one-off scripts written this way; extend
+`tools/astro_console.py` instead if the capability is worth keeping.
 
 ### Useful commands
 
@@ -247,6 +286,11 @@ adc log on
 adc log off
 adc display on
 adc display off
+eeprom probe
+eeprom dump
+eeprom read <offset> [length]
+eeprom write <offset> <hexbytes>
+eeprom erase
 ```
 
 Every completed input line produces an echo similar to:
@@ -299,9 +343,9 @@ Use the narrowest checks appropriate to the change:
 3. Confirm the expected ELF exists and run `arm-none-eabi-size` on it.
 4. Stop any old debug session, then press F5 with **HostController Debug** selected.
 5. Confirm the Debug Console reports a successful ST-LINK connection and program download.
-6. Identify the USB CDC COM port and capture startup output.
-7. Send `help\r\n` and verify an echo/command response.
-8. Send `status\r\n` or the command relevant to the change and retain the output.
+6. Identify the USB CDC COM port and capture startup output, e.g. `python tools/astro_console.py capture --duration 10`.
+7. Send `help` (`python tools/astro_console.py send help`) and verify an echo/command response.
+8. Send `status` or the command relevant to the change and retain the output.
 9. For communication changes, leave the capture running long enough to observe the five-second telemetry behavior and any warnings/errors.
 10. Stop the debug session before disconnecting the probe or reopening the COM port in another tool.
 

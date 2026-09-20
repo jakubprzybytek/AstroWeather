@@ -100,7 +100,7 @@ void NumericDisplay::setTime(uint8_t hour, uint8_t minute)
         setError();
         return;
     }
-    data_.slots[0] = kDigits[hour / 10U];
+    data_.slots[0] = hour < 10U ? 0U : kDigits[hour / 10U];
     data_.slots[1] = kDigits[hour % 10U];
     data_.slots[2] = kDigits[minute / 10U];
     data_.slots[3] = kDigits[minute % 10U];

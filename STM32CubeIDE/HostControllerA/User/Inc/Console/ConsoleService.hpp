@@ -8,12 +8,17 @@
 
 #include <cstdint>
 
+namespace Device {
+class Eeprom24AA01;
+}
+
 class ConsoleService : public Task<2048>
 {
 public:
     static ConsoleService& instance();
 
     void init(Display::Display* display);
+    void setEeprom(Device::Eeprom24AA01* eeprom);
     void onUsbRxData(const uint8_t* data, uint32_t len);
 
 protected:
@@ -48,6 +53,7 @@ private:
     uint32_t lineLength_;
     bool lineTruncated_;
     Display::Display* display_;
+    Device::Eeprom24AA01* eeprom_;
 };
 
 extern "C" void ConsoleService_OnUsbRxData(const uint8_t* data, uint32_t len);
