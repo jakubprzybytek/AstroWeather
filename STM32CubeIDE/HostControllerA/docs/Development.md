@@ -243,8 +243,10 @@ display set <index> <value> <precision>
 display time <index> <HH:MM>
 display blank <index>
 astro refresh
-adc on
-adc off
+adc log on
+adc log off
+adc display on
+adc display off
 ```
 
 Every completed input line produces an echo similar to:

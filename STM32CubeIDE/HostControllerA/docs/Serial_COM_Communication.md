@@ -75,6 +75,7 @@ The device's line-based interface is documented in detail in [USB_CDC_Debug_Serv
   - `display time <index> <HH:MM>`
   - `display blank <index>`
   - `astro refresh` — start the non-blocking fetch, parse, and display refresh
-  - `adc on` / `adc off` — toggle current-sense readout logging
+  - `adc log on` / `adc log off` — toggle current-sense readout logging
+  - `adc display on` / `adc display off` — toggle current-sense readout on the display
 - Unsolicited log lines (`[INFO]`, `[WARN]`, `[ERR]`, `[DEBUG]`) and periodic `[STATS]` / `[MEM]` / `[STACK]` telemetry (every 5s of inactivity) arrive interleaved with command responses — a capture window should be long enough to separate the two.
 - Command set may evolve; re-run `help` to get the current list rather than trusting this document to stay exhaustive.
