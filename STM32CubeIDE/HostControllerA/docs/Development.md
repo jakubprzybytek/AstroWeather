@@ -288,8 +288,8 @@ adc display on
 adc display off
 eeprom probe
 eeprom dump
-eeprom read <offset> [length]
-eeprom write <offset> <hexbytes>
+eeprom read <hex-offset> [hex-length]
+eeprom write <hex-offset> <hexbytes>
 eeprom erase
 ```
 

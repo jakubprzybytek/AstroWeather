@@ -128,8 +128,8 @@ void ConsoleService::execute(const char* line)
         reply("OK 'adc display off' - disable current-sense readout on display, example: 'adc display off'");
         reply("OK 'eeprom probe' - check the settings EEPROM responds, example: 'eeprom probe'");
         reply("OK 'eeprom dump' - hex dump the whole EEPROM, example: 'eeprom dump'");
-        reply("OK 'eeprom read' - hex dump a range, example: 'eeprom read 0 16'");
-        reply("OK 'eeprom write' - write hex bytes, example: 'eeprom write 0 A55A01'");
+        reply("OK 'eeprom read' - hex dump a range, hex offset/length, example: 'eeprom read 70 10'");
+        reply("OK 'eeprom write' - write hex bytes at a hex offset, example: 'eeprom write 00 A55A01'");
         reply("OK 'eeprom erase' - fill the EEPROM with 0xFF, example: 'eeprom erase'");
         return;
     }

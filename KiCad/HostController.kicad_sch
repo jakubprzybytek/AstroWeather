@@ -2973,6 +2973,16 @@
 			(embedded_fonts no)
 		)
 	)
+	(text "Using 2.2k because ~10 board + 1 eeprom chip"
+		(exclude_from_sim no)
+		(at 264.16 20.066 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "612ad70f-f4f5-49bc-91d0-6581701d8f4c")
+	)
 	(text "25.07.2026 - 22p"
 		(exclude_from_sim no)
 		(at 81.534 42.418 0)

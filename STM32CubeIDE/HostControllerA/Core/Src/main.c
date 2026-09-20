@@ -340,14 +340,7 @@ static void MX_I2C1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN I2C1_Init 2 */
-  /* CubeMX computes Timing for 100 kHz, which needs a 1 us rise time. The
-     internal pull-ups used here (see HAL_I2C_MspInit) give roughly 3 us into
-     typical bus capacitance, so run SCL at ~21 kHz instead: same TIMINGR with
-     PRESC raised from 0 to 4. Restore 0x00503D58 once external pull-ups exist. */
-  __HAL_I2C_DISABLE(&hi2c1);
-  hi2c1.Init.Timing = 0x40503D58;
-  hi2c1.Instance->TIMINGR = hi2c1.Init.Timing;
-  __HAL_I2C_ENABLE(&hi2c1);
+
   /* USER CODE END I2C1_Init 2 */
 
 }

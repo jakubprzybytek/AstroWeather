@@ -108,14 +108,16 @@ CommandResult handleEepromCommand(const char* line, Device::Eeprom24AA01* eeprom
         return dumpRange(*eeprom, 0U, Device::Eeprom24AA01::kSize);
     }
 
-    int offset = 0;
-    int length = 0;
-    const int readArguments = std::sscanf(line, "eeprom read %i %i", &offset, &length);
+    // Offsets and lengths are hex, so an address read off a 'dump' line can be
+    // typed straight back in. Decimal parsing here made 'read 70' mean 0x46.
+    unsigned int offset = 0U;
+    unsigned int length = 0U;
+    const int readArguments = std::sscanf(line, "eeprom read %x %x", &offset, &length);
     if (readArguments >= 1) {
         if (readArguments == 1) {
-            length = 1;
+            length = 1U;
         }
-        if (offset < 0 || length <= 0 || offset >= Device::Eeprom24AA01::kSize ||
+        if (length == 0U || offset >= Device::Eeprom24AA01::kSize ||
             length > (Device::Eeprom24AA01::kSize - offset)) {
             return CommandResult::InvalidArgument;
         }
@@ -124,13 +126,13 @@ CommandResult handleEepromCommand(const char* line, Device::Eeprom24AA01* eeprom
 
     char payloadText[kMaxPayloadText] = {};
     static_assert(kMaxPayloadText == 65U, "update the sscanf width below when the cap changes");
-    if (std::sscanf(line, "eeprom write %i %64s", &offset, payloadText) == 2) {
+    if (std::sscanf(line, "eeprom write %x %64s", &offset, payloadText) == 2) {
         uint8_t payload[kMaxWritePayload];
         uint16_t size = 0U;
         if (!parseHexPayload(payloadText, payload, kMaxWritePayload, size)) {
             return CommandResult::InvalidArgument;
         }
-        if (offset < 0 || offset >= Device::Eeprom24AA01::kSize ||
+        if (offset >= Device::Eeprom24AA01::kSize ||
             size > (Device::Eeprom24AA01::kSize - offset)) {
             return CommandResult::InvalidArgument;
         }
@@ -138,8 +140,8 @@ CommandResult handleEepromCommand(const char* line, Device::Eeprom24AA01* eeprom
             return CommandResult::Unavailable;
         }
         char message[64];
-        std::snprintf(message, sizeof(message), "OK eeprom-write offset=%u bytes=%u",
-                      static_cast<unsigned>(offset), static_cast<unsigned>(size));
+        std::snprintf(message, sizeof(message), "OK eeprom-write offset=0x%02X bytes=%u",
+                      offset, static_cast<unsigned>(size));
         LogService::instance().sendLine(message);
         return CommandResult::Ok;
     }
