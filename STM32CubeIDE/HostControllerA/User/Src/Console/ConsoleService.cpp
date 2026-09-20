@@ -6,6 +6,7 @@
 #endif
 #include <Console/DisplayCommand.hpp>
 #include <Console/EepromCommand.hpp>
+#include <Console/SettingsCommand.hpp>
 #include <Debug/LogService.hpp>
 
 #include "cmsis_os2.h"
@@ -24,7 +25,7 @@ ConsoleService::ConsoleService()
     : Task<2048>("ConsoleService", osPriorityNormal),
       commandQueueHandle_(nullptr), commandQueueCb_{}, commandQueueStorage_{},
       rxRing_{}, rxHead_(0U), rxTail_(0U), line_{}, lineLength_(0U),
-    lineTruncated_(false), display_(nullptr), eeprom_(nullptr)
+    lineTruncated_(false), display_(nullptr), eeprom_(nullptr), settings_(nullptr)
 {
 }
 
@@ -43,6 +44,11 @@ void ConsoleService::init(Display::Display* display)
 void ConsoleService::setEeprom(Device::Eeprom24AA01* eeprom)
 {
     eeprom_ = eeprom;
+}
+
+void ConsoleService::setSettings(Settings::Store* settings)
+{
+    settings_ = settings;
 }
 
 void ConsoleService::onUsbRxData(const uint8_t* data, uint32_t len)
@@ -131,6 +137,11 @@ void ConsoleService::execute(const char* line)
         reply("OK 'eeprom read' - hex dump a range, hex offset/length, example: 'eeprom read 70 10'");
         reply("OK 'eeprom write' - write hex bytes at a hex offset, example: 'eeprom write 00 A55A01'");
         reply("OK 'eeprom erase' - fill the EEPROM with 0xFF, example: 'eeprom erase'");
+        reply("OK 'settings show' - print stored settings, example: 'settings show'");
+        reply("OK 'settings save' - write settings to EEPROM, example: 'settings save'");
+        reply("OK 'settings defaults' - reset settings and save, example: 'settings defaults'");
+        reply("OK 'wifi set' - store credentials, example: 'wifi set MyNet MyPassword'");
+        reply("OK 'wifi clear' - drop stored credentials, example: 'wifi clear'");
         return;
     }
     if (std::strcmp(line, "status") == 0) {
@@ -156,7 +167,7 @@ void ConsoleService::execute(const char* line)
         return;
     }
 #endif
-    const Console::CommandResult adcResult = Console::handleAdcCommand(line);
+    const Console::CommandResult adcResult = Console::handleAdcCommand(line, settings_);
     if (adcResult == Console::CommandResult::Ok) {
         if (std::strcmp(line, "adc log on") == 0) {
             reply("OK adc-log=on");
@@ -171,6 +182,20 @@ void ConsoleService::execute(const char* line)
     }
     if (adcResult != Console::CommandResult::NotHandled) {
         reply("ERR invalid-command");
+        return;
+    }
+
+    const Console::CommandResult settingsResult =
+        Console::handleSettingsCommand(line, settings_);
+    if (settingsResult == Console::CommandResult::Ok) {
+        return;
+    }
+    if (settingsResult == Console::CommandResult::Unavailable) {
+        reply("ERR settings-unavailable");
+        return;
+    }
+    if (settingsResult == Console::CommandResult::InvalidArgument) {
+        reply("ERR invalid-argument");
         return;
     }
 

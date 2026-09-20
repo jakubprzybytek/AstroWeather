@@ -12,6 +12,10 @@ namespace Device {
 class Eeprom24AA01;
 }
 
+namespace Settings {
+class Store;
+}
+
 class ConsoleService : public Task<2048>
 {
 public:
@@ -19,6 +23,7 @@ public:
 
     void init(Display::Display* display);
     void setEeprom(Device::Eeprom24AA01* eeprom);
+    void setSettings(Settings::Store* settings);
     void onUsbRxData(const uint8_t* data, uint32_t len);
 
 protected:
@@ -54,6 +59,7 @@ private:
     bool lineTruncated_;
     Display::Display* display_;
     Device::Eeprom24AA01* eeprom_;
+    Settings::Store* settings_;
 };
 
 extern "C" void ConsoleService_OnUsbRxData(const uint8_t* data, uint32_t len);

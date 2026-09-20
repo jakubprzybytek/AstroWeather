@@ -10,7 +10,9 @@
 #include <Display/PcbDisplayBoard.hpp>
 #include <HostController/MainLoopTask.hpp>
 #include <HostController/AstroDataRefreshTask.hpp>
+#include <Debug/LogService.hpp>
 #include <Sensors/CurrentSenseTask.hpp>
+#include <Settings/SettingsStore.hpp>
 #include <St67HttpFetchTask.hpp>
 #include <Utils/Led.hpp>
 #include <Utils/SwitchInput.hpp>
@@ -49,15 +51,32 @@ Display::Display display(localBoard, {&remoteBoard1, &remoteBoard2,
 
 Device::Eeprom24AA01 settingsEeprom(i2c1Bus);
 
+Settings::Store settingsStore(settingsEeprom);
+
 Led led2(LED_2_GPIO_Port, LED_2_Pin);
 
 void AppVariant_Init() {
   LogService::instance().init();
   LogService::instance().start();
+
+  // Runs before osKernelStart(); reads take no osDelay and the bus mutex is
+  // uncontended here, so this does not block. Log the outcome rather than the
+  // values, since they include credentials.
+  const Settings::LoadResult loaded = settingsStore.load();
+  LogService::instance().logf(
+      LogService::Level::Info, "Settings load=%s stored=%s",
+      (loaded == Settings::LoadResult::Ok)
+          ? "ok"
+          : ((loaded == Settings::LoadResult::ReadFailed) ? "read-failed" : "defaulted"),
+      Settings::Store::describe(settingsStore.lastDecode()));
+
+  CurrentSenseTask::instance().setLoggingEnabled(settingsStore.values().adcLogEnabled);
+  CurrentSenseTask::instance().setDisplayEnabled(settingsStore.values().adcDisplayEnabled);
   CurrentSenseTask::instance().setDisplay(&display);
   CurrentSenseTask::instance().start();
   ConsoleService::instance().init(&display);
   ConsoleService::instance().setEeprom(&settingsEeprom);
+  ConsoleService::instance().setSettings(&settingsStore);
   ConsoleService::instance().start();
   localBoard.start();
 

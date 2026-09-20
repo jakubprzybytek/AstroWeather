@@ -381,7 +381,22 @@ eeprom dump
 eeprom read <hex-offset> [hex-length]
 eeprom write <hex-offset> <hexbytes>
 eeprom erase
+settings show
+settings save
+settings defaults
+wifi set <ssid> <password>
+wifi clear
 ```
+
+`adc log`, `adc display` and the `wifi` commands write straight through to the
+settings EEPROM, so they survive a power cycle and are re-applied at startup.
+Settings are stored as tag/length/value records behind a CRC-checked header;
+see `User/Inc/Settings/SettingsCodec.hpp` for the layout and for the rules on
+adding a new setting. A blank or corrupt chip falls back to defaults rather
+than refusing to boot.
+
+Note that `wifi set` is echoed to the log like any other console line, and
+`eeprom dump` shows the stored password in the clear.
 
 Every completed input line produces an echo similar to:
 
