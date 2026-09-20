@@ -15,9 +15,8 @@ void BufferedDisplayBoard::submit()
         report(HAL_ERROR);
         return;
     }
-    report(HAL_I2C_Master_Transmit(&bus_, static_cast<uint16_t>(address_ << 1U),
-                                   message.data(), static_cast<uint16_t>(message.size()),
-                                   kTransferTimeoutMs));
+    report(bus_.transmit(address_, message.data(), static_cast<uint16_t>(message.size()),
+                         kTransferTimeoutMs));
 }
 
 void BufferedDisplayBoard::report(HAL_StatusTypeDef status)

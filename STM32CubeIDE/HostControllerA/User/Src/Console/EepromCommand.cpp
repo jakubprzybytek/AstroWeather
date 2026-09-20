@@ -151,13 +151,13 @@ CommandResult handleEepromCommand(const char* line, Device::Eeprom24AA01* eeprom
         char message[64];
         // Addressing our own slave address wedges the peripheral (START never
         // completes and BUSY latches), so step over it.
-        const uint16_t ownAddress = static_cast<uint16_t>(eeprom->bus().Init.OwnAddress1 >> 1U);
+        const uint16_t ownAddress =
+            static_cast<uint16_t>(eeprom->bus().handle().Init.OwnAddress1 >> 1U);
         for (uint16_t candidate = 0x08U; candidate <= 0x77U; ++candidate) {
             if (candidate == ownAddress) {
                 continue;
             }
-            if (HAL_I2C_IsDeviceReady(&eeprom->bus(), static_cast<uint16_t>(candidate << 1U), 2U,
-                                      5U) == HAL_OK) {
+            if (eeprom->bus().isDeviceReady(candidate, 2U, 5U) == HAL_OK) {
                 std::snprintf(message, sizeof(message), "OK eeprom-scan found=0x%02X",
                               static_cast<unsigned>(candidate));
                 LogService::instance().sendLine(message);

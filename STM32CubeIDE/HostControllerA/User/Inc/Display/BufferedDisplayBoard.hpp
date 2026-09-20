@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Display/DisplayBoard.hpp>
+#include <Device/I2cBus.hpp>
 
 #include "main.h"
 
@@ -8,7 +9,7 @@ namespace Display {
 
 class BufferedDisplayBoard : public DisplayBoard {
 public:
-    BufferedDisplayBoard(I2C_HandleTypeDef& bus, uint16_t address)
+    BufferedDisplayBoard(Device::I2cBus& bus, uint16_t address)
         : bus_(bus), address_(address) {}
 
     void submit() override;
@@ -27,7 +28,7 @@ private:
 
     void report(HAL_StatusTypeDef status);
 
-    I2C_HandleTypeDef& bus_;
+    Device::I2cBus& bus_;
     uint16_t address_;
     HAL_StatusTypeDef lastStatus_ = HAL_OK;
     uint32_t lastReportTick_ = 0U;

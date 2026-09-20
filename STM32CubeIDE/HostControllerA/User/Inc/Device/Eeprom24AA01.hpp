@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Device/I2cBus.hpp>
+
 #include "main.h"
 
 #include <cstdint>
@@ -26,7 +28,7 @@ public:
     static constexpr uint32_t kAckPollTimeoutMs = 10U;
     static constexpr uint32_t kWriteCycleTimeoutMs = 20U;  // t_WC is 5 ms max
 
-    explicit Eeprom24AA01(I2C_HandleTypeDef& bus, uint16_t address = kDeviceAddress);
+    explicit Eeprom24AA01(I2cBus& bus, uint16_t address = kDeviceAddress);
 
     // Acknowledge poll; HAL_OK means the chip is present and idle.
     HAL_StatusTypeDef probe(uint32_t trials = 3U);
@@ -44,7 +46,7 @@ public:
     uint16_t address() const { return address_; }
 
     // Exposed so bring-up code can ack-poll the rest of the bus.
-    I2C_HandleTypeDef& bus() const { return bus_; }
+    I2cBus& bus() const { return bus_; }
     HAL_StatusTypeDef lastStatus() const { return lastStatus_; }
 
 private:
@@ -52,7 +54,7 @@ private:
     HAL_StatusTypeDef waitForWriteCycle();
     HAL_StatusTypeDef fail(HAL_StatusTypeDef status);
 
-    I2C_HandleTypeDef& bus_;
+    I2cBus& bus_;
     uint16_t address_;
     HAL_StatusTypeDef lastStatus_ = HAL_OK;
 };

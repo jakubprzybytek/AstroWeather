@@ -3,6 +3,7 @@
 #include <Console/ConsoleService.hpp>
 #include <Debug/LogService.hpp>
 #include <Device/Eeprom24AA01.hpp>
+#include <Device/I2cBus.hpp>
 #include <Device/SCT2xxx.hpp>
 #include <Display/BufferedDisplayBoard.hpp>
 #include <Display/Display.hpp>
@@ -22,6 +23,10 @@ extern SPI_HandleTypeDef hspi3;
 extern I2C_HandleTypeDef hi2c1;
 extern TIM_HandleTypeDef htim2;
 
+// Declared before its clients: within a translation unit static objects are
+// constructed in declaration order, and the boards below hold a reference to it.
+Device::I2cBus i2c1Bus(hi2c1);
+
 SCT2xxx localSct(&hspi3, SCT_ENABLE_GPIO_Port, SCT_ENABLE_Pin,
                  SCT_LATCH_GPIO_Port, SCT_LATCH_Pin);
 
@@ -32,17 +37,17 @@ Display::PcbDisplayBoard localBoard(
     {DISPLAY_1_EN_Pin, DISPLAY_2_EN_Pin, DISPLAY_3_EN_Pin, DISPLAY_4_EN_Pin,
      DISPLAY_5_EN_Pin});
 
-Display::BufferedDisplayBoard remoteBoard1(hi2c1, 0x10U);
-Display::BufferedDisplayBoard remoteBoard2(hi2c1, 0x11U);
-Display::BufferedDisplayBoard remoteBoard3(hi2c1, 0x12U);
-Display::BufferedDisplayBoard remoteBoard4(hi2c1, 0x13U);
-Display::BufferedDisplayBoard remoteBoard5(hi2c1, 0x14U);
+Display::BufferedDisplayBoard remoteBoard1(i2c1Bus, 0x10U);
+Display::BufferedDisplayBoard remoteBoard2(i2c1Bus, 0x11U);
+Display::BufferedDisplayBoard remoteBoard3(i2c1Bus, 0x12U);
+Display::BufferedDisplayBoard remoteBoard4(i2c1Bus, 0x13U);
+Display::BufferedDisplayBoard remoteBoard5(i2c1Bus, 0x14U);
 
 Display::Display display(localBoard, {&remoteBoard1, &remoteBoard2,
                                       &remoteBoard3, &remoteBoard4,
                                       &remoteBoard5});
 
-Device::Eeprom24AA01 settingsEeprom(hi2c1);
+Device::Eeprom24AA01 settingsEeprom(i2c1Bus);
 
 Led led2(LED_2_GPIO_Port, LED_2_Pin);
 
