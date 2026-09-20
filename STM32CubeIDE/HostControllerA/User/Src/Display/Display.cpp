@@ -8,7 +8,7 @@ void Display::submit()
     local_.submit();
     for (DisplayBoard* board : remote_) {
         if (board != nullptr) {
-            //board->submit();
+            board->submit();
         }
     }
 }
