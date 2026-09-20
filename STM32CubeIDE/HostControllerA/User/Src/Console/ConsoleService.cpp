@@ -116,8 +116,10 @@ void ConsoleService::execute(const char* line)
     #if defined(FIRMWARE_VARIANT_HostController)
         reply("OK 'astro refresh' - fetch and publish astro data, example: 'astro refresh'");
     #endif
-        reply("OK 'adc on' - enable current-sense readout logging, example: 'adc on'");
-        reply("OK 'adc off' - disable current-sense readout logging, example: 'adc off'");
+        reply("OK 'adc log on' - enable current-sense readout logging, example: 'adc log on'");
+        reply("OK 'adc log off' - disable current-sense readout logging, example: 'adc log off'");
+        reply("OK 'adc display on' - enable current-sense readout on display, example: 'adc display on'");
+        reply("OK 'adc display off' - disable current-sense readout on display, example: 'adc display off'");
         return;
     }
     if (std::strcmp(line, "status") == 0) {
@@ -145,7 +147,15 @@ void ConsoleService::execute(const char* line)
 #endif
     const Console::CommandResult adcResult = Console::handleAdcCommand(line);
     if (adcResult == Console::CommandResult::Ok) {
-        reply(std::strcmp(line, "adc on") == 0 ? "OK adc=on" : "OK adc=off");
+        if (std::strcmp(line, "adc log on") == 0) {
+            reply("OK adc-log=on");
+        } else if (std::strcmp(line, "adc log off") == 0) {
+            reply("OK adc-log=off");
+        } else if (std::strcmp(line, "adc display on") == 0) {
+            reply("OK adc-display=on");
+        } else {
+            reply("OK adc-display=off");
+        }
         return;
     }
     if (adcResult != Console::CommandResult::NotHandled) {

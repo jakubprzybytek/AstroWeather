@@ -36,6 +36,11 @@ void CurrentSenseTask::setLoggingEnabled(bool enabled)
     loggingEnabled_ = enabled;
 }
 
+void CurrentSenseTask::setDisplayEnabled(bool enabled)
+{
+    displayEnabled_ = enabled;
+}
+
 void CurrentSenseTask::notifyAdcComplete()
 {
     osThreadFlagsSet(getHandle(), kAdcCompleteFlag);
@@ -100,7 +105,7 @@ void CurrentSenseTask::run()
         const Sample sample = readSample();
         if (sample.valid)
         {
-            if (display_ != nullptr)
+            if (display_ != nullptr && displayEnabled_)
             {
                 display_->local().numeric(0U).setValue(
                     static_cast<int16_t>(sample.currentMilliAmps));

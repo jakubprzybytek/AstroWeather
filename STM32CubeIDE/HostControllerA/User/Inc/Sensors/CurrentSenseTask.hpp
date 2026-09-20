@@ -15,6 +15,7 @@ public:
 
     void setDisplay(Display::Display* display);
     void setLoggingEnabled(bool enabled);
+    void setDisplayEnabled(bool enabled);
     void notifyAdcComplete();
     void notifyAdcError();
 
@@ -43,4 +44,5 @@ private:
     alignas(uint32_t) uint16_t adcValues_[3] = {0U, 0U, 0U};
     Display::Display* display_ = nullptr;
     volatile bool loggingEnabled_ = false;
+    volatile bool displayEnabled_ = true;
 };
