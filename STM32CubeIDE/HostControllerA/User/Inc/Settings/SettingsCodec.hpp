@@ -35,6 +35,10 @@ constexpr uint8_t kContainerVersion = 1U;
 // simply has no record for the new tag, and decode() leaves that field at its
 // default. The version above tracks the container - header layout, CRC choice -
 // not the set of settings, so it should almost never change.
+//
+// docs/Settings.md is the specification, and holds the authoritative tag
+// registry. Follow its "Adding a new setting" checklist before editing this
+// enum, and update the registry there to match.
 enum class Tag : uint8_t {
     AdcFlags = 0x01,      // 1 byte: bit0 log enabled, bit1 display enabled
     WifiSsid = 0x10,      // 1..32 bytes, not NUL terminated

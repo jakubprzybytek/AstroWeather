@@ -255,6 +255,10 @@ The initial implementation may update prepared data without double buffering. A 
 
 I2C1 is enabled in the CubeMX configuration on PA9/SCL and PA10/SDA using 7-bit addressing. The Host Controller acts as controller/master, and each Display Controller acts as target/slave.
 
+The bus needs external 2.2k pull-up resistors to 3V3 on SCL and SDA. They are sized for the eventual bus of one settings EEPROM plus up to ten Display Controllers, roughly 300-450 pF, where the more common 4.7k would exceed the 1 us rise time that 100 kHz standard mode allows. Without pull-ups the lines can never be released high, the peripheral latches BUSY on its first START, and no device on the bus responds.
+
+I2C1 is shared with the settings EEPROM described in [Settings.md](Settings.md), which is driven from a different task. All traffic therefore goes through `Device::I2cBus`, which owns the handle and the mutex serializing one transfer at a time. `Display::submit()`'s own mutex serializes display refreshes against each other but does not cover other clients of the bus, so any new I2C device must be given the same `I2cBus` rather than the raw `I2C_HandleTypeDef`.
+
 Each message contains 36 bytes. The payload has one explicit byte order used by both I2C sender and receiver:
 
 | Offset | Size | Content |
@@ -288,6 +292,8 @@ The Display Controller checks the first received byte before processing the payl
 - The local PCB-backed Display Board and its refresh mechanism.
 - The top-level `Display` containing the local board and five remote buffer-backed boards.
 - Client code calls `Display::submit()` after it has finished updating all local and remote board objects. Setters are intentionally unsynchronized, so independent clients may overwrite pending fields; the last update to each field wins. `submit()` serializes the hardware transfer sequence, submits the local logical buffer to the PCB-backed board for encoding and periodic SPI refresh, then sends each remote logical buffer to its configured I2C address.
+
+Each remote transfer is bounded by a 50 ms timeout rather than `HAL_MAX_DELAY`, so an unreachable board cannot block the calling task. A board's reachability is logged on transition, and an unreachable board is restated every 30 seconds; refreshes run at 10 Hz, so logging every failure would flood the console, while logging only the transition would lose the message entirely for a board missing from boot, which fails before USB CDC has enumerated.
 
 ### Display Controller
 

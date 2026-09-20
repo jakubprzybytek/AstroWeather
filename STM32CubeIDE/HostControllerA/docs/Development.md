@@ -389,11 +389,12 @@ wifi clear
 ```
 
 `adc log`, `adc display` and the `wifi` commands write straight through to the
-settings EEPROM, so they survive a power cycle and are re-applied at startup.
-Settings are stored as tag/length/value records behind a CRC-checked header;
-see `User/Inc/Settings/SettingsCodec.hpp` for the layout and for the rules on
-adding a new setting. A blank or corrupt chip falls back to defaults rather
-than refusing to boot.
+settings EEPROM, so they survive a power cycle and are re-applied at startup. A
+blank or corrupt chip falls back to defaults rather than refusing to boot.
+
+[Settings.md](Settings.md) specifies the stored format, and anything adding a
+new persisted setting should follow
+[Adding a new setting](Settings.md#adding-a-new-setting) there.
 
 Note that `wifi set` is echoed to the log like any other console line, and
 `eeprom dump` shows the stored password in the clear.
