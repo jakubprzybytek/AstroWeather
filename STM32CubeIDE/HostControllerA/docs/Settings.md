@@ -266,7 +266,8 @@ wear concern at console-command rates.
 | `settings show` | Print current values and the startup load result. The password is reported only as `<set>` or `<unset>`. |
 | `settings save` | Force a write. |
 | `settings defaults` | Reset all values to defaults and save. |
-| `wifi set <ssid> <password>` | Store credentials and save. |
+| `wifi set <ssid> [password]` | Store credentials, save, and test the connection. |
+| `wifi test` | Connect with the stored credentials and report the result. |
 | `wifi clear` | Drop stored credentials and save. |
 | `adc log on\|off` | Toggle and save. |
 | `adc display on\|off` | Toggle and save. |

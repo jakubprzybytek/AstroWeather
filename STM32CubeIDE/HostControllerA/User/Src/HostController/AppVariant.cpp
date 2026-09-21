@@ -80,6 +80,8 @@ void AppVariant_Init() {
   ConsoleService::instance().start();
   localBoard.start();
 
+  // Before the fetch task starts: it reads the credentials on every connect.
+  HostController::SetSt67CredentialSource(&settingsStore);
   HostController::StartSt67HttpFetchTask();
   HostController::AstroDataRefreshTask::instance().init(&display);
   HostController::AstroDataRefreshTask::instance().start();

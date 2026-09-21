@@ -14,6 +14,7 @@ enum class St67FetchStatus : uint8_t {
   HttpFailure,
   ResponseTooLarge,
   CleanupFailure,
+  NoCredentials,  // no SSID stored; see 'wifi set'
 };
 
 struct St67FetchResult {

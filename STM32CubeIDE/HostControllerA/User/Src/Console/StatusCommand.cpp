@@ -6,6 +6,7 @@
 #include <Settings/SettingsStore.hpp>
 #if defined(FIRMWARE_VARIANT_HostController)
 #include <HostController/AstroDataRefreshTask.hpp>
+#include <HostController/St67HttpFetchTask.hpp>
 #endif
 
 #include "FreeRTOS.h"
@@ -42,6 +43,35 @@ void formatDuration(uint32_t milliseconds, char* out, std::size_t size)
                   static_cast<unsigned long>(seconds % 60U));
 }
 
+void reportWifi(const Settings::Values& values)
+{
+    if (values.wifiSsid[0] == '\0') {
+        line("wifi       not configured; set credentials with 'wifi set <ssid> <password>'");
+        return;
+    }
+#if defined(FIRMWARE_VARIANT_HostController)
+    using namespace HostController;
+    const WifiConnectSummary last = LastWifiConnect();
+    if (last.result == WifiConnectResult::NeverTried) {
+        line("wifi       '%s' stored; not connected since boot ('wifi test' to try)",
+             values.wifiSsid);
+        return;
+    }
+    char ago[24];
+    formatDuration(osKernelGetTickCount() - last.tick, ago, sizeof(ago));
+    if (last.result == WifiConnectResult::Connected) {
+        line("wifi       '%s' stored; last connect ok %s ago (channel %lu, %ld dBm)",
+             values.wifiSsid, ago, static_cast<unsigned long>(last.channel),
+             static_cast<long>(last.rssi));
+    } else {
+        line("wifi       '%s' stored; last connect FAILED %s ago: %s", values.wifiSsid, ago,
+             wifiConnectResultName(last.result));
+    }
+#else
+    line("wifi       '%s' stored", values.wifiSsid);
+#endif
+}
+
 void reportEeprom(Device::Eeprom24AA04* eeprom, Settings::Store* settings)
 {
     if (eeprom == nullptr) {
@@ -62,13 +92,7 @@ void reportEeprom(Device::Eeprom24AA04* eeprom, Settings::Store* settings)
     line("settings   loaded at boot: %s; adc log %s, adc display %s",
          Settings::Store::describe(settings->lastDecode()), values.adcLogEnabled ? "on" : "off",
          values.adcDisplayEnabled ? "on" : "off");
-    // Stored credentials are not yet read by the WiFi connection.
-    if (values.wifiSsid[0] != '\0') {
-        line("wifi       '%s' stored, but connecting uses the built-in credentials",
-             values.wifiSsid);
-    } else {
-        line("wifi       nothing stored; connecting uses the built-in credentials");
-    }
+    reportWifi(values);
 }
 
 #if defined(FIRMWARE_VARIANT_HostController)
@@ -88,9 +112,20 @@ void reportAstro()
     char ago[24];
     formatDuration(osKernelGetTickCount() - last.finishedTick, ago, sizeof(ago));
     if (last.outcome == RefreshOutcome::FetchFailed) {
-        line("astro      last refresh %s (%s, http %u), %s ago, from %s%s",
-             refreshOutcomeName(last.outcome), fetchStatusName(last.fetchStatus),
-             static_cast<unsigned>(last.httpStatus), ago, refreshTriggerName(last.trigger),
+        // An HTTP code only means something for an HTTP failure. Even then, 505
+        // is the fetcher's placeholder until a response arrives, not a reply
+        // from this server, so it means none came back.
+        char detail[40];
+        if (last.fetchStatus != St67FetchStatus::HttpFailure) {
+            std::snprintf(detail, sizeof(detail), "%s", fetchStatusName(last.fetchStatus));
+        } else if (last.httpStatus == 505U) {
+            std::snprintf(detail, sizeof(detail), "no HTTP response");
+        } else {
+            std::snprintf(detail, sizeof(detail), "http %u",
+                          static_cast<unsigned>(last.httpStatus));
+        }
+        line("astro      last refresh %s (%s), %s ago, from %s%s",
+             refreshOutcomeName(last.outcome), detail, ago, refreshTriggerName(last.trigger),
              last.running ? "; another running now" : "");
     } else {
         line("astro      last refresh %s, %s ago, from %s%s", refreshOutcomeName(last.outcome), ago,

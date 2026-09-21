@@ -43,6 +43,40 @@ HAL_StatusTypeDef Store::save()
     return HAL_OK;
 }
 
+namespace {
+
+void copyBounded(char* destination, std::size_t size, const char* source)
+{
+    if (destination == nullptr || size == 0U) {
+        return;
+    }
+    std::strncpy(destination, (source != nullptr) ? source : "", size - 1U);
+    destination[size - 1U] = '\0';
+}
+
+} // namespace
+
+void Store::setWifiCredentials(const char* ssid, const char* password)
+{
+    MutexGuard guard(mutex_);
+    copyBounded(values_.wifiSsid, sizeof(values_.wifiSsid), ssid);
+    copyBounded(values_.wifiPassword, sizeof(values_.wifiPassword), password);
+}
+
+void Store::copyWifiCredentials(char* ssid, std::size_t ssidSize, char* password,
+                                std::size_t passwordSize) const
+{
+    MutexGuard guard(mutex_);
+    copyBounded(ssid, ssidSize, values_.wifiSsid);
+    copyBounded(password, passwordSize, values_.wifiPassword);
+}
+
+void Store::resetToDefaults()
+{
+    MutexGuard guard(mutex_);
+    values_ = Values{};
+}
+
 const char* Store::describe(DecodeResult result)
 {
     switch (result) {

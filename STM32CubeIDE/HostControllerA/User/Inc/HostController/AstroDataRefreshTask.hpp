@@ -19,6 +19,7 @@ enum class RefreshTrigger : uint8_t
     Switch1,
     Console,
     Scheduled,
+    WifiTest,  // 'wifi set' / 'wifi test': a refresh used to exercise the credentials
 };
 
 enum class RefreshRequestResult : uint8_t

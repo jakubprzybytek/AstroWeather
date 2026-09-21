@@ -40,6 +40,7 @@ const char* statusName(St67FetchStatus status)
     case St67FetchStatus::HttpFailure: return "http-failure";
     case St67FetchStatus::ResponseTooLarge: return "response-too-large";
     case St67FetchStatus::CleanupFailure: return "cleanup-failure";
+    case St67FetchStatus::NoCredentials: return "no-wifi-credentials";
     }
     return "unknown";
 }
@@ -170,6 +171,7 @@ const char* refreshTriggerName(RefreshTrigger trigger)
     case RefreshTrigger::Switch1: return "switch1";
     case RefreshTrigger::Console: return "console";
     case RefreshTrigger::Scheduled: return "scheduled";
+    case RefreshTrigger::WifiTest: return "wifi-test";
     }
     return "unknown";
 }
@@ -289,8 +291,49 @@ bool AstroDataRefreshTask::publishDisplay(const AstroData& data)
     return true;
 }
 
+namespace {
+
+// One verdict line for 'wifi set' / 'wifi test', so the user need not read the
+// connection log to learn whether the credentials work. The specific reason for
+// a failure has already been logged by the network session.
+void reportWifiTest(RefreshOutcome outcome, St67FetchStatus fetchStatus, uint32_t startedTick)
+{
+    const WifiConnectSummary wifi = LastWifiConnect();
+    const bool attemptedThisTime = static_cast<int32_t>(wifi.tick - startedTick) >= 0 &&
+                                   wifi.result != WifiConnectResult::NeverTried;
+    if (!attemptedThisTime) {
+        LogService::instance().logf(LogService::Level::Error,
+                                    "WiFi test FAILED before connecting: %s.",
+                                    statusName(fetchStatus));
+        return;
+    }
+    if (wifi.result != WifiConnectResult::Connected) {
+        const bool generic = wifi.result == WifiConnectResult::Failed && wifi.reasonText[0] != '\0';
+        LogService::instance().logf(LogService::Level::Error, "WiFi test FAILED for '%s': %s%s%s.",
+                                    wifi.ssid, wifiConnectResultName(wifi.result),
+                                    generic ? ", " : "", generic ? wifi.reasonText : "");
+        return;
+    }
+    if (outcome == RefreshOutcome::Ok) {
+        LogService::instance().logf(LogService::Level::Info,
+                                    "WiFi test passed: connected to '%s' (channel %lu, %ld dBm) "
+                                    "and fetched the forecast.",
+                                    wifi.ssid, static_cast<unsigned long>(wifi.channel),
+                                    static_cast<long>(wifi.rssi));
+        return;
+    }
+    LogService::instance().logf(LogService::Level::Warn,
+                                "WiFi test: connected to '%s' (channel %lu, %ld dBm), but the "
+                                "refresh then failed: %s.",
+                                wifi.ssid, static_cast<unsigned long>(wifi.channel),
+                                static_cast<long>(wifi.rssi), refreshOutcomeName(outcome));
+}
+
+} // namespace
+
 void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
 {
+    const uint32_t startedTick = osKernelGetTickCount();
     LogService::instance().logf(
         LogService::Level::Info,
         "AstroDataRefresh started source=%s", refreshTriggerName(trigger));
@@ -346,6 +389,9 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
         LogService::Level::Info,
         "AstroDataRefresh complete source=%s outcome=%s", refreshTriggerName(trigger),
         refreshOutcomeName(outcome));
+    if (trigger == RefreshTrigger::WifiTest) {
+        reportWifiTest(outcome, request_.result.status, startedTick);
+    }
 }
 
 RefreshSummary AstroDataRefreshTask::lastRefresh() const

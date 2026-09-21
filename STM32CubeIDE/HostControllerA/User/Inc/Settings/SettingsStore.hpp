@@ -2,6 +2,9 @@
 
 #include <Device/Eeprom24AA04.hpp>
 #include <Settings/SettingsCodec.hpp>
+#include <Utils/Mutex.hpp>
+
+#include <cstddef>
 
 namespace Settings {
 
@@ -35,6 +38,16 @@ public:
     Values& values() { return values_; }
     const Values& values() const { return values_; }
 
+    // WiFi credentials are the one part of Values read by another task: the
+    // console writes them and the WiFi task reads them when it connects. These
+    // go through the lock so neither can see a half-written string. Callers on
+    // the console task may still read values() directly, since only that task
+    // writes.
+    void setWifiCredentials(const char* ssid, const char* password);
+    void copyWifiCredentials(char* ssid, std::size_t ssidSize, char* password,
+                             std::size_t passwordSize) const;
+    void resetToDefaults();
+
     // Detail behind a Defaulted load, for logging.
     DecodeResult lastDecode() const { return lastDecode_; }
 
@@ -44,6 +57,7 @@ private:
     Device::Eeprom24AA04& eeprom_;
     Values values_{};
     DecodeResult lastDecode_ = DecodeResult::Blank;
+    mutable Mutex mutex_;
 };
 
 } // namespace Settings

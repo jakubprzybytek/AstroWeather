@@ -33,7 +33,7 @@ const char* const kIndex[] = {
 #endif
     "  adc ...           current-sense logging and readout (saved)",
     "  settings ...      show, save or reset the saved settings",
-    "  wifi ...          store or clear WiFi credentials (saved)",
+    "  wifi ...          set, test or clear WiFi credentials (saved)",
     "  eeprom ...        raw EEPROM access, for bring-up and debugging",
 #if defined(FIRMWARE_VARIANT_HostController)
     "Groups: stats, display, astro, adc, settings, wifi, eeprom",
@@ -108,14 +108,17 @@ const char* const kSettings[] = {
 };
 
 const char* const kWifi[] = {
-    "wifi set <ssid> <password>",
-    "    Save WiFi credentials: SSID up to 32 characters, password up to 63,",
-    "    neither containing spaces. This line is echoed to the log, password",
-    "    included. e.g. 'wifi set AstroNet correcthorse'",
+    "wifi set <ssid> [password]",
+    "    Save WiFi credentials, then test them straight away. SSID 1-32",
+    "    characters; WPA2 password 8-63, or leave it out for an open network.",
+    "    Quote values containing spaces: wifi set \"My Network\" \"my pass phrase\"",
+    "    The line is echoed to the log, password included.",
+    "wifi test",
+    "    Connect with the stored credentials and report the result in plain",
+    "    words: passed, network not found, wrong password, and so on.",
     "wifi clear",
-    "    Forget the stored credentials.",
-    "Note: not used for connecting yet; the firmware still connects with the",
-    "credentials it was built with. Check what is stored with 'settings show'.",
+    "    Forget the stored credentials. WiFi stays off until new ones are set.",
+    "'status' shows what is stored and how the last connection went.",
 };
 
 const char* const kEeprom[] = {

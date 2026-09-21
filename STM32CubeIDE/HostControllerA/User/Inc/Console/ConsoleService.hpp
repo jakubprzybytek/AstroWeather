@@ -34,7 +34,9 @@ protected:
 private:
     ConsoleService();
 
-    static constexpr uint32_t kMaxLineLength = 96U;
+    // Long enough for 'wifi set' with a quoted 32-character SSID and a quoted
+    // 63-character passphrase.
+    static constexpr uint32_t kMaxLineLength = 128U;
     static constexpr uint32_t kRxRingSize = 256U;
     static constexpr uint32_t kCommandQueueDepth = 8U;
     static constexpr uint32_t kFlagCommand = 1U << 0;

@@ -387,7 +387,8 @@ eeprom erase
 settings show
 settings save
 settings defaults
-wifi set <ssid> <password>
+wifi set <ssid> [password]
+wifi test
 wifi clear
 ```
 
@@ -401,6 +402,42 @@ new persisted setting should follow
 
 Note that `wifi set` is echoed to the log like any other console line, and
 `eeprom dump` shows the stored password in the clear.
+
+### WiFi setup
+
+The firmware has no built-in WiFi credentials: they default to empty and are
+set from the console, stored in the settings EEPROM, and read on every connect.
+`Appli/App/app_credentials.h` is no longer used.
+
+```text
+wifi set MyNetwork mypassphrase
+wifi set "My Network" "my pass phrase"
+wifi set CafeGuest
+```
+
+Quote values containing spaces. The SSID is 1-32 characters; the WPA2 password
+8-63, or left out for an open network. `wifi set` saves, then immediately runs a
+connection test (a refresh tagged `wifi-test`) and ends with a one-line verdict;
+`wifi test` repeats the test. Invalid input is rejected with the specific
+reason before anything is saved.
+
+A failed connection is reported in plain words, taken from the ST67 module's
+Wi-Fi reason code:
+
+| Situation | Message |
+| --- | --- |
+| Nothing stored | `WiFi not configured: no SSID stored. Set one with 'wifi set <ssid> <password>'.` |
+| Wrong SSID or out of range | `WiFi network '<ssid>' not found: no access point with that name is in range. ...` |
+| Wrong password | `WiFi '<ssid>' rejected the connection during the password check, which almost always means a wrong password. ...` |
+| Authentication or security type mismatch | `WiFi '<ssid>' refused authentication. ...` |
+| Joined but no IP address | `WiFi joined '<ssid>' but got no IP address from DHCP. ...` |
+
+Behaviour verified against the bench access point: a missing SSID reports
+reason 12 (`SCAN_NO_BSSID_AND_CHANNEL`) and a wrong password reason 7
+(`DEAUTH_BY_AP_WHEN_CONNECTION`). A connect can also time out with no reason at
+all; the firmware then scans for the SSID to decide between "not found" and
+"in range but did not answer". `status` shows the stored SSID and how the last
+connection went.
 
 Every completed input line produces an echo similar to:
 
@@ -427,7 +464,7 @@ heap       24752 B free, 19352 B lowest since boot
 stats      off
 eeprom     answering at 0x50, 512 bytes
 settings   loaded at boot: ok; adc log off, adc display on
-wifi       'hello' stored, but connecting uses the built-in credentials
+wifi       'lemo' stored; last connect ok 0d 00:03:05 ago (channel 2, -39 dBm)
 astro      last refresh ok, 0d 00:02:25 ago, from console
 remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 ```

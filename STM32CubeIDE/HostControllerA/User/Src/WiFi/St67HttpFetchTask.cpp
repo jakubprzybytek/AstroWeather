@@ -102,7 +102,12 @@ void publishClientResult(St67Runtime& runtime) {
   } else if (std::strcmp(runtime.firstFailureStage, "netif-stop") == 0 ||
              std::strcmp(runtime.firstFailureStage, "final-state") == 0) {
     result.status = St67FetchStatus::CleanupFailure;
-  } else if (std::strcmp(runtime.firstFailureStage, "connect") == 0) {
+  } else if (std::strcmp(runtime.firstFailureStage, "credentials") == 0) {
+    result.status = St67FetchStatus::NoCredentials;
+  } else if (std::strcmp(runtime.firstFailureStage, "connect") == 0 ||
+             std::strcmp(runtime.firstFailureStage, "connect-state") == 0 ||
+             std::strcmp(runtime.firstFailureStage, "dhcp") == 0) {
+    // Station never got online; LastWifiConnect() holds the reason.
     result.status = St67FetchStatus::NetworkFailure;
   } else if (std::strcmp(runtime.firstFailureStage, "w6x-init") == 0 ||
              std::strcmp(runtime.firstFailureStage, "wifi-init") == 0) {
