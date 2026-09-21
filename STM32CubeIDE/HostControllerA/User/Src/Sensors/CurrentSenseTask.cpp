@@ -111,7 +111,9 @@ void CurrentSenseTask::run()
             {
                 display_->local().numeric(kCurrentDisplayIndex).setValue(
                     static_cast<int16_t>(sample.currentMilliAmps));
-                display_->submit();
+                // Only this board changes, so skip the I2C refresh of every
+                // remote board that submit() would do ten times a second.
+                display_->submitLocal();
             }
 
             if (loggingEnabled_)
