@@ -17,7 +17,7 @@ LogService& LogService::instance()
 LogService::LogService()
     : Task<1536>("LogService", osPriorityNormal),
       logQueueHandle_(nullptr), logQueueCb_{}, logQueueStorage_{}, txBuffer_{},
-      sentCount_(0), droppedCount_(0), busyDropCount_(0)
+      sentCount_(0), droppedCount_(0), busyDropCount_(0), statsEnabled_(false)
 {
 }
 
@@ -189,12 +189,49 @@ void LogService::emitStats()
     }, &context);
 }
 
+void LogService::setStatsEnabled(bool enabled)
+{
+    statsEnabled_ = enabled;
+    // Wake the task so it drops or adopts the stats deadline straight away
+    // instead of after its current wait.
+    const osThreadId_t handle = getHandle();
+    if (handle != nullptr) {
+        osThreadFlagsSet(handle, kFlagStatsChanged);
+    }
+}
+
 void LogService::run()
 {
+    // Stats run on a fixed schedule rather than after a quiet period, so they
+    // keep coming while the log is busy. The wait is bounded by the next
+    // deadline only while stats are enabled.
+    uint32_t nextStats = osKernelGetTickCount() + kStatsPeriodMs;
     for (;;) {
-        uint32_t flags = osThreadFlagsWait(kFlagLogQueued, osFlagsWaitAny, kStatsPeriodMs);
-        if (flags == osFlagsErrorTimeout) { emitStats(); continue; }
-        if ((flags & osFlagsError) != 0U) continue;
+        uint32_t timeout = osWaitForever;
+        if (statsEnabled_) {
+            const int32_t remaining = static_cast<int32_t>(nextStats - osKernelGetTickCount());
+            timeout = (remaining > 0) ? static_cast<uint32_t>(remaining) : 0U;
+        }
+
+        const uint32_t flags =
+            osThreadFlagsWait(kFlagLogQueued | kFlagStatsChanged, osFlagsWaitAny, timeout);
+        const bool woken = (flags & osFlagsError) == 0U;
+
+        if (woken && (flags & kFlagStatsChanged) != 0U && statsEnabled_) {
+            // Report once as soon as stats are switched on, then every period.
+            nextStats = osKernelGetTickCount();
+        }
         drainLogQueue();
+
+        if (statsEnabled_ &&
+            static_cast<int32_t>(osKernelGetTickCount() - nextStats) >= 0) {
+            emitStats();
+            nextStats += kStatsPeriodMs;
+            // After a long stall, resynchronise rather than emitting a burst to
+            // catch up on missed periods.
+            if (static_cast<int32_t>(osKernelGetTickCount() - nextStats) >= 0) {
+                nextStats = osKernelGetTickCount() + kStatsPeriodMs;
+            }
+        }
     }
 }

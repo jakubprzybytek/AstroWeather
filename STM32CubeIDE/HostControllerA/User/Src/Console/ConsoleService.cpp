@@ -6,7 +6,9 @@
 #endif
 #include <Console/DisplayCommand.hpp>
 #include <Console/EepromCommand.hpp>
+#include <Console/HelpCommand.hpp>
 #include <Console/SettingsCommand.hpp>
+#include <Settings/SettingsStore.hpp>
 #include <Debug/LogService.hpp>
 
 #include "cmsis_os2.h"
@@ -44,6 +46,37 @@ void ConsoleService::init(Display::Display* display)
 void ConsoleService::setEeprom(Device::Eeprom24AA04* eeprom)
 {
     eeprom_ = eeprom;
+}
+
+void ConsoleService::onHostLineState(bool dataTerminalReady)
+{
+    // Called from the USB interrupt. Terminals raise DTR when they open the
+    // port, so a rising edge means someone has just connected.
+    const bool connected = dataTerminalReady && !hostDtr_;
+    hostDtr_ = dataTerminalReady;
+    const osThreadId_t handle = getHandle();
+    if (connected && handle != nullptr) {
+        osThreadFlagsSet(handle, kFlagHostConnected);
+    }
+}
+
+void ConsoleService::sendWelcome()
+{
+#if defined(FIRMWARE_VARIANT_HostController)
+    static constexpr const char* kVariant = "HostController";
+#else
+    static constexpr const char* kVariant = "DisplayController";
+#endif
+    reply("OK connected to AstroWeather %s, built %s %s", kVariant, __DATE__, __TIME__);
+    // The startup log is emitted before USB has enumerated and never reaches
+    // the host, so restate the one boot-time result worth knowing.
+    if (settings_ != nullptr) {
+        reply("Settings loaded from EEPROM: %s",
+              Settings::Store::describe(settings_->lastDecode()));
+    }
+    reply("Type 'help' for commands. Periodic stats are %s; 'stats %s' to switch.",
+          LogService::instance().statsEnabled() ? "on" : "off",
+          LogService::instance().statsEnabled() ? "off" : "on");
 }
 
 void ConsoleService::setSettings(Settings::Store* settings)
@@ -118,34 +151,19 @@ void ConsoleService::reply(const char* format, ...)
 
 void ConsoleService::execute(const char* line)
 {
-    if (std::strcmp(line, "help") == 0) {
-        reply("OK 'help' - show commands, example: 'help'");
-        reply("OK 'status' - show system status, example: 'status'");
-        reply("OK 'display set' - set value and precision, example: 'display set 0 1234 2'");
-        reply("OK 'display time' - set hour and minute, example: 'display time 0 12:34'");
-        reply("OK 'display blank' - clear a display, example: 'display blank 0'");
-        reply("OK 'display matrix' - set binary pixels, example: 'display matrix 0 010101010101101100110'");
-    #if defined(FIRMWARE_VARIANT_HostController)
-        reply("OK 'astro refresh' - fetch and publish astro data, example: 'astro refresh'");
-    #endif
-        reply("OK 'adc log on' - enable current-sense readout logging, example: 'adc log on'");
-        reply("OK 'adc log off' - disable current-sense readout logging, example: 'adc log off'");
-        reply("OK 'adc display on' - enable current-sense readout on display, example: 'adc display on'");
-        reply("OK 'adc display off' - disable current-sense readout on display, example: 'adc display off'");
-        reply("OK 'eeprom probe' - check the settings EEPROM responds, example: 'eeprom probe'");
-        reply("OK 'eeprom dump' - hex dump the whole EEPROM, example: 'eeprom dump'");
-        reply("OK 'eeprom read' - hex dump a range, hex offset/length, example: 'eeprom read 70 10'");
-        reply("OK 'eeprom write' - write hex bytes at a hex offset, example: 'eeprom write 00 A55A01'");
-        reply("OK 'eeprom erase' - fill the EEPROM with 0xFF, example: 'eeprom erase'");
-        reply("OK 'settings show' - print stored settings, example: 'settings show'");
-        reply("OK 'settings save' - write settings to EEPROM, example: 'settings save'");
-        reply("OK 'settings defaults' - reset settings and save, example: 'settings defaults'");
-        reply("OK 'wifi set' - store credentials, example: 'wifi set MyNet MyPassword'");
-        reply("OK 'wifi clear' - drop stored credentials, example: 'wifi clear'");
+    if (Console::handleHelpCommand(line) == Console::CommandResult::Ok) {
         return;
     }
     if (std::strcmp(line, "status") == 0) {
         reply("OK status=ready");
+        return;
+    }
+    if (std::strcmp(line, "stats on") == 0 || std::strcmp(line, "stats off") == 0) {
+        const bool enabled = std::strcmp(line, "stats on") == 0;
+        // Reply first: switching on emits a report straight away, which would
+        // otherwise land ahead of the acknowledgement.
+        reply(enabled ? "OK stats=on" : "OK stats=off");
+        LogService::instance().setStatsEnabled(enabled);
         return;
     }
 #if defined(FIRMWARE_VARIANT_HostController)
@@ -227,9 +245,13 @@ void ConsoleService::execute(const char* line)
 void ConsoleService::run()
 {
     for (;;) {
-        const uint32_t flags = osThreadFlagsWait(kFlagCommand, osFlagsWaitAny, osWaitForever);
+        const uint32_t flags =
+            osThreadFlagsWait(kFlagCommand | kFlagHostConnected, osFlagsWaitAny, osWaitForever);
         if ((flags & osFlagsError) != 0U) {
             continue;
+        }
+        if ((flags & kFlagHostConnected) != 0U) {
+            sendWelcome();
         }
         drainRxRing();
         CommandLine command{};
@@ -243,4 +265,9 @@ void ConsoleService::run()
 extern "C" void ConsoleService_OnUsbRxData(const uint8_t* data, uint32_t len)
 {
     ConsoleService::instance().onUsbRxData(data, len);
+}
+
+extern "C" void ConsoleService_OnHostLineState(uint8_t dataTerminalReady)
+{
+    ConsoleService::instance().onHostLineState(dataTerminalReady != 0U);
 }

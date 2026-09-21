@@ -66,7 +66,7 @@ The debug task serializes healthcheck echoes, log records, and periodic statisti
 
 Queued logs are removed before they are transmitted. Therefore, a log accepted by `log()` can still be lost if CDC transmission later fails or remains busy. Echo responses use the same retry policy. This design favors keeping application tasks responsive over retaining output while the host is absent or slow.
 
-When neither incoming data nor queued logs wake the task, it times out after 5 seconds and emits:
+Periodic statistics are off at boot and are switched with the `stats on` and `stats off` console commands; the setting is not persisted. While enabled, the task emits them every 5 seconds on a fixed schedule, whatever other log traffic is flowing, and once immediately when they are switched on. Earlier firmware emitted them only after 5 seconds with no other output, so they never appeared while the log was busy. Each report is:
 
 ```text
 [days:hours:minutes:seconds] [STATS] sent=N dropped=N busyDrop=N rxOverflow=N rxTrunc=N\n
@@ -75,6 +75,20 @@ When neither incoming data nor queued logs wake the task, it times out after 5 s
 The periodic `[MEM]` and `[STACK]` records use the same dark-gray ANSI formatting as `Debug` logs. The `[STATS]` record remains uncolored.
 
 `sent` counts successfully transmitted log records only; it does not include echo responses or statistics lines. The other counters are cumulative since startup.
+
+## Connect Message
+
+When a host opens the port, the console prints a short welcome so the device does not look dead while statistics are off:
+
+```text
+OK connected to AstroWeather HostController, built <date> <time>
+Settings loaded from EEPROM: ok
+Type 'help' for commands. Periodic stats are off; 'stats on' to switch.
+```
+
+Opening is detected from the CDC `SET_CONTROL_LINE_STATE` request: terminals, pyserial and `astro_console.py` raise DTR when they open the port, and a rising edge triggers the message. The hook is in the `USER CODE 5` block of `USB_Device/App/usbd_cdc_if.c` and calls `ConsoleService_OnHostLineState()`. A terminal configured not to assert DTR will not see the welcome.
+
+The settings line is there because the startup log is emitted before USB enumerates and is never delivered; it restates the one boot-time result worth knowing.
 
 ## Fixed Limits
 
@@ -87,7 +101,7 @@ The periodic `[MEM]` and `[STACK]` records use the same dark-gray ANSI formattin
 | RX line text | 95 characters plus terminator |
 | CDC busy retry window | 40 ms |
 | CDC busy retry delay | 5 ms |
-| Statistics interval | 5 seconds of inactivity |
+| Statistics interval | 5 seconds, fixed, while `stats on` (off at boot) |
 
 ## Maintenance Notes
 

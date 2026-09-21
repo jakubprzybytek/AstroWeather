@@ -8,6 +8,8 @@ extern "C" {
 #endif
 
 void ConsoleService_OnUsbRxData(const uint8_t* data, uint32_t len);
+/* dataTerminalReady: DTR from the host's SET_CONTROL_LINE_STATE request. */
+void ConsoleService_OnHostLineState(uint8_t dataTerminalReady);
 
 #ifdef __cplusplus
 }

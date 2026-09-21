@@ -25,6 +25,11 @@ public:
     bool logf(Level level, const char* format, ...);
     bool sendLine(const char* message);
 
+    // Periodic [STATS]/[MEM]/[STACK] telemetry, every kStatsPeriodMs on a fixed
+    // schedule regardless of other log traffic. Off at boot; not persisted.
+    void setStatsEnabled(bool enabled);
+    bool statsEnabled() const { return statsEnabled_; }
+
 protected:
     void run() override;
 
@@ -37,6 +42,7 @@ private:
     static constexpr uint32_t kTxRetryDelayMs   = 5;
     static constexpr uint32_t kStatsPeriodMs    = 5000;
     static constexpr uint32_t kFlagLogQueued = 1u << 0;
+    static constexpr uint32_t kFlagStatsChanged = 1u << 1;
 
     struct LogEvent { Level level; char text[kMaxLogMessageLen]; };
 
@@ -57,6 +63,7 @@ private:
     uint32_t sentCount_;
     uint32_t droppedCount_;
     uint32_t busyDropCount_;
+    volatile bool statsEnabled_;
 };
 
 #endif /* INC_DEBUG_LOGSERVICE_HPP_ */

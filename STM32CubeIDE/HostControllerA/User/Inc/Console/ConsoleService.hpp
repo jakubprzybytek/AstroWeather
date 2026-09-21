@@ -25,6 +25,8 @@ public:
     void setEeprom(Device::Eeprom24AA04* eeprom);
     void setSettings(Settings::Store* settings);
     void onUsbRxData(const uint8_t* data, uint32_t len);
+    // USB CDC SET_CONTROL_LINE_STATE, from interrupt context.
+    void onHostLineState(bool dataTerminalReady);
 
 protected:
     void run() override;
@@ -36,6 +38,7 @@ private:
     static constexpr uint32_t kRxRingSize = 256U;
     static constexpr uint32_t kCommandQueueDepth = 8U;
     static constexpr uint32_t kFlagCommand = 1U << 0;
+    static constexpr uint32_t kFlagHostConnected = 1U << 1;
 
     struct CommandLine
     {
@@ -47,6 +50,7 @@ private:
     void dispatchLine();
     void execute(const char* line);
     void reply(const char* format, ...);
+    void sendWelcome();
 
     osMessageQueueId_t commandQueueHandle_;
     StaticQueue_t commandQueueCb_;
@@ -60,6 +64,7 @@ private:
     Display::Display* display_;
     Device::Eeprom24AA04* eeprom_;
     Settings::Store* settings_;
+    volatile bool hostDtr_ = false;
 };
 
 extern "C" void ConsoleService_OnUsbRxData(const uint8_t* data, uint32_t len);

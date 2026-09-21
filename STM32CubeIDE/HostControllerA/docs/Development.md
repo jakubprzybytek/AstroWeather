@@ -367,7 +367,9 @@ The command set can change; send `help` first. Current commands include:
 
 ```text
 help
+help <group>
 status
+stats on|off
 display set <index> <value> <precision>
 display time <index> <HH:MM>
 display blank <index>
@@ -377,6 +379,7 @@ adc log off
 adc display on
 adc display off
 eeprom probe
+eeprom scan
 eeprom dump
 eeprom read <hex-offset> [hex-length]
 eeprom write <hex-offset> <hexbytes>
@@ -414,7 +417,9 @@ Logs have this form:
 [days:hours:minutes:seconds] [DEBUG] message
 ```
 
-When the device has been inactive for approximately five seconds, it emits periodic `[STATS]`, `[MEM]`, and `[STACK]` telemetry. These records can be interleaved with command responses.
+`help` prints a grouped index; `help <group>` (for example `help eeprom`) prints details and examples for one group. Each reply is kept under the 16-line log queue so no lines are dropped.
+
+Opening the port prints a welcome message, so a connected but idle device is visibly alive. `[STATS]`, `[MEM]` and `[STACK]` telemetry is off at boot; `stats on` emits it every 5 seconds regardless of other traffic, interleaved with command responses. See [USB_CDC_Debug_Service.md](USB_CDC_Debug_Service.md).
 
 Verified USB CDC command sequence on `COM4`:
 

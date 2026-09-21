@@ -242,7 +242,10 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
     break;
 
     case CDC_SET_CONTROL_LINE_STATE:
-
+      /* A no-data request: the class passes the setup packet itself rather
+         than a data buffer, and DTR is bit 0 of wValue. */
+      ConsoleService_OnHostLineState(
+          (uint8_t)((((USBD_SetupReqTypedef *)pbuf)->wValue & 0x01U) != 0U));
     break;
 
     case CDC_SEND_BREAK:
