@@ -25,7 +25,7 @@ struct Group
 
 const char* const kIndex[] = {
     "Commands. Type 'help <group>' for details and examples.",
-    "  status            report that the console is up",
+    "  status            firmware, uptime, memory, EEPROM, WiFi, astro, boards",
     "  stats on|off      memory, stack and log statistics every 5 s (off at boot)",
     "  display ...       numbers, times and matrix rows on this board",
 #if defined(FIRMWARE_VARIANT_HostController)

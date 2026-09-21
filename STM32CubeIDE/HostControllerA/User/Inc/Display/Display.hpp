@@ -12,16 +12,24 @@ namespace Display {
 // only method that requires mutual exclusion between client tasks.
 class Display {
 public:
-    Display(DisplayBoard& local, const std::array<DisplayBoard*, 5>& remote)
+    static constexpr uint8_t kRemoteSlots = 5U;
+
+    Display(DisplayBoard& local, const std::array<DisplayBoard*, kRemoteSlots>& remote)
         : local_(local), remote_(remote) {}
 
     DisplayBoard& local() { return local_; }
     DisplayBoard& remote(uint8_t index) { return *remote_[index]; }
+
+    // Remote board in slot index, or nullptr if the slot is empty or out of range.
+    DisplayBoard* remoteSlot(uint8_t index)
+    {
+        return (index < kRemoteSlots) ? remote_[index] : nullptr;
+    }
     void submit();
 
 private:
     DisplayBoard& local_;
-    std::array<DisplayBoard*, 5> remote_;
+    std::array<DisplayBoard*, kRemoteSlots> remote_;
     Mutex submitMutex_;
 };
 

@@ -417,6 +417,27 @@ Logs have this form:
 [days:hours:minutes:seconds] [DEBUG] message
 ```
 
+`status` prints a one-screen summary, for example:
+
+```text
+OK status
+firmware   HostController, built Sep 21 2026 09:42:53
+uptime     0d 00:03:11
+heap       24752 B free, 19352 B lowest since boot
+stats      off
+eeprom     answering at 0x50, 512 bytes
+settings   loaded at boot: ok; adc log off, adc display on
+wifi       'hello' stored, but connecting uses the built-in credentials
+astro      last refresh ok, 0d 00:02:25 ago, from console
+remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
+```
+
+The EEPROM and remote boards are probed live when the command runs, not taken
+from earlier results. WiFi has no link state of its own, so the `astro` line,
+which gives the outcome of the last refresh, is the evidence that the network
+path works. The build time is when `User/Src/Debug/FirmwareInfo.cpp` was last
+compiled, so after an incremental build it can be older than the image.
+
 `help` prints a grouped index; `help <group>` (for example `help eeprom`) prints details and examples for one group. Each reply is kept under the 16-line log queue so no lines are dropped.
 
 Opening the port prints a welcome message, so a connected but idle device is visibly alive. `[STATS]`, `[MEM]` and `[STACK]` telemetry is off at boot; `stats on` emits it every 5 seconds regardless of other traffic, interleaved with command responses. See [USB_CDC_Debug_Service.md](USB_CDC_Debug_Service.md).

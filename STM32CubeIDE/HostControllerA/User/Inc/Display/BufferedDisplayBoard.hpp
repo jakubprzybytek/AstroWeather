@@ -13,7 +13,10 @@ public:
         : bus_(bus), address_(address) {}
 
     void submit() override;
-    uint16_t address() const { return address_; }
+    uint16_t address() const override { return address_; }
+    // Probes the bus now, independent of the last submit(): a board that has
+    // not been refreshed since boot would otherwise look reachable.
+    bool present() override;
     HAL_StatusTypeDef lastStatus() const { return lastStatus_; }
     bool online() const { return lastStatus_ == HAL_OK; }
 
@@ -22,6 +25,7 @@ private:
     // which hung the calling task outright when the bus could not complete a
     // transfer - the reason remote submits were commented out.
     static constexpr uint32_t kTransferTimeoutMs = 50U;
+    static constexpr uint32_t kProbeTimeoutMs = 5U;
 
     // How often to restate that a board is still unreachable (tick rate is 1 kHz).
     static constexpr uint32_t kReportIntervalMs = 30000U;

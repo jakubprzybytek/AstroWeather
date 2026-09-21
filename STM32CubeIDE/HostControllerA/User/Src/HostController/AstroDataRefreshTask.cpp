@@ -294,13 +294,23 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
     LogService::instance().logf(
         LogService::Level::Info,
         "AstroDataRefresh started source=%s", refreshTriggerName(trigger));
-    if (fetchPayload())
+    RefreshOutcome outcome = RefreshOutcome::Ok;
+    if (!fetchPayload())
+    {
+        // FetchSt67Data succeeds exactly when the status is Success, so a
+        // failure that still reads Success can only be the CRC check.
+        outcome = (request_.result.status == St67FetchStatus::Success)
+                      ? RefreshOutcome::IntegrityFailed
+                      : RefreshOutcome::FetchFailed;
+    }
+    else
     {
         AstroData data{};
         const AstroParseStatus status =
             parseAstroData(responseBuffer_, request_.result.length, data);
         if (status != AstroParseStatus::Success)
         {
+            outcome = RefreshOutcome::ParseFailed;
             LogService::instance().logf(
                 LogService::Level::Error,
                 "AstroDataRefresh parse status=%s",
@@ -311,6 +321,7 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
             logParsedData(data);
             if (!publishDisplay(data))
             {
+                outcome = RefreshOutcome::PublishFailed;
                 LogService::instance().log(
                     LogService::Level::Error,
                     "AstroDataRefresh display publication failed");
@@ -324,11 +335,47 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
         }
     }
     taskENTER_CRITICAL();
+    last_.outcome = outcome;
+    last_.trigger = trigger;
+    last_.fetchStatus = request_.result.status;
+    last_.httpStatus = request_.result.httpStatus;
+    last_.finishedTick = osKernelGetTickCount();
     active_ = false;
     taskEXIT_CRITICAL();
     LogService::instance().logf(
         LogService::Level::Info,
-        "AstroDataRefresh complete source=%s", refreshTriggerName(trigger));
+        "AstroDataRefresh complete source=%s outcome=%s", refreshTriggerName(trigger),
+        refreshOutcomeName(outcome));
+}
+
+RefreshSummary AstroDataRefreshTask::lastRefresh() const
+{
+    // Written by the refresh task; copied whole so a reader never sees half of
+    // one refresh and half of the next.
+    taskENTER_CRITICAL();
+    RefreshSummary summary = last_;
+    summary.running = active_;
+    taskEXIT_CRITICAL();
+    return summary;
+}
+
+const char* refreshOutcomeName(RefreshOutcome outcome)
+{
+    switch (outcome)
+    {
+    case RefreshOutcome::Never: return "never";
+    case RefreshOutcome::Ok: return "ok";
+    case RefreshOutcome::FetchFailed: return "fetch-failed";
+    case RefreshOutcome::IntegrityFailed: return "crc-failed";
+    case RefreshOutcome::ParseFailed: return "parse-failed";
+    case RefreshOutcome::PublishFailed: return "publish-failed";
+    }
+    return "unknown";
+}
+
+const char* fetchStatusName(St67FetchStatus status)
+{
+    return statusName(status);
 }
 
 void AstroDataRefreshTask::run()

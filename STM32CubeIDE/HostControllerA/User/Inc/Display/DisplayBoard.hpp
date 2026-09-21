@@ -12,6 +12,12 @@ public:
     const LogicalBoardState& state() const { return state_; }
     virtual void submit() = 0;
 
+    // For status reporting. Remote boards sit on I2C and may be absent, so they
+    // answer whether they respond right now; the local board is wired directly,
+    // has no bus address, and is always present.
+    virtual bool present() { return true; }
+    virtual uint16_t address() const { return 0U; }
+
 protected:
     LogicalBoardState state_{};
 };

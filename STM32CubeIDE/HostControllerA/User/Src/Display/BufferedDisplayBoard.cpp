@@ -19,6 +19,11 @@ void BufferedDisplayBoard::submit()
                          kTransferTimeoutMs));
 }
 
+bool BufferedDisplayBoard::present()
+{
+    return bus_.isDeviceReady(address_, 1U, kProbeTimeoutMs) == HAL_OK;
+}
+
 void BufferedDisplayBoard::report(HAL_StatusTypeDef status)
 {
     const bool nowOnline = (status == HAL_OK);

@@ -8,6 +8,8 @@
 #include <Console/EepromCommand.hpp>
 #include <Console/HelpCommand.hpp>
 #include <Console/SettingsCommand.hpp>
+#include <Console/StatusCommand.hpp>
+#include <Debug/FirmwareInfo.hpp>
 #include <Settings/SettingsStore.hpp>
 #include <Debug/LogService.hpp>
 
@@ -62,12 +64,7 @@ void ConsoleService::onHostLineState(bool dataTerminalReady)
 
 void ConsoleService::sendWelcome()
 {
-#if defined(FIRMWARE_VARIANT_HostController)
-    static constexpr const char* kVariant = "HostController";
-#else
-    static constexpr const char* kVariant = "DisplayController";
-#endif
-    reply("OK connected to AstroWeather %s, built %s %s", kVariant, __DATE__, __TIME__);
+    reply("OK connected to AstroWeather %s, built %s", firmwareVariant(), firmwareBuildTime());
     // The startup log is emitted before USB has enumerated and never reaches
     // the host, so restate the one boot-time result worth knowing.
     if (settings_ != nullptr) {
@@ -154,8 +151,8 @@ void ConsoleService::execute(const char* line)
     if (Console::handleHelpCommand(line) == Console::CommandResult::Ok) {
         return;
     }
-    if (std::strcmp(line, "status") == 0) {
-        reply("OK status=ready");
+    if (Console::handleStatusCommand(line, display_, eeprom_, settings_) ==
+        Console::CommandResult::Ok) {
         return;
     }
     if (std::strcmp(line, "stats on") == 0 || std::strcmp(line, "stats off") == 0) {
