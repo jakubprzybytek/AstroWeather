@@ -86,7 +86,12 @@ Settings loaded from EEPROM: ok
 Type 'help' for commands. Periodic stats are off; 'stats on' to switch.
 ```
 
-Opening is detected from the CDC `SET_CONTROL_LINE_STATE` request: terminals, pyserial and `astro_console.py` raise DTR when they open the port, and a rising edge triggers the message. The hook is in the `USER CODE 5` block of `USB_Device/App/usbd_cdc_if.c` and calls `ConsoleService_OnHostLineState()`. A terminal configured not to assert DTR will not see the welcome.
+Opening is detected from two CDC requests, both hooked in the `USER CODE 5` block of `USB_Device/App/usbd_cdc_if.c`:
+
+- `SET_LINE_CODING`, which every terminal sends when it opens the port to set the baud rate, even though USB CDC ignores it. This is what reaches terminals that never raise DTR, such as HTerm with its default settings. It calls `ConsoleService_OnHostLineCoding()`.
+- `SET_CONTROL_LINE_STATE`, on a rising edge of DTR, which pyserial and `astro_console.py` raise on open. It calls `ConsoleService_OnHostLineState()`.
+
+A program that sends both gets them within milliseconds of each other, so the console prints at most one welcome per second. Changing the baud rate in a terminal that is already connected sends `SET_LINE_CODING` again, and so prints the welcome again.
 
 The settings line is there because the startup log is emitted before USB enumerates and is never delivered; it restates the one boot-time result worth knowing.
 

@@ -229,6 +229,9 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
       LineCoding.format = pbuf[4];
       LineCoding.paritytype = pbuf[5];
       LineCoding.datatype = pbuf[6];
+      /* Terminals set the line coding when they open the port, including those
+         that never raise DTR (HTerm by default), so treat it as a connect too. */
+      ConsoleService_OnHostLineCoding();
     break;
 
     case CDC_GET_LINE_CODING:

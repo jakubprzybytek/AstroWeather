@@ -62,6 +62,17 @@ void ConsoleService::onHostLineState(bool dataTerminalReady)
     }
 }
 
+void ConsoleService::onHostLineCoding()
+{
+    // Called from the USB interrupt. There is no edge to track: any terminal
+    // opening the port sets the line coding, so each one is a candidate
+    // connect, and run() folds repeats into one welcome.
+    const osThreadId_t handle = getHandle();
+    if (handle != nullptr) {
+        osThreadFlagsSet(handle, kFlagHostConnected);
+    }
+}
+
 void ConsoleService::sendWelcome()
 {
     reply("OK connected to AstroWeather %s, built %s", firmwareVariant(), firmwareBuildTime());
@@ -248,7 +259,14 @@ void ConsoleService::run()
             continue;
         }
         if ((flags & kFlagHostConnected) != 0U) {
-            sendWelcome();
+            // Opening a port can raise DTR and set the line coding within a few
+            // milliseconds of each other; one welcome per open is enough.
+            const uint32_t now = osKernelGetTickCount();
+            if (!welcomed_ || (now - lastWelcomeTick_) >= kWelcomeHoldoffMs) {
+                welcomed_ = true;
+                lastWelcomeTick_ = now;
+                sendWelcome();
+            }
         }
         drainRxRing();
         CommandLine command{};
@@ -267,4 +285,9 @@ extern "C" void ConsoleService_OnUsbRxData(const uint8_t* data, uint32_t len)
 extern "C" void ConsoleService_OnHostLineState(uint8_t dataTerminalReady)
 {
     ConsoleService::instance().onHostLineState(dataTerminalReady != 0U);
+}
+
+extern "C" void ConsoleService_OnHostLineCoding(void)
+{
+    ConsoleService::instance().onHostLineCoding();
 }
