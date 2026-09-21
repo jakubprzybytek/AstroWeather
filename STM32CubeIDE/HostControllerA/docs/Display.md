@@ -219,17 +219,21 @@ The encoder reads normalized A-G and DP segment values, then applies the wiring 
 
 ## Refresh Operation
 
-A complete multiplexing frame consists of five slots. The complete frame rate must be at least 50 Hz, giving a maximum nominal slot period of 4 ms. SPI transfer and latch time are part of that slot period; the active dwell time is the remaining portion.
+A complete multiplexing frame consists of five slots. The complete frame rate must be at least 50 Hz, giving a maximum nominal slot period of 4 ms.
 
 Each slot is processed in this order:
 
-1. Drive the previously active `DISPLAY_x_EN` output high to disable it.
-2. Shift all seven bytes for the next slot without latching between bytes.
-3. Pulse the SCT latch using the sequence already confirmed by the existing SCT driver.
-4. Drive the next `DISPLAY_x_EN` output low to enable it.
-5. Keep the slot active until the next 4 ms deadline.
+1. Shift all seven bytes for the next slot while the current slot stays lit. The SCT drivers keep their outputs while LA/ is low (SCT2024 truth table), so the display is not disturbed.
+2. Blank all driver outputs with OE/ (`SCT_ENABLE` high).
+3. Drive the previously active `DISPLAY_x_EN` output high to disable it.
+4. Pulse the SCT latch, moving the shifted data to the outputs.
+5. Drive the next `DISPLAY_x_EN` output low to enable it.
+6. Wait `kSlotSettleMicros` (10 us), then re-enable the outputs with OE/.
+7. Keep the slot active until the next 4 ms deadline.
 
-The current SPI mode, latch sequence, and low SPI speed have been confirmed on hardware. SPI speed may be increased later after hardware verification.
+The display is therefore dark only for the swap, steps 2-6, about 12 us per slot, rather than for the whole transfer. Brightness no longer depends on SPI speed. The settle time lets the old slot's switch finish turning off before the outputs return: the Si2333DDS high-side P-MOSFET is switched on hard through a BC847 but turned off only by its gate pull-up resistor, and returning the outputs too early would show a faint copy of the new slot's pattern on the old one (ghosting). If ghosting is visible, raise `kSlotSettleMicros` in `PcbDisplayBoard.cpp`. The delay is timed from SysTick, so it does not depend on compiler optimisation.
+
+SPI3 runs at 1 MHz (prescaler 16), so a slot's 56 bits take about 56 us. The SCT2024 accepts up to 25 MHz; above about 4 MHz the SCK/MOSI pins (PB3/PB5) would also need a faster GPIO speed than the current `GPIO_SPEED_FREQ_LOW`. If a transfer fails, the current slot stays lit and the next tick tries again.
 
 The preferred scheduling design is TIM2 providing the 250 Hz slot cadence and a high-priority refresh task performing the short seven-byte SPI transaction. The timer interrupt should only signal the task and must not call blocking SPI functions. SPI DMA may replace the blocking task-level transfer later if measured jitter or CPU use requires it.
 
@@ -245,7 +249,7 @@ TIM2 configuration for the initial 250 Hz slot trigger, assuming the current 16 
 
 The update ISR should clear or dispatch the TIM2 update event through the HAL callback and signal the refresh task. Do not use the TIM2 HAL time base for the RTOS tick; TIM1 currently provides the HAL time base.
 
-Current project status: the `.ioc` and generated `main.c` already contain TIM2 with internal clock, prescaler `15999`, and period `3`. The TIM2 update interrupt/NVIC entry, `TIM2_IRQHandler`, display-task signal path, and `HAL_TIM_Base_Start_IT(&htim2)` call are not yet present and must be added before the display refresh can use TIM2.
+This is implemented: TIM2's update interrupt signals the `DisplayRefresh` task (`osPriorityRealtime`), which runs the sequence above. The ST67 WiFi driver's own tasks are configured just below it, so WiFi activity cannot hold up the multiplexing; see [CubeMXCompliance.md](CubeMXCompliance.md#st67-driver-task-settings).
 
 Logical-to-segment conversion is performed when display state changes, not in the periodic refresh loop. The refresh mechanism reads only prepared slot bytes.
 

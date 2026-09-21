@@ -11,15 +11,24 @@ SCT2xxx::SCT2xxx(SPI_HandleTypeDef* spi,
       latchPort_(latchPort),
       latchPin_(latchPin) {}
 
+HAL_StatusTypeDef SCT2xxx::shift(const uint8_t* data, uint16_t size)
+{
+    return HAL_SPI_Transmit(spi_, const_cast<uint8_t*>(data), size, HAL_MAX_DELAY);
+}
+
+void SCT2xxx::latch()
+{
+    HAL_GPIO_WritePin(latchPort_, latchPin_, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(latchPort_, latchPin_, GPIO_PIN_RESET);
+}
+
 HAL_StatusTypeDef SCT2xxx::send(const uint8_t* data, uint16_t size)
 {
-    HAL_StatusTypeDef status = HAL_SPI_Transmit(spi_, const_cast<uint8_t*>(data), size, HAL_MAX_DELAY);
+    const HAL_StatusTypeDef status = shift(data, size);
     if (status != HAL_OK) {
         return status;
     }
-
-    HAL_GPIO_WritePin(latchPort_, latchPin_, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(latchPort_, latchPin_, GPIO_PIN_RESET);
+    latch();
     return HAL_OK;
 }
 
