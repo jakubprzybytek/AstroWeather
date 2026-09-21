@@ -26,6 +26,10 @@ public:
         return (index < kRemoteSlots) ? remote_[index] : nullptr;
     }
     void submit();
+    // Refreshes only the local board, under the same lock as submit(). For
+    // frequent local-only changes, such as refresh progress, that should not
+    // cost an I2C transfer to every remote board.
+    void submitLocal();
 
 private:
     DisplayBoard& local_;

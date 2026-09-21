@@ -13,4 +13,10 @@ void Display::submit()
     }
 }
 
+void Display::submitLocal()
+{
+    MutexGuard guard(submitMutex_);
+    local_.submit();
+}
+
 } // namespace Display

@@ -48,7 +48,11 @@ const char* wifiConnectResultName(WifiConnectResult result);
 void StartSt67HttpFetchTask();
 void TriggerSt67SmokeTest();
 void TriggerSt67ConnectivityCycle();
-bool FetchSt67Data(St67FetchRequest* request);
+// Runs one fetch on the WiFi task and waits for it on the calling thread,
+// calling onProgress (if given) on stage changes and every 250 ms. Uses the
+// kFetchFlagDone/kFetchFlagStage thread flags of the calling thread.
+bool FetchSt67Data(St67FetchRequest* request, FetchProgressFn onProgress = nullptr,
+                   void* context = nullptr);
 
 }  // namespace HostController
 

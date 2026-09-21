@@ -263,6 +263,7 @@ bool St67NetworkSession::initialize(bool logModule) {
     fail(runtime_, "credentials");
     return false;
   }
+  setFetchStage(runtime_, FetchStage::StartingModule);
   runtime_.state = St67State::Starting;
   const uint32_t startedAt = HAL_GetTick();
   if (!runtime_.w6xInitialized) {
@@ -333,6 +334,7 @@ bool St67NetworkSession::open() {
   std::memset(credentials.password, 0, sizeof(credentials.password));
   options.Reconnection_interval = 1U;
   options.Reconnection_nb_attempts = 1U;
+  setFetchStage(runtime_, FetchStage::JoiningWifi);
   runtime_.state = St67State::Connecting;
   runtime_.lastWifiReason = kNoReason;
   const uint32_t startedAt = HAL_GetTick();
@@ -373,6 +375,7 @@ bool St67NetworkSession::open() {
                                 connection.SSID,
                                 static_cast<unsigned long>(connection.Channel),
                                 static_cast<long>(connection.Rssi));
+  setFetchStage(runtime_, FetchStage::GettingIp);
   if (!waitForDhcp()) {
     recordConnect(WifiConnectResult::DhcpFailed, credentials.ssid);
     reportConnectFailure(WifiConnectResult::DhcpFailed, credentials.ssid, kNoReason);
@@ -401,6 +404,7 @@ bool St67NetworkSession::disconnect() {
   if (!runtime_.wifiInitialized || stationDisconnected(runtime_)) {
     return true;
   }
+  setFetchStage(runtime_, FetchStage::Disconnecting);
   runtime_.state = St67State::Disconnecting;
   osThreadFlagsClear(kFlagDisconnected | kFlagDriverError);
   runtime_.lastStatus = W6X_WiFi_Disconnect(1U);

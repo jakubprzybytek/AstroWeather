@@ -140,6 +140,7 @@ bool resolveHost(St67Runtime& runtime) {
 St67HttpFetcher::St67HttpFetcher(St67Runtime& runtime) : runtime_(runtime) {}
 
 bool St67HttpFetcher::fetch(St67FetchRequest* request) {
+  setFetchStage(runtime_, FetchStage::Downloading);
   if (std::strlen(APP_ST67_HTTP_HOST) == 0U ||
       std::strlen(APP_ST67_HTTP_HOST) > HTTP_SNI_MAX_SIZE ||
       std::strstr(APP_ST67_HTTP_HOST, "://") != nullptr ||

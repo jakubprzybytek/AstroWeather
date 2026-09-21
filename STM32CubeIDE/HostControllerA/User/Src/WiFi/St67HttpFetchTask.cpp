@@ -40,6 +40,8 @@ namespace HostController {
 namespace {
 
 constexpr uint32_t kFlagTrigger = 1U << 0;
+// How often a waiting caller is woken to animate progress when nothing changes.
+constexpr uint32_t kProgressTickMs = 250U;
 
 enum class LifecycleMode : uint8_t {
   SingleFullShutdown = APP_ST67_LIFECYCLE_SINGLE_FULL_SHUTDOWN,
@@ -115,8 +117,14 @@ void publishClientResult(St67Runtime& runtime) {
   } else {
     result.status = St67FetchStatus::HttpFailure;
   }
-  runtime.clientRequest->completed = true;
+  St67FetchRequest* request = runtime.clientRequest;
+  request->completed = true;
   runtime.clientRequest = nullptr;
+  // Signal last: the waiter may start another fetch as soon as it wakes, and by
+  // then the slot must already be free.
+  if (request->waiter != nullptr) {
+    osThreadFlagsSet(request->waiter, kFetchFlagDone);
+  }
 }
 
 class St67HttpFetchTask : public Task<2560> {
@@ -135,7 +143,12 @@ class St67HttpFetchTask : public Task<2560> {
     }
   }
 
-  bool requestClientFetch(St67FetchRequest* request) {
+  // Runs on the caller's thread: hands the request to this task, then waits for
+  // it. The wait is on thread flags rather than polling, woken by completion or
+  // a stage change and otherwise every kProgressTickMs so the caller can
+  // animate, and bounded by kClientFetchTimeoutMs.
+  bool requestClientFetch(St67FetchRequest* request, FetchProgressFn onProgress,
+                          void* context) {
     if (request == nullptr || request->buffer == nullptr || request->capacity == 0U ||
         request->capacity > APP_ST67_HTTP_MAX_RESPONSE_BYTES || batchActive_ ||
         runtime_.clientRequest != nullptr) {
@@ -149,11 +162,36 @@ class St67HttpFetchTask : public Task<2560> {
     }
     request->result = {};
     request->result.status = St67FetchStatus::Busy;
+    request->stage = FetchStage::Queued;
+    request->waiter = osThreadGetId();
     request->completed = false;
+    // A fetch that timed out earlier may still have signalled since.
+    osThreadFlagsClear(kFetchFlagDone | kFetchFlagStage);
     runtime_.clientRequest = request;
     trigger();
-    while (!request->completed) {
-      osDelay(10U);
+
+    const uint32_t startedAt = osKernelGetTickCount();
+    for (;;) {
+      if (onProgress != nullptr) {
+        onProgress(request->stage, context);
+      }
+      if (request->completed) {
+        break;
+      }
+      const uint32_t elapsed = osKernelGetTickCount() - startedAt;
+      if (elapsed >= kClientFetchTimeoutMs) {
+        // The WiFi task cannot be cancelled and keeps the request until it
+        // finishes, so later fetches report Busy until then.
+        request->result.status = St67FetchStatus::Timeout;
+        LogService::instance().logf(LogService::Level::Error,
+                                    "ST67 fetch did not finish within %lu s; the WiFi task is "
+                                    "still working on it",
+                                    static_cast<unsigned long>(kClientFetchTimeoutMs / 1000U));
+        return false;
+      }
+      const uint32_t remaining = kClientFetchTimeoutMs - elapsed;
+      (void)osThreadFlagsWait(kFetchFlagDone | kFetchFlagStage, osFlagsWaitAny,
+                              (remaining < kProgressTickMs) ? remaining : kProgressTickMs);
     }
     return request->result.status == St67FetchStatus::Success;
   }
@@ -329,8 +367,8 @@ void TriggerSt67SmokeTest() { TriggerSt67ConnectivityCycle(); }
 
 void TriggerSt67ConnectivityCycle() { St67HttpFetchTask::instance().trigger(); }
 
-bool FetchSt67Data(St67FetchRequest* request) {
-  return St67HttpFetchTask::instance().requestClientFetch(request);
+bool FetchSt67Data(St67FetchRequest* request, FetchProgressFn onProgress, void* context) {
+  return St67HttpFetchTask::instance().requestClientFetch(request, onProgress, context);
 }
 
 }  // namespace HostController

@@ -72,6 +72,16 @@ private:
     bool fetchPayload();
     bool publishDisplay(const AstroData& data);
 
+    // Progress bar on the local board's bottom matrix row. Drawn from this task
+    // only, while it waits for the WiFi task, so the WiFi task never touches the
+    // display.
+    enum class Indicator : uint8_t { None, Success, Failure };
+    static void onFetchProgress(FetchStage stage, void* context);
+    void showProgressRow(uint32_t columns);
+    void startIndicator(Indicator indicator, uint8_t failedSegment);
+    void stepIndicator();
+    void clearIndicator();
+
     static constexpr uint32_t kFlagRun = 1U << 0;
 
     Display::Display* display_ = nullptr;
@@ -80,6 +90,12 @@ private:
     RefreshTrigger trigger_ = RefreshTrigger::Scheduled;
     volatile bool active_ = false;
     RefreshSummary last_{};
+    Indicator indicator_ = Indicator::None;
+    uint32_t indicatorUntil_ = 0U;
+    uint8_t failedSegment_ = 0U;
+    bool indicatorLit_ = false;
+    uint32_t shownRow_ = 0xFFFFFFFFU;  // columns last submitted; none yet
+    uint8_t loggedStage_ = 0xFFU;
 };
 
 const char* refreshTriggerName(RefreshTrigger trigger);

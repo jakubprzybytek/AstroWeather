@@ -283,6 +283,43 @@ The three detected states are mapped deterministically to a board ID from `0` th
 
 The Display Controller checks the first received byte before processing the payload. It reacts only to known commands; currently command `0x01` is the only valid command. Unknown commands and messages with an invalid length are ignored, and the previous logical display state is retained. Initial transport error handling may be limited to detecting HAL/I2C transfer failure and retaining the previous display state.
 
+## Refresh Progress
+
+While an astro refresh runs, the bottom row (row 4) of the Host Controller's
+own matrix shows its progress. Remote boards are not affected; their row 4 is
+always blank. Nothing else uses that row, so the forecast in the numeric
+displays and rows 0-3 stays visible until the new one is published.
+
+The row is split into six segments, one per step, spread to fill all 21
+columns:
+
+| Segment | Columns | Step | Typical time |
+| --- | --- | --- | --- |
+| 1 | 0-2 | Start the WiFi module (first refresh after boot only) | ~15 s |
+| 2 | 3-6 | Join WiFi | ~2-3 s |
+| 3 | 7-9 | Get an IP address (DHCP) | < 1 s |
+| 4 | 10-13 | Download (DNS and HTTP) | ~2 s |
+| 5 | 14-16 | Disconnect | ~1 s |
+| 6 | 17-20 | Check, parse and publish | milliseconds |
+
+Finished steps are solid and the current one blinks every 250 ms, so a long
+step still visibly moves. On success the full row lights for 1.5 s, then
+clears. On failure the bar up to and including the step that failed blinks
+every 500 ms for a minute, so the position shows where it went wrong: stuck at
+segment 2 is a WiFi problem, at segment 4 the network or server. The console
+log carries the detail. A new refresh interrupts the blink at once.
+
+The WiFi task reports its step through the request (`FetchStage`, frozen at the
+first failure so cleanup does not overwrite it). The refresh task draws the
+bar itself while it waits on thread flags for the fetch to finish, woken by
+each step change and every 250 ms, so the WiFi task never touches the display.
+Drawing uses `Display::submitLocal()`, which takes the same lock as `submit()`
+but does not send I2C traffic to the remote boards.
+
+Verified by reading the local board's row 4 over SWD during refreshes: the
+segment values progressed `0x07`/`0x7F` (joining) through `0x3FF`/`0x3FFF`
+(downloading) and `0x1FFFF` (disconnecting) to `0x1FFFFF` (success).
+
 ## Variant Lifecycle
 
 ### Host Controller

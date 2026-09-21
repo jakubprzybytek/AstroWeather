@@ -81,6 +81,8 @@ const char* const kAstro[] = {
     "    WiFi session is up, up to a couple of minutes on the first run after boot.",
     "    'ERR astro-refresh-busy'         a refresh is already running",
     "    'ERR astro-refresh-unavailable'  the WiFi task is not ready",
+    "Progress fills a bar on this board's bottom matrix row step by step; the",
+    "full bar shows success, and a failure blinks where it stopped for a minute.",
 };
 #endif
 

@@ -51,6 +51,20 @@ struct St67Runtime {
   W6X_Status_t firstFailureStatus = W6X_STATUS_OK;
 };
 
+// Advances the progress of the client request being served, if any, and wakes
+// its waiter. Frozen once a failure is recorded, so the stage keeps naming the
+// step that failed while disconnect and cleanup still run.
+inline void setFetchStage(St67Runtime& runtime, FetchStage stage) {
+  St67FetchRequest* request = runtime.clientRequest;
+  if (request == nullptr || runtime.firstFailureStage != nullptr) {
+    return;
+  }
+  request->stage = stage;
+  if (request->waiter != nullptr) {
+    osThreadFlagsSet(request->waiter, kFetchFlagStage);
+  }
+}
+
 }  // namespace HostController
 
 #endif /* INC_HOSTCONTROLLER_ST67RUNTIME_HPP_ */
