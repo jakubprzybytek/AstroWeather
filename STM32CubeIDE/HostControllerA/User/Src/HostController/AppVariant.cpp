@@ -2,7 +2,7 @@
 #include <Console/AstroCommand.hpp>
 #include <Console/ConsoleService.hpp>
 #include <Debug/LogService.hpp>
-#include <Device/Eeprom24AA01.hpp>
+#include <Device/Eeprom24AA04.hpp>
 #include <Device/I2cBus.hpp>
 #include <Device/SCT2xxx.hpp>
 #include <Display/BufferedDisplayBoard.hpp>
@@ -49,7 +49,7 @@ Display::Display display(localBoard, {&remoteBoard1, &remoteBoard2,
                                       &remoteBoard3, &remoteBoard4,
                                       &remoteBoard5});
 
-Device::Eeprom24AA01 settingsEeprom(i2c1Bus);
+Device::Eeprom24AA04 settingsEeprom(i2c1Bus);
 
 Settings::Store settingsStore(settingsEeprom);
 

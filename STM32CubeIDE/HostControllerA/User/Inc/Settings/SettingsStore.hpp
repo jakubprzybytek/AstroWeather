@@ -1,9 +1,13 @@
 #pragma once
 
-#include <Device/Eeprom24AA01.hpp>
+#include <Device/Eeprom24AA04.hpp>
 #include <Settings/SettingsCodec.hpp>
 
 namespace Settings {
+
+static_assert(kImageSize <= Device::Eeprom24AA04::kSize, "settings image must fit the EEPROM");
+static_assert((kImageSize % Device::Eeprom24AA04::kPageSize) == 0U,
+              "save() diffs whole pages, so the image must be a whole number of them");
 
 enum class LoadResult : uint8_t {
     Ok,         // a valid image was read and applied
@@ -19,13 +23,13 @@ enum class LoadResult : uint8_t {
 class Store
 {
 public:
-    explicit Store(Device::Eeprom24AA01& eeprom) : eeprom_(eeprom) {}
+    explicit Store(Device::Eeprom24AA04& eeprom) : eeprom_(eeprom) {}
 
     LoadResult load();
 
-    // Encodes the current values and writes only the 8-byte pages that differ,
-    // so flipping one flag costs a single page (~5 ms) rather than the whole
-    // image (~16 pages). Returns HAL_OK when nothing needed writing.
+    // Encodes the current values and writes only the 16-byte pages that differ,
+    // so flipping one flag costs a single page (~5 ms) rather than all 8 pages
+    // of the image. Returns HAL_OK when nothing needed writing.
     HAL_StatusTypeDef save();
 
     Values& values() { return values_; }
@@ -37,7 +41,7 @@ public:
     static const char* describe(DecodeResult result);
 
 private:
-    Device::Eeprom24AA01& eeprom_;
+    Device::Eeprom24AA04& eeprom_;
     Values values_{};
     DecodeResult lastDecode_ = DecodeResult::Blank;
 };

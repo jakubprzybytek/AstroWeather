@@ -22,25 +22,49 @@ of this document, and the rules that preserve it are listed under
 
 | Property | Value |
 | --- | --- |
-| Part | Microchip 24AA01T-I/OT |
+| Part | Microchip 24AA04HT-I/OT, datasheet DS20002119 |
 | Bus | I2C1, shared with the remote Display Controllers |
 | Device address | `0x50`, 7-bit |
-| Capacity | 128 bytes |
-| Page size | 8 bytes |
+| Capacity | 512 bytes, as two 256-byte blocks |
+| Page size | 16 bytes |
 | Write cycle | 5 ms maximum |
+| Write protect | WP tied to ground: whole array writable |
 
-The part has no address pins, so it acknowledges the whole range `0x50`–`0x57`.
-Treat all eight addresses as reserved when assigning addresses to other devices
-on the bus.
+The control byte is `1010 x x B0`. The `x` bits are don't-care because the
+SOT-23-5 package has no address pins, and `B0` selects the block, so the part
+acknowledges the whole range `0x50`–`0x57`: even addresses reach block 0
+(`000h`–`0FFh`) and odd addresses block 1 (`100h`–`1FFh`). Treat all eight
+addresses as reserved when assigning addresses to other devices on the bus.
 
-Access goes through `Device::Eeprom24AA01`, which splits writes on page
-boundaries and polls for the internal write cycle. That driver in turn uses
-`Device::I2cBus`, which holds the mutex serializing all I2C1 traffic.
+Sequential reads run through the entire array, across the block boundary, in a
+single transaction. Page writes do not: a write crossing a 16-byte page wraps to
+the start of that page. Since 256 is a multiple of 16, a page never straddles a
+block.
+
+The `H` variant's WP pin protects the upper block (`100h`–`1FFh`) when tied
+high. On this board it is tied to ground.
+
+The part was verified on hardware, not only from its marking: distinct values
+written at `0F8h`, `178h` and `1F8h` read back independently, with `078h`
+unchanged, which a 128-byte 24AA01 cannot do; a single 16-byte transaction
+landed without wrapping; and one read spanning `0F8h`–`107h` returned the bytes
+written through block 1.
+
+Access goes through `Device::Eeprom24AA04`, which splits writes on page
+boundaries, places bit 8 of the offset in `B0`, and polls for the internal write
+cycle. That driver in turn uses `Device::I2cBus`, which holds the mutex
+serializing all I2C1 traffic.
 
 ## Image Layout
 
-The whole 128-byte array is one record. A fixed header carries integrity
-information, and the payload after it is a sequence of variable-length records.
+The settings image is a fixed 128-byte region at offset `000h`. The remaining
+384 bytes of the part are unused. A fixed header carries integrity information,
+and the payload after it is a sequence of variable-length records.
+
+The 128-byte size predates the move to the 512-byte part and is kept
+deliberately: it is a container parameter, since `payloadLen` and the CRC are
+defined against it, so growing it is a container change that needs a version
+bump. See [When the version must change](#when-the-version-must-change).
 
 ```
 offset  size  field
@@ -49,7 +73,7 @@ offset  size  field
 0x04    1     version     container format version, currently 1
 0x05    1     payloadLen  number of payload bytes that follow
 0x06    N     payload     sequence of tag/length/value records
-0x06+N  ...   padding     0xFF to the end of the array
+0x06+N  ...   padding     0xFF to the end of the 128-byte image
 ```
 
 The CRC deliberately sits *before* the fields it protects so that everything it
@@ -141,7 +165,8 @@ that field at its compile-time default.
 
 Bump `kContainerVersion` only if the **container** changes, not when settings
 are added or removed. That means a change to the header layout, the CRC
-algorithm or coverage, or the record framing itself. Such a change should be
+algorithm or coverage, the image size or location, or the record framing
+itself. Such a change should be
 rare. A decoder that meets a version it does not recognise reports
 `BadVersion` and falls back to defaults, so an unexpected bump silently discards
 the user's settings.
@@ -197,7 +222,7 @@ bug to spot.
 
 ## Space budget
 
-Available payload is `128 - 6 = 122` bytes. Each record costs its value length
+Within the 128-byte image, available payload is `128 - 6 = 122` bytes. Each record costs its value length
 plus two bytes of framing.
 
 | Content | Payload cost |
@@ -222,15 +247,16 @@ record over writing a default value.
 ## Write Behaviour
 
 `Settings::Store::save()` encodes the full 128-byte image, reads the current
-contents, and writes only the 8-byte pages that differ. Toggling a single flag
-therefore costs one page and one write cycle, roughly 5 ms, rather than 16 pages.
+contents, and writes only the 16-byte pages that differ. Toggling a single flag
+therefore costs one page and one write cycle, roughly 5 ms, rather than all
+8 pages of the image.
 If the read fails, every page is written rather than skipping the save.
 
 The encoder always produces a full-length image with `0xFF` padding, so the
 result is deterministic and no stale bytes are left behind a shortened payload.
 
 Saves happen synchronously from the console task whenever a setting changes.
-The 24AA01 is rated for 1 million write cycles, so per-change saves are not a
+The 24AA04H is rated for more than 1 million erase/write cycles, so per-change saves are not a
 wear concern at console-command rates.
 
 ## Console Interface
@@ -289,11 +315,11 @@ loaded state from the console.
 ## Limitations
 
 - **A torn write is detected but not recoverable.** Losing power during a save
-  leaves a CRC mismatch, and the firmware falls back to defaults. Surviving
-  this would need two slots with a sequence number, which does not fit: 122
-  usable bytes split in two gives 61 per slot against a 102-byte worst case.
-  A larger part such as the 24AA02 or 24AA08 is the answer if this ever
-  matters, rather than capping the passphrase length to force redundancy in.
+  leaves a CRC mismatch, and the firmware falls back to defaults. The 512-byte
+  part now has room to fix this, for example one image per 256-byte block with
+  a sequence number, loading the newest valid copy and saving over the older.
+  That is not implemented: it changes the container, so it would be container
+  version 2.
 - **Credentials are stored and transported in the clear.** `wifi set` is echoed
   to the log like any other console line, and `eeprom dump` prints the stored
   password. `settings show` masks it, but that is the only place it is hidden.
@@ -305,12 +331,12 @@ loaded state from the console.
 ## Worked Example
 
 An image holding logging enabled, display disabled, SSID `AstroNet` and password
-`hunter2secret`, read back with `eeprom read 00 30`:
+`hunter2secret`, read back with `eeprom read 000 30`:
 
 ```text
-00: 41 57 3F 90 01 1C 01 01 01 10 08 41 73 74 72 6F
-10: 4E 65 74 11 0D 68 75 6E 74 65 72 32 73 65 63 72
-20: 65 74 FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+000: 41 57 3F 90 01 1C 01 01 01 10 08 41 73 74 72 6F
+010: 4E 65 74 11 0D 68 75 6E 74 65 72 32 73 65 63 72
+020: 65 74 FF FF FF FF FF FF FF FF FF FF FF FF FF FF
 ```
 
 | Bytes | Meaning |
@@ -327,7 +353,7 @@ An image holding logging enabled, display disabled, SSID `AstroNet` and password
 After `settings defaults`, the same array reads:
 
 ```text
-00: 41 57 04 C2 01 03 01 01 02 FF FF FF FF FF FF FF
+000: 41 57 04 C2 01 03 01 01 02 FF FF FF FF FF FF FF
 ```
 
 The WiFi records are gone entirely rather than being present and empty, leaving

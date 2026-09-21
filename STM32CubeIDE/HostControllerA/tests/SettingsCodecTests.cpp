@@ -163,7 +163,7 @@ void testMaximumLengthFieldsFit()
 
     uint8_t image[Settings::kImageSize] = {};
     expect(Settings::encode(written, image, sizeof(image)) == Settings::kImageSize,
-           "worst case credentials fit in 128 bytes");
+           "worst case credentials fit in the image");
 
     Settings::Values read;
     expectResult(Settings::decode(image, sizeof(image), read), Settings::DecodeResult::Ok,

@@ -9,7 +9,7 @@
 #include <cstdint>
 
 namespace Device {
-class Eeprom24AA01;
+class Eeprom24AA04;
 }
 
 namespace Settings {
@@ -22,7 +22,7 @@ public:
     static ConsoleService& instance();
 
     void init(Display::Display* display);
-    void setEeprom(Device::Eeprom24AA01* eeprom);
+    void setEeprom(Device::Eeprom24AA04* eeprom);
     void setSettings(Settings::Store* settings);
     void onUsbRxData(const uint8_t* data, uint32_t len);
 
@@ -58,7 +58,7 @@ private:
     uint32_t lineLength_;
     bool lineTruncated_;
     Display::Display* display_;
-    Device::Eeprom24AA01* eeprom_;
+    Device::Eeprom24AA04* eeprom_;
     Settings::Store* settings_;
 };
 

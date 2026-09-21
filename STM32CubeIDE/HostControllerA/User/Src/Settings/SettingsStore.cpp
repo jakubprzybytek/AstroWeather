@@ -30,7 +30,7 @@ HAL_StatusTypeDef Store::save()
     const bool haveCurrent =
         eeprom_.read(0U, current, static_cast<uint16_t>(sizeof(current))) == HAL_OK;
 
-    constexpr uint16_t kPage = Device::Eeprom24AA01::kPageSize;
+    constexpr uint16_t kPage = Device::Eeprom24AA04::kPageSize;
     for (uint16_t offset = 0U; offset < kImageSize; offset = static_cast<uint16_t>(offset + kPage)) {
         if (haveCurrent && std::memcmp(&current[offset], &desired[offset], kPage) == 0) {
             continue;

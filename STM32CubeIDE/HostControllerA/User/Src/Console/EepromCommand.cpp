@@ -1,7 +1,7 @@
 #include <Console/EepromCommand.hpp>
 
 #include <Debug/LogService.hpp>
-#include <Device/Eeprom24AA01.hpp>
+#include <Device/Eeprom24AA04.hpp>
 
 #include <cstddef>
 #include <cstdio>
@@ -57,7 +57,8 @@ bool parseHexPayload(const char* text, uint8_t* data, uint16_t capacity, uint16_
 void emitHexLine(uint16_t offset, const uint8_t* data, uint16_t size)
 {
     char line[(kBytesPerLine * 3U) + 8U];
-    int written = std::snprintf(line, sizeof(line), "%02X:", static_cast<unsigned>(offset));
+    // Three digits: offsets run to 0x1FF.
+    int written = std::snprintf(line, sizeof(line), "%03X:", static_cast<unsigned>(offset));
     for (uint16_t column = 0U; column < size; ++column) {
         written += std::snprintf(&line[written], sizeof(line) - static_cast<size_t>(written),
                                  " %02X", static_cast<unsigned>(data[column]));
@@ -66,7 +67,7 @@ void emitHexLine(uint16_t offset, const uint8_t* data, uint16_t size)
 }
 
 // Reads and prints one line at a time so no full-array buffer lands on the stack.
-CommandResult dumpRange(Device::Eeprom24AA01& eeprom, uint16_t offset, uint16_t size)
+CommandResult dumpRange(Device::Eeprom24AA04& eeprom, uint16_t offset, uint16_t size)
 {
     uint8_t buffer[kBytesPerLine];
     for (uint16_t index = 0U; index < size; index = static_cast<uint16_t>(index + kBytesPerLine)) {
@@ -82,7 +83,7 @@ CommandResult dumpRange(Device::Eeprom24AA01& eeprom, uint16_t offset, uint16_t 
 
 } // namespace
 
-CommandResult handleEepromCommand(const char* line, Device::Eeprom24AA01* eeprom)
+CommandResult handleEepromCommand(const char* line, Device::Eeprom24AA04* eeprom)
 {
     if (std::strncmp(line, "eeprom", 6U) != 0) {
         return CommandResult::NotHandled;
@@ -98,14 +99,14 @@ CommandResult handleEepromCommand(const char* line, Device::Eeprom24AA01* eeprom
         char message[64];
         std::snprintf(message, sizeof(message), "OK eeprom-probe addr=0x%02X size=%u page=%u",
                       static_cast<unsigned>(eeprom->address()),
-                      static_cast<unsigned>(Device::Eeprom24AA01::kSize),
-                      static_cast<unsigned>(Device::Eeprom24AA01::kPageSize));
+                      static_cast<unsigned>(Device::Eeprom24AA04::kSize),
+                      static_cast<unsigned>(Device::Eeprom24AA04::kPageSize));
         LogService::instance().sendLine(message);
         return CommandResult::Ok;
     }
 
     if (std::strcmp(line, "eeprom dump") == 0) {
-        return dumpRange(*eeprom, 0U, Device::Eeprom24AA01::kSize);
+        return dumpRange(*eeprom, 0U, Device::Eeprom24AA04::kSize);
     }
 
     // Offsets and lengths are hex, so an address read off a 'dump' line can be
@@ -117,8 +118,8 @@ CommandResult handleEepromCommand(const char* line, Device::Eeprom24AA01* eeprom
         if (readArguments == 1) {
             length = 1U;
         }
-        if (length == 0U || offset >= Device::Eeprom24AA01::kSize ||
-            length > (Device::Eeprom24AA01::kSize - offset)) {
+        if (length == 0U || offset >= Device::Eeprom24AA04::kSize ||
+            length > (Device::Eeprom24AA04::kSize - offset)) {
             return CommandResult::InvalidArgument;
         }
         return dumpRange(*eeprom, static_cast<uint16_t>(offset), static_cast<uint16_t>(length));
@@ -132,15 +133,15 @@ CommandResult handleEepromCommand(const char* line, Device::Eeprom24AA01* eeprom
         if (!parseHexPayload(payloadText, payload, kMaxWritePayload, size)) {
             return CommandResult::InvalidArgument;
         }
-        if (offset >= Device::Eeprom24AA01::kSize ||
-            size > (Device::Eeprom24AA01::kSize - offset)) {
+        if (offset >= Device::Eeprom24AA04::kSize ||
+            size > (Device::Eeprom24AA04::kSize - offset)) {
             return CommandResult::InvalidArgument;
         }
         if (eeprom->write(static_cast<uint16_t>(offset), payload, size) != HAL_OK) {
             return CommandResult::Unavailable;
         }
         char message[64];
-        std::snprintf(message, sizeof(message), "OK eeprom-write offset=0x%02X bytes=%u",
+        std::snprintf(message, sizeof(message), "OK eeprom-write offset=0x%03X bytes=%u",
                       offset, static_cast<unsigned>(size));
         LogService::instance().sendLine(message);
         return CommandResult::Ok;
@@ -170,11 +171,11 @@ CommandResult handleEepromCommand(const char* line, Device::Eeprom24AA01* eeprom
     }
 
     if (std::strcmp(line, "eeprom erase") == 0) {
-        uint8_t blank[Device::Eeprom24AA01::kPageSize];
+        uint8_t blank[Device::Eeprom24AA04::kPageSize];
         std::memset(blank, 0xFF, sizeof(blank));
-        for (uint16_t page = 0U; page < Device::Eeprom24AA01::kSize;
-             page = static_cast<uint16_t>(page + Device::Eeprom24AA01::kPageSize)) {
-            if (eeprom->write(page, blank, Device::Eeprom24AA01::kPageSize) != HAL_OK) {
+        for (uint16_t page = 0U; page < Device::Eeprom24AA04::kSize;
+             page = static_cast<uint16_t>(page + Device::Eeprom24AA04::kPageSize)) {
+            if (eeprom->write(page, blank, Device::Eeprom24AA04::kPageSize) != HAL_OK) {
                 return CommandResult::Unavailable;
             }
         }

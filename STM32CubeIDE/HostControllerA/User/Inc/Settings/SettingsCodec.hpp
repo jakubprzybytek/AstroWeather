@@ -5,7 +5,7 @@
 
 namespace Settings {
 
-// On-chip layout for the 24AA01 settings EEPROM.
+// Layout of the settings image, stored at offset 0 of the 24AA04 EEPROM.
 //
 //   0x00  2  magic       'A','W'
 //   0x02  2  crc16       CCITT over 0x04 .. 0x05 + payload
@@ -16,10 +16,16 @@ namespace Settings {
 // The CRC deliberately sits before the fields it covers so that everything it
 // protects is one contiguous range.
 //
-// The payload is TLV rather than a packed struct because the part only holds
-// 128 bytes. A struct would have to reserve the worst case for WiFi
-// credentials (97 bytes) whether or not any are set; as records, an
-// unconfigured WiFi costs nothing and a typical one costs about 40 bytes.
+// The image is a fixed 128-byte region, not the whole 512-byte part. Its size
+// is a container parameter: growing it changes what the CRC and payloadLen
+// describe, so it needs a version bump, and the rest of the part stays free for
+// that or other uses.
+//
+// The payload is TLV rather than a packed struct chiefly so that adding a
+// setting needs no migration (see below). It also keeps unset settings free: a
+// struct would reserve the worst case for WiFi credentials (97 bytes) whether
+// or not any are set, while as records an unconfigured WiFi costs nothing and
+// a typical one about 40 bytes.
 constexpr std::size_t kImageSize = 128U;
 constexpr std::size_t kHeaderSize = 6U;
 constexpr std::size_t kMaxPayloadSize = kImageSize - kHeaderSize;

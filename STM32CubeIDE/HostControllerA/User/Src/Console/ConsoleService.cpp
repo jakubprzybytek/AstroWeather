@@ -41,7 +41,7 @@ void ConsoleService::init(Display::Display* display)
     commandQueueHandle_ = osMessageQueueNew(kCommandQueueDepth, sizeof(CommandLine), &attr);
 }
 
-void ConsoleService::setEeprom(Device::Eeprom24AA01* eeprom)
+void ConsoleService::setEeprom(Device::Eeprom24AA04* eeprom)
 {
     eeprom_ = eeprom;
 }
