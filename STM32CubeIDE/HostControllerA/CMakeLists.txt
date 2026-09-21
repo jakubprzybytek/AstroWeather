@@ -93,6 +93,20 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${USER_SOURCES_VARIANT}
 )
 
+# Stamp the real build time into the image on every build. A custom target always
+# runs; listing the file as a byproduct lets Ninja see that it changed, so only
+# BuildInfo.cpp is recompiled and the image relinked. See cmake/BuildInfo.cmake.
+set(BUILD_INFO_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/generated/BuildInfo.cpp)
+add_custom_target(firmware_build_info
+    COMMAND ${CMAKE_COMMAND} -DOUTPUT=${BUILD_INFO_SOURCE}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildInfo.cmake
+    BYPRODUCTS ${BUILD_INFO_SOURCE}
+    COMMENT "Stamping firmware build time"
+    VERBATIM
+)
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${BUILD_INFO_SOURCE})
+add_dependencies(${CMAKE_PROJECT_NAME} firmware_build_info)
+
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Appli/App

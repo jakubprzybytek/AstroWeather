@@ -9,7 +9,10 @@ const char* firmwareVariant()
 #endif
 }
 
+// Defined in BuildInfo.cpp, which the build regenerates every time.
+extern const char* const kFirmwareBuildTime;
+
 const char* firmwareBuildTime()
 {
-    return __DATE__ " " __TIME__;
+    return kFirmwareBuildTime;
 }

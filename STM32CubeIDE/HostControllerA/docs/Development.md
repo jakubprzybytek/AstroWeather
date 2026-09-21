@@ -458,7 +458,7 @@ Logs have this form:
 
 ```text
 OK status
-firmware   HostController, built Sep 21 2026 09:42:53
+firmware   HostController, built 2026-09-21 11:17:26
 uptime     0d 00:03:11
 heap       24752 B free, 19352 B lowest since boot
 stats      off
@@ -472,8 +472,9 @@ remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 The EEPROM and remote boards are probed live when the command runs, not taken
 from earlier results. WiFi has no link state of its own, so the `astro` line,
 which gives the outcome of the last refresh, is the evidence that the network
-path works. The build time is when `User/Src/Debug/FirmwareInfo.cpp` was last
-compiled, so after an incremental build it can be older than the image.
+path works. The build time is stamped on every build by `cmake/BuildInfo.cmake`,
+so it identifies the flashed image even after an incremental build. A side
+effect is that every build relinks, even when no source has changed.
 
 `help` prints a grouped index; `help <group>` (for example `help eeprom`) prints details and examples for one group. Each reply is kept under the 16-line log queue so no lines are dropped.
 

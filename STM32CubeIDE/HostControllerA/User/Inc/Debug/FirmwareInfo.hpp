@@ -4,6 +4,7 @@
 // the two cannot disagree.
 const char* firmwareVariant();
 
-// __DATE__ __TIME__ of FirmwareInfo.cpp. It only changes when that file is
-// recompiled, so after an incremental build it can be older than the image.
+// When the image was built, as "YYYY-MM-DD HH:MM:SS" local time. Stamped on
+// every build by cmake/BuildInfo.cmake, so it matches the image even after an
+// incremental build.
 const char* firmwareBuildTime();
