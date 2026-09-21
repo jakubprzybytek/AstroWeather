@@ -91,7 +91,7 @@ const char* const kAdc[] = {
     "    Log a current-sense reading 10 times a second: current (mA), MCU",
     "    temperature and supply voltage. Very noisy; switch off when done.",
     "adc display on|off",
-    "    Show the measured current in mA on numeric display 0.",
+    "    Show the measured current in mA on numeric display 2.",
     "Both are saved to the EEPROM immediately and restored at the next boot.",
     "e.g. 'adc log on', 'adc display off'",
 };

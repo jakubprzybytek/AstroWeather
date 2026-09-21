@@ -9,6 +9,8 @@
 namespace {
 
 constexpr uint32_t kSamplePeriodMs = 100U;
+// Local numeric display that shows the current, in mA, while 'adc display' is on.
+constexpr uint8_t kCurrentDisplayIndex = 2U;
 constexpr uint32_t kAdcSequenceLength = 3U;
 constexpr uint32_t kNominalReferenceMilliVolts = 3300U;
 }  // namespace
@@ -107,7 +109,7 @@ void CurrentSenseTask::run()
         {
             if (display_ != nullptr && displayEnabled_)
             {
-                display_->local().numeric(0U).setValue(
+                display_->local().numeric(kCurrentDisplayIndex).setValue(
                     static_cast<int16_t>(sample.currentMilliAmps));
                 display_->submit();
             }
