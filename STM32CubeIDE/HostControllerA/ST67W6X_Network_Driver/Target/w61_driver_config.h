@@ -52,7 +52,20 @@ extern "C" {
 #define MDM_CMD_LOG_ENABLE                      0
 
 /* USER CODE BEGIN EC */
+/* Project overrides of the driver's #ifndef defaults in spi_iface.c and
+   w61_at_common.h. They must live here: this header is included ahead of those
+   defaults, whereas definitions on the top-level CMake target never reach the
+   driver, which is compiled in the generated STM32_Drivers library.
 
+   Keep the driver's two own tasks just below DisplayRefresh (osPriorityRealtime,
+   48). At their defaults of 53 and 54 they held off the display multiplexing
+   for up to 14 ms during WiFi activity, seen as the whole display flashing.
+   The modem RX task stays one above the SPI engine, as in the defaults. */
+#define SPI_THREAD_PRIO                 46U
+#define W61_MDM_RX_TASK_PRIO            47U
+
+/* Larger SPI engine stack; see docs/CubeMXCompliance.md. */
+#define SPI_THREAD_STACK_SIZE           1536U
 /* USER CODE END EC */
 
 #ifdef __cplusplus

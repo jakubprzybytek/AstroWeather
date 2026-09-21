@@ -53,7 +53,7 @@ Completed and build-checked:
 
 - SPI1 RX/TX DMA configuration, DMA IRQ priority, initialization order, and IRQ dispatch were already restored by CubeMX and remain unchanged.
 - Added the Cortex-M0+ FreeRTOS 10.3.1 interrupt-context compatibility macro in the preserved USER include section of `Core/Inc/FreeRTOSConfig.h`.
-- Added `SPI_THREAD_STACK_SIZE=1536U` to the top-level target compile definitions.
+- Added `SPI_THREAD_STACK_SIZE=1536U` to the top-level target compile definitions. *(Later found to have no effect; see [ST67 driver task settings](#st67-driver-task-settings).)*
 - Added the missing empty `logshell_ctrl.h` compatibility header under `User/Inc`; the generated TLS source includes this header but no current root source uses its API.
 - Replaced the removed private station-status and network-running checks with the User-owned `St67NetworkAdapter`, which uses public W6X and lwIP interfaces, and made the default lifecycle persistent.
 - `Debug-HostController`, `Debug-DisplayController`, and `Release-HostController` build successfully. `git diff --check` passes.
@@ -80,7 +80,7 @@ Still pending:
 | Application bootstrap | Retain `AstroWeather_Init()` and `AppVariant_Init()` integration | Existing USER blocks in `Core/Src/main.c`; implementations in `User` |
 | USB debug | Retain the CDC bridge to `DebugService_OnUsbRxData()` | Existing USER blocks in `USB_Device/App/usbd_cdc_if.c`; implementation in `User` |
 | SPI DMA | Complete: RX/TX DMA, DMA IRQs, and priority 3 regenerated and compile-checked | CubeMX `.ioc` configuration followed by regeneration |
-| SPI task stack | **Complete**: use the larger ST67 stack requirement | Target compile definition in top-level `CMakeLists.txt` |
+| SPI task stack | **Complete**: use the larger ST67 stack requirement | `USER CODE BEGIN EC` block of `ST67W6X_Network_Driver/Target/w61_driver_config.h` |
 | CM0+ FreeRTOS compatibility | **Complete**: provide `xPortIsInsideInterrupt()` for FreeRTOS older than 10.6 | Existing USER configuration section in `Core/Inc/FreeRTOSConfig.h` |
 | SPI completion and RDY handling | **Complete for compile-time migration**: User-owned RDY rising-edge bridge calls `spi_on_txn_data_ready()`; hardware handshake validation remains | `User/Src/HostController/St67SpiReady.cpp` |
 | Station status | **Complete for compile-time migration**: dedicated User-owned adapter uses public W6X/lwIP interfaces; hardware validation remains | `User/Inc/HostController/St67NetworkAdapter.hpp`, `User/Src/HostController/St67NetworkAdapter.cpp` |
@@ -95,7 +95,7 @@ Still pending:
 3. Complete: regenerate the project.
 4. Complete: verify the generated DMA mapping, HAL links, initialization order, and IRQ dispatch.
 5. **Complete:** added the ST-documented `xPortIsInsideInterrupt()` compatibility definition for this Cortex-M0+ and FreeRTOS 10.3.1 configuration in the preserved USER include section of `Core/Inc/FreeRTOSConfig.h`.
-6. **Complete:** added `SPI_THREAD_STACK_SIZE=1536U` as a compile definition for the HostController target in the top-level `CMakeLists.txt`.
+6. **Complete:** `SPI_THREAD_STACK_SIZE=1536U`. First added as a compile definition in the top-level `CMakeLists.txt`, which never took effect; now set in the driver's configuration header. See [ST67 driver task settings](#st67-driver-task-settings).
 7. **Complete:** `Debug-HostController`, `Debug-DisplayController`, and `Release-HostController` build successfully.
 
 Do not manually recreate DMA handles, MSP links, IRQ forwarding, or peripheral initialization in generated files.
@@ -237,3 +237,19 @@ Do not make cold-restart heap stability a release gate until a compliant teardow
 - The existing build artifacts may contain a stale compile database; a fresh CMake build is required for trustworthy diagnostics.
 - The STM32Cube toolchain is now available on `PATH`; fresh builds should be used to replace stale build-artifact diagnostics.
 - USB CDC logging currently reports substantial cumulative `USBD_BUSY` drops under the hardware run; this affects debug observability but did not prevent the HTTP smoke test from completing.
+
+## ST67 driver task settings
+
+The ST67 driver takes three settings from `#ifndef` defaults: `SPI_THREAD_STACK_SIZE` and `SPI_THREAD_PRIO` in `spi_iface.c`, and `W61_MDM_RX_TASK_PRIO` in `w61_at_common.h`. CubeMX does not expose them in the `.ioc`. They are overridden in the `USER CODE BEGIN EC` block of `ST67W6X_Network_Driver/Target/w61_driver_config.h`, which the driver includes ahead of those defaults and which survives regeneration.
+
+Definitions on the top-level CMake target do **not** reach the driver: it is compiled in the generated `STM32_Drivers` object library, which receives only the CubeMX defines. The earlier `SPI_THREAD_STACK_SIZE=1536U` target definition was silently ignored for that reason, so the driver ran with its 768-byte default until the setting moved into the header.
+
+| Setting | Default | Project value | Why |
+| --- | --- | --- | --- |
+| `SPI_THREAD_STACK_SIZE` | 768 | 1536 | Larger ST67 stack requirement, as above. |
+| `SPI_THREAD_PRIO` | 53 | 46 | Below `DisplayRefresh` (48). |
+| `W61_MDM_RX_TASK_PRIO` | 54 | 47 | Below `DisplayRefresh`; kept one above the SPI engine as in the defaults. |
+
+At their default priorities the two driver tasks pre-empted the display multiplexing task, holding a slot for up to 14 ms instead of 4 ms during WiFi activity, which was visible as the whole display flashing during a refresh. Measured by timing slot switches in the display task: the longest gap fell from 14 ms with four late switches to 8 ms with one per refresh, with WiFi fetches still succeeding. The remaining short stall happens during connect and was not traced.
+
+Verify any change here with a preprocessor dump of a driver unit, for example `spi_iface.c` from `compile_commands.json` with `-E -dM`, since a misplaced override fails silently.
