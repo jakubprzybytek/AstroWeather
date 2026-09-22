@@ -7,7 +7,7 @@ This document is the practical build, flash, debug, and device-communication gui
 Run commands from the repository root:
 
 ```text
-D:/Workspace/AstroWeather/STM32CubeIDE/HostControllerA
+D:/Workspace/AstroWeather/firmware/HostControllerA
 ```
 
 The following commands should be available in the Bash environment:
