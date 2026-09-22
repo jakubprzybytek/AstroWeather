@@ -8,6 +8,7 @@
 #include <Display/BufferedDisplayBoard.hpp>
 #include <Display/Display.hpp>
 #include <Display/PcbDisplayBoard.hpp>
+#include <HostController/ClockTask.hpp>
 #include <HostController/MainLoopTask.hpp>
 #include <HostController/AstroDataRefreshTask.hpp>
 #include <Debug/LogService.hpp>
@@ -79,6 +80,8 @@ void AppVariant_Init() {
   ConsoleService::instance().setSettings(&settingsStore);
   ConsoleService::instance().start();
   localBoard.start();
+  ClockTask::instance().setDisplay(&display);
+  ClockTask::instance().start();
 
   // Before the fetch task starts: it reads the credentials on every connect.
   HostController::SetSt67CredentialSource(&settingsStore);
