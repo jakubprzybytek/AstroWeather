@@ -107,6 +107,15 @@ void NumericDisplay::setTime(uint8_t hour, uint8_t minute)
     data_.slots[4] = kSegmentA | kSegmentB;
 }
 
+void NumericDisplay::setTimeUnset()
+{
+    data_.slots[0] = kMinus;
+    data_.slots[1] = kMinus;
+    data_.slots[2] = kMinus;
+    data_.slots[3] = kMinus;
+    data_.slots[4] = kSegmentA | kSegmentB;
+}
+
 void NumericDisplay::setBlank()
 {
     data_.slots.fill(0U);

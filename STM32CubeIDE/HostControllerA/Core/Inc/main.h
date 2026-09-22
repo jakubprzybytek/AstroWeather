@@ -41,6 +41,12 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
+/* Written to an RTC backup register once the time has been set. Backup
+ * registers survive a reset but not a power loss, so the marker tells
+ * MX_RTC_Init() to keep the running time rather than start from 00:00.
+ * See docs/RTC.md. */
+#define RTC_TIME_SET_BKP_REGISTER   RTC_BKP_DR0
+#define RTC_TIME_SET_MARKER         0x54494D45UL /* "TIME" */
 
 /* USER CODE END EC */
 

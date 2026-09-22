@@ -89,9 +89,11 @@ void reportEeprom(Device::Eeprom24AA04* eeprom, Settings::Store* settings)
         return;
     }
     const Settings::Values& values = settings->values();
-    line("settings   loaded at boot: %s; adc log %s, adc display %s",
+    line("settings   loaded at boot: %s; adc log %s, adc display %s, time display %s, "
+         "trim %+ld ppm",
          Settings::Store::describe(settings->lastDecode()), values.adcLogEnabled ? "on" : "off",
-         values.adcDisplayEnabled ? "on" : "off");
+         values.adcDisplayEnabled ? "on" : "off", values.clockDisplayEnabled ? "on" : "off",
+         static_cast<long>(values.clockTrimPpm));
     reportWifi(values);
 }
 

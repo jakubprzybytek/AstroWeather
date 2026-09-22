@@ -77,5 +77,9 @@ The device's line-based interface is documented in detail in [USB_CDC_Debug_Serv
   - `astro refresh` — start the non-blocking fetch, parse, and display refresh
   - `adc log on` / `adc log off` — toggle current-sense readout logging
   - `adc display on` / `adc display off` — toggle current-sense readout on the display
+  - `time show` — RTC time to the millisecond and the trim in use
+  - `time set <YYYY-MM-DD> <HH:MM[:SS]>` — set the RTC date and time, seconds optional (kept over a reset, lost on power loss)
+  - `time trim <ppm>` — correct the RTC for this board's LSI error; see `docs/RTC.md`
+  - `time display on` / `time display off` — toggle the clock on numeric display 3
 - Unsolicited log lines (`[INFO]`, `[WARN]`, `[ERR]`, `[DEBUG]`) and periodic `[STATS]` / `[MEM]` / `[STACK]` telemetry (every 5 s while `stats on`; off at boot) arrive interleaved with command responses — a capture window should be long enough to separate the two.
 - Command set may evolve; re-run `help` to get the current list rather than trusting this document to stay exhaustive.

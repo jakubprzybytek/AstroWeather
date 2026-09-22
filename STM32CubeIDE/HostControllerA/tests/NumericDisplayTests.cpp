@@ -122,6 +122,14 @@ void testSetTime() {
   expectEqual(data, {kD, kD, kD, kD, 0U}, "invalid time");
 }
 
+void testSetTimeUnset() {
+  NumericSegments data{};
+  NumericDisplay display(data);
+
+  display.setTimeUnset();
+  expectEqual(data, {kG, kG, kG, kG, static_cast<uint8_t>(kA | kB)}, "unset time");
+}
+
 void testSetBlank() {
   NumericSegments data{};
   NumericDisplay display(data);
@@ -146,6 +154,7 @@ int main() {
   testSetValueInteger();
   testSetValueFloat();
   testSetTime();
+  testSetTimeUnset();
   testSetBlank();
   testSetSegments();
   std::cout << "NumericDisplay tests passed\n";

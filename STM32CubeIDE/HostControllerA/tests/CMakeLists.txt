@@ -14,6 +14,14 @@ add_executable(current_sense_conversion_tests
     CurrentSenseConversionTests.cpp
 )
 
+add_executable(calendar_date_tests
+    CalendarDateTests.cpp
+)
+
+add_executable(rtc_trim_tests
+    RtcTrimTests.cpp
+)
+
 add_executable(settings_codec_tests
     SettingsCodecTests.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../User/Src/Settings/SettingsCodec.cpp
@@ -36,6 +44,14 @@ target_include_directories(display_codec_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../User/Inc
 )
 
+target_include_directories(calendar_date_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../User/Inc
+)
+
+target_include_directories(rtc_trim_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../User/Inc
+)
+
 target_include_directories(settings_codec_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../User/Inc
 )
@@ -48,9 +64,13 @@ target_compile_features(numeric_display_tests PRIVATE cxx_std_17)
 target_compile_features(display_codec_tests PRIVATE cxx_std_17)
 target_compile_features(astro_data_parser_tests PRIVATE cxx_std_17)
 target_compile_features(settings_codec_tests PRIVATE cxx_std_17)
+target_compile_features(rtc_trim_tests PRIVATE cxx_std_17)
+target_compile_features(calendar_date_tests PRIVATE cxx_std_17)
 
 add_test(NAME numeric_display_tests COMMAND numeric_display_tests)
 add_test(NAME display_codec_tests COMMAND display_codec_tests)
 add_test(NAME current_sense_conversion_tests COMMAND current_sense_conversion_tests)
 add_test(NAME astro_data_parser_tests COMMAND astro_data_parser_tests)
 add_test(NAME settings_codec_tests COMMAND settings_codec_tests)
+add_test(NAME rtc_trim_tests COMMAND rtc_trim_tests)
+add_test(NAME calendar_date_tests COMMAND calendar_date_tests)

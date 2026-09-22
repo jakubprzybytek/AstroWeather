@@ -80,6 +80,11 @@ void AppVariant_Init() {
   ConsoleService::instance().setSettings(&settingsStore);
   ConsoleService::instance().start();
   localBoard.start();
+  ClockTask::instance().setDisplayEnabled(settingsStore.values().clockDisplayEnabled);
+  if (!ClockTask::instance().setTrim(settingsStore.values().clockTrimPpm)) {
+    LogService::instance().logf(LogService::Level::Error, "Clock trim %ld ppm not applied",
+                                static_cast<long>(settingsStore.values().clockTrimPpm));
+  }
   ClockTask::instance().setDisplay(&display);
   ClockTask::instance().start();
 

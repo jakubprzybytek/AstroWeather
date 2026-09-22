@@ -11,6 +11,8 @@ Currently persisted:
 
 - Current-sense logging on/off (`adc log`).
 - Current-sense display output on/off (`adc display`).
+- Clock display on/off (`time display`).
+- Clock trim, the measured LSI error in ppm (`time trim`).
 - WiFi SSID and password.
 
 The storage format is designed so that adding a further setting requires no
@@ -120,8 +122,10 @@ must match it.
 | Tag | Name | Length | Value |
 | --- | --- | --- | --- |
 | `0x01` | `AdcFlags` | 1 | Bit 0 = current-sense logging enabled, bit 1 = current-sense display enabled. Remaining bits reserved, write 0. |
+| `0x02` | `ClockTrim` | 4 | Signed LSI error in ppm, big endian; see [RTC.md](RTC.md#trimming). Written only when non-zero. |
 | `0x10` | `WifiSsid` | 1–32 | SSID bytes, not NUL terminated. |
 | `0x11` | `WifiPassword` | 1–63 | Passphrase bytes, not NUL terminated. |
+| `0x20` | `ClockFlags` | 1 | Bit 0 = clock shown on local numeric display 3. Remaining bits reserved, write 0. Written only when it differs from the default, so normally absent. |
 | `0xFF` | *reserved* | — | End of records. Never allocate. |
 
 Suggested grouping for future allocations, to keep related settings together:
@@ -217,6 +221,8 @@ bug to spot.
 | --- | --- | --- |
 | `adcLogEnabled` | `false` | `CurrentSenseTask::loggingEnabled_` |
 | `adcDisplayEnabled` | `true` | `CurrentSenseTask::displayEnabled_` |
+| `clockDisplayEnabled` | `true` | `ClockTask::displayEnabled_` |
+| `clockTrimPpm` | `0` | `ClockTask::trimPpm_` |
 | `wifiSsid` | empty | — |
 | `wifiPassword` | empty | — |
 
@@ -228,9 +234,11 @@ plus two bytes of framing.
 | Content | Payload cost |
 | --- | --- |
 | `AdcFlags` | 3 |
+| `ClockTrim`, only when a trim is set | 6 |
+| `ClockFlags`, only when the clock display is off | 3 |
 | WiFi, typical (15-char SSID, 20-char password) | 39 |
 | WiFi, worst case (32 + 63) | 99 |
-| **Worst case total** | **102 of 122** |
+| **Worst case total** | **111 of 122** |
 
 A measured image on hardware with SSID `AstroNet` and a 13-character password
 occupied 34 bytes of 128, leaving 94 free. With no WiFi configured the image is
@@ -271,6 +279,8 @@ wear concern at console-command rates.
 | `wifi clear` | Drop stored credentials and save. |
 | `adc log on\|off` | Toggle and save. |
 | `adc display on\|off` | Toggle and save. |
+| `time display on\|off` | Toggle and save. HostController only. |
+| `time trim <ppm>` | Apply and save. HostController only. |
 
 The raw image can be inspected with `eeprom dump` and `eeprom read`, which is
 the quickest way to confirm a new record encodes as intended. See

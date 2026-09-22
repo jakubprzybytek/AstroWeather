@@ -30,13 +30,14 @@ const char* const kIndex[] = {
     "  display ...       numbers, times and matrix rows on this board",
 #if defined(FIRMWARE_VARIANT_HostController)
     "  astro refresh     fetch the sky forecast and publish it to all boards",
+    "  time ...          show, set and trim the clock; show it on display 3",
 #endif
     "  adc ...           current-sense logging and readout (saved)",
     "  settings ...      show, save or reset the saved settings",
     "  wifi ...          set, test or clear WiFi credentials (saved)",
     "  eeprom ...        raw EEPROM access, for bring-up and debugging",
 #if defined(FIRMWARE_VARIANT_HostController)
-    "Groups: stats, display, astro, adc, settings, wifi, eeprom",
+    "Groups: stats, display, astro, time, adc, settings, wifi, eeprom",
 #else
     "Groups: stats, display, adc, settings, wifi, eeprom",
 #endif
@@ -86,6 +87,23 @@ const char* const kAstro[] = {
 };
 #endif
 
+#if defined(FIRMWARE_VARIANT_HostController)
+const char* const kTime[] = {
+    "time show         date and time to the millisecond, and the trim in use",
+    "time set <YYYY-MM-DD> <HH:MM[:SS]>",
+    "    Set the clock, 24-hour; seconds are optional and default to 00. The",
+    "    date is tracked but not shown. Kept over a reset or flashing; after a",
+    "    power loss display 3 shows --:-- until it is set again.",
+    "    e.g. 'time set 2026-09-22 21:45' or 'time set 2026-09-22 21:45:30'",
+    "time trim <ppm>",
+    "    Correct for this board's LSI running ppm fast (+) or slow (-) of 32 kHz;",
+    "    0 for none. Saved. See docs/RTC.md to measure it. e.g. 'time trim 18372'",
+    "time display on|off",
+    "    Show the time on numeric display 3. Saved. An astro refresh may",
+    "    overwrite display 3; the time returns at the next minute.",
+};
+#endif
+
 const char* const kAdc[] = {
     "adc log on|off",
     "    Log a current-sense reading 10 times a second: current (mA), MCU",
@@ -106,7 +124,8 @@ const char* const kSettings[] = {
     "    wifi commands save as they change. Use it to rewrite the stored copy",
     "    after 'boot-load=' reported an error, or after 'eeprom erase'.",
     "settings defaults",
-    "    Reset everything and save: adc log off, adc display on, no WiFi.",
+    "    Reset everything and save: adc log off, adc display on, time display",
+    "    on, no clock trim, no WiFi. Takes effect at the next boot.",
 };
 
 const char* const kWifi[] = {
@@ -151,6 +170,7 @@ const Group kGroups[] = {
     group("display", kDisplay),
 #if defined(FIRMWARE_VARIANT_HostController)
     group("astro", kAstro),
+    group("time", kTime),
 #endif
     group("adc", kAdc),
     group("settings", kSettings),

@@ -291,6 +291,9 @@ The open failure is `FileNotFoundError` (the device is gone), not
 `PermissionError` (another application holds the port). For the latter, close
 the other holder instead; see [Console CLI tool](#console-cli-tool).
 
+Reading the RTC over SWD (`python tools/rtc_offset.py`) is another way to see
+that the firmware is alive while the console is unreachable.
+
 #### First, confirm the firmware is still running
 
 Do this before power cycling anything. A lost port and a hung or crash-looping
@@ -336,7 +339,16 @@ In order of escalation:
    Enable-PnpDevice  -InstanceId $id -Confirm:$false
    ```
 
-   Without elevation these fail with `Generic failure`.
+   Without elevation these fail with `Generic failure`. When enumeration has
+   already failed, the board appears not as `VID_0483&PID_5740` but as an
+   `Unknown USB Device (Device Descriptor Request Failed)` with
+   `VID_0000&PID_0002`, so that instance has to be restarted instead.
+
+4. **Move the cable to a different USB port on the PC.** Seen once on
+   2026-09-22 to be the only thing that worked, after the three steps above had
+   all failed and the device sat in `CM_PROB_FAILED_POST_START`. This
+   re-enumerates the board on another host controller. It also cuts power, so
+   the RTC loses the time; see [RTC.md](RTC.md#reset-and-power-loss).
 
 Confirm recovery with:
 
@@ -374,6 +386,11 @@ display set <index> <value> <precision>
 display time <index> <HH:MM>
 display blank <index>
 astro refresh
+time show
+time set <YYYY-MM-DD> <HH:MM[:SS]>
+time trim <ppm>
+time display on
+time display off
 adc log on
 adc log off
 adc display on
@@ -392,13 +409,17 @@ wifi test
 wifi clear
 ```
 
-`adc log`, `adc display` and the `wifi` commands write straight through to the
+`adc log`, `adc display`, `time display`, `time trim` and the `wifi` commands write straight through to the
 settings EEPROM, so they survive a power cycle and are re-applied at startup. A
 blank or corrupt chip falls back to defaults rather than refusing to boot.
 
 [Settings.md](Settings.md) specifies the stored format, and anything adding a
 new persisted setting should follow
 [Adding a new setting](Settings.md#adding-a-new-setting) there.
+
+The clock is its own subject: [RTC.md](RTC.md) covers the `time` commands, how
+each board's LSI is trimmed, what survives a reset, and how to measure the
+drift with `tools/rtc_offset.py`.
 
 Note that `wifi set` is echoed to the log like any other console line, and
 `eeprom dump` shows the stored password in the clear.
@@ -463,7 +484,7 @@ uptime     0d 00:03:11
 heap       24752 B free, 19352 B lowest since boot
 stats      off
 eeprom     answering at 0x50, 512 bytes
-settings   loaded at boot: ok; adc log off, adc display on
+settings   loaded at boot: ok; adc log off, adc display on, time display on, trim +18400 ppm
 wifi       'lemo' stored; last connect ok 0d 00:03:05 ago (channel 2, -39 dBm)
 astro      last refresh ok, 0d 00:02:25 ago, from console
 remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no

@@ -43,6 +43,18 @@ void applyRecord(uint8_t tag, const uint8_t* value, std::size_t length, Values& 
             values.adcDisplayEnabled = (value[0] & kAdcFlagDisplay) != 0U;
         }
         break;
+    case static_cast<uint8_t>(Tag::ClockTrim):
+        if (length >= 4U) {
+            values.clockTrimPpm = static_cast<int32_t>(
+                (static_cast<uint32_t>(value[0]) << 24U) | (static_cast<uint32_t>(value[1]) << 16U) |
+                (static_cast<uint32_t>(value[2]) << 8U) | static_cast<uint32_t>(value[3]));
+        }
+        break;
+    case static_cast<uint8_t>(Tag::ClockFlags):
+        if (length >= 1U) {
+            values.clockDisplayEnabled = (value[0] & kClockFlagDisplay) != 0U;
+        }
+        break;
     case static_cast<uint8_t>(Tag::WifiSsid):
         copyString(values.wifiSsid, sizeof(values.wifiSsid), value, length);
         break;
@@ -88,6 +100,25 @@ std::size_t encode(const Values& values, uint8_t* image, std::size_t size)
                                                (values.adcDisplayEnabled ? kAdcFlagDisplay : 0U));
     if (!appendRecord(payload, sizeof(payload), used, Tag::AdcFlags, &flags, 1U)) {
         return 0U;
+    }
+
+    // The clock records are written only when they differ from the default,
+    // so an untouched clock costs no space.
+    if (values.clockTrimPpm != 0) {
+        const uint32_t trim = static_cast<uint32_t>(values.clockTrimPpm);
+        const uint8_t bytes[4] = {
+            static_cast<uint8_t>(trim >> 24U), static_cast<uint8_t>(trim >> 16U),
+            static_cast<uint8_t>(trim >> 8U), static_cast<uint8_t>(trim),
+        };
+        if (!appendRecord(payload, sizeof(payload), used, Tag::ClockTrim, bytes, sizeof(bytes))) {
+            return 0U;
+        }
+    }
+    if (!values.clockDisplayEnabled) {
+        const uint8_t clockFlags = 0U;
+        if (!appendRecord(payload, sizeof(payload), used, Tag::ClockFlags, &clockFlags, 1U)) {
+            return 0U;
+        }
     }
 
     // An empty string writes no record at all, which is what keeps an

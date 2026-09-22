@@ -387,6 +387,12 @@ static void MX_RTC_Init(void)
   }
 
   /* USER CODE BEGIN Check_RTC_BKUP */
+  /* Time set before a reset: keep it. HAL_RTC_Init() above left the calendar
+   * and prescalers alone, as setting the time also sets a non-zero year. */
+  if (HAL_RTCEx_BKUPRead(&hrtc, RTC_TIME_SET_BKP_REGISTER) == RTC_TIME_SET_MARKER)
+  {
+    return;
+  }
 
   /* USER CODE END Check_RTC_BKUP */
 

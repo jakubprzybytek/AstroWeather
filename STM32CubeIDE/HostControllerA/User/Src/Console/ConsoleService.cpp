@@ -9,6 +9,9 @@
 #include <Console/HelpCommand.hpp>
 #include <Console/SettingsCommand.hpp>
 #include <Console/StatusCommand.hpp>
+#if defined(FIRMWARE_VARIANT_HostController)
+#include <Console/TimeCommand.hpp>
+#endif
 #include <Debug/FirmwareInfo.hpp>
 #include <Settings/SettingsStore.hpp>
 #include <Debug/LogService.hpp>
@@ -189,6 +192,19 @@ void ConsoleService::execute(const char* line)
         return;
     }
     if (astroResult == Console::CommandResult::InvalidArgument) {
+        reply("ERR invalid-argument");
+        return;
+    }
+
+    const Console::CommandResult timeResult = Console::handleTimeCommand(line, settings_);
+    if (timeResult == Console::CommandResult::Ok) {
+        return;
+    }
+    if (timeResult == Console::CommandResult::Unavailable) {
+        reply("ERR rtc-unavailable");
+        return;
+    }
+    if (timeResult == Console::CommandResult::InvalidArgument) {
         reply("ERR invalid-argument");
         return;
     }

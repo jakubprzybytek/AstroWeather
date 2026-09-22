@@ -46,6 +46,8 @@ void testRoundTrip()
     Settings::Values written;
     written.adcLogEnabled = true;
     written.adcDisplayEnabled = false;
+    written.clockDisplayEnabled = false;
+    written.clockTrimPpm = -18372;
     std::strcpy(written.wifiSsid, "AstroNet");
     std::strcpy(written.wifiPassword, "correcthorsebattery");
 
@@ -58,6 +60,8 @@ void testRoundTrip()
                  "round trip decodes");
     expect(read.adcLogEnabled, "round trip adc log");
     expect(!read.adcDisplayEnabled, "round trip adc display");
+    expect(!read.clockDisplayEnabled, "round trip clock display");
+    expect(read.clockTrimPpm == -18372, "round trip negative clock trim");
     expect(std::strcmp(read.wifiSsid, "AstroNet") == 0, "round trip ssid");
     expect(std::strcmp(read.wifiPassword, "correcthorsebattery") == 0, "round trip password");
 }
@@ -73,6 +77,8 @@ void testBlankChipYieldsDefaults()
                  "blank chip reports blank");
     expect(!read.adcLogEnabled, "blank chip restores adc log default");
     expect(read.adcDisplayEnabled, "blank chip restores adc display default");
+    expect(read.clockDisplayEnabled, "blank chip restores clock display default");
+    expect(read.clockTrimPpm == 0, "blank chip restores clock trim default");
     expect(read.wifiSsid[0] == '\0', "blank chip leaves ssid empty");
 }
 
@@ -128,6 +134,24 @@ void testMissingRecordKeepsDefault()
     expect(read.wifiSsid[0] == '\0', "absent wifi record leaves the default");
 }
 
+void testImageWithoutClockRecordKeepsDefault()
+{
+    // Content written before the clock setting existed: ADC flags only.
+    const uint8_t payload[] = {
+        static_cast<uint8_t>(Settings::Tag::AdcFlags), 0x01U, Settings::kAdcFlagLog,
+    };
+    uint8_t image[Settings::kImageSize];
+    buildImage(image, payload, sizeof(payload));
+
+    Settings::Values read;
+    read.clockDisplayEnabled = false;  // must be replaced by the default
+    read.clockTrimPpm = 5;
+    expectResult(Settings::decode(image, sizeof(image), read), Settings::DecodeResult::Ok,
+                 "image without clock record decodes");
+    expect(read.clockDisplayEnabled, "absent clock record leaves the display on");
+    expect(read.clockTrimPpm == 0, "absent clock trim record leaves no trim");
+}
+
 void testTruncatedRecordIsRejected()
 {
     const uint8_t payload[] = {
@@ -181,6 +205,28 @@ void testUnconfiguredWifiCostsNothing()
     expect(image[5] == 3U, "unconfigured wifi writes no record");
 }
 
+void testClockTrimCostsOneRecord()
+{
+    Settings::Values written;
+    written.clockTrimPpm = 18372;
+    uint8_t image[Settings::kImageSize] = {};
+    Settings::encode(written, image, sizeof(image));
+    expect(image[5] == 9U, "clock trim adds one 6-byte record");
+
+    Settings::Values read;
+    Settings::decode(image, sizeof(image), read);
+    expect(read.clockTrimPpm == 18372, "positive clock trim survives");
+}
+
+void testClockDisplayOffCostsOneRecord()
+{
+    Settings::Values written;
+    written.clockDisplayEnabled = false;
+    uint8_t image[Settings::kImageSize] = {};
+    Settings::encode(written, image, sizeof(image));
+    expect(image[5] == 6U, "clock display off adds one 3-byte record");
+}
+
 } // namespace
 
 int main()
@@ -190,10 +236,13 @@ int main()
     testCorruptedByteIsRejected();
     testUnknownTagIsSkipped();
     testMissingRecordKeepsDefault();
+    testImageWithoutClockRecordKeepsDefault();
     testTruncatedRecordIsRejected();
     testFutureVersionIsRejected();
     testMaximumLengthFieldsFit();
     testUnconfiguredWifiCostsNothing();
+    testClockDisplayOffCostsOneRecord();
+    testClockTrimCostsOneRecord();
 
     if (failures != 0) {
         std::cerr << failures << " SettingsCodec test(s) failed\n";

@@ -38,6 +38,8 @@ public:
     void setValue(int16_t value);
     void setValue(float value, uint8_t precision = 0);
     void setTime(uint8_t hour, uint8_t minute);
+    // "--:--", for a clock that has not been set.
+    void setTimeUnset();
     void setBlank();
     void setSegments(const NumericSegments& segments) { data_ = segments; }
 
