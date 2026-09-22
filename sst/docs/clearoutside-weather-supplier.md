@@ -11,6 +11,24 @@ fetch performed on **2026-09-11** against:
 https://clearoutside.com/forecast/27.86/34.30
 ```
 
+## Current Status
+
+Clear Outside has been adopted as the only weather source for the main
+forecast API; no documented weather API is integrated yet. The implementation
+follows the recommended integration below, with these differences:
+
+- It stores general weather fields rather than the differentiated astronomy
+  fields: `temperatureC`, `cloudCoverTotalPct`, `precipitationProbabilityPct`,
+  and `thunderstormRisk` per hour. The observing rating, Bortle estimate, and
+  dark windows are not parsed.
+- The scheduled job runs every six hours and fails its invocation when any
+  location fails, but no alarm or other monitoring alert is configured on that
+  failure.
+- No agreement with First Light Optics is recorded, so the first item of the
+  decision checklist remains open until its outcome is noted here.
+
+See [architecture.md](architecture.md) for the ingestion design and item shape.
+
 ## Executive Assessment
 
 Scraping is **technically feasible** and the data is unusually well-suited to
@@ -139,8 +157,8 @@ documented weather API:
 4. Store results using the same nightly DynamoDB pattern as other sources:
 
    ```text
-  PK = LOC#krakow
-  SK = NIGHT#2026-09-10#WEATHER
+   PK = LOC#krakow
+   SK = NIGHT#2026-09-10#WEATHER
    ```
 
 5. Cache aggressively and keep polling frequency low to reduce legal/ethical

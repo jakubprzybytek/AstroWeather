@@ -6,69 +6,166 @@
 |---|---|
 | Test runner | [Vitest](https://vitest.dev/) v4 |
 | Language | TypeScript (native ESM, no transpilation step) |
-| Mocking | Vitest built-ins (`vi.mock`, `vi.fn`, `vi.spyOn`) |
+| Mocking | Dependency injection first; Vitest built-ins (`vi.fn`, `vi.mock`) where needed |
+| Web components | React Testing Library with jsdom |
 
 Vitest was chosen because it supports native ESM and TypeScript out of the box, shares the same API surface as Jest, and integrates well with a monorepo project structure through its **projects** feature.
 
-## Test Types
+## Vitest Projects
 
-### Unit Tests
+`vitest.config.ts` declares three named projects. The `--project` flag selects which suite to run:
 
-Unit tests exercise individual functions and modules in isolation. External dependencies (e.g. `suncalc`) are mocked so tests remain fast and deterministic.
+| npm script | Vitest project | Include pattern | Target environment |
+|---|---|---|---|
+| `npm run test` / `npm run test:unit` | `unit` | `packages/**/src/**/*.test.ts` | Node, no network or AWS |
+| `npm run test:integration` | `integration` | `packages/**/tests/integration/**/*.test.ts` | A deployed or `sst dev` stage, through `sst shell` |
+| `npm run test:web` | `web` | `packages/web/src/**/*.test.tsx` | jsdom |
+| `npm run test:all` | _(all)_ | all patterns above | — |
 
-**Location**: co-located with source files — `packages/<pkg>/src/**/*.test.ts`
+`test:all` includes the integration project, so it needs the same SST
+credentials and stage as `test:integration`.
 
-**Run**:
+## Unit Tests
+
+Unit tests exercise individual functions and modules in isolation. They are
+co-located with source files as `*.test.ts`. Plain `.test.ts` files under
+`packages/web/src` (for example `time.test.ts`) also run in the `unit` project.
+
 ```bash
 npm run test
 ```
 
-### Integration Tests
+Current coverage:
 
-Integration tests verify end-to-end behaviour of Lambda handlers by calling them via HTTP. The same test files run against both the local dev environment and a live deployed stage — the only difference is the base URL passed through the `API_URL` environment variable.
+| Test file | Covers |
+|---|---|
+| `forecast/nights.test.ts` | Local-noon boundary, six consecutive nights, 21 slots, DST transitions |
+| `forecast/assemble.test.ts` | Six displays and independent astronomy/weather degradation |
+| `forecast/protocol.test.ts` | Serialized record order, `time` header format, and error payloads |
+| `astro.test.ts` | Forecast handler: local `time` header (including after DST ends), status, content type, `404` error |
+| `configurations-handler.test.ts` | `GET /configurations` response |
+| `clearoutside.test.ts` | `POST /tools/clearoutside` handler |
+| `weather/clearoutside.test.ts` | HTML parser against a saved fixture; fetch timeout and retry behavior |
+| `weather/clearoutside-storage.test.ts` | DynamoDB keys, metadata, and `expireAt` calculation |
+| `jobs/clearoutside-weather.test.ts` | Scheduled ingestion: sequential locations, failure isolation, final failure signal |
 
-**Location**: `packages/<pkg>/tests/integration/**/*.test.ts` (separate folder, not co-located)
+The forecast weather reader (`forecast/weather-reader.ts`) and astronomy
+projection (`forecast/astronomy.ts`) have no dedicated unit tests yet. Astronomy is exercised indirectly through `assemble.test.ts`.
 
-**Run locally** (requires `sst dev` to already be running):
+Run a focused subset by passing paths:
+
 ```bash
-# API_URL defaults to http://localhost:3000 when not set
+npx vitest run --project unit packages/functions/src/forecast
+```
+
+### Writing unit tests
+
+Modules take their external dependencies as parameters, so most tests pass
+plain fakes instead of mocking modules. The forecast assembler receives the
+clock, weather reader, and logger:
+
+```typescript
+import { describe, expect, test, vi } from "vitest";
+import { assembleForecast } from "./assemble";
+
+describe("assembleForecast", () => {
+  test("keeps six displays and available astronomy when weather fails", async () => {
+    const result = await assembleForecast("krakow", { lat: 50, lon: 20, tz: "Europe/Warsaw" }, {
+      now: () => new Date("2026-09-17T10:00:00Z"),
+      readWeather: vi.fn().mockRejectedValue(new Error("Dynamo unavailable")),
+      log: vi.fn()
+    });
+
+    expect(result).toHaveLength(6);
+    expect(result[0].cloud).toBe("?");
+  });
+});
+```
+
+The same pattern applies to the other injectable entry points:
+
+- `createHandler({ now, readWeather, log })` in `astro.ts`;
+- `createWeatherReader(tableName, client)` and `createClearOutsideStore(tableName, client)`,
+  which accept a DynamoDB document client;
+- `ingestClearOutside({ configurations, fetchHtml, parse, store, now, waitBetweenLocations, log })`.
+
+Astronomy tests run the real `suncalc` library, which is deterministic for an
+injected time. Use `vi.mock` only for modules that are imported directly and
+have no injection point, as `clearoutside.test.ts` does for the scraper.
+
+## Integration Tests
+
+Integration tests call a deployed API over HTTP. They live in
+`packages/<pkg>/tests/integration/` rather than next to the source.
+
+`npm run test:integration` wraps Vitest in `sst shell`, which makes the stage's
+linked resources available. `globalSetup.ts` reads `Resource.AstroApi.url`, the
+generated API Gateway URL of the selected stage, prints it, and hands it to the
+test files through Vitest's `provide`/`inject`. Test files must use
+`inject("apiUrl")` rather than `Resource`: on Windows, Vitest workers receive
+environment variable names upper-cased, which hides the SST links from
+`Resource` inside the worker.
+
+`sst shell` selects the stage from `SST_STAGE`, so deploy the stage first (see
+[development.md](development.md)) and then run:
+
+```bash
+# Your personal stage, deployed or running under `sst dev`
 npm run test:integration
+
+# A named stage
+SST_STAGE=int npm run test:integration
 ```
 
-**Run against a deployed stage**:
-```bash
-API_URL=https://<deployed-url> npm run test:integration
-```
+The suite covers:
 
-### All Tests
+- `GET /astro/krakow` returns `200`, `text/plain`, protocol 1, a `time` header
+  within the Krakow UTC offset of the test machine's clock, and six well-formed
+  display blocks;
+- an unknown configuration returns `404` with the versioned error body;
+- a missing path parameter is not `200`;
+- `GET /configurations` returns the configuration list.
 
-Runs both suites in a single command:
-```bash
-npm run test:all
-```
-
-### Scheduled Clearoutside ingestion
-
-The scheduled writer is unit-tested without AWS or network access through its
-injected fetch, parser, clock, configuration, and storage dependencies. The
-focused tests cover deterministic DynamoDB keys and TTL values, successful
-writes for every configured location, no writes after a fetch or parse failure,
-continuation after one location fails, and the final invocation failure signal.
-
-Run the focused tests with:
+Because the tests call the generated API Gateway URL, they do not exercise the
+public CloudFront hostname, its certificate, or plain-HTTP access. Check those
+manually after infrastructure changes, with redirects disabled:
 
 ```bash
-npx vitest run \
-  packages/functions/src/weather/clearoutside-storage.test.ts \
-  packages/functions/src/jobs/clearoutside-weather.test.ts \
-  packages/functions/src/weather/clearoutside.test.ts
+curl -si http://api.<stage>.astroweather.albedoonline.com/configurations
+curl -si https://api.<stage>.astroweather.albedoonline.com/astro/krakow
 ```
 
-The deployed `ClearOutsideIngestion` schedule runs every six hours with one
-retry. For a manual staging check, identify the generated Lambda from the SST
-deployment output or AWS Console, invoke it with `{}`, and inspect CloudWatch
-for one structured success or failure record per configuration followed by the
-completion summary.
+Both should return the final API response with no `Location` header.
+
+### Live Clear Outside scrape
+
+`clearoutside.integration.test.ts` fetches and parses the real Clear Outside
+page for Wrocław and prints three nights of hourly data. It is skipped unless
+`RUN_LIVE_SCRAPE=1`, which the dedicated script sets:
+
+```bash
+npm run test:clearoutside
+```
+
+Use it to check whether a Clear Outside page change has broken the parser.
+
+## Web Tests
+
+The web project uses React Testing Library with jsdom. API requests are stubbed
+with Vitest, so component tests do not require SST or a running API:
+
+```bash
+npm run test:web
+```
+
+## Scheduled Clearoutside Ingestion
+
+The scheduled writer is unit-tested without AWS or network access (see above).
+The deployed `ClearOutsideIngestion` schedule runs every six hours without
+scheduler retries. For a manual staging check, identify the generated Lambda
+from the SST deployment output or AWS Console, invoke it with `{}`, and inspect
+CloudWatch for one structured success or failure record per configuration
+followed by the completion summary.
 
 The table name is returned as the `forecastDataTableName` stack output. Query
 one location with:
@@ -84,164 +181,9 @@ Verify that returned items use the `NIGHT#<nightId>#WEATHER` sort-key
 format, contain numeric `expireAt` values and normalized `hours`, and contain no
 raw HTML. A failed scrape should leave the previous item unchanged.
 
-## Project Structure
-
-```
-sst/
-├── vitest.config.ts                          # Vitest projects config
-├── packages/
-│   └── functions/
-│       └── src/
-│           ├── astro.ts
-│           └── astro.test.ts                 # unit test (co-located with source)
-│       └── tests/
-│           └── integration/                  # integration tests (local or stage)
-│               └── astro.integration.test.ts
-```
-
-## Vitest Projects
-
-`vitest.config.ts` declares three named projects. The `--project` flag selects which suite to run:
-
-| npm script | Vitest project | Include pattern | Target environment |
-|---|---|---|---|
-| `npm run test` | `unit` | `packages/**/src/**/*.test.ts` | local (no network) |
-| `npm run test:integration` | `integration` | `packages/**/tests/integration/**/*.test.ts` | local `sst dev` or deployed stage via `API_URL` |
-| `npm run test:web` | `web` | `packages/web/src/**/*.test.tsx` | jsdom |
-| `npm run test:all` | _(all)_ | all patterns above | — |
-
 ## CI Usage
 
 | Pipeline stage | Command | Notes |
 |---|---|---|
-| Pull Request | `npm run test` | Unit tests only; no external deps required |
-| Post-deploy (staging) | `API_URL=$STAGE_URL npm run test:integration` | Smoke test after `sst deploy` to staging |
-| Post-deploy (production) | `API_URL=$PROD_URL npm run test:integration` | Smoke test after production deploy |
-
-`API_URL` is injected as a CI secret / environment variable. When running locally without setting `API_URL`, tests fall back to `http://localhost:3000`.
-
-### Web tests
-
-The web project uses React Testing Library with the jsdom environment. API
-requests are stubbed with Vitest, so component tests do not require SST or a
-running API. Run them with:
-
-```bash
-npm run test:web
-```
-
-## Writing Unit Tests
-
-Mock external libraries at the top of the test file, then import the module under test:
-
-```typescript
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-vi.mock("suncalc", () => ({
-  default: {
-    getTimes: vi.fn(),
-    getMoonTimes: vi.fn()
-  }
-}));
-
-import SunCalc from "suncalc";
-import { handler } from "./astro.js";
-
-describe("handler", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("returns 404 for unknown configId", async () => {
-    const result = await handler({ pathParameters: { configId: "unknown" } });
-    expect(result.statusCode).toBe(404);
-  });
-});
-```
-
-## Writing Integration Tests
-
-Integration tests call the handler via HTTP and read the base URL from `API_URL` (defaulting to localhost):
-
-```typescript
-import { describe, it, expect } from "vitest";
-
-const BASE_URL = process.env.API_URL ?? "http://localhost:3000";
-
-describe("GET /astro/:configId", () => {
-  it("returns the six-display text payload", async () => {
-    const res = await fetch(`${BASE_URL}/astro/krakow`);
-    const body = await res.text();
-    expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toContain("text/plain");
-    expect(body).toContain("protocol=1\nconfigurationId=krakow\n");
-    expect(body.match(/^display=/gm)).toHaveLength(6);
-  });
-});
-```
-
-## SunCalc Mocking Strategies
-
-There are four approaches for mocking `suncalc` in unit tests, with different trade-offs:
-
-### 1. `vi.mock()` — whole-module replacement (recommended)
-
-```typescript
-vi.mock("suncalc", () => ({
-  default: { getTimes: vi.fn(), getMoonTimes: vi.fn() }
-}));
-```
-
-Vitest hoists `vi.mock()` calls before any imports, so the stub is in place before the module under test loads. This is the simplest and most robust approach when you want full control over every call. Per-test return values are set with `mockReturnValue` / `mockResolvedValue`.
-
-**Pros**: complete isolation; no real computation runs; works even if `suncalc` is not installed.  
-**Cons**: you must explicitly stub every method you use; easy to forget a method and get `undefined`.
-
-### 2. `vi.spyOn()` — wrap individual methods
-
-```typescript
-import SunCalc from "suncalc";
-const spy = vi.spyOn(SunCalc, "getTimes").mockReturnValue({ ... });
-```
-
-Wraps a single method with a spy while leaving the rest of the module intact. The real implementation can be restored with `spy.mockRestore()`.
-
-**Pros**: surgical — only the targeted method is replaced; real implementations of other methods still run.  
-**Cons**: `suncalc` must be importable; harder to guarantee full isolation; spy state leaks between tests if not restored.
-
-### 3. Manual mock in `__mocks__/`
-
-Create `packages/functions/src/__mocks__/suncalc.ts` (adjacent to `node_modules` or next to the source):
-
-```typescript
-// __mocks__/suncalc.ts
-export default {
-  getTimes: vi.fn(),
-  getMoonTimes: vi.fn()
-};
-```
-
-Vitest picks this up automatically when `vi.mock("suncalc")` is called without a factory. Keeping mock logic in a dedicated file makes it reusable across multiple test files without copy-paste.
-
-**Pros**: single source of truth for the mock; easy to share across test files.  
-**Cons**: slightly more file ceremony; factory-less `vi.mock()` call can be surprising to newcomers.
-
-### 4. Dependency injection — no mock framework needed
-
-Refactor the handler to accept a `sunCalc` parameter (or a factory) instead of importing it directly:
-
-```typescript
-// astro.ts
-export function createHandler(sunCalc = SunCalc) {
-  return async (event) => { /* use sunCalc.getTimes(...) */ };
-}
-export const handler = createHandler();
-```
-
-In tests, pass a plain stub object:
-
-```typescript
-const fakeSunCalc = { getTimes: vi.fn(), getMoonTimes: vi.fn() };
-const handler = createHandler(fakeSunCalc);
-```
-
-**Pros**: zero coupling to Vitest mocking machinery; dependency is explicit in the API; trivially testable.  
-**Cons**: changes the production API surface; requires refactoring the handler signature.
+| Pull Request | `npm run test` and `npm run test:web` | No AWS or network access required |
+| Post-deploy | `SST_STAGE=<stage> npm run test:integration` | After `npm run deploy -- --stage <stage>`; needs AWS credentials that can read the stage's SST resources |

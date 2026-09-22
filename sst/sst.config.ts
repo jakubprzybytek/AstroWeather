@@ -59,12 +59,12 @@ export default $config({
   app(input) {
     return {
       name: "astroweather-api",
-      removal: input?.stage === "production" ? "retain" : "remove",
+      removal: input?.stage === "prod" ? "retain" : "remove",
       home: "aws"
     };
   },
   async run() {
-    const domain = $app.stage === "production"
+    const domain = $app.stage === "prod"
       ? {
           web: "astroweather.albedoonline.com",
           api: "api.astroweather.albedoonline.com"

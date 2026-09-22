@@ -13,13 +13,14 @@ function validate(display: ForecastDisplay): void {
   if (![display.sunset, display.sunrise, display.maximumTemperature, display.minimumTemperature].every((value) => value === "?" || /^[0-9:.+-]+$/.test(value))) throw new Error("Invalid forecast value");
 }
 
-export function serializeForecast(configurationId: string, displays: ForecastDisplay[]): string {
+export function serializeForecast(configurationId: string, time: string, displays: ForecastDisplay[]): string {
   if (!/^[\x21-\x7e]+$/.test(configurationId) || displays.length !== 6) throw new Error("Invalid forecast response");
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(time)) throw new Error("Invalid forecast time");
   displays.forEach((display, index) => {
     if (display.display !== index) throw new Error("Invalid display order");
     validate(display);
   });
-  const lines = ["protocol=1", `configurationId=${configurationId}`, ""];
+  const lines = ["protocol=1", `configurationId=${configurationId}`, `time=${time}`, ""];
   for (const [index, display] of displays.entries()) {
     if (index > 0) lines.push("");
     const values: Record<typeof DISPLAY_KEYS[number], string | number> = {

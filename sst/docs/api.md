@@ -15,6 +15,8 @@ supplier produced it.
 For a valid `configurationId`, the main endpoint returns:
 
 - the configuration identifier;
+- the local date and time at which the response was rendered, which the
+  device uses to synchronize its real-time clock;
 - six observing nights, starting with the current night in the configuration's
   local timezone;
 - local sunset and next-day sunrise times for each night;
@@ -34,10 +36,10 @@ through local noon on September 18.
 GET /astro/{configurationId}
 ```
 
-This is the only main forecast endpoint. It expands the existing
-`GET /astro/{configurationId}` response from one day's astronomy data into the
-six-night response described below. No `/forecast` endpoint should be added,
-and clients do not need a migration period or a second route.
+This is the only main forecast endpoint. It is served on the public API
+hostname over both HTTP and HTTPS without redirects; see the API edge section
+in [architecture.md](architecture.md) for the security constraints of plain
+HTTP.
 
 ## Response Format
 
@@ -45,8 +47,9 @@ The endpoint is consumed by an STM32-based device without a JSON parser. A
 successful request returns `text/plain; charset=utf-8` using the versioned ASCII
 `key=value` protocol defined in [api-payload.md](api-payload.md).
 
-The response contains the `protocol=1` and `configurationId` header records,
-followed by six fixed-order display blocks. Each block contains, in order,
+The response contains the `protocol=1`, `configurationId`, and `time` header
+records, followed by six fixed-order display blocks. `time` is the
+configuration's local wall-clock time as `YYYY-MM-DDTHH:MM:SS`. Each block contains, in order,
 `display`, `board`, `nightId`, `numeric_0`, `numeric_1`, `matrix_0` through
 `matrix_3`, `numeric_2`, and `numeric_3`. `numeric_0` and `numeric_1`
 are sunset and sunrise; `matrix_0` through `matrix_3` are sun, moon, cloud,
@@ -73,12 +76,20 @@ The six-night window is stable around UTC midnight because it is derived from
 the location's local time. Tests should inject the current time so the boundary
 before and after local noon is deterministic.
 
+### Response time
+
+The `time` header record is the configuration's local wall-clock time, read
+from the server clock after the forecast has been assembled so it is as close
+as possible to the moment the response is sent. It uses the same IANA timezone
+and DST rules as the forecast window, has no UTC offset, and truncates to whole
+seconds. The embedded device uses it to set its real-time clock.
+
 ### Astronomy
 
 Astronomical events are calculated for each night from the configured latitude
 and longitude. Sunset belongs to the date that starts the night, and sunrise
-belongs to the following local date. Moon events are included when they occur
-within the same local-noon-to-local-noon window.
+belongs to the following local date. Moonrise and moonset times are not
+emitted; the moon is represented only by its hourly above-horizon matrix.
 
 Sunset and sunrise are serialized as local `HH:MM` values. An event that does
 not occur is represented by `?`. Sun and moon state are sampled for the
@@ -167,6 +178,8 @@ client. Operational details belong in structured Lambda logs.
    encoding, sentinels, and serialization order.
 10. An integration test verifies the deployed route for one known and one
    unknown configuration.
+11. A successful response carries `time` as the configuration's local
+   `YYYY-MM-DDTHH:MM:SS` at render time, including after a DST change.
 
 ## Non-goals
 
@@ -176,9 +189,10 @@ client. Operational details belong in structured Lambda logs.
 - Adding aurora or additional forecast services in this story.
 - Guaranteeing that weather exists for every requested night.
 
-## Client Impact
+## Clients
 
-The existing web client expects JSON from `GET /astro/{configurationId}`. Since
-there is only one endpoint, changing it to this text protocol also requires the
-web client to parse the line format or to stop consuming this route. The handler
-and web client changes must be deployed together.
+- **Embedded device**: parses the line protocol as described in
+  [api-payload.md](api-payload.md).
+- **Web UI**: a protocol inspection tool. It shows the HTTP status, content
+  type, and response body verbatim, and deliberately does not parse the line
+  protocol.

@@ -20,6 +20,7 @@ Wire example
 ```
 protocol=1
 configurationId=krakow
+time=2026-09-22T23:22:45
 
 display=0
 board=num4x4_matrix5x21
@@ -105,10 +106,10 @@ Framing and parsing rules
 - There are no comments, spaces, quoted strings, or escaped values. One empty
   row follows the header records, before `display=0`, and separates each
   display block.
-  on the wire.
 - Split each record at the first equals sign. Unknown keys must be ignored so
   fields can be added in a later protocol version.
-- Header records occur once and in the documented order.
+- Header records occur once and in the documented order: `protocol`,
+  `configurationId`, `time`.
 - A display=<index> record starts a display block. It is followed by that
   block's records in the documented order.
 - Each matrix record contains either 21 slot characters or the single `?`
@@ -136,6 +137,18 @@ board
 
 configurationId
   Configuration requested in the URL.
+
+time
+  Local date and time at which the server rendered the response, in the
+  configuration's timezone, formatted as ISO 8601 local date-time
+  `YYYY-MM-DDTHH:MM:SS` (24-hour clock, seconds truncated). The device uses
+  it to set its real-time clock. It carries no UTC offset: it is the
+  wall-clock time the device should display,
+  already adjusted for DST. The clock is read after the forecast is assembled,
+  so the value lags the moment the response is sent only by serialization time
+  plus network latency. `time` appears only in successful responses, not in
+  error payloads. It was added within protocol version 1; a parser that
+  predates it ignores it as an unknown header key.
 
 display
   Zero-based display index. Display 0 is the current observing night in the
@@ -261,19 +274,18 @@ when no trustworthy protocol response can be assembled. A failure isolated to
 astronomy or weather returns 200 with unavailable sentinels for the affected
 fields. Error values are stable ASCII identifiers, not human messages.
 
-Implementation assessment
--------------------------
+Transport and integrity
+-----------------------
 
-This protocol is practical to implement. The Lambda can calculate six astronomy
-windows, query six WEATHER records from DynamoDB, aggregate min/max temperature,
-build fixed-size matrices, and serialize the result with string joins. The STM32
-can parse one bounded line at a time using a small fixed buffer and does not need
-to hold the entire response in RAM.
+The STM32 can parse one bounded line at a time using a small fixed buffer and
+does not need to hold the entire response in RAM.
 
-HTTPS/TCP and HTTP Content-Length already provide transport integrity. The
-device can reject a syntactically truncated body when the received byte count
-does not match Content-Length or when required records are missing, so an
-application end marker or checksum is not required while payloads remain inside
-HTTP.
+The endpoint is served over both HTTP and HTTPS. TCP and, when present, the
+HTTP Content-Length header detect truncation: the device can reject a body
+whose received byte count does not match Content-Length or that is missing
+required records, so an application end marker or checksum is not required.
 
-The endpoint can be implemented with the current line protocol.
+Only HTTPS protects the payload against deliberate modification. Over plain
+HTTP, a forecast can be read or altered in transit. This is accepted because
+the data is public and non-sensitive; see the API edge section in
+architecture.md.

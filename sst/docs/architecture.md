@@ -8,23 +8,72 @@ astronomy and weather fields for one observing night, while clients do not need
 to call a separate endpoint for each data source.
 
 ## Core Components
-### 1. API Gateway (SST `Api`)
+### 1. API Gateway (SST `ApiGatewayV2`)
 - **Endpoint**: `GET /configurations`
   - **Output**: JSON array of public configuration identifiers and labels for UI selectors.
 - **Endpoint**: `GET /astro/{configurationId}`
-- **Input**: `configurationId` (path parameter)
-- **Output**: `text/plain; charset=utf-8` version 1 payload containing six fixed
-  display blocks with astronomical and weather fields.
+  - **Input**: `configurationId` (path parameter)
+  - **Output**: `text/plain; charset=utf-8` version 1 payload containing six fixed
+    display blocks with astronomical and weather fields. See [api.md](api.md)
+    and [api-payload.md](api-payload.md).
+- **Endpoint**: `POST /tools/clearoutside`
+  - **Output**: JSON with normalized hourly Clearoutside nights, used by the web
+    UI's helper tool (see [Web UI](#web-ui)).
+- **Throttling**: burst of one request and a steady rate of one request per second.
 
-### 2. Lambda Function
-- **Handler**: Processes the `configurationId` and assembles the response.
-- **Logic**:
-  - Resolves the configuration and its location data (latitude, longitude, timezone).
-  - Reads or calculates the available data for the requested nights.
-  - Merges independent astronomy and weather data into one fixed text response,
-    using sentinels when a source is unavailable.
+### 2. Lambda Functions
+- **Forecast handler** (`packages/functions/src/astro.ts`): a thin adapter that
+  resolves the configuration and delegates to `forecast/`:
+  - `nights.ts` derives the six observing nights and 21 local-hour slots;
+  - `astronomy.ts` calculates sunset, sunrise, and sun/moon matrices with `suncalc`;
+  - `weather-reader.ts` reads and projects the stored `#WEATHER` items;
+  - `assemble.ts` merges astronomy and weather independently, using sentinels
+    when a source is unavailable;
+  - `protocol.ts` validates the model and serializes the text payload.
+- **Configurations handler** and **Clearoutside tool handler** for the other routes.
+- **Clearoutside ingestion job** (`jobs/clearoutside-weather.ts`), described in
+  [Write path](#write-path-independent-cadence-per-source).
 
-### 3. Configuration and location
+### 3. API edge (CloudFront, HTTP and HTTPS)
+
+The public API hostname points at a CloudFront distribution rather than directly
+at API Gateway, so the API is reachable over both `http://` and `https://`
+without redirects. This supports constrained clients, such as the embedded
+device, that cannot use TLS.
+
+```text
+HTTP or HTTPS client
+  |
+  v
+CloudFront (public API hostname, viewer protocol policy allow-all)
+  |
+  | HTTPS only
+  v
+API Gateway generated execute-api endpoint
+  |
+  v
+Route Lambdas
+```
+
+- The distribution uses the managed `CachingDisabled` cache policy and the
+  `AllViewerExceptHostHeader` origin request policy, so every request, method,
+  query string, and body reaches API Gateway, which still owns routing, CORS,
+  and throttling.
+- The CloudFront certificate is issued by ACM in `us-east-1` and validated
+  through Route 53; `A` and `AAAA` alias records point the API hostname at the
+  distribution.
+- The web UI always calls the API over HTTPS (`VITE_API_URL` uses `https://`),
+  and CORS allows only the HTTPS web origin plus local Vite origins.
+
+**Security constraints.** Plain HTTP exposes request paths, query strings,
+bodies, and responses to interception and modification. It is accepted only as
+compatibility behavior for public, non-sensitive forecast data. Do not add
+credentials, cookies, tokens, API keys, or sensitive parameters to the API
+while HTTP is allowed. Any future authenticated or sensitive route must be
+HTTPS-only, for example on a separate hostname whose CloudFront behavior uses
+`redirect-to-https`. HSTS is intentionally not enabled.
+
+### 4. Configuration and location
 
 The public identifier is currently called `configurationId` rather than
 `locationId`. At present, a configuration contains only a location, so
@@ -34,19 +83,21 @@ location, such as units, forecast horizon, enabled data sources, or presentation
 preferences. This keeps the API contract open to those additions without
 renaming the path parameter later.
 
-For now, configurations are deliberately simple and are hardcoded in a shared
-global configuration file as a JSON object. The object maps each identifier to
-its location and timezone:
+For now, configurations are deliberately simple and are hardcoded in
+`packages/functions/src/configurations.ts`. The object maps each identifier to
+a display label, location, and timezone:
 
 ```typescript
-const configurations = {
+export const configurations = {
   "wroclaw": {
+    label: "Wrocław",
     location: { lat: 51.1079, lon: 17.0385, tz: "Europe/Warsaw" }
   },
   "krakow": {
-    location: { lat: 50.0647, lon: 19.9450, tz: "Europe/Warsaw" }
+    label: "Kraków",
+    location: { lat: 50.0647, lon: 19.945, tz: "Europe/Warsaw" }
   }
-};
+} as const;
 ```
 
 The configuration collection can eventually be managed with CRUD operations,
@@ -54,7 +105,7 @@ with profiles stored independently from the nightly forecast records. That is
 not required for the current implementation; keeping the configuration in one
 global JSON object is sufficient while the model and API are being established.
 
-### 4. Data Storage
+### 5. Data Storage
 
 **Amazon DynamoDB** stores the nightly data described below. Configuration
 profiles remain in the shared global JSON object for now; they can be moved to
@@ -69,9 +120,14 @@ PK = LOC#<configurationId>
 SK = NIGHT#<nightId>#WEATHER
 ```
 
-Each item contains the configuration identifier, coordinates, normalized hourly
-Clearoutside fields, `fetchedAt`, and an `expireAt` timestamp 72 hours after
-the last hourly forecast value. Raw Clearoutside HTML is never persisted.
+Each item contains the configuration identifier, `nightId`,
+`service: "skyConditions"`, coordinates, normalized hourly Clearoutside fields
+(`hour`, `timestampUtc`, `temperatureC`, `cloudCoverTotalPct`,
+`precipitationProbabilityPct`, `thunderstormRisk`), `fetchedAt`, and an
+`expireAt` timestamp (epoch seconds) 72 hours after the last hourly forecast
+value. Raw Clearoutside HTML is never persisted. DynamoDB TTL deletion is
+eventual, so the forecast reader also discards items whose `expireAt` is at or
+before the request time.
 
 ## Nightly Data Architecture
 
@@ -93,13 +149,10 @@ nightId = the calendar date (YYYY-MM-DD) of the local noon that starts the night
 `nightId = "2026-09-10"` represents the window `2026-09-10T12:00` →
 `2026-09-11T12:00` in that location's timezone.
 
-```typescript
-function nightIdFor(t: DateTime, tz: string): string {
-  const local = t.setZone(tz);
-  const anchor = local.hour < 12 ? local.minus({ days: 1 }) : local;
-  return anchor.toFormat('yyyy-LL-dd');
-}
-```
+`nightIdFor` in `packages/functions/src/forecast/nights.ts` implements this with
+the runtime's `Intl.DateTimeFormat` and IANA timezones: it takes the local date
+and moves to the previous date when the local hour is before 12:00. No
+date/time library is used.
 
 ### Persistence: DynamoDB, single table
 
@@ -112,10 +165,13 @@ writes independently without clobbering the others:
 
 | PK | SK | attributes |
 |---|---|---|
-| `LOC#krakow` | `NIGHT#2026-09-10#ASTRO` | sun/moon rise-set, `fetchedAt`, `ttl` |
-| `LOC#krakow` | `NIGHT#2026-09-10#WEATHER` | forecast blob, `fetchedAt`, `ttl` |
-| `LOC#krakow` | `NIGHT#2026-09-10#AURORA` | kp-index/forecast, `fetchedAt`, `ttl` |
-| `LOC#krakow` | `NIGHT#2026-09-11#ASTRO` | … |
+| `LOC#krakow` | `NIGHT#2026-09-10#WEATHER` | hourly forecast, `fetchedAt`, `expireAt` |
+| `LOC#krakow` | `NIGHT#2026-09-10#AURORA` | kp-index/forecast, `fetchedAt`, `expireAt` (future) |
+| `LOC#krakow` | `NIGHT#2026-09-11#WEATHER` | … |
+
+Only `#WEATHER` items exist today. Astronomy is calculated on demand and is not
+stored; `#AURORA` and other suffixes illustrate how future sources fit the key
+design.
 
 - **By-night split**: `Query(PK = LOC#krakow, SK begins_with "NIGHT#2026-09-10")`
   returns all services for one night in a single call. A range query
@@ -124,7 +180,7 @@ writes independently without clobbering the others:
 - **By-service split**: each source (weather poller, astro calculator, aurora
   poller) only ever writes its own `#SERVICE` suffix, so independent schedules
   never conflict and a stale/failing source doesn't block the others.
-- **Freshness/TTL**: each item carries a `ttl` attribute (epoch seconds) a few
+- **Freshness/TTL**: each item carries an `expireAt` attribute (epoch seconds) a few
   days past the night; DynamoDB auto-deletes stale items, keeping the table small.
 - **Merge at read time**: the API Lambda queries the weather night range and
   assembles the six fixed display blocks, even though source writes are fully
@@ -139,51 +195,46 @@ weather data for night X"):
 
 ### Write path (independent cadence per source)
 
-- **Astro**: deterministic; computed on-demand or via an infrequent scheduled
-  Lambda (long or no TTL).
-- **Weather**: EventBridge Scheduler triggers a Lambda every N minutes/hours per
-  location, upserting `NIGHT#...#WEATHER` items for the next few nights.
-- Meteosource is the first evaluated weather supplier; see
-  [Meteosource Weather Supplier Evaluation](meteosource-weather-supplier.md) for
-  live API results, plan limits, integration guidance, and the proposed weather
-  item shape.
-- Clear Outside was evaluated as a supplementary, astronomy-specific source
-  (observing-condition rating, Bortle estimate, dark-sky windows) obtained via
-  HTML scraping rather than an API; see
+- **Astro**: deterministic; computed on demand by the forecast Lambda for every
+  request and not stored.
+- **Weather (Clearoutside, implemented)**: the `ClearOutsideIngestion` `CronV2`
+  schedule invokes a Lambda every six hours with no scheduler retries. It
+  processes the configured locations sequentially with a one-second gap between
+  them. Each fetch times out after 15 seconds and is retried once on network
+  errors and HTTP `5xx`; HTTP `429` and other `4xx` responses are not retried.
+  The whole page is parsed before anything is written, so a fetch or parse
+  failure leaves the previous items untouched. Each parsed night is upserted as
+  one `NIGHT#...#WEATHER` item with a deterministic key. A failed location is
+  logged and does not block other locations; the invocation still throws after
+  all locations are attempted so the failure is visible in monitoring, and the
+  next scheduled run repairs it. See
   [Clear Outside Supplier Evaluation](clearoutside-weather-supplier.md) for
-  feasibility, risks, and integration guidance.
-- **Aurora forecast**: separate scheduled Lambda with its own polling interval;
-  shorter TTL since forecasts go stale quickly.
-
-- **Clearoutside sky conditions**: the `ClearOutsideIngestion` EventBridge
-  Scheduler invokes a Lambda every six hours. It processes the configured
-  locations sequentially with a five-second gap between requests, parses the
-  complete server-rendered page before writing, and upserts
-  `NIGHT#...#WEATHER` items. A failed location is logged and does not
-  block other locations; the invocation still fails after all locations are
-  attempted so the scheduler can retry it.
+  feasibility, risks, and the outstanding permission question.
+- **Weather (Meteosource, evaluated only)**: a documented API alternative; see
+  [Meteosource Weather Supplier Evaluation](meteosource-weather-supplier.md) for
+  live API results, plan limits, and integration guidance.
+- **Aurora forecast (future)**: separate scheduled Lambda with its own polling
+  interval; shorter TTL since forecasts go stale quickly.
 
 Each writer is a small, independent Lambda + schedule, matching the existing
 SST/Lambda-per-concern style and keeping blast radius small if one upstream API
 changes or breaks.
 
 ## Technical Stack
-- **Infrastructure as Code**: SST (v3/Ion or v2)
+- **Infrastructure as Code**: SST v4 (`sst.config.ts`), with Pulumi AWS
+  resources for the API CloudFront distribution and DNS records
 - **Runtime**: Node.js / TypeScript
-- **Library**: `suncalc`
+- **Libraries**: `suncalc`, `node-html-parser`, AWS SDK v3 DynamoDB clients
+- **Web UI**: React, Vite, React-Bootstrap
 - **Cloud Provider**: AWS
 
-## Project Structure
-- `sst/stacks/`: Infrastructure definitions.
-- `sst/packages/functions/src/`: Lambda handler code.
-- `sst/docs/`: Documentation.
-
 ## Data Flow
-1. Client calls `GET /astro/krakow`.
-2. API Gateway triggers the Lambda.
-3. Lambda resolves the `krakow` configuration and its location.
-4. The Lambda reads or computes the available astro, weather, aurora, and other
-  service data for the requested night range.
+1. Client calls `GET /astro/krakow` over HTTP or HTTPS.
+2. CloudFront forwards the request over HTTPS to API Gateway, which triggers the
+   forecast Lambda.
+3. The Lambda resolves the `krakow` configuration and its location.
+4. The Lambda calculates astronomy and queries the stored weather items for the
+   six requested nights.
 5. The Lambda returns the versioned six-display text payload. The web UI shows
   that response body verbatim for inspection; the embedded client parses it.
 
@@ -191,17 +242,20 @@ changes or breaks.
 
 The React/TypeScript web UI lives in `packages/web` and is hosted by an SST
 `StaticSite` component backed by S3 and CloudFront. At build time, SST injects
-the API URL as `VITE_API_URL`. The browser calls API Gateway, which invokes the
-Lambda and returns the unified nightly data for the selected configuration and
-location.
+the HTTPS API URL as `VITE_API_URL`. The main view calls
+`GET /astro/{configurationId}` and shows the HTTP status, content type, and
+response body verbatim; it deliberately does not parse the line protocol.
 
-In deployed stages, the web UI uses an app-specific custom domain. Production is
+In deployed stages, the web UI uses an app-specific custom domain. The `prod` stage is
 available at `https://astroweather.albedoonline.com`, with the API at
 `https://api.astroweather.albedoonline.com`. Other stages use the stage name as
 the first label, for example `https://int.astroweather.albedoonline.com` and
-`https://api.int.astroweather.albedoonline.com`. SST manages the ACM certificates
-and Route 53 records in the `albedoonline.com` hosted zone. The API allows the
-matching web origin plus the local Vite development origins.
+`https://api.int.astroweather.albedoonline.com`. SST manages the web
+certificate and DNS records; the API certificate, CloudFront distribution, and
+aliases are defined explicitly in `sst.config.ts` (see
+[API edge](#3-api-edge-cloudfront-http-and-https)). All records live in the
+`albedoonline.com` hosted zone. The API allows the matching web origin plus the
+local Vite development origins.
 
 The UI also exposes helper tools independently from the main astronomy view.
 It loads the configuration list from `GET /configurations` and uses that list
@@ -217,8 +271,10 @@ The project structure is:
 
 ```text
 sst/
-├── packages/functions/   # API Lambda handlers
+├── packages/functions/
+│   ├── src/              # Lambda handlers, forecast/, weather/, jobs/
+│   └── tests/integration/
 ├── packages/web/         # Vite + React UI
-├── docs/                 # Architecture and testing documentation
-└── sst.config.ts         # API and StaticSite infrastructure
+├── docs/                 # Architecture, API, development, and testing documentation
+└── sst.config.ts         # API, CloudFront, DynamoDB, schedule, and StaticSite
 ```

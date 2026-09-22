@@ -1,5 +1,6 @@
 import { configurations } from "./configurations";
 import { assembleForecast } from "./forecast/assemble";
+import { localDateTime } from "./forecast/nights";
 import { serializeError, serializeForecast } from "./forecast/protocol";
 import { createWeatherReader } from "./forecast/weather-reader";
 
@@ -29,13 +30,18 @@ export function createHandler(
       return textResponse(404, serializeError("configuration_not_found"));
     }
 
+    const now = dependencies.now ?? (() => new Date());
+    const { location } = configurations[configurationId];
+
     try {
-      const displays = await assembleForecast(configurationId, configurations[configurationId].location, {
-        now: dependencies.now ?? (() => new Date()),
+      const displays = await assembleForecast(configurationId, location, {
+        now,
         readWeather: dependencies.readWeather ?? createWeatherReader().read,
         log: dependencies.log ?? ((message, details) => console.log(message, details))
       });
-      return textResponse(200, serializeForecast(configurationId, displays));
+      // Read the clock after assembly so the device's RTC sync is as close to sending as possible.
+      const time = localDateTime(now(), location.tz);
+      return textResponse(200, serializeForecast(configurationId, time, displays));
     } catch (cause) {
       dependencies.log?.("Forecast response failed", {
         configurationId,

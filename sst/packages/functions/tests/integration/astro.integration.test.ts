@@ -1,7 +1,6 @@
-import { describe, test, expect } from "vitest";
-import { Resource } from "sst";
+import { describe, test, expect, inject } from "vitest";
 
-const BASE_URL = Resource.AstroApi.url;
+const BASE_URL = inject("apiUrl");
 const displayKeys = [
   "display", "board", "nightId", "numeric_0", "numeric_1",
   "matrix_0", "matrix_1", "matrix_2", "matrix_3", "numeric_2", "numeric_3"
@@ -17,8 +16,14 @@ describe("GET /astro/{configurationId}", () => {
     expect(response.headers.get("content-type")).toContain("text/plain");
     expect(lines[0]).toBe("protocol=1");
     expect(lines[1]).toBe("configurationId=krakow");
-    expect(lines[2]).toBe("");
-    expect(lines[3]).toBe("display=0");
+    expect(lines[2]).toMatch(/^time=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+    const renderedAt = Date.parse(`${lines[2].slice(5)}Z`);
+    // Krakow is UTC+1 or UTC+2, so the local time leads UTC by one to two hours.
+    const offsetMinutes = (renderedAt - Date.now()) / 60_000;
+    expect(offsetMinutes).toBeGreaterThan(55);
+    expect(offsetMinutes).toBeLessThan(125);
+    expect(lines[3]).toBe("");
+    expect(lines[4]).toBe("display=0");
     expect(body).toContain("\n\ndisplay=1");
 
     expect(lines.filter((line) => line.startsWith("display="))).toEqual([
