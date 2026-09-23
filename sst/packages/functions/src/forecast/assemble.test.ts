@@ -10,10 +10,11 @@ describe("assembleForecast", () => {
       log
     });
 
-    expect(result).toHaveLength(6);
-    expect(result[0].nightId).toBe("2026-09-17");
-    expect(result[0].sunset).not.toBe("?");
-    expect(result[0].cloud).toBe("?");
+    expect(result.displays).toHaveLength(6);
+    expect(result.displays[0].nightId).toBe("2026-09-17");
+    expect(result.displays[0].sunset).not.toBe("?");
+    expect(result.displays[0].cloud).toBe("?");
+    expect(result.lastWeatherFetch).toBeUndefined();
     expect(log).toHaveBeenCalledWith("Forecast weather failed", expect.objectContaining({ source: "weather" }));
   });
 
@@ -31,8 +32,27 @@ describe("assembleForecast", () => {
       log: vi.fn()
     });
 
-    expect(result[0].sun).toBe("?");
-    expect(result[0].maximumTemperature).toBe("18.5");
-    expect(result[0].cloud[0]).toBe("*");
+    expect(result.displays[0].sun).toBe("?");
+    expect(result.displays[0].maximumTemperature).toBe("18.5");
+    expect(result.displays[0].cloud[0]).toBe("*");
+  });
+
+  test("reports the newest weather fetch among the nights used", async () => {
+    const item = (nightId: string, fetchedAt: string) => ({
+      pk: "LOC#krakow", sk: `NIGHT#${nightId}#WEATHER`, configurationId: "krakow",
+      nightId, service: "skyConditions" as const,
+      coordinates: { latitude: 50, longitude: 20 }, fetchedAt, expireAt: 2_000_000_000, hours: []
+    });
+    const result = await assembleForecast("krakow", { lat: 50, lon: 20, tz: "Europe/Warsaw" }, {
+      now: () => new Date("2026-09-17T10:00:00Z"),
+      readWeather: async () => new Map([
+        ["2026-09-17", item("2026-09-17", "2026-09-17T04:00:03.000Z")],
+        ["2026-09-18", item("2026-09-18", "2026-09-16T22:00:05.000Z")],
+        ["2026-09-19", item("2026-09-19", "not a date")]
+      ]),
+      log: vi.fn()
+    });
+
+    expect(result.lastWeatherFetch?.toISOString()).toBe("2026-09-17T04:00:03.000Z");
   });
 });

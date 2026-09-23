@@ -26,6 +26,10 @@ add_executable(clock_sync_tests
     ClockSyncTests.cpp
 )
 
+add_executable(refresh_schedule_tests
+    RefreshScheduleTests.cpp
+)
+
 add_executable(settings_codec_tests
     SettingsCodecTests.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../User/Src/Settings/SettingsCodec.cpp
@@ -60,6 +64,10 @@ target_include_directories(clock_sync_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../User/Inc
 )
 
+target_include_directories(refresh_schedule_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../User/Inc
+)
+
 target_include_directories(settings_codec_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../User/Inc
 )
@@ -75,6 +83,7 @@ target_compile_features(settings_codec_tests PRIVATE cxx_std_17)
 target_compile_features(rtc_trim_tests PRIVATE cxx_std_17)
 target_compile_features(clock_sync_tests PRIVATE cxx_std_17)
 target_compile_features(calendar_date_tests PRIVATE cxx_std_17)
+target_compile_features(refresh_schedule_tests PRIVATE cxx_std_17)
 
 add_test(NAME numeric_display_tests COMMAND numeric_display_tests)
 add_test(NAME display_codec_tests COMMAND display_codec_tests)
@@ -84,3 +93,4 @@ add_test(NAME settings_codec_tests COMMAND settings_codec_tests)
 add_test(NAME rtc_trim_tests COMMAND rtc_trim_tests)
 add_test(NAME clock_sync_tests COMMAND clock_sync_tests)
 add_test(NAME calendar_date_tests COMMAND calendar_date_tests)
+add_test(NAME refresh_schedule_tests COMMAND refresh_schedule_tests)

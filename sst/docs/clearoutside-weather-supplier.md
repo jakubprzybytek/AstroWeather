@@ -21,7 +21,8 @@ follows the recommended integration below, with these differences:
   fields: `temperatureC`, `cloudCoverTotalPct`, `precipitationProbabilityPct`,
   and `thunderstormRisk` per hour. The observing rating, Bortle estimate, and
   dark windows are not parsed.
-- The scheduled job runs every six hours and fails its invocation when any
+- The scheduled job runs every six hours (00:00, 06:00, 12:00 and 18:00
+  Europe/Warsaw) and fails its invocation when any
   location fails, but no alarm or other monitoring alert is configured on that
   failure.
 - No agreement with First Light Optics is recorded, so the first item of the

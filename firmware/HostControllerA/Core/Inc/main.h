@@ -47,6 +47,10 @@ extern "C" {
  * See docs/RTC.md. */
 #define RTC_TIME_SET_BKP_REGISTER   RTC_BKP_DR0
 #define RTC_TIME_SET_MARKER         0x54494D45UL /* "TIME" */
+/* Time of the last successful astro refresh, in seconds since 2000 local, or
+ * 0 for none. Kept over a reset so the scheduled refresh does not repeat a
+ * slot already done. */
+#define RTC_ASTRO_REFRESH_BKP_REGISTER RTC_BKP_DR1
 
 /* USER CODE END EC */
 

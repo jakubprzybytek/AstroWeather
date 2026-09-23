@@ -35,9 +35,21 @@ struct AstroServerTime
     uint16_t millisecond = 0U;
 };
 
+// The `lastWeatherFetchTime` header record: the server's local time when it
+// last fetched the weather in this response, to the second. Specific to the
+// weather source.
+struct AstroWeatherFetchTime
+{
+    bool present = false;    // absent from payloads of servers that predate it
+    bool valid = false;      // present and either `?` or a well-formed date and time
+    bool available = false;  // valid and a time, not `?` (no weather on the server)
+    Calendar::DateTime value{};
+};
+
 struct AstroData
 {
     AstroServerTime serverTime{};
+    AstroWeatherFetchTime lastWeatherFetch{};
     std::array<AstroBoardData, 6> boards{};
 };
 

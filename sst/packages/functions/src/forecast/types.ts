@@ -16,6 +16,12 @@ export type ForecastDisplay = {
   minimumTemperature: string;
 };
 
+export type AssembledForecast = {
+  displays: ForecastDisplay[];
+  // Newest `fetchedAt` among the weather items used; absent when there were none.
+  lastWeatherFetch?: Date;
+};
+
 export type ForecastDependencies = {
   now: () => Date;
   readWeather: (configurationId: string, nightIds: string[], now: Date) => Promise<Map<string, ClearOutsideItem>>;

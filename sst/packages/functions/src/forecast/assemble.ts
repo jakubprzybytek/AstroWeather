@@ -1,7 +1,7 @@
 import { calculateAstronomy } from "./astronomy";
 import { nextNightIds } from "./nights";
 import { projectWeather } from "./weather-reader";
-import type { ForecastDependencies, ForecastDisplay } from "./types";
+import type { AssembledForecast, ForecastDependencies, ForecastDisplay } from "./types";
 
 const BOARD = "num4x4_matrix5x21" as const;
 
@@ -17,10 +17,11 @@ export async function assembleForecast(
   configurationId: string,
   location: { lat: number; lon: number; tz: string },
   dependencies: ForecastDependencies
-): Promise<ForecastDisplay[]> {
+): Promise<AssembledForecast> {
   const now = dependencies.now();
   const nightIds = nextNightIds(now, location.tz);
   const displays = nightIds.map((nightId, display) => emptyDisplay(display, nightId));
+  let lastWeatherFetch: Date | undefined;
 
   for (const display of displays) {
     try {
@@ -39,7 +40,12 @@ export async function assembleForecast(
     const weather = await dependencies.readWeather(configurationId, nightIds, now);
     for (const display of displays) {
       const item = weather.get(display.nightId);
-      if (item) Object.assign(display, projectWeather(item, location.tz));
+      if (!item) continue;
+      Object.assign(display, projectWeather(item, location.tz));
+      const fetchedAt = new Date(item.fetchedAt);
+      if (!Number.isNaN(fetchedAt.getTime()) && (!lastWeatherFetch || fetchedAt > lastWeatherFetch)) {
+        lastWeatherFetch = fetchedAt;
+      }
     }
   } catch (cause) {
     dependencies.log?.("Forecast weather failed", {
@@ -50,5 +56,5 @@ export async function assembleForecast(
     });
   }
 
-  return displays;
+  return { displays, lastWeatherFetch };
 }

@@ -308,6 +308,25 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
                 parsed.serverTime.valid = parseServerTime(value, parsed.serverTime);
                 continue;
             }
+            if (std::strcmp(key, "lastWeatherFetchTime") == 0 &&
+                !parsed.lastWeatherFetch.present)
+            {
+                // Informational only: a bad value does not cost the forecast.
+                AstroWeatherFetchTime& fetch = parsed.lastWeatherFetch;
+                fetch.present = true;
+                AstroServerTime time{};
+                if (valueEquals(value, "?"))
+                {
+                    fetch.valid = true;
+                }
+                else if (std::strlen(value) == 19U && parseServerTime(value, time))
+                {
+                    fetch.valid = true;
+                    fetch.available = true;
+                    fetch.value = time.value;
+                }
+                continue;
+            }
             if (std::strcmp(key, "display") != 0)
             {
                 continue;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <HostController/AstroData.hpp>
+#include <HostController/RefreshSchedule.hpp>
 #include <HostController/St67FetchTypes.hpp>
 #include <Utils/Task.hpp>
 
@@ -50,6 +51,21 @@ struct RefreshSummary
     uint16_t httpStatus = 0U;
     uint32_t finishedTick = 0U;  // osKernelGetTickCount() when it finished
     bool running = false;
+    // From the last response that parsed, which a later failure leaves alone.
+    bool weatherFetchKnown = false;
+    AstroWeatherFetchTime lastWeatherFetch{};
+};
+
+// Where the scheduled refresh stands, for status reporting.
+struct ScheduleSummary
+{
+    bool timeSet = false;         // false: the next slot is not known yet
+    uint32_t nextSlot = 0U;       // seconds since 2000, local
+    bool hasSuccess = false;
+    uint32_t lastSuccess = 0U;    // seconds since 2000, local
+    uint32_t failures = 0U;       // consecutive, since the last success
+    uint32_t retryInMs = 0U;      // with failures: until the next attempt
+    bool waitingForNextSlot = false;  // failed for want of WiFi credentials
 };
 
 // 3 KB: the parsed forecast (~700 B), the clock sync and their formatted log
@@ -63,6 +79,7 @@ public:
     RefreshRequestResult requestRefresh(RefreshTrigger trigger);
     // Safe to call from any task.
     RefreshSummary lastRefresh() const;
+    ScheduleSummary schedule() const;
 
 protected:
     void run() override;
@@ -73,6 +90,12 @@ private:
     void executeRefresh(RefreshTrigger trigger);
     bool fetchPayload();
     bool publishDisplay(const AstroData& data);
+
+    // Scheduled refresh; see RefreshSchedule. Checked each time run() wakes,
+    // at least every kScheduleCheckMs.
+    static RefreshSchedule::Clock readClock();
+    void checkSchedule();
+    void recordScheduleOutcome(RefreshOutcome outcome, St67FetchStatus fetchStatus);
 
     // Progress bar on the local board's bottom matrix row. Drawn from this task
     // only, while it waits for the WiFi task, so the WiFi task never touches the
@@ -85,6 +108,7 @@ private:
     void clearIndicator();
 
     static constexpr uint32_t kFlagRun = 1U << 0;
+    static constexpr uint32_t kScheduleCheckMs = 60000U;
 
     Display::Display* display_ = nullptr;
     uint8_t responseBuffer_[APP_ST67_HTTP_MAX_RESPONSE_BYTES]{};
@@ -92,6 +116,8 @@ private:
     RefreshTrigger trigger_ = RefreshTrigger::Scheduled;
     volatile bool active_ = false;
     RefreshSummary last_{};
+    // Written by this task only; read by others through schedule().
+    RefreshSchedule::Scheduler scheduler_{};
     Indicator indicator_ = Indicator::None;
     uint32_t indicatorUntil_ = 0U;
     uint8_t failedSegment_ = 0U;

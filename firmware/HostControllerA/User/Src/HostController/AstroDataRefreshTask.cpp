@@ -3,12 +3,16 @@
 #include <Display/Display.hpp>
 #include <Display/DisplayTypes.hpp>
 #include <HostController/AstroDataParser.hpp>
+#include <HostController/CalendarDate.hpp>
 #include <HostController/ClockTask.hpp>
 #include <St67HttpFetchTask.hpp>
 
 #include <Debug/LogService.hpp>
 
 #include "FreeRTOS.h"
+#include "main.h"
+
+extern "C" RTC_HandleTypeDef hrtc;
 
 namespace HostController {
 namespace {
@@ -158,8 +162,38 @@ void syncClock(const AstroServerTime& serverTime, uint32_t responseTick)
                                        serverTime.hasMilliseconds, responseTick);
 }
 
+void logWeatherFetch(const AstroWeatherFetchTime& fetch)
+{
+    if (!fetch.present)
+    {
+        LogService::instance().log(LogService::Level::Info,
+                                   "AstroDataRefresh lastWeatherFetchTime absent");
+    }
+    else if (!fetch.valid)
+    {
+        LogService::instance().log(LogService::Level::Warn,
+                                   "AstroDataRefresh lastWeatherFetchTime malformed");
+    }
+    else if (!fetch.available)
+    {
+        LogService::instance().log(LogService::Level::Warn,
+                                   "AstroDataRefresh lastWeatherFetchTime=? (no weather)");
+    }
+    else
+    {
+        const Calendar::DateTime& t = fetch.value;
+        LogService::instance().logf(
+            LogService::Level::Info,
+            "AstroDataRefresh lastWeatherFetchTime=%04u-%02u-%02uT%02u:%02u:%02u",
+            static_cast<unsigned int>(t.year), static_cast<unsigned int>(t.month),
+            static_cast<unsigned int>(t.day), static_cast<unsigned int>(t.hour),
+            static_cast<unsigned int>(t.minute), static_cast<unsigned int>(t.second));
+    }
+}
+
 void logParsedData(const AstroData& data)
 {
+    logWeatherFetch(data.lastWeatherFetch);
     for (uint8_t displayIndex = 0U; displayIndex < data.boards.size(); ++displayIndex)
     {
         const AstroBoardData& board = data.boards[displayIndex];
@@ -212,6 +246,13 @@ AstroDataRefreshTask::AstroDataRefreshTask()
 void AstroDataRefreshTask::init(Display::Display* display)
 {
     display_ = display;
+    // The backup register goes with the time: both survive a reset and are
+    // lost with power. Called after MX_RTC_Init().
+    const uint32_t lastSuccess = HAL_RTCEx_BKUPRead(&hrtc, RTC_ASTRO_REFRESH_BKP_REGISTER);
+    if (ClockTask::instance().isTimeSet() && lastSuccess != 0U)
+    {
+        scheduler_.restoreLastSuccess(lastSuccess);
+    }
 }
 
 RefreshRequestResult AstroDataRefreshTask::requestRefresh(RefreshTrigger trigger)
@@ -447,6 +488,10 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
         }
         else
         {
+            taskENTER_CRITICAL();
+            last_.weatherFetchKnown = true;
+            last_.lastWeatherFetch = data.lastWeatherFetch;
+            taskEXIT_CRITICAL();
             logParsedData(data);
             syncClock(data.serverTime, request_.result.responseTick);
             if (!publishDisplay(data))
@@ -464,6 +509,7 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
             }
         }
     }
+    recordScheduleOutcome(outcome, request_.result.status);
     taskENTER_CRITICAL();
     last_.outcome = outcome;
     last_.trigger = trigger;
@@ -488,6 +534,92 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
     if (trigger == RefreshTrigger::WifiTest) {
         reportWifiTest(outcome, request_.result.status, startedTick);
     }
+}
+
+RefreshSchedule::Clock AstroDataRefreshTask::readClock()
+{
+    RefreshSchedule::Clock clock{false, 0U, osKernelGetTickCount()};
+    ClockTask::DateTime now{};
+    if (ClockTask::instance().isTimeSet() && ClockTask::instance().readDateTime(now))
+    {
+        clock.timeSet = true;
+        clock.now = Calendar::secondsSince2000(now.year, now.month, now.day, now.hour,
+                                               now.minute, now.second);
+    }
+    return clock;
+}
+
+void AstroDataRefreshTask::checkSchedule()
+{
+    if (active_)
+    {
+        return;
+    }
+    if (scheduler_.due(readClock()))
+    {
+        (void)requestRefresh(RefreshTrigger::Scheduled);
+    }
+}
+
+void AstroDataRefreshTask::recordScheduleOutcome(RefreshOutcome outcome,
+                                                 St67FetchStatus fetchStatus)
+{
+    // Read after the refresh: a success may have just set or stepped the clock.
+    const RefreshSchedule::Clock clock = readClock();
+    const bool success = outcome == RefreshOutcome::Ok;
+    taskENTER_CRITICAL();
+    scheduler_.recordOutcome(clock, success, fetchStatus != St67FetchStatus::NoCredentials);
+    taskEXIT_CRITICAL();
+    if (success && clock.timeSet)
+    {
+        HAL_RTCEx_BKUPWrite(&hrtc, RTC_ASTRO_REFRESH_BKP_REGISTER, clock.now);
+    }
+    if (!clock.timeSet)
+    {
+        return;
+    }
+    const Calendar::DateTime next =
+        Calendar::fromSecondsSince2000(RefreshSchedule::nextSlotStart(clock.now));
+    if (success)
+    {
+        LogService::instance().logf(LogService::Level::Info,
+                                    "AstroDataRefresh next scheduled at %02u:%02u",
+                                    static_cast<unsigned int>(next.hour),
+                                    static_cast<unsigned int>(next.minute));
+    }
+    else if (fetchStatus == St67FetchStatus::NoCredentials)
+    {
+        LogService::instance().logf(LogService::Level::Warn,
+                                    "AstroDataRefresh no retry without WiFi credentials; "
+                                    "next scheduled at %02u:%02u",
+                                    static_cast<unsigned int>(next.hour),
+                                    static_cast<unsigned int>(next.minute));
+    }
+    else
+    {
+        LogService::instance().logf(
+            LogService::Level::Warn, "AstroDataRefresh retry %lu in %lu min",
+            static_cast<unsigned long>(scheduler_.failures()),
+            static_cast<unsigned long>(RefreshSchedule::retryDelayMs(scheduler_.failures()) / 60000U));
+    }
+}
+
+ScheduleSummary AstroDataRefreshTask::schedule() const
+{
+    const RefreshSchedule::Clock clock = readClock();
+    taskENTER_CRITICAL();
+    const RefreshSchedule::Scheduler scheduler = scheduler_;
+    taskEXIT_CRITICAL();
+    ScheduleSummary summary{};
+    summary.timeSet = clock.timeSet;
+    summary.nextSlot = clock.timeSet ? RefreshSchedule::nextSlotStart(clock.now) : 0U;
+    summary.hasSuccess = scheduler.hasSuccess();
+    summary.lastSuccess = scheduler.lastSuccess();
+    summary.failures = scheduler.failures();
+    summary.waitingForNextSlot = scheduler.waitingForNextSlot();
+    const int32_t retryIn = static_cast<int32_t>(scheduler.retryAtTick() - clock.tick);
+    summary.retryInMs = (summary.failures != 0U && retryIn > 0) ? static_cast<uint32_t>(retryIn) : 0U;
+    return summary;
 }
 
 RefreshSummary AstroDataRefreshTask::lastRefresh() const
@@ -582,10 +714,10 @@ void AstroDataRefreshTask::run()
 {
     for (;;)
     {
-        // Between refreshes the task idles, except while an outcome is shown on
-        // the progress row: it then wakes to blink it and to clear it when it
-        // expires. A new refresh request always takes over straight away.
-        uint32_t timeout = osWaitForever;
+        // Between refreshes the task wakes to check the schedule, and while an
+        // outcome is shown on the progress row, to blink it and to clear it when
+        // it expires. A new refresh request always takes over straight away.
+        uint32_t timeout = kScheduleCheckMs;
         if (indicator_ != Indicator::None)
         {
             const int32_t left =
@@ -595,7 +727,10 @@ void AstroDataRefreshTask::run()
                 clearIndicator();
                 continue;
             }
-            timeout = static_cast<uint32_t>(left);
+            if (static_cast<uint32_t>(left) < timeout)
+            {
+                timeout = static_cast<uint32_t>(left);
+            }
             if (indicator_ == Indicator::Failure && timeout > kFailureBlinkMs)
             {
                 timeout = kFailureBlinkMs;
@@ -606,6 +741,7 @@ void AstroDataRefreshTask::run()
         if (flags == static_cast<uint32_t>(osFlagsErrorTimeout))
         {
             stepIndicator();
+            checkSchedule();
             continue;
         }
         if ((flags & osFlagsError) != 0U)

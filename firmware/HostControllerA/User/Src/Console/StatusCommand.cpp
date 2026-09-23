@@ -6,6 +6,8 @@
 #include <Settings/SettingsStore.hpp>
 #if defined(FIRMWARE_VARIANT_HostController)
 #include <HostController/AstroDataRefreshTask.hpp>
+#include <HostController/CalendarDate.hpp>
+#include <HostController/ClockTask.hpp>
 #include <HostController/St67HttpFetchTask.hpp>
 #endif
 
@@ -20,7 +22,7 @@ namespace Console {
 namespace {
 
 // The whole reply is one burst, so it must stay under the 16-line log queue;
-// see HelpCommand.cpp. It is currently 10 lines.
+// see HelpCommand.cpp. It is currently 12 lines.
 
 void line(const char* format, ...)
 {
@@ -98,6 +100,78 @@ void reportEeprom(Device::Eeprom24AA04* eeprom, Settings::Store* settings)
 }
 
 #if defined(FIRMWARE_VARIANT_HostController)
+void reportSchedule()
+{
+    using namespace HostController;
+    const ScheduleSummary schedule = AstroDataRefreshTask::instance().schedule();
+    char last[24] = "none since power-up";
+    if (schedule.hasSuccess) {
+        const Calendar::DateTime at = Calendar::fromSecondsSince2000(schedule.lastSuccess);
+        std::snprintf(last, sizeof(last), "%04u-%02u-%02u %02u:%02u",
+                      static_cast<unsigned>(at.year), static_cast<unsigned>(at.month),
+                      static_cast<unsigned>(at.day), static_cast<unsigned>(at.hour),
+                      static_cast<unsigned>(at.minute));
+    }
+    char next[48] = "once the clock is set";
+    if (schedule.failures != 0U && schedule.waitingForNextSlot) {
+        std::snprintf(next, sizeof(next), "no WiFi credentials");
+    } else if (schedule.failures != 0U && schedule.retryInMs != 0U) {
+        std::snprintf(next, sizeof(next), "retry %lu in %lu s",
+                      static_cast<unsigned long>(schedule.failures),
+                      static_cast<unsigned long>(schedule.retryInMs / 1000U));
+    } else if (schedule.failures != 0U) {
+        std::snprintf(next, sizeof(next), "retry %lu now", static_cast<unsigned long>(schedule.failures));
+    }
+    if (schedule.timeSet && (schedule.failures == 0U || schedule.waitingForNextSlot)) {
+        const Calendar::DateTime at = Calendar::fromSecondsSince2000(schedule.nextSlot);
+        const std::size_t used = (schedule.failures != 0U) ? std::strlen(next) : 0U;
+        std::snprintf(next + used, sizeof(next) - used, "%s%02u:%02u", used != 0U ? ", then " : "",
+                      static_cast<unsigned>(at.hour), static_cast<unsigned>(at.minute));
+    }
+    line("schedule   every 6 h from 00:10; next %s; last ok %s", next, last);
+}
+
+// The server's last weather fetch, as the last parsed response reported it.
+void reportWeatherFetch(const HostController::RefreshSummary& last)
+{
+    const HostController::AstroWeatherFetchTime& fetch = last.lastWeatherFetch;
+    if (!last.weatherFetchKnown) {
+        line("weather    last fetch time unknown until a refresh succeeds");
+        return;
+    }
+    if (!fetch.present) {
+        line("weather    last fetch time not reported by the server");
+        return;
+    }
+    if (!fetch.valid) {
+        line("weather    last fetch time malformed in the response");
+        return;
+    }
+    if (!fetch.available) {
+        line("weather    none on the server at the last refresh");
+        return;
+    }
+    const Calendar::DateTime& t = fetch.value;
+    char age[40] = "";
+    ClockTask::DateTime now{};
+    if (ClockTask::instance().isTimeSet() && ClockTask::instance().readDateTime(now)) {
+        const uint32_t nowSeconds = Calendar::secondsSince2000(now.year, now.month, now.day,
+                                                               now.hour, now.minute, now.second);
+        const uint32_t fetchSeconds =
+            Calendar::secondsSince2000(t.year, t.month, t.day, t.hour, t.minute, t.second);
+        if (nowSeconds >= fetchSeconds) {
+            const uint32_t minutes = (nowSeconds - fetchSeconds) / 60U;
+            std::snprintf(age, sizeof(age), ", %lu h %02lu min ago",
+                          static_cast<unsigned long>(minutes / 60U),
+                          static_cast<unsigned long>(minutes % 60U));
+        }
+    }
+    line("weather    last fetched by the server %04u-%02u-%02u %02u:%02u:%02u%s",
+         static_cast<unsigned>(t.year), static_cast<unsigned>(t.month),
+         static_cast<unsigned>(t.day), static_cast<unsigned>(t.hour),
+         static_cast<unsigned>(t.minute), static_cast<unsigned>(t.second), age);
+}
+
 void reportAstro()
 {
     using namespace HostController;
@@ -181,6 +255,8 @@ CommandResult handleStatusCommand(const char* command, Display::Display* display
     reportEeprom(eeprom, settings);
 #if defined(FIRMWARE_VARIANT_HostController)
     reportAstro();
+    reportWeatherFetch(HostController::AstroDataRefreshTask::instance().lastRefresh());
+    reportSchedule();
 #endif
     reportRemoteBoards(display);
     return CommandResult::Ok;

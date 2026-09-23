@@ -15,9 +15,26 @@ describe("astro handler", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["content-type"]).toBe("text/plain; charset=utf-8");
-    expect(response.body.split("\n").slice(0, 4)).toEqual([
-      "protocol=1", "configurationId=krakow", "time=2026-09-22T23:22:45.678", ""
+    expect(response.body.split("\n").slice(0, 5)).toEqual([
+      "protocol=1", "configurationId=krakow", "time=2026-09-22T23:22:45.678",
+      "lastWeatherFetchTime=?", ""
     ]);
+  });
+
+  test("renders the last weather fetch time in local time, to the second", async () => {
+    const handler = createHandler({
+      now: () => new Date("2026-09-22T21:22:45.678Z"),
+      readWeather: async (_configurationId, nightIds) => new Map([[nightIds[0], {
+        pk: "LOC#krakow", sk: `NIGHT#${nightIds[0]}#WEATHER`, configurationId: "krakow",
+        nightId: nightIds[0], service: "skyConditions" as const,
+        coordinates: { latitude: 50, longitude: 20 }, fetchedAt: "2026-09-22T16:00:04.321Z",
+        expireAt: 2_000_000_000, hours: []
+      }]]),
+      log: vi.fn()
+    });
+    const response = await handler({ pathParameters: { configurationId: "krakow" } });
+
+    expect(response.body).toContain("\nlastWeatherFetchTime=2026-09-22T18:00:04\n");
   });
 
   test("pads the milliseconds to three digits", async () => {

@@ -132,6 +132,50 @@ void testServerTime()
     }
 }
 
+std::string withWeatherFetchTime(const std::string& value)
+{
+    std::string payload = withTime("2026-09-22T23:22:45.078");
+    payload.insert(payload.find("\n\n") + 1U, "lastWeatherFetchTime=" + value + "\n");
+    return payload;
+}
+
+void testLastWeatherFetchTime()
+{
+    HostController::AstroData data{};
+    expect(parse(validPayload(), data) == HostController::AstroParseStatus::Success,
+           "payload without lastWeatherFetchTime");
+    expect(!data.lastWeatherFetch.present, "lastWeatherFetchTime absent");
+
+    expect(parse(withWeatherFetchTime("2026-09-22T18:00:04"), data) ==
+               HostController::AstroParseStatus::Success,
+           "payload with lastWeatherFetchTime");
+    expect(data.lastWeatherFetch.present && data.lastWeatherFetch.valid &&
+               data.lastWeatherFetch.available,
+           "lastWeatherFetchTime available");
+    const Calendar::DateTime& t = data.lastWeatherFetch.value;
+    expect(t.year == 2026U && t.month == 9U && t.day == 22U && t.hour == 18U &&
+               t.minute == 0U && t.second == 4U,
+           "lastWeatherFetchTime fields");
+    expect(data.serverTime.valid && data.serverTime.value.hour == 23U,
+           "time still parsed next to it");
+
+    expect(parse(withWeatherFetchTime("?"), data) == HostController::AstroParseStatus::Success,
+           "payload with unavailable lastWeatherFetchTime");
+    expect(data.lastWeatherFetch.present && data.lastWeatherFetch.valid &&
+               !data.lastWeatherFetch.available,
+           "lastWeatherFetchTime unavailable");
+
+    const char* malformed[] = {"2026-09-22T18:00:04.000", "2026-09-22 18:00:04", "2026-02-30T10:00:00",
+                               "", "??"};
+    for (const char* value : malformed) {
+        expect(parse(withWeatherFetchTime(value), data) == HostController::AstroParseStatus::Success,
+               "a malformed lastWeatherFetchTime keeps the forecast");
+        expect(data.lastWeatherFetch.present && !data.lastWeatherFetch.valid &&
+                   !data.lastWeatherFetch.available,
+               "malformed lastWeatherFetchTime flagged");
+    }
+}
+
 } // namespace
 
 int main()
@@ -140,6 +184,7 @@ int main()
     testMalformedTemperatureRejected();
     testUnknownKeysAreIgnored();
     testServerTime();
+    testLastWeatherFetchTime();
     std::cout << "AstroDataParser tests passed\n";
     return EXIT_SUCCESS;
 }

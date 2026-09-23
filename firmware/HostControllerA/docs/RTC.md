@@ -259,9 +259,11 @@ and the frequency is what that makes the LSI:
 - **No time zone.** The RTC holds local time. The server sends the
   configuration's local time with daylight saving applied, so a DST change
   reaches the clock at the next fetch after it.
-- **Synced only as often as something fetches.** Scheduled refreshes do not
-  exist yet (`RefreshTrigger::Scheduled` is never raised), so the clock is
-  corrected by switch 1, `astro refresh` and `wifi test`.
+- **Synced only as often as something fetches.** The scheduled refresh runs
+  every 6 hours (see
+  [Astro_Data_Refresh_Implementation_Plan.md](Astro_Data_Refresh_Implementation_Plan.md#11-scheduled-refresh)),
+  and switch 1, `astro refresh` and `wifi test` fetch in between. Each of
+  those may step the RTC.
 - **The drift measurement is in RAM.** A reset or flashing restarts it, though
   the time itself survives.
 - **The date is tracked but never shown.** It is kept so that an API sync and a

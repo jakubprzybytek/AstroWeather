@@ -198,7 +198,10 @@ weather data for night X"):
 - **Astro**: deterministic; computed on demand by the forecast Lambda for every
   request and not stored.
 - **Weather (Clearoutside, implemented)**: the `ClearOutsideIngestion` `CronV2`
-  schedule invokes a Lambda every six hours with no scheduler retries. It
+  schedule invokes a Lambda at 00:00, 06:00, 12:00 and 18:00 Europe/Warsaw time
+  (`cron(0 0/6 * * ? *)` with a timezone, so DST is followed) with no scheduler
+  retries. The HostController refreshes 10 minutes after each of these times,
+  so the fixed hours matter: a `rate()` schedule would drift with each deploy. It
   processes the configured locations sequentially with a one-second gap between
   them. Each fetch times out after 15 seconds and is retried once on network
   errors and HTTP `5xx`; HTTP `429` and other `4xx` responses are not retried.

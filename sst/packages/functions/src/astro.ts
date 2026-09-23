@@ -1,6 +1,6 @@
 import { configurations } from "./configurations";
 import { assembleForecast } from "./forecast/assemble";
-import { localDateTimeMillis } from "./forecast/nights";
+import { localDateTime, localDateTimeMillis } from "./forecast/nights";
 import { serializeError, serializeForecast } from "./forecast/protocol";
 import { createWeatherReader } from "./forecast/weather-reader";
 
@@ -34,14 +34,15 @@ export function createHandler(
     const { location } = configurations[configurationId];
 
     try {
-      const displays = await assembleForecast(configurationId, location, {
+      const { displays, lastWeatherFetch } = await assembleForecast(configurationId, location, {
         now,
         readWeather: dependencies.readWeather ?? createWeatherReader().read,
         log: dependencies.log ?? ((message, details) => console.log(message, details))
       });
       // Read the clock after assembly so the device's RTC sync is as close to sending as possible.
       const time = localDateTimeMillis(now(), location.tz);
-      return textResponse(200, serializeForecast(configurationId, time, displays));
+      const lastWeatherFetchTime = lastWeatherFetch ? localDateTime(lastWeatherFetch, location.tz) : "?";
+      return textResponse(200, serializeForecast(configurationId, time, lastWeatherFetchTime, displays));
     } catch (cause) {
       dependencies.log?.("Forecast response failed", {
         configurationId,

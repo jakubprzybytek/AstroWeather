@@ -47,9 +47,11 @@ The endpoint is consumed by an STM32-based device without a JSON parser. A
 successful request returns `text/plain; charset=utf-8` using the versioned ASCII
 `key=value` protocol defined in [api-payload.md](api-payload.md).
 
-The response contains the `protocol=1`, `configurationId`, and `time` header
-records, followed by six fixed-order display blocks. `time` is the
-configuration's local wall-clock time as `YYYY-MM-DDTHH:MM:SS.mmm`. Each block contains, in order,
+The response contains the `protocol=1`, `configurationId`, `time`, and
+`lastWeatherFetchTime` header records, followed by six fixed-order display
+blocks. `time` is the configuration's local wall-clock time as
+`YYYY-MM-DDTHH:MM:SS.mmm`; `lastWeatherFetchTime` is the local
+`YYYY-MM-DDTHH:MM:SS` of the last successful weather fetch, or `?`. Each block contains, in order,
 `display`, `board`, `nightId`, `numeric_0`, `numeric_1`, `matrix_0` through
 `matrix_3`, `numeric_2`, and `numeric_3`. `numeric_0` and `numeric_1`
 are sunset and sunrise; `matrix_0` through `matrix_3` are sun, moon, cloud,
@@ -83,6 +85,16 @@ from the server clock after the forecast has been assembled so it is as close
 as possible to the moment the response is sent. It uses the same IANA timezone
 and DST rules as the forecast window, has no UTC offset, and carries
 milliseconds. The embedded device uses it to set its real-time clock.
+
+### Last weather fetch time
+
+`lastWeatherFetchTime` is the newest `fetchedAt` among the weather items used in
+the response, converted to the configuration's local time and truncated to the
+second. An ingestion run writes a night's item only after fetching and parsing
+it, so a failed run leaves the value at the last success, and the value grows
+old when ingestion keeps failing. It is `?` when no weather item is available.
+The record is specific to weather: a future source adds its own record rather
+than sharing this one.
 
 ### Astronomy
 
@@ -180,6 +192,8 @@ client. Operational details belong in structured Lambda logs.
    unknown configuration.
 11. A successful response carries `time` as the configuration's local
    `YYYY-MM-DDTHH:MM:SS.mmm` at render time, including after a DST change.
+12. A successful response carries `lastWeatherFetchTime` as the local time of
+   the newest weather `fetchedAt` used, or `?` without weather.
 
 ## Non-goals
 

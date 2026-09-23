@@ -22,8 +22,10 @@ describe("GET /astro/{configurationId}", () => {
     const offsetMinutes = (renderedAt - Date.now()) / 60_000;
     expect(offsetMinutes).toBeGreaterThan(55);
     expect(offsetMinutes).toBeLessThan(125);
-    expect(lines[3]).toBe("");
-    expect(lines[4]).toBe("display=0");
+    // Weather is ingested every six hours, so a working deployment has a value.
+    expect(lines[3]).toMatch(/^lastWeatherFetchTime=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+    expect(lines[4]).toBe("");
+    expect(lines[5]).toBe("display=0");
     expect(body).toContain("\n\ndisplay=1");
 
     expect(lines.filter((line) => line.startsWith("display="))).toEqual([

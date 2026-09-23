@@ -70,7 +70,7 @@ The device's line-based interface is documented in detail in [USB_CDC_Debug_Serv
 - Every line sent produces an echo response: `[days:hours:minutes:seconds]: received text`.
 - `ConsoleService` interprets specific commands (discoverable via `help`), including at least:
   - `help` — list commands
-  - `status` — firmware, uptime, heap, EEPROM, settings, WiFi, last astro refresh, remote boards
+  - `status` — firmware, uptime, heap, EEPROM, settings, WiFi, last astro refresh, server's last weather fetch, refresh schedule, remote boards
   - `display set <index> <value> <precision>`
   - `display time <index> <HH:MM>`
   - `display blank <index>`

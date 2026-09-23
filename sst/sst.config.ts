@@ -186,7 +186,10 @@ export default $config({
     }
 
     new sst.aws.CronV2("ClearOutsideIngestion", {
-      schedule: "rate(6 hours)",
+      // 00:00, 06:00, 12:00 and 18:00 local. The HostController refreshes at
+      // 10 minutes past these hours, so each fetch picks up fresh weather.
+      schedule: "cron(0 0/6 * * ? *)",
+      timezone: "Europe/Warsaw",
         retries: 0,
       function: {
         handler: "packages/functions/src/jobs/clearoutside-weather.handler",

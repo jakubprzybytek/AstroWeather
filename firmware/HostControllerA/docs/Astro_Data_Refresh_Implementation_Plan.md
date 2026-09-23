@@ -494,8 +494,8 @@ Exit criteria:
 2. Measure stack high-water marks and static RAM after task changes.
 3. Update `Display.md`, `Serial_COM_Communication.md`, and the ST67 Phase 4/5
    status documents with the implemented ownership and command behavior.
-4. Add a future scheduler through
-   `requestRefresh(RefreshTrigger::Scheduled)` without creating another path.
+4. Add a scheduler through `requestRefresh(RefreshTrigger::Scheduled)`
+   without creating another path. Done; see section 11.
 
 ## 8. Validation Matrix
 
@@ -562,3 +562,92 @@ data transaction. Switch 1, `astro refresh`, and future scheduling all use the
 same guarded request API; duplicate requests never queue another run; switch 2
 remains responsive; and `Display::submit()` serializes hardware transfers while
 clients retain intentional last-writer-wins access to pending display state.
+
+## 11. Scheduled Refresh
+
+Implemented in `HostController/RefreshSchedule.hpp` (pure logic, native tests in
+`tests/RefreshScheduleTests.cpp`) and driven by `AstroDataRefreshTask`.
+
+### Slots
+
+The device refreshes at **00:10, 06:10, 12:10 and 18:10 local time**. The
+server's Clear Outside ingestion runs at 00:00, 06:00, 12:00 and 18:00
+Europe/Warsaw (`sst.config.ts`, a `cron()` with a timezone), so each refresh
+picks up weather that is at most 10 minutes old. The 12:10 slot also picks up
+the local-noon rollover, after which display 0 is the next observing night.
+
+The RTC holds the configuration's local time with DST applied (see `RTC.md`), so
+the device's slots and the server's schedule follow DST together.
+
+### When a refresh is due
+
+Only the RTC time of the **last successful refresh** is kept. The latest slot is
+done when that time is at or after the slot's start. This covers:
+
+- **Any trigger.** Switch 1, `astro refresh` and `wifi test` count as well; a
+  manual refresh inside a slot means the scheduler skips it.
+- **Missed slots.** After a day offline one refresh catches up, not four.
+- **Clock steps.** A backward step makes the last success look like the future,
+  so nothing runs until the next slot. A forward step past a slot runs it.
+- **Reset.** The time is kept in RTC backup register `DR1`
+  (`RTC_ASTRO_REFRESH_BKP_REGISTER`), which survives a reset and flashing like
+  the time itself. After a power loss both are gone, the clock is unset, and a
+  refresh is due at once, which also sets the clock.
+
+### Failures
+
+A failed refresh, whatever started it, is retried after 2, 5, 10 and 20
+minutes, then every 30 minutes. Retries count RTOS ticks, so they also work
+while the clock is unset. When the next slot starts, the backoff restarts from
+there. A failure for want of WiFi credentials is not retried: the next attempt
+is the next slot, or `wifi set`, which refreshes by itself.
+
+### Driver
+
+There is no separate task. `AstroDataRefreshTask::run()` wakes at least every
+60 seconds (more often while it blinks the outcome on the progress row), asks
+the scheduler, and when a refresh is due calls
+`requestRefresh(RefreshTrigger::Scheduled)` on itself. A slot therefore starts
+up to a minute late, and the first refresh after boot runs about a minute after
+start-up. The outcome of every refresh is recorded in `executeRefresh()`, which
+logs the next slot or the next retry:
+
+```text
+AstroDataRefresh next scheduled at 18:10
+AstroDataRefresh retry 2 in 5 min
+AstroDataRefresh no retry without WiFi credentials; next scheduled at 18:10
+```
+
+`status` prints one line for it, after a line with the server's last weather
+fetch from the `lastWeatherFetchTime` record of the last response that parsed:
+
+```text
+weather    last fetched by the server 2026-09-23 12:00:04, 0 h 11 min ago
+schedule   every 6 h from 00:10; next 18:10; last ok 2026-09-23 12:11
+schedule   every 6 h from 00:10; next retry 2 in 284 s; last ok 2026-09-23 06:11
+```
+
+There are no quiet hours: a scheduled refresh shows the same progress bar on
+the local board's bottom row as a manual one.
+
+A future low-power mode would replace the 60-second wake with an RTC alarm set
+to `RefreshSchedule::nextSlotStart()` or the next retry.
+
+### Improvement proposal: shift stale data at the noon rollover
+
+Not implemented. If the 12:10 refresh keeps failing, every board shows data one
+night old: display 0 is the night that has just ended. The payload already
+holds six consecutive nights, so the firmware could keep the last parsed
+`AstroData` (about 700 B) and, at local noon, publish it shifted by one night:
+
+- board 0 shows what board 1 showed, and so on up to board 4;
+- board 5 shows the unavailable pattern (four decimal points, matrix off);
+- repeat at each following noon until a refresh succeeds, so the display stays
+  correct, with fewer nights, for up to five days offline.
+
+Conditions: shift only while the clock is set, compare the stored `nightId` of
+board 0 with the current observing night rather than counting noons, so a
+reset or a clock step cannot shift twice, and discard the stored data once
+nothing is left to shift. Weather values carry no expiry of their own and would
+simply age with the data, as they do today.
+

@@ -21,6 +21,7 @@ Wire example
 protocol=1
 configurationId=krakow
 time=2026-09-22T23:22:45.678
+lastWeatherFetchTime=2026-09-22T18:00:04
 
 display=0
 board=num4x4_matrix5x21
@@ -152,6 +153,17 @@ time
   error payloads. It was added within protocol version 1; a parser that
   predates it ignores it as an unknown header key. The milliseconds were
   added later still: the firmware accepts `time` with or without them.
+
+lastWeatherFetchTime
+  Local date and time at which the server last fetched weather successfully,
+  as `YYYY-MM-DDTHH:MM:SS` in the configuration's timezone (no milliseconds,
+  no UTC offset). It is the newest `fetchedAt` among the weather items used in
+  this response, so it describes the weather source only; other sources get
+  their own `<source>FetchTime` record. It is the server's fetch from the
+  supplier, not the time the supplier's model ran. `?` means the response
+  carries no weather. It appears only in successful responses, and was added
+  within protocol version 1: a parser that predates it ignores it as an
+  unknown header key.
 
 display
   Zero-based display index. Display 0 is the current observing night in the
