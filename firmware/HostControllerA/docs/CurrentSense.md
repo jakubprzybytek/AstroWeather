@@ -13,10 +13,12 @@ by default shows the current in mA on numeric display 2 of the local board.
 Only the HostController firmware starts the task. The DisplayController
 variant builds the same `MX_ADC1_Init()` but does not use the ADC.
 
-The measurement has an open problem: readings taken during bring-up did not
-match the voltage measured at the pin. See
-[Troubleshooting history](#troubleshooting-history); the likely cause is
-`VREF+` tied to GND on the host board.
+The measurement works on the prototype host board, which has a hand rework:
+`VREF+` (U302 pin 5) is tied to GND in the schematic and PCB, and has been
+rewired to VDD on the board. Boards built from the current design files need
+the same rework until the schematic and PCB are fixed (issue C-1 in
+[Hardware_Review.md](../../../KiCad/Hardware_Review.md)). See
+[Troubleshooting history](#troubleshooting-history).
 
 ## Signal Chain
 
@@ -162,7 +164,7 @@ diagnosing. See [Console.md](Console.md) for the replies.
 
 Not covered: the task, the ADC and DMA configuration, the VDDA and temperature
 calculations, and the display output. These have been checked on hardware only,
-subject to the open problem below.
+on the reworked prototype.
 
 ## Troubleshooting History
 
@@ -172,15 +174,16 @@ voltage, from the former `ADC_Current_Monitor_Troubleshooting.md`
 recorded **no resolution**. The configuration it was debugging was a single
 channel read by polling; the firmware has since moved to the three-channel DMA
 scan above, **with oversampling enabled**, which is the opposite of what its
-resolution path recommended while diagnosing. Treat the problem as **open**
-until a known-voltage test on the shipped configuration passes.
+resolution path recommended while diagnosing.
 
-**Likely root cause (2026-09-23 hardware review):** on the host board `VREF+`
-(U302 pin 5) is tied to GND in both the schematic and the PCB, so the ADC has
-no reference and every result, VREFINT and temperature included, is
-meaningless. Strap pin 5 to VDD with 100 nF + 1 µF, then repeat the
-known-voltage test. See issue C-1 in
-[Hardware_Review.md](../../../KiCad/Hardware_Review.md).
+**Resolution:** the 2026-09-23 hardware review found `VREF+` (U302 pin 5) tied
+to GND in both the schematic and the PCB, so the ADC had no reference and every
+result, VREFINT and temperature included, was meaningless. Rewiring pin 5 to
+VDD on the prototype fixed it; current sensing now works with the shipped
+three-channel, oversampled configuration. The schematic and PCB still carry
+the fault (issue C-1 in
+[Hardware_Review.md](../../../KiCad/Hardware_Review.md)). The rest of this
+section is kept for reference.
 
 ### Symptom
 

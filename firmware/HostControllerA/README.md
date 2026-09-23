@@ -64,33 +64,49 @@ One CMake project builds either image, selected by `FIRMWARE_VARIANT`:
 
 ## Features
 
-| Feature | Document |
-| --- | --- |
-| Boot sequence, tasks, inter-task communication, pins, tests, unused code | [Architecture.md](docs/Architecture.md) |
-| Build, flash, debug, native tests, serial tools | [Development.md](docs/Development.md) |
-| USB CDC console, logging and the command reference | [Console.md](docs/Console.md) |
-| ST67 Wi-Fi session, HTTP fetch, configuration, failure diagnosis, stress mode | [WiFi.md](docs/WiFi.md) |
-| Astro fetch, payload format, board mapping, triggers, schedule, progress bar | [AstroRefresh.md](docs/AstroRefresh.md) |
-| Local and remote display boards, encoding, I2C protocol | [Display.md](docs/Display.md) |
-| RTC on the LSI, trim, sync from the server, drift | [RTC.md](docs/RTC.md) |
-| EEPROM settings and their format | [Settings.md](docs/Settings.md) |
-| Current, temperature and VDDA monitor | [CurrentSense.md](docs/CurrentSense.md) |
+Status: ✅ done · 🟡 partial · 🔴 not started · ⚠️ blocked by hardware.
+Hardware issue IDs (C-1, H-1, ...) refer to
+[Hardware_Review.md](../../KiCad/Hardware_Review.md).
+
+| Feature | Status | Notes | Document |
+| --- | --- | --- | --- |
+| **Connectivity** | | | |
+| Wi-Fi connection (ST67W611M1): join, DHCP, failure diagnosis | ✅ Done | Credentials are set with `wifi set` and saved to the EEPROM | [WiFi.md](docs/WiFi.md) |
+| Fetch data over HTTP | ✅ Done | Plain HTTP on port 80 only | [WiFi.md](docs/WiFi.md) |
+| Fetch data over HTTPS | 🔴 Not started | Planned; mbedTLS is not linked | [HTTPS plan](docs/ST67_HTTPS_Implementation_Plan.md) |
+| Module power saving between fetches | 🔴 Not started | The module and LwIP stay up between fetches | [WiFi.md](docs/WiFi.md#open-items) |
+| **Astro data** | | | |
+| Payload parser (protocol 1, 6 blocks) | ✅ Done | Unit tested | [AstroRefresh.md](docs/AstroRefresh.md) |
+| Refresh every 6 hours with retry and catch-up | ✅ Done | The last success is lost on power loss | [AstroRefresh.md](docs/AstroRefresh.md#schedule) |
+| Refresh from switch 1 or the console | ✅ Done | The switch is not debounced; a second press while busy is rejected | [AstroRefresh.md](docs/AstroRefresh.md) |
+| **Display** | | | |
+| Local LED board (multiplexing, progress bar) | ⚠️ Works, HW issue | Off digits glow because the slot P-FETs do not fully turn off (H-3) | [Display.md](docs/Display.md) |
+| Sending data to the 5 remote boards over I2C | ✅ Done (host side) | Needs I2C pull-ups, which are `dnp` in the schematic (H-4) | [Display.md](docs/Display.md#i2c-transport) |
+| DisplayController firmware for the remote boards | 🔴 Stub | Only the console task starts and its replies are dropped; no I2C slave, no local display | [Development.md](docs/Development.md#firmware-variants) |
+| Negative temperatures between -1 and 0 | 🟡 Bug | -0.5 °C shows as `-5` | [Display.md](docs/Display.md#fixed-point-values) |
+| **Time** | | | |
+| RTC clock on numeric display 3, `time` commands | ✅ Done | Lost on power loss (no LSE crystal or backup battery) | [RTC.md](docs/RTC.md) |
+| Clock sync from the server | ✅ Done | | [RTC.md](docs/RTC.md#sync-from-the-api) |
+| Clock trim | 🟡 Partial | Set by hand with `time trim`; automatic trim is planned | [RTC.md](docs/RTC.md) |
+| **Power and sensing** | | | |
+| Current, temperature and VDDA monitor | ✅ Done (reworked board) | Works on the prototype with `VREF+` rewired to VDD; the schematic and PCB still tie it to GND (C-1). Current sense also relies on the PC6→PB2 connection (H-1) | [CurrentSense.md](docs/CurrentSense.md) |
+| VBUS voltage sense | ⚠️ Blocked by HW | PC7 is not an ADC pin and has no divider (H-1, H-2) | [Hardware review](../../KiCad/Hardware_Review.md) |
+| USB-PD negotiation for more than 5 V | 🔴 Not implemented | Feasibility study only; the hardware needs changes | [USB_PD_Feasibility.md](docs/USB_PD_Feasibility.md) |
+| Reading the USB-C current limit (CC pins) | 🔴 Not implemented | Worst-case load exceeds the USB default (H-5) | [Hardware review](../../KiCad/Hardware_Review.md) |
+| **System** | | | |
+| USB console and logging | ✅ Done | | [Console.md](docs/Console.md) |
+| EEPROM settings | ✅ Done | A read failure is reported as "blank" | [Settings.md](docs/Settings.md) |
+| Firmware version and git hash | 🔴 Not started | Only the build time is stamped | [Development.md](docs/Development.md) |
+| Unit tests | 🟡 Partial | 9 suites for the pure-logic modules; none for the console, Wi-Fi, EEPROM driver or refresh pipeline | [Architecture.md](docs/Architecture.md#unit-tests) |
 
 ## Known Limitations
 
-- **Plain HTTP only.** The fetch uses port 80 with no TLS; HTTPS is planned in
-  [ST67_HTTPS_Implementation_Plan.md](docs/ST67_HTTPS_Implementation_Plan.md).
-- **No firmware version or git hash.** Only the build time is stamped into the
-  image and reported by the console.
-- **DisplayController is a stub.** See [Firmware Variants](#firmware-variants).
-  The remote boards the host writes to therefore do not show anything yet.
 - **Switch 2 starts a bench stress batch**, by default 100 Wi-Fi connect and
-  HTTP fetch cycles, not a user function. See [WiFi.md](docs/WiFi.md).
-- **The switches are not debounced.** Each falling edge sets a flag directly
-  from the EXTI interrupt, so a bouncing press can register twice; a second
-  refresh request while one runs is rejected as busy.
-- **The RTC is lost on power loss.** There is no LSE crystal or backup battery;
-  the clock shows `--:--` until the next successful fetch or `time set`.
+  HTTP fetch cycles, not a user function. It cannot be cancelled and refreshes
+  are rejected as busy while it runs. See [WiFi.md](docs/WiFi.md).
+- **The prototype host board carries hand rework** that the design files do not
+  show yet: `VREF+` rewired to VDD (C-1) and the current-sense net taken to PB2
+  (H-1). Boards built from the current files need the same changes.
 
 ## Documentation
 
