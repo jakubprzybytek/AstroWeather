@@ -13,11 +13,12 @@ function validate(display: ForecastDisplay): void {
   if (![display.sunset, display.sunrise, display.maximumTemperature, display.minimumTemperature].every((value) => value === "?" || /^[0-9:.+-]+$/.test(value))) throw new Error("Invalid forecast value");
 }
 
-// `lastWeatherFetchTime` is local `YYYY-MM-DDTHH:MM:SS`, or `?` without weather.
+// `time` is local `YYYY-MM-DDTHH:MM:SS.mmm+HH:MM`; `lastWeatherFetchTime` is local
+// `YYYY-MM-DDTHH:MM:SS+HH:MM`, or `?` without weather. The offset names the zone.
 export function serializeForecast(configurationId: string, time: string, lastWeatherFetchTime: string, displays: ForecastDisplay[]): string {
   if (!/^[\x21-\x7e]+$/.test(configurationId) || displays.length !== 6) throw new Error("Invalid forecast response");
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(time)) throw new Error("Invalid forecast time");
-  if (lastWeatherFetchTime !== "?" && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(lastWeatherFetchTime)) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}$/.test(time)) throw new Error("Invalid forecast time");
+  if (lastWeatherFetchTime !== "?" && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/.test(lastWeatherFetchTime)) {
     throw new Error("Invalid last weather fetch time");
   }
   displays.forEach((display, index) => {

@@ -293,7 +293,7 @@ eeprom     answering at 0x50, 512 bytes
 settings   loaded at boot: ok; adc log off, adc display on, time display on, trim +18400 ppm
 wifi       'MyNetwork' stored; last connect ok 0d 00:03:05 ago (channel 2, -39 dBm)
 astro      last refresh ok, 0d 00:02:25 ago, from console
-weather    last fetched by the server 2026-09-23 09:05:12, 1 h 07 min ago
+weather    last fetched by the server 2026-09-23 09:05:12 +02:00, 1 h 07 min ago
 schedule   every 6 h from 00:10; next 12:10; last ok 2026-09-23 10:10
 remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 ```

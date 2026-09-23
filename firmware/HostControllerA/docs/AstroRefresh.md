@@ -152,10 +152,10 @@ whole payload has validated.
 
 | Record | Accepted form | Bad value |
 | --- | --- | --- |
-| `time` | `YYYY-MM-DDTHH:MM:SS` or `YYYY-MM-DDTHH:MM:SS.mmm`, a real date in 2000..2099 | Kept as present but invalid; the clock sync is skipped, the forecast is kept. |
-| `lastWeatherFetchTime` | `YYYY-MM-DDTHH:MM:SS`, no milliseconds, or `?` for no weather | Kept as present but invalid; reported by `status`, the forecast is kept. |
+| `time` | `YYYY-MM-DDTHH:MM:SS` or `YYYY-MM-DDTHH:MM:SS.mmm`, a real date in 2000..2099, then optionally `Z` or a UTC offset `+HH:MM` / `-HH:MM` | Kept as present but invalid; the clock sync is skipped, the forecast is kept. |
+| `lastWeatherFetchTime` | `YYYY-MM-DDTHH:MM:SS`, no milliseconds, with the same optional offset, or `?` for no weather | Kept as present but invalid; reported by `status`, the forecast is kept. |
 
-Both may be absent, as from servers that predate them.
+Both may be absent.
 
 ### Display blocks
 
@@ -209,8 +209,11 @@ The firmware follows `api-payload.md` except in these details:
   lines wherever they are.
 - `configurationId` is limited to 20 characters by the firmware, not by the
   contract.
-- The contract gives `time` always with milliseconds. The firmware also
-  accepts whole seconds, which servers before 2026-09-23 sent.
+- The contract gives `time` always with milliseconds and both times always
+  with a `+HH:MM` / `-HH:MM` UTC offset. The firmware also accepts whole
+  seconds, no offset, and `Z`.
+- The UTC offset is kept and shown by the log and `status`, but the RTC is set
+  from the wall-clock part only; see [RTC.md](RTC.md#limits).
 - A bad `time` or `lastWeatherFetchTime` does not reject the payload; the
   contract's rejection rules cover only required records.
 - `nightId` is not checked to be a date, and times are not range-checked.

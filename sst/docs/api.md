@@ -49,9 +49,9 @@ successful request returns `text/plain; charset=utf-8` using the versioned ASCII
 
 The response contains the `protocol=1`, `configurationId`, `time`, and
 `lastWeatherFetchTime` header records, followed by six fixed-order display
-blocks. `time` is the configuration's local wall-clock time as
-`YYYY-MM-DDTHH:MM:SS.mmm`; `lastWeatherFetchTime` is the local
-`YYYY-MM-DDTHH:MM:SS` of the last successful weather fetch, or `?`. Each block contains, in order,
+blocks. `time` is the configuration's local wall-clock time with its UTC
+offset as `YYYY-MM-DDTHH:MM:SS.mmm+HH:MM`; `lastWeatherFetchTime` is the local
+`YYYY-MM-DDTHH:MM:SS+HH:MM` of the last successful weather fetch, or `?`. Each block contains, in order,
 `display`, `board`, `nightId`, `numeric_0`, `numeric_1`, `matrix_0` through
 `matrix_3`, `numeric_2`, and `numeric_3`. `numeric_0` and `numeric_1`
 are sunset and sunrise; `matrix_0` through `matrix_3` are sun, moon, cloud,
@@ -83,14 +83,16 @@ before and after local noon is deterministic.
 The `time` header record is the configuration's local wall-clock time, read
 from the server clock after the forecast has been assembled so it is as close
 as possible to the moment the response is sent. It uses the same IANA timezone
-and DST rules as the forecast window, has no UTC offset, and carries
-milliseconds. The embedded device uses it to set its real-time clock.
+and DST rules as the forecast window, carries milliseconds, and ends in the UTC
+offset in force at that instant (`+02:00`, `+01:00`), so a reader can tell
+which zone it is in. The embedded device sets its real-time clock from the
+wall-clock part.
 
 ### Last weather fetch time
 
 `lastWeatherFetchTime` is the newest `fetchedAt` among the weather items used in
-the response, converted to the configuration's local time and truncated to the
-second. An ingestion run writes a night's item only after fetching and parsing
+the response, converted to the configuration's local time, truncated to the
+second, and followed by the UTC offset in force at the fetch. An ingestion run writes a night's item only after fetching and parsing
 it, so a failed run leaves the value at the last success, and the value grows
 old when ingestion keeps failing. It is `?` when no weather item is available.
 The record is specific to weather: a future source adds its own record rather
@@ -191,9 +193,10 @@ client. Operational details belong in structured Lambda logs.
 10. An integration test verifies the deployed route for one known and one
    unknown configuration.
 11. A successful response carries `time` as the configuration's local
-   `YYYY-MM-DDTHH:MM:SS.mmm` at render time, including after a DST change.
-12. A successful response carries `lastWeatherFetchTime` as the local time of
-   the newest weather `fetchedAt` used, or `?` without weather.
+   `YYYY-MM-DDTHH:MM:SS.mmm+HH:MM` at render time, with the offset of that
+   instant, including after a DST change.
+12. A successful response carries `lastWeatherFetchTime` as the local time and
+   UTC offset of the newest weather `fetchedAt` used, or `?` without weather.
 
 ## Non-goals
 

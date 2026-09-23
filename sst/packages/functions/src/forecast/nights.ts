@@ -35,6 +35,15 @@ export function localDateTimeMillis(date: Date, timezone: string): string {
   return `${localDateTime(date, timezone)}.${String(date.getUTCMilliseconds()).padStart(3, "0")}`;
 }
 
+// The zone's UTC offset at `date` as `+HH:MM`, for the response time records.
+// Every IANA offset in use today is a whole number of minutes.
+export function utcOffset(date: Date, timezone: string): string {
+  const minutes = Math.round(offsetMilliseconds(date, timezone) / 60_000);
+  const magnitude = Math.abs(minutes);
+  const hours = String(Math.floor(magnitude / 60)).padStart(2, "0");
+  return `${minutes < 0 ? "-" : "+"}${hours}:${String(magnitude % 60).padStart(2, "0")}`;
+}
+
 export function localDate(date: Date, timezone: string): string {
   return localDateTime(date, timezone).slice(0, 10);
 }

@@ -20,8 +20,8 @@ Wire example
 ```
 protocol=1
 configurationId=krakow
-time=2026-09-22T23:22:45.678
-lastWeatherFetchTime=2026-09-22T18:00:04
+time=2026-09-22T23:22:45.678+02:00
+lastWeatherFetchTime=2026-09-22T18:00:04+02:00
 
 display=0
 board=num4x4_matrix5x21
@@ -141,29 +141,29 @@ configurationId
 
 time
   Local date and time at which the server rendered the response, in the
-  configuration's timezone, formatted as ISO 8601 local date-time
-  `YYYY-MM-DDTHH:MM:SS.mmm` (24-hour clock, always three digits of
-  milliseconds). The device uses it to set its real-time clock; the
-  milliseconds let it compare its clock to about a tenth of a second rather
-  than to the second. It carries no UTC offset: it is the
-  wall-clock time the device should display,
-  already adjusted for DST. The clock is read after the forecast is assembled,
+  configuration's timezone, formatted as ISO 8601 date-time with a UTC offset
+  `YYYY-MM-DDTHH:MM:SS.mmm+HH:MM` (24-hour clock, always three digits of
+  milliseconds, the offset always as `+HH:MM` or `-HH:MM`, never `Z`). The
+  date and time part is the wall-clock time the device should display,
+  already adjusted for DST; the offset is the one in force at that instant
+  (`+02:00` for Poland in summer, `+01:00` in winter) and says which zone the
+  wall-clock value is in, so the value names one instant even in the hour a
+  DST change repeats. The device uses the wall-clock part to set its real-time
+  clock; the milliseconds let it compare its clock to about a tenth of a
+  second rather than to the second. The clock is read after the forecast is assembled,
   so the value lags the moment the response is sent only by serialization time
   plus network latency. `time` appears only in successful responses, not in
-  error payloads. It was added within protocol version 1; a parser that
-  predates it ignores it as an unknown header key. The milliseconds were
-  added later still: the firmware accepts `time` with or without them.
+  error payloads.
 
 lastWeatherFetchTime
   Local date and time at which the server last fetched weather successfully,
-  as `YYYY-MM-DDTHH:MM:SS` in the configuration's timezone (no milliseconds,
-  no UTC offset). It is the newest `fetchedAt` among the weather items used in
+  as `YYYY-MM-DDTHH:MM:SS+HH:MM` in the configuration's timezone (no
+  milliseconds; the UTC offset in force at the fetch, which after a DST change
+  differs from the one on `time`). It is the newest `fetchedAt` among the weather items used in
   this response, so it describes the weather source only; other sources get
   their own `<source>FetchTime` record. It is the server's fetch from the
   supplier, not the time the supplier's model ran. `?` means the response
-  carries no weather. It appears only in successful responses, and was added
-  within protocol version 1: a parser that predates it ignores it as an
-  unknown header key.
+  carries no weather. It appears only in successful responses.
 
 display
   Zero-based display index. Display 0 is the current observing night in the

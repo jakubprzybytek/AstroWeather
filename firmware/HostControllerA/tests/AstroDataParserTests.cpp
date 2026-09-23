@@ -172,6 +172,72 @@ void testLastWeatherFetchTime()
     }
 }
 
+void testUtcOffset()
+{
+    HostController::AstroData data{};
+    expect(parse(withTime("2026-09-22T23:22:45.078"), data) ==
+               HostController::AstroParseStatus::Success,
+           "time without an offset");
+    expect(data.serverTime.valid && !data.serverTime.utcOffset.present, "no offset");
+
+    struct Case
+    {
+        const char* value;
+        int16_t minutes;
+        bool hasMilliseconds;
+    };
+    const Case cases[] = {{"2026-09-22T23:22:45.078+02:00", 120, true},
+                          {"2026-09-22T23:22:45+01:00", 60, false},
+                          {"2026-09-22T23:22:45.078Z", 0, true},
+                          {"2026-09-22T23:22:45-03:30", -210, false},
+                          {"2026-09-22T23:22:45-00:00", 0, false},
+                          {"2026-09-22T23:22:45+23:59", 1439, false}};
+    for (const Case& item : cases) {
+        expect(parse(withTime(item.value), data) == HostController::AstroParseStatus::Success,
+               "time with an offset");
+        expect(data.serverTime.valid && data.serverTime.utcOffset.present &&
+                   data.serverTime.utcOffset.minutes == item.minutes,
+               "offset value");
+        expect(data.serverTime.hasMilliseconds == item.hasMilliseconds &&
+                   data.serverTime.value.hour == 23U && data.serverTime.value.second == 45U,
+               "wall-clock time kept next to the offset");
+    }
+
+    const char* malformed[] = {"2026-09-22T23:22:45+2:00", "2026-09-22T23:22:45+0200",
+                               "2026-09-22T23:22:45+02", "2026-09-22T23:22:45+24:00",
+                               "2026-09-22T23:22:45+02:60", "2026-09-22T23:22:45z",
+                               "2026-09-22T23:22:45 +02:00", "2026-09-22T23:22:45.078+02:00x",
+                               "2026-09-22T23:22:45.07+02:00", "2026-09-22T23:22:45ZZ"};
+    for (const char* value : malformed) {
+        expect(parse(withTime(value), data) == HostController::AstroParseStatus::Success,
+               "a malformed offset keeps the forecast");
+        expect(data.serverTime.present && !data.serverTime.valid, "malformed offset flagged");
+    }
+
+    expect(parse(withWeatherFetchTime("2026-09-22T18:00:04+02:00"), data) ==
+               HostController::AstroParseStatus::Success,
+           "lastWeatherFetchTime with an offset");
+    expect(data.lastWeatherFetch.valid && data.lastWeatherFetch.available &&
+               data.lastWeatherFetch.utcOffset.present &&
+               data.lastWeatherFetch.utcOffset.minutes == 120 &&
+               data.lastWeatherFetch.value.hour == 18U,
+           "lastWeatherFetchTime offset");
+    expect(parse(withWeatherFetchTime("2026-09-22T18:00:04.000+02:00"), data) ==
+                   HostController::AstroParseStatus::Success &&
+               !data.lastWeatherFetch.valid,
+           "lastWeatherFetchTime milliseconds rejected with an offset too");
+
+    char text[8];
+    HostController::formatUtcOffset({true, 120}, text);
+    expect(std::string(text) == "+02:00", "format +02:00");
+    HostController::formatUtcOffset({true, -210}, text);
+    expect(std::string(text) == "-03:30", "format -03:30");
+    HostController::formatUtcOffset({true, 0}, text);
+    expect(std::string(text) == "+00:00", "format UTC");
+    HostController::formatUtcOffset({}, text);
+    expect(std::string(text).empty(), "format without an offset");
+}
+
 AstroParseStatus parse(const std::string& payload)
 {
     HostController::AstroData data{};
@@ -368,6 +434,7 @@ int main()
     testUnknownKeysAreIgnored();
     testServerTime();
     testLastWeatherFetchTime();
+    testUtcOffset();
     testLineLengthLimit();
     testCrlfLineEndings();
     testBlocksOutOfOrder();

@@ -105,22 +105,58 @@ bool twoDigits(const char* text, uint8_t& result)
     return true;
 }
 
-// YYYY-MM-DDTHH:MM:SS or YYYY-MM-DDTHH:MM:SS.mmm, within the RTC's range.
+// Nothing, `Z`, or `+HH:MM` / `-HH:MM` up to 23:59.
+bool parseUtcOffset(const char* text, AstroUtcOffset& result)
+{
+    if (*text == '\0')
+    {
+        result = {};
+        return true;
+    }
+    if (valueEquals(text, "Z"))
+    {
+        result.present = true;
+        result.minutes = 0;
+        return true;
+    }
+    uint8_t hours = 0U;
+    uint8_t minutes = 0U;
+    if (std::strlen(text) != 6U || (text[0] != '+' && text[0] != '-') || text[3] != ':' ||
+        !twoDigits(text + 1, hours) || !twoDigits(text + 4, minutes) || hours > 23U ||
+        minutes > 59U)
+    {
+        return false;
+    }
+    const int16_t magnitude = static_cast<int16_t>(hours * 60U + minutes);
+    result.present = true;
+    result.minutes = text[0] == '-' ? static_cast<int16_t>(-magnitude) : magnitude;
+    return true;
+}
+
+// YYYY-MM-DDTHH:MM:SS or YYYY-MM-DDTHH:MM:SS.mmm, within the RTC's range, then
+// an optional UTC offset.
 bool parseServerTime(const char* text, AstroServerTime& result)
 {
     const size_t length = std::strlen(text);
-    if ((length != 19U && length != 23U) || text[4] != '-' || text[7] != '-' ||
+    if (length < 19U || text[4] != '-' || text[7] != '-' ||
         text[10] != 'T' || text[13] != ':' || text[16] != ':')
     {
         return false;
     }
-    uint16_t millisecond = 0U;
-    if (length == 23U)
+    const bool hasMilliseconds = text[19] == '.';
+    const size_t dateTimeLength = hasMilliseconds ? 23U : 19U;
+    if (length < dateTimeLength)
     {
-        if (text[19] != '.')
-        {
-            return false;
-        }
+        return false;
+    }
+    AstroUtcOffset utcOffset{};
+    if (!parseUtcOffset(text + dateTimeLength, utcOffset))
+    {
+        return false;
+    }
+    uint16_t millisecond = 0U;
+    if (hasMilliseconds)
+    {
         for (uint32_t index = 20U; index < 23U; ++index)
         {
             if (text[index] < '0' || text[index] > '9')
@@ -148,7 +184,8 @@ bool parseServerTime(const char* text, AstroServerTime& result)
     }
     result.value = value;
     result.millisecond = millisecond;
-    result.hasMilliseconds = length == 23U;
+    result.hasMilliseconds = hasMilliseconds;
+    result.utcOffset = utcOffset;
     return true;
 }
 
@@ -319,11 +356,12 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
                 {
                     fetch.valid = true;
                 }
-                else if (std::strlen(value) == 19U && parseServerTime(value, time))
+                else if (parseServerTime(value, time) && !time.hasMilliseconds)
                 {
                     fetch.valid = true;
                     fetch.available = true;
                     fetch.value = time.value;
+                    fetch.utcOffset = time.utcOffset;
                 }
                 continue;
             }

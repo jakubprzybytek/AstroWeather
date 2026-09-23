@@ -166,10 +166,13 @@ void reportWeatherFetch(const HostController::RefreshSummary& last)
                           static_cast<unsigned long>(minutes % 60U));
         }
     }
-    line("weather    last fetched by the server %04u-%02u-%02u %02u:%02u:%02u%s",
+    char offset[8];
+    HostController::formatUtcOffset(fetch.utcOffset, offset);
+    line("weather    last fetched by the server %04u-%02u-%02u %02u:%02u:%02u%s%s%s",
          static_cast<unsigned>(t.year), static_cast<unsigned>(t.month),
          static_cast<unsigned>(t.day), static_cast<unsigned>(t.hour),
-         static_cast<unsigned>(t.minute), static_cast<unsigned>(t.second), age);
+         static_cast<unsigned>(t.minute), static_cast<unsigned>(t.second),
+         offset[0] != '\0' ? " " : "", offset, age);
 }
 
 void reportAstro()

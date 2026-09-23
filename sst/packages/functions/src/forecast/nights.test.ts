@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { instantAtLocal, localDate, nextNightIds, observingSlots } from "./nights";
+import { instantAtLocal, localDate, nextNightIds, observingSlots, utcOffset } from "./nights";
 
 describe("observing nights", () => {
   const timezone = "Europe/Warsaw";
@@ -22,6 +22,16 @@ describe("observing nights", () => {
     expect(slots[0]).toMatchObject({ date: "2026-10-24", hour: 14 });
     expect(slots[20]).toMatchObject({ date: "2026-10-25", hour: 10 });
     expect(localDate(slots[10].midpoint, timezone)).toBe("2026-10-25");
+  });
+
+  test("formats the zone's UTC offset at an instant", () => {
+    expect(utcOffset(new Date("2026-09-17T12:30:00.678Z"), timezone)).toBe("+02:00");
+    expect(utcOffset(new Date("2026-12-01T12:00:00Z"), timezone)).toBe("+01:00");
+    expect(utcOffset(new Date("2026-10-25T00:59:59Z"), timezone)).toBe("+02:00");
+    expect(utcOffset(new Date("2026-10-25T01:00:00Z"), timezone)).toBe("+01:00");
+    expect(utcOffset(new Date("2026-09-17T12:00:00Z"), "UTC")).toBe("+00:00");
+    expect(utcOffset(new Date("2026-09-17T12:00:00Z"), "America/St_Johns")).toBe("-02:30");
+    expect(utcOffset(new Date("2026-09-17T12:00:00Z"), "Asia/Kathmandu")).toBe("+05:45");
   });
 
   test("maps local wall clock time to the configured zone", () => {

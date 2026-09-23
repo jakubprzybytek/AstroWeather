@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstdio>
 
 namespace HostController {
 
@@ -24,15 +25,38 @@ struct AstroBoardData
     std::array<uint32_t, 4> matrix{};
 };
 
+// The UTC offset that may follow a header date and time (`Z`, `+02:00`). It
+// only says which zone the wall-clock value is in; the value itself is local.
+struct AstroUtcOffset
+{
+    bool present = false;  // the value has an offset
+    int16_t minutes = 0;   // local time minus UTC, e.g. 120 for `+02:00`
+};
+
+// `+02:00` or `-03:30` (`Z` as `+00:00`), or an empty string without an offset.
+inline void formatUtcOffset(const AstroUtcOffset& offset, char (&text)[8])
+{
+    if (!offset.present)
+    {
+        text[0] = '\0';
+        return;
+    }
+    const unsigned int magnitude =
+        static_cast<unsigned int>(offset.minutes < 0 ? -offset.minutes : offset.minutes);
+    std::snprintf(text, sizeof(text), "%c%02u:%02u", offset.minutes < 0 ? '-' : '+',
+                  magnitude / 60U, magnitude % 60U);
+}
+
 // The `time` header record: the server's local time when it rendered the
-// response. Servers before 2026-09-23 sent whole seconds, truncated.
+// response. Milliseconds and the UTC offset are optional.
 struct AstroServerTime
 {
-    bool present = false;  // absent from payloads of servers that predate it
+    bool present = false;  // the payload has the record
     bool valid = false;    // present and a well-formed, in-range date and time
     bool hasMilliseconds = false;
     Calendar::DateTime value{};
     uint16_t millisecond = 0U;
+    AstroUtcOffset utcOffset{};
 };
 
 // The `lastWeatherFetchTime` header record: the server's local time when it
@@ -40,10 +64,11 @@ struct AstroServerTime
 // weather source.
 struct AstroWeatherFetchTime
 {
-    bool present = false;    // absent from payloads of servers that predate it
+    bool present = false;    // the payload has the record
     bool valid = false;      // present and either `?` or a well-formed date and time
     bool available = false;  // valid and a time, not `?` (no weather on the server)
     Calendar::DateTime value{};
+    AstroUtcOffset utcOffset{};
 };
 
 struct AstroData

@@ -16,14 +16,12 @@ describe("GET /astro/{configurationId}", () => {
     expect(response.headers.get("content-type")).toContain("text/plain");
     expect(lines[0]).toBe("protocol=1");
     expect(lines[1]).toBe("configurationId=krakow");
-    expect(lines[2]).toMatch(/^time=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/);
-    const renderedAt = Date.parse(`${lines[2].slice(5)}Z`);
-    // Krakow is UTC+1 or UTC+2, so the local time leads UTC by one to two hours.
-    const offsetMinutes = (renderedAt - Date.now()) / 60_000;
-    expect(offsetMinutes).toBeGreaterThan(55);
-    expect(offsetMinutes).toBeLessThan(125);
+    // Krakow is UTC+1 or UTC+2; with the offset the value names an exact instant.
+    expect(lines[2]).toMatch(/^time=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+0[12]:00$/);
+    const renderedAt = Date.parse(lines[2].slice(5));
+    expect(Math.abs(renderedAt - Date.now())).toBeLessThan(60_000);
     // Weather is ingested every six hours, so a working deployment has a value.
-    expect(lines[3]).toMatch(/^lastWeatherFetchTime=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+    expect(lines[3]).toMatch(/^lastWeatherFetchTime=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+0[12]:00$/);
     expect(lines[4]).toBe("");
     expect(lines[5]).toBe("display=0");
     expect(body).toContain("\n\ndisplay=1");

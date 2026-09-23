@@ -258,7 +258,9 @@ and the frequency is what that makes the LSI:
   `time set`. See [Reset and power loss](#reset-and-power-loss).
 - **No time zone.** The RTC holds local time. The server sends the
   configuration's local time with daylight saving applied, so a DST change
-  reaches the clock at the next fetch after it.
+  reaches the clock at the next fetch after it. The payload's UTC offset is
+  logged but not stored with the clock, so `status` computes the age of the
+  last weather fetch in local time, one hour off across a DST change.
 - **Synced only as often as something fetches.** The scheduled refresh runs
   every 6 hours (see [AstroRefresh.md](AstroRefresh.md#schedule)),
   and switch 1, `astro refresh` and `wifi test` fetch in between. Each of
@@ -276,10 +278,11 @@ and the frequency is what that makes the LSI:
 
 The astro API's payload carries a `time` header record, the configuration's
 local time when the server rendered the response, as
-`YYYY-MM-DDTHH:MM:SS.mmm` with daylight saving applied; see
-`sst/docs/api-payload.md`. Servers before 2026-09-23 sent whole seconds,
-truncated, without `.mmm`; the firmware accepts both, and takes the precision
-of each comparison from the form it gets (`ClockSync::Precision`). Each successful fetch uses it to check the RTC. This
+`YYYY-MM-DDTHH:MM:SS.mmm+HH:MM` with daylight saving applied; see
+`sst/docs/api-payload.md`. The offset only names the zone; the RTC is set from
+the wall-clock part before it. The firmware also accepts `time` in whole
+seconds, without `.mmm`, and takes the precision of each comparison from the
+form it gets (`ClockSync::Precision`). Each successful fetch uses it to check the RTC. This
 bounds the error to the drift since the last fetch, whatever the temperature.
 A response without `time`, or with a malformed one, still updates the forecast;
 the sync is skipped with a warning.

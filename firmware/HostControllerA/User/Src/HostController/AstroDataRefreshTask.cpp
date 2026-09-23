@@ -148,12 +148,14 @@ void logWeatherFetch(const AstroWeatherFetchTime& fetch)
     else
     {
         const Calendar::DateTime& t = fetch.value;
+        char offset[8];
+        formatUtcOffset(fetch.utcOffset, offset);
         LogService::instance().logf(
             LogService::Level::Info,
-            "AstroDataRefresh lastWeatherFetchTime=%04u-%02u-%02uT%02u:%02u:%02u",
+            "AstroDataRefresh lastWeatherFetchTime=%04u-%02u-%02uT%02u:%02u:%02u%s",
             static_cast<unsigned int>(t.year), static_cast<unsigned int>(t.month),
             static_cast<unsigned int>(t.day), static_cast<unsigned int>(t.hour),
-            static_cast<unsigned int>(t.minute), static_cast<unsigned int>(t.second));
+            static_cast<unsigned int>(t.minute), static_cast<unsigned int>(t.second), offset);
     }
 }
 
