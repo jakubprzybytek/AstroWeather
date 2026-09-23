@@ -16,14 +16,20 @@ describe("astro handler", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["content-type"]).toBe("text/plain; charset=utf-8");
     expect(response.body.split("\n").slice(0, 4)).toEqual([
-      "protocol=1", "configurationId=krakow", "time=2026-09-22T23:22:45", ""
+      "protocol=1", "configurationId=krakow", "time=2026-09-22T23:22:45.678", ""
     ]);
+  });
+
+  test("pads the milliseconds to three digits", async () => {
+    const response = await handlerAt("2026-09-22T21:22:45.007Z")({ pathParameters: { configurationId: "krakow" } });
+
+    expect(response.body).toContain("\ntime=2026-09-22T23:22:45.007\n");
   });
 
   test("uses the winter offset after the DST change", async () => {
     const response = await handlerAt("2026-12-01T23:30:00Z")({ pathParameters: { configurationId: "wroclaw" } });
 
-    expect(response.body).toContain("\ntime=2026-12-02T00:30:00\n");
+    expect(response.body).toContain("\ntime=2026-12-02T00:30:00.000\n");
   });
 
   test("returns the versioned error without a time for an unknown configuration", async () => {

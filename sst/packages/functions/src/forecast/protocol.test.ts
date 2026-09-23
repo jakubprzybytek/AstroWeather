@@ -15,19 +15,19 @@ function display(index: number): ForecastDisplay {
 
 describe("forecast protocol", () => {
   test("serializes six displays in the documented fixed order", () => {
-    const body = serializeForecast("krakow", "2026-09-17T23:22:45", Array.from({ length: 6 }, (_, index) => display(index)));
+    const body = serializeForecast("krakow", "2026-09-17T23:22:45.678", Array.from({ length: 6 }, (_, index) => display(index)));
     expect(body.split("\n").slice(0, 17)).toEqual([
-      "protocol=1", "configurationId=krakow", "time=2026-09-17T23:22:45", "", "display=0", "board=num4x4_matrix5x21",
+      "protocol=1", "configurationId=krakow", "time=2026-09-17T23:22:45.678", "", "display=0", "board=num4x4_matrix5x21",
       "nightId=2026-09-17", "numeric_0=20:30", "numeric_1=05:59",
       "matrix_0=******........*******", "matrix_1=?", "matrix_2=.....................",
       "matrix_3=?", "numeric_2=18.5", "numeric_3=9.2", "", "display=1"
     ]);
     expect(body).not.toContain("displayCount");
-    expect(body).toContain("time=2026-09-17T23:22:45\n\ndisplay=0");
+    expect(body).toContain("time=2026-09-17T23:22:45.678\n\ndisplay=0");
     expect(body).toContain("numeric_3=9.2\n\ndisplay=1");
   });
 
-  test.each(["2026-09-17 23:22:45", "2026-09-17T23:22", "?"])("rejects a malformed time %s", (time) => {
+  test.each(["2026-09-17 23:22:45.678", "2026-09-17T23:22:45", "2026-09-17T23:22:45.6", "?"])("rejects a malformed time %s", (time) => {
     expect(() => serializeForecast("krakow", time, Array.from({ length: 6 }, (_, index) => display(index))))
       .toThrow("Invalid forecast time");
   });

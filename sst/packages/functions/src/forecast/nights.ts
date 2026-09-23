@@ -29,6 +29,12 @@ export function localDateTime(date: Date, timezone: string): string {
   return `${value.year}-${value.month}-${value.day}T${value.hour}:${value.minute}:${value.second}`;
 }
 
+// Local date-time with milliseconds, for the response `time` record. Every IANA
+// offset in use is a whole number of seconds, so the milliseconds are the UTC ones.
+export function localDateTimeMillis(date: Date, timezone: string): string {
+  return `${localDateTime(date, timezone)}.${String(date.getUTCMilliseconds()).padStart(3, "0")}`;
+}
+
 export function localDate(date: Date, timezone: string): string {
   return localDateTime(date, timezone).slice(0, 10);
 }

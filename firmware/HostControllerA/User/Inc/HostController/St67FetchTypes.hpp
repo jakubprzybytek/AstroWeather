@@ -48,6 +48,9 @@ struct St67FetchResult {
   uint32_t length = 0U;
   uint32_t crc32 = 0U;
   int32_t detail = 0;
+  // osKernelGetTickCount() when the response headers arrived. The server
+  // stamps its `time` just before sending, so the clock sync measures from here.
+  uint32_t responseTick = 0U;
 };
 
 struct St67FetchRequest {

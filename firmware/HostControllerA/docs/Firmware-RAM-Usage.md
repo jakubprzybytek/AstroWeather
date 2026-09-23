@@ -29,7 +29,7 @@ The current ELF and map files are generated under `build/Debug-HostController/`:
 | ST67 HTTP fetch task object | 7200 | 2560-byte task stack plus task state in `User/Src/HostController/St67HttpFetchTask.cpp` |
 | Main-loop task object | 6056 | 1536-byte task stack plus task state in `User/Inc/HostController/MainLoopTask.hpp` |
 | USB CDC buffers | 4096 | `UserRxBufferFS` and `UserTxBufferFS`, 2048 bytes each |
-| Astro data refresh task object | 6400 | 2048-byte task stack plus task state in `User/Inc/HostController/AstroDataRefreshTask.hpp` |
+| Astro data refresh task object | 7424 | 3072-byte task stack plus task state in `User/Inc/HostController/AstroDataRefreshTask.hpp` |
 | FreeRTOS scheduler/static support | approximately 3424 | Idle/timer stacks, TCBs, and ready-task lists |
 | LwIP pools and tables | approximately 9420 | TCP pools, DNS table, IPv6 caches, netif state, and statistics |
 | ST67 static driver state | 1184 | Includes `W61_Obj` at 992 bytes |
@@ -66,7 +66,7 @@ Runtime diagnostics are emitted by `DebugService::emitStats()`:
 | --- | ---: |
 | `DebugService` | 1536 bytes |
 | `MainLoopTask` | 1536 bytes |
-| `AstroDataRefreshTask` | 2048 bytes |
+| `AstroDataRefreshTask` | 3072 bytes; 2048 overflowed once the clock sync ran on it, 760 left at the deepest path |
 | `ConsoleService` | 1024 bytes |
 | `BlinkingLed` | 768 bytes |
 | `St67HttpFetchTask` | 2560 bytes |

@@ -71,6 +71,44 @@ void testEveryDayAdvancesByOne()
     }
 }
 
+void testSecondsSince2000()
+{
+    expect(Calendar::secondsSince2000(2000U, 1U, 1U, 0U, 0U, 0U) == 0U, "the epoch is 0");
+    expect(Calendar::secondsSince2000(2000U, 1U, 2U, 0U, 0U, 1U) == 86401U, "a day and a second");
+    expect(Calendar::daysSince2000(2001U, 1U, 1U) == 366U, "2000 has 366 days");
+    // 2026-09-23 09:09:47 is 843 469 787 s after the epoch (Python's datetime).
+    expect(Calendar::secondsSince2000(2026U, 9U, 23U, 9U, 9U, 47U) == 843469787U,
+           "a known timestamp");
+    const Calendar::DateTime last = Calendar::fromSecondsSince2000(
+        Calendar::secondsSince2000(2099U, 12U, 31U, 23U, 59U, 59U));
+    expect(last.year == 2099U && last.month == 12U && last.day == 31U && last.hour == 23U &&
+               last.minute == 59U && last.second == 59U,
+           "the last second round-trips");
+}
+
+void testEveryDayRoundTrips()
+{
+    uint32_t expectedDays = 0U;
+    for (uint16_t year = Calendar::kMinYear; year <= Calendar::kMaxYear; ++year) {
+        for (uint8_t month = 1U; month <= 12U; ++month) {
+            for (uint8_t day = 1U; day <= Calendar::daysInMonth(year, month); ++day) {
+                const uint32_t seconds =
+                    Calendar::secondsSince2000(year, month, day, 12U, 34U, 56U);
+                const Calendar::DateTime back = Calendar::fromSecondsSince2000(seconds);
+                if (Calendar::daysSince2000(year, month, day) != expectedDays ||
+                    back.year != year || back.month != month || back.day != day ||
+                    back.hour != 12U || back.minute != 34U || back.second != 56U) {
+                    std::cerr << "round trip breaks at " << year << '-' << unsigned(month)
+                              << '-' << unsigned(day) << '\n';
+                    expect(false, "every day round-trips through seconds");
+                    return;
+                }
+                ++expectedDays;
+            }
+        }
+    }
+}
+
 } // namespace
 
 int main()
@@ -79,6 +117,8 @@ int main()
     testValidDates();
     testDayOfWeek();
     testEveryDayAdvancesByOne();
+    testSecondsSince2000();
+    testEveryDayRoundTrips();
 
     if (failures != 0) {
         std::cerr << failures << " CalendarDate test(s) failed\n";

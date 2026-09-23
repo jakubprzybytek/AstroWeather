@@ -81,6 +81,57 @@ void testUnknownKeysAreIgnored()
            "unknown key");
 }
 
+HostController::AstroParseStatus parse(const std::string& payload,
+                                       HostController::AstroData& data)
+{
+    return HostController::parseAstroData(
+        reinterpret_cast<const uint8_t*>(payload.data()),
+        static_cast<uint32_t>(payload.size()), data);
+}
+
+std::string withTime(const std::string& value)
+{
+    std::string payload = validPayload();
+    payload.insert(payload.find("\n\n") + 1U, "time=" + value + "\n");
+    return payload;
+}
+
+void testServerTime()
+{
+    HostController::AstroData data{};
+    expect(parse(validPayload(), data) == HostController::AstroParseStatus::Success,
+           "payload without time");
+    expect(!data.serverTime.present, "time absent");
+
+    expect(parse(withTime("2026-09-22T23:22:45"), data) ==
+               HostController::AstroParseStatus::Success,
+           "payload with time");
+    expect(data.serverTime.present && data.serverTime.valid, "time valid");
+    const Calendar::DateTime& t = data.serverTime.value;
+    expect(t.year == 2026U && t.month == 9U && t.day == 22U && t.hour == 23U &&
+               t.minute == 22U && t.second == 45U,
+           "time fields");
+
+    expect(!data.serverTime.hasMilliseconds, "whole seconds");
+
+    expect(parse(withTime("2026-09-22T23:22:45.078"), data) ==
+               HostController::AstroParseStatus::Success,
+           "payload with milliseconds");
+    expect(data.serverTime.valid && data.serverTime.hasMilliseconds, "milliseconds present");
+    expect(data.serverTime.millisecond == 78U && data.serverTime.value.second == 45U,
+           "milliseconds value");
+
+    const char* malformed[] = {"2026-09-22 23:22:45", "2026-09-22T23:22", "2026-02-30T10:00:00",
+                               "2026-09-22T24:00:00", "1999-12-31T23:59:59", "2026-9-22T23:22:45",
+                               "2026-09-22T23:22:45.1", "2026-09-22T23:22:45,123",
+                               "2026-09-22T23:22:45.12x", "2026-09-22T23:22:45.1234"};
+    for (const char* value : malformed) {
+        expect(parse(withTime(value), data) == HostController::AstroParseStatus::Success,
+               "a malformed time keeps the forecast");
+        expect(data.serverTime.present && !data.serverTime.valid, "malformed time flagged");
+    }
+}
+
 } // namespace
 
 int main()
@@ -88,6 +139,7 @@ int main()
     testValidPayload();
     testMalformedTemperatureRejected();
     testUnknownKeysAreIgnored();
+    testServerTime();
     std::cout << "AstroDataParser tests passed\n";
     return EXIT_SUCCESS;
 }

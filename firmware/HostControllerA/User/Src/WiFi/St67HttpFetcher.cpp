@@ -61,6 +61,7 @@ int32_t httpHeadersCallback(HTTP_state_t* connection, void* argument,
   (void)connection;
   (void)contentLength;
   St67Runtime& runtime = *static_cast<St67Runtime*>(argument);
+  runtime.httpResponseTick = osKernelGetTickCount();
   const char* contentType = findBounded(headers, headerLength, "Content-Type:");
   if (contentType == nullptr) {
     return -1;
@@ -170,6 +171,7 @@ bool St67HttpFetcher::fetch(St67FetchRequest* request) {
   runtime_.clientPayloadLength = 0U;
   runtime_.responseTooLarge = false;
   runtime_.httpCrc = 0xFFFFFFFFU;
+  runtime_.httpResponseTick = 0U;
   runtime_.clientRequest = request;
   HTTP_connection_t settings{};
   settings.server_name = const_cast<char*>(APP_ST67_HTTP_HOST);

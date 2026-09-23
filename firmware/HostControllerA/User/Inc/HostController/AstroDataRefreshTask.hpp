@@ -52,7 +52,9 @@ struct RefreshSummary
     bool running = false;
 };
 
-class AstroDataRefreshTask : public Task<2048>
+// 3 KB: the parsed forecast (~700 B), the clock sync and their formatted log
+// lines all sit on this stack. 2 KB overflowed once the sync was added.
+class AstroDataRefreshTask : public Task<3072>
 {
 public:
     static AstroDataRefreshTask& instance();

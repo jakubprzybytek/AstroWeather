@@ -3,6 +3,7 @@
 #include <Display/Display.hpp>
 #include <Display/DisplayTypes.hpp>
 #include <HostController/AstroDataParser.hpp>
+#include <HostController/ClockTask.hpp>
 #include <St67HttpFetchTask.hpp>
 
 #include <Debug/LogService.hpp>
@@ -137,6 +138,26 @@ void logNumeric(uint8_t index, const AstroNumericValue& value)
     }
 }
 
+// The clock follows the server's `time` on every successful fetch; see
+// docs/RTC.md. A missing or bad value leaves the clock alone but not the forecast.
+void syncClock(const AstroServerTime& serverTime, uint32_t responseTick)
+{
+    if (!serverTime.present)
+    {
+        LogService::instance().log(LogService::Level::Warn,
+                                   "Clock sync skipped: the response has no time record");
+        return;
+    }
+    if (!serverTime.valid)
+    {
+        LogService::instance().log(LogService::Level::Warn,
+                                   "Clock sync skipped: the response's time record is malformed");
+        return;
+    }
+    ClockTask::instance().syncToServer(serverTime.value, serverTime.millisecond,
+                                       serverTime.hasMilliseconds, responseTick);
+}
+
 void logParsedData(const AstroData& data)
 {
     for (uint8_t displayIndex = 0U; displayIndex < data.boards.size(); ++displayIndex)
@@ -184,7 +205,7 @@ AstroDataRefreshTask& AstroDataRefreshTask::instance()
 }
 
 AstroDataRefreshTask::AstroDataRefreshTask()
-    : Task<2048>("AstroDataRefresh", osPriorityNormal)
+    : Task<3072>("AstroDataRefresh", osPriorityNormal)
 {
 }
 
@@ -427,6 +448,7 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
         else
         {
             logParsedData(data);
+            syncClock(data.serverTime, request_.result.responseTick);
             if (!publishDisplay(data))
             {
                 outcome = RefreshOutcome::PublishFailed;

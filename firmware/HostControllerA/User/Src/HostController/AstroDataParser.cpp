@@ -1,6 +1,7 @@
 #include <HostController/AstroDataParser.hpp>
 
 #include <Display/DisplayTypes.hpp>
+#include <HostController/CalendarDate.hpp>
 
 #include <cmath>
 #include <cstring>
@@ -91,6 +92,63 @@ bool parseTime(const char* text, uint8_t& hour, uint8_t& minute)
     }
     hour = static_cast<uint8_t>((text[0] - '0') * 10 + text[1] - '0');
     minute = static_cast<uint8_t>((text[3] - '0') * 10 + text[4] - '0');
+    return true;
+}
+
+bool twoDigits(const char* text, uint8_t& result)
+{
+    if (text[0] < '0' || text[0] > '9' || text[1] < '0' || text[1] > '9')
+    {
+        return false;
+    }
+    result = static_cast<uint8_t>((text[0] - '0') * 10 + text[1] - '0');
+    return true;
+}
+
+// YYYY-MM-DDTHH:MM:SS or YYYY-MM-DDTHH:MM:SS.mmm, within the RTC's range.
+bool parseServerTime(const char* text, AstroServerTime& result)
+{
+    const size_t length = std::strlen(text);
+    if ((length != 19U && length != 23U) || text[4] != '-' || text[7] != '-' ||
+        text[10] != 'T' || text[13] != ':' || text[16] != ':')
+    {
+        return false;
+    }
+    uint16_t millisecond = 0U;
+    if (length == 23U)
+    {
+        if (text[19] != '.')
+        {
+            return false;
+        }
+        for (uint32_t index = 20U; index < 23U; ++index)
+        {
+            if (text[index] < '0' || text[index] > '9')
+            {
+                return false;
+            }
+            millisecond = static_cast<uint16_t>(millisecond * 10U + (text[index] - '0'));
+        }
+    }
+    uint8_t century = 0U;
+    uint8_t year = 0U;
+    Calendar::DateTime value{};
+    if (!twoDigits(text, century) || !twoDigits(text + 2, year) ||
+        !twoDigits(text + 5, value.month) || !twoDigits(text + 8, value.day) ||
+        !twoDigits(text + 11, value.hour) || !twoDigits(text + 14, value.minute) ||
+        !twoDigits(text + 17, value.second))
+    {
+        return false;
+    }
+    value.year = static_cast<uint16_t>(century * 100U + year);
+    if (!Calendar::isValidDate(value.year, value.month, value.day) ||
+        value.hour > 23U || value.minute > 59U || value.second > 59U)
+    {
+        return false;
+    }
+    result.value = value;
+    result.millisecond = millisecond;
+    result.hasMilliseconds = length == 23U;
     return true;
 }
 
@@ -242,6 +300,14 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
 
         if (!inBlocks)
         {
+            if (std::strcmp(key, "time") == 0 && !parsed.serverTime.present)
+            {
+                // Only the clock uses it, so a bad value does not cost the
+                // forecast; the caller logs it.
+                parsed.serverTime.present = true;
+                parsed.serverTime.valid = parseServerTime(value, parsed.serverTime);
+                continue;
+            }
             if (std::strcmp(key, "display") != 0)
             {
                 continue;

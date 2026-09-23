@@ -20,7 +20,7 @@ Wire example
 ```
 protocol=1
 configurationId=krakow
-time=2026-09-22T23:22:45
+time=2026-09-22T23:22:45.678
 
 display=0
 board=num4x4_matrix5x21
@@ -141,14 +141,17 @@ configurationId
 time
   Local date and time at which the server rendered the response, in the
   configuration's timezone, formatted as ISO 8601 local date-time
-  `YYYY-MM-DDTHH:MM:SS` (24-hour clock, seconds truncated). The device uses
-  it to set its real-time clock. It carries no UTC offset: it is the
+  `YYYY-MM-DDTHH:MM:SS.mmm` (24-hour clock, always three digits of
+  milliseconds). The device uses it to set its real-time clock; the
+  milliseconds let it compare its clock to about a tenth of a second rather
+  than to the second. It carries no UTC offset: it is the
   wall-clock time the device should display,
   already adjusted for DST. The clock is read after the forecast is assembled,
   so the value lags the moment the response is sent only by serialization time
   plus network latency. `time` appears only in successful responses, not in
   error payloads. It was added within protocol version 1; a parser that
-  predates it ignores it as an unknown header key.
+  predates it ignores it as an unknown header key. The milliseconds were
+  added later still: the firmware accepts `time` with or without them.
 
 display
   Zero-based display index. Display 0 is the current observing night in the

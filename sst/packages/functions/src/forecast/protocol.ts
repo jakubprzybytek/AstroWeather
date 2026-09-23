@@ -15,7 +15,7 @@ function validate(display: ForecastDisplay): void {
 
 export function serializeForecast(configurationId: string, time: string, displays: ForecastDisplay[]): string {
   if (!/^[\x21-\x7e]+$/.test(configurationId) || displays.length !== 6) throw new Error("Invalid forecast response");
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(time)) throw new Error("Invalid forecast time");
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(time)) throw new Error("Invalid forecast time");
   displays.forEach((display, index) => {
     if (display.display !== index) throw new Error("Invalid display order");
     validate(display);

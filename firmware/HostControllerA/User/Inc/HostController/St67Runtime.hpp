@@ -46,6 +46,7 @@ struct St67Runtime {
   uint32_t clientPayloadLength = 0U;
   bool responseTooLarge = false;
   uint32_t httpCrc = 0U;
+  uint32_t httpResponseTick = 0U;
   St67State state = St67State::Off;
   const char* firstFailureStage = nullptr;
   W6X_Status_t firstFailureStatus = W6X_STATUS_OK;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <HostController/CalendarDate.hpp>
+
 #include <array>
 #include <cstdint>
 
@@ -22,8 +24,20 @@ struct AstroBoardData
     std::array<uint32_t, 4> matrix{};
 };
 
+// The `time` header record: the server's local time when it rendered the
+// response. Servers before 2026-09-23 sent whole seconds, truncated.
+struct AstroServerTime
+{
+    bool present = false;  // absent from payloads of servers that predate it
+    bool valid = false;    // present and a well-formed, in-range date and time
+    bool hasMilliseconds = false;
+    Calendar::DateTime value{};
+    uint16_t millisecond = 0U;
+};
+
 struct AstroData
 {
+    AstroServerTime serverTime{};
     std::array<AstroBoardData, 6> boards{};
 };
 

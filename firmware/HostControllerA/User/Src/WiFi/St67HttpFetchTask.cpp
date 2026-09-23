@@ -99,6 +99,7 @@ void publishClientResult(St67Runtime& runtime) {
     result.length = runtime.clientPayloadLength;
     result.crc32 = runtime.httpCrc ^ 0xFFFFFFFFU;
     result.detail = 0;
+    result.responseTick = runtime.httpResponseTick;
   } else if (runtime.responseTooLarge) {
     result.status = St67FetchStatus::ResponseTooLarge;
   } else if (std::strcmp(runtime.firstFailureStage, "netif-stop") == 0 ||

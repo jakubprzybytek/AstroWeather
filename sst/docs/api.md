@@ -49,7 +49,7 @@ successful request returns `text/plain; charset=utf-8` using the versioned ASCII
 
 The response contains the `protocol=1`, `configurationId`, and `time` header
 records, followed by six fixed-order display blocks. `time` is the
-configuration's local wall-clock time as `YYYY-MM-DDTHH:MM:SS`. Each block contains, in order,
+configuration's local wall-clock time as `YYYY-MM-DDTHH:MM:SS.mmm`. Each block contains, in order,
 `display`, `board`, `nightId`, `numeric_0`, `numeric_1`, `matrix_0` through
 `matrix_3`, `numeric_2`, and `numeric_3`. `numeric_0` and `numeric_1`
 are sunset and sunrise; `matrix_0` through `matrix_3` are sun, moon, cloud,
@@ -81,8 +81,8 @@ before and after local noon is deterministic.
 The `time` header record is the configuration's local wall-clock time, read
 from the server clock after the forecast has been assembled so it is as close
 as possible to the moment the response is sent. It uses the same IANA timezone
-and DST rules as the forecast window, has no UTC offset, and truncates to whole
-seconds. The embedded device uses it to set its real-time clock.
+and DST rules as the forecast window, has no UTC offset, and carries
+milliseconds. The embedded device uses it to set its real-time clock.
 
 ### Astronomy
 
@@ -179,7 +179,7 @@ client. Operational details belong in structured Lambda logs.
 10. An integration test verifies the deployed route for one known and one
    unknown configuration.
 11. A successful response carries `time` as the configuration's local
-   `YYYY-MM-DDTHH:MM:SS` at render time, including after a DST change.
+   `YYYY-MM-DDTHH:MM:SS.mmm` at render time, including after a DST change.
 
 ## Non-goals
 

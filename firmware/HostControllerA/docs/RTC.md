@@ -9,11 +9,12 @@ internal LSI oscillator, which is only accurate to a few percent, so each board
 is **trimmed**: its LSI error is measured once and stored in the EEPROM, and the
 RTC prescalers are set to cancel it.
 
-For now the time is set by hand with `time set`. It is kept over a reset or
-flashing. After a power loss display 3 shows `--:--` until it is set again.
-See [Reset and power loss](#reset-and-power-loss). The plan is for the time to
-come from the astro API: every fetch corrects the clock, and could refine the
-trim as well. See [Planned: time from the API](#planned-time-from-the-api).
+Every successful astro fetch compares the RTC with the time the server sends
+and steps it when it is a second or more out; it also logs the drift measured
+across fetches and what that says about the trim. See
+[Sync from the API](#sync-from-the-api). `time set` sets it by hand. The time
+is kept over a reset or flashing. After a power loss display 3 shows `--:--`
+until the next fetch or `time set`. See [Reset and power loss](#reset-and-power-loss).
 
 Only the HostController firmware has the clock. The DisplayController variant
 builds the same `MX_RTC_Init()` but does not use the RTC.
@@ -35,12 +36,12 @@ spread between parts, and it moves with temperature and supply voltage. It also
 has no trim register: `RCC_CSR` only turns it on and reports it ready. The
 correction therefore happens in the RTC, not the oscillator.
 
-The first board's LSI runs **about 1.85% fast, between 32 589 and 32 600 Hz**
+The first board's LSI runs **about 1.85% fast, between 32 589 and 32 615 Hz**
 against a nominal 32 000 Hz, well inside the datasheet spread. Untrimmed, the
-clock gained 66 s an hour, or 26 minutes a day. The 11 Hz is not scatter in the
+clock gained 66 s an hour, or 26 minutes a day. The 26 Hz is not scatter in the
 measurement: the frequency really moves, over hours. Each 1 Hz is about 30 ppm,
 or 2.6 s a day, so the trim needs the frequency to roughly 0.1 Hz to be worth
-much, and no fixed trim can beat the spread, about ±13 s a day here. See the
+much, and no fixed trim can beat the spread, about ±34 s a day here. See the
 [measurement history](#measurement-history).
 
 ## CubeMX Configuration
@@ -67,7 +68,10 @@ defines the marker. That is the only change to generated code; see
 | --- | --- |
 | `User/Inc/HostController/ClockTask.hpp`, `User/Src/HostController/ClockTask.cpp` | Draws the time, sets the time and trim, and owns RTC access. |
 | `User/Inc/HostController/RtcTrim.hpp` | Pure maths: trim in ppm → prescalers and calibration. Tested by `tests/RtcTrimTests.cpp`. |
-| `User/Inc/HostController/CalendarDate.hpp` | Pure maths: leap years, month lengths and the weekday the RTC needs. Tested by `tests/CalendarDateTests.cpp`. |
+| `User/Inc/HostController/CalendarDate.hpp` | Pure maths: leap years, month lengths, the weekday the RTC needs, and dates to seconds and back. Tested by `tests/CalendarDateTests.cpp`. |
+| `User/Inc/HostController/ClockSync.hpp` | Pure maths for the API sync: the constants, and the drift tracker. Tested by `tests/ClockSyncTests.cpp`. |
+| `User/Src/HostController/AstroDataParser.cpp` | Parses the payload's `time` record. |
+| `User/Src/HostController/AstroDataRefreshTask.cpp` | Calls `ClockTask::syncToServer()` after each successful parse. |
 | `User/Src/Console/TimeCommand.cpp` | The `time` console commands. |
 | `User/Src/HostController/AppVariant.cpp` | Applies the stored display setting and trim, then starts the task. |
 | `tools/rtc_offset.py` | Measures the RTC against the PC clock over SWD. |
@@ -96,7 +100,7 @@ cases are told apart by a marker, `"TIME"` (`0x54494D45`), which
 | Event | Backup domain | Result |
 | --- | --- | --- |
 | Reset or flashing | kept, marker present | The time carries on. `MX_RTC_Init()` returns before setting 00:00. |
-| Power-up | cleared, no marker | 00:00 is set; display 3 shows `--:--` and `time show` reports `set=no` until `time set`. |
+| Power-up | cleared, no marker | 00:00 is set; display 3 shows `--:--` and `time show` reports `set=no` until the next astro fetch or `time set`. |
 
 Two other boot steps would otherwise disturb a running clock, because
 rewriting the prescalers drops the part of the current second already counted:
@@ -173,14 +177,18 @@ matter for a mains-powered controller.
 What limits accuracy is how stable the LSI stays, not the arithmetic or the
 trim. On the first board the drift on one trim climbed from +1 ppm just after a
 power-up to +308 ppm six hours later, near the +341 ppm measured on a board
-that had been running for hours, a spread of about 30 s a day. The cause is not
+that had been running for hours. A following overnight run averaged +798 ppm,
+so the spread seen so far is about 800 ppm, or 69 s a day. The cause is not
 known. It builds up over hours, which is too slow for the chip warming up, so
-ambient temperature, the supply, or a correction to the PC's clock are the
-likelier candidates. The MCU's own temperature sensor would settle it; the ADC
+ambient temperature or the supply are the likelier candidates; the fastest run
+being the overnight one points at a cooler room. The PC's clock is ruled out:
+checked against time.windows.com after the overnight run, it was 0.5 s off,
+about 15 ppm over that run. The MCU's own temperature sensor would settle it; the ADC
 already reads it, but the two have not been logged together.
 
 A trim is therefore worth taking from a settled period rather than from a run
-that is still climbing, and the residual spread stays. Resyncing from the API
+that is still climbing, or aimed at the middle of the range seen over a whole
+day and night, and the residual spread stays. Resyncing from the API
 bounds the error regardless, which matters more than refining the trim.
 
 ## Measuring the Drift
@@ -209,7 +217,11 @@ fastest of four reads, so one reading is good to a few tens of ms.
 The error in the result is about 0.1 s divided by the elapsed time. That is
 28 ppm after one hour and 3 ppm after ten. A reset or flashing keeps the
 baseline valid; a power cycle, a `time set`, or a `time trim` that changes the
-prescalers does not, and needs a new baseline.
+prescalers does not, and needs a new baseline. Nor does an astro fetch that
+steps the RTC: the log gives the step (`Clock sync: RTC stepped by -28.574 s`),
+which can be taken off the baseline offset, but it is good only to about
+±150 ms, so a fresh baseline is better. With the RTC stepped once it is 250 ms
+out, the SWD method now suits measuring between fetches, or with none running.
 
 **Read order matters.** With shadow registers in use, reading `RTC_SSR` or
 `RTC_TR` freezes `RTC_TR` and `RTC_DR` until `RTC_DR` is read. A block read
@@ -235,60 +247,140 @@ and the frequency is what that makes the LSI:
 | 2026-09-22 19:54 → 22:33, 2.7 h | +18 400 | +308 ± 10 ppm, 32 598.8 Hz: near the fastest seen |
 | 2026-09-22 16:35 → 22:33, 6.0 h in total | +18 400 | +230 ± 5 ppm, 32 596.3 Hz on average, 19.9 s/day |
 | 2026-09-22 22:35 → 22:41 | +18 400 | ended by a power cycle, recovering the USB console port |
-| from 2026-09-22 22:51:31, offset +0.043 s | +18 400 | running |
+| 2026-09-22 22:51:31 → ?, offset +0.043 s | +18 400 | ended by an unplugged board, not read before; the clock was later set by hand, 2.1 s ahead |
+| 2026-09-22 23:49:52 → 2026-09-23 09:09, 9.3 h overnight, board up since 23:11 | +18 400 | **+798 ± 3 ppm**, 32 614.8 Hz, 69 s/day: the fastest by far |
+| 2026-09-22 23:49:52 → 2026-09-23 09:32, 9.7 h | +18 400 | +806 ± 3 ppm, 32 614.9 Hz; ended by the first API sync, which stepped the RTC back 28.6 s |
+| from 2026-09-23 09:40:14, offset +0.010 s | +18 400 | running; after the step, the RTC was within 10 ms of the PC |
 
 ## Limits
 
-- **The time is lost when power is lost**, and must be set again. See
-  [Reset and power loss](#reset-and-power-loss).
-- **No time zone.** The RTC holds whatever local time was set; nothing
-  converts or applies daylight saving.
+- **The time is lost when power is lost**, until the next astro fetch or
+  `time set`. See [Reset and power loss](#reset-and-power-loss).
+- **No time zone.** The RTC holds local time. The server sends the
+  configuration's local time with daylight saving applied, so a DST change
+  reaches the clock at the next fetch after it.
+- **Synced only as often as something fetches.** Scheduled refreshes do not
+  exist yet (`RefreshTrigger::Scheduled` is never raised), so the clock is
+  corrected by switch 1, `astro refresh` and `wifi test`.
+- **The drift measurement is in RAM.** A reset or flashing restarts it, though
+  the time itself survives.
 - **The date is tracked but never shown.** It is kept so that an API sync and a
   future date display have it. The RTC rolls it over, including leap years. Its
   two-digit year limits it to 2000..2099.
 - **LSI stability.** The trim is right only for the conditions it was measured
-  in. The LSI has been seen to move by about 350 ppm between runs; see
+  in. The LSI has been seen to move by about 800 ppm between runs; see
   [Trimming](#trimming).
 
-## Planned: Time from the API
+## Sync from the API
 
-The astro API response will carry the current time, and each fetch will set the
-RTC from it. This bounds the error to the drift since the last fetch, whatever
-the temperature.
+The astro API's payload carries a `time` header record, the configuration's
+local time when the server rendered the response, as
+`YYYY-MM-DDTHH:MM:SS.mmm` with daylight saving applied; see
+`sst/docs/api-payload.md`. Servers before 2026-09-23 sent whole seconds,
+truncated, without `.mmm`; the firmware accepts both, and takes the precision
+of each comparison from the form it gets (`ClockSync::Precision`). Each successful fetch uses it to check the RTC. This
+bounds the error to the drift since the last fetch, whatever the temperature.
+A response without `time`, or with a malformed one, still updates the forecast;
+the sync is skipped with a warning.
 
-- **Time format.** The server should send both UTC and the local offset, or
-  the local time with seconds. Daylight saving is then the server's problem,
-  not the firmware's. The HTTP `Date` header gives UTC only, to the second.
-- **Latency.** The value is stamped when the server sends it. Take the moment
-  the response arrives, add a fixed allowance, and set the RTC with seconds,
-  which `ClockTask::setDateTime()` accepts. Sub-second accuracy would need
-  more: the RTC has no way to set a fraction of a second, though
-  `HAL_RTCEx_SetSynchroShift()` can shift the clock by fractions of a second
-  afterwards. The ST SNTP client in `LWIP/App/sntp.c` also writes the RTC
-  when it runs. It is not started, and must stay off, or the two would fight.
-- **Frequency.** Scheduled refreshes do not exist yet
-  (`RefreshTrigger::Scheduled` is never raised). The clock is only corrected as
-  often as something fetches.
+### Comparing
+
+1. The WiFi task notes `osKernelGetTickCount()` when the response headers
+   arrive (`St67FetchResult::responseTick`).
+2. The server's time at that moment is taken as `time` + 100 ms, the one-way
+   delay after the server stamps it: measured from a PC, the whole HTTP round
+   trip took 150–240 ms, and the stamp is taken late in handling the request.
+   A whole-seconds `time` also gets 500 ms, the average lost to the truncation.
+3. After the parse, about 1.3 s later once the ST67 has disconnected, the RTC is
+   read, and the ticks since the headers are added to the server time.
+4. The offset is RTC minus server. With milliseconds it is good to about
+   ±150 ms, the spread of the network delay; with whole seconds to about
+   ±0.6 s, mostly from the truncation.
+
+### Deciding and stepping
+
+The RTC is stepped when the offset is 250 ms or more either way, or 1 s with a
+whole-seconds `time` (`Precision::adjustThresholdMs`). A smaller offset is
+within the error of the comparison, and stepping it would add noise rather than
+remove it. At the ~800 ppm the first board drifts, 250 ms builds up in about
+5 minutes, so nearly every fetch steps the clock back by a fraction of a
+second. After a
+power-up, when the RTC has not been set, it is always set.
+
+The RTC can only be set to a whole second, and starts that second when it is
+written. So `stepToServer()` waits for the server's next second to begin, up to
+a second, and writes it then; the log gives how many ms late the write was,
+normally 0. It goes through the same path as `time set`, so the time is marked
+set and survives a reset. The first sync on the first board stepped the RTC by
+−28.574 s; `tools/rtc_offset.py` then found it within 10 ms of the PC clock.
+
+The ST SNTP client in `LWIP/App/sntp.c` also writes the RTC when it runs. It is
+not started, and must stay off, or the two would fight.
+
+### Drift measurement
+
+Each sync also measures the drift since the previous one:
+`drift = offset − (what the previous sync left)`, where a step leaves 0 and a
+kept RTC leaves its offset. `ClockSync::DriftTracker` sums these from the first
+sync of the measurement, so the rate gets more precise as the span grows, and
+the errors of the syncs in between cancel. The error is the sum of the errors
+of the two ends over the span. With milliseconds that is 2 × 150 ms: ±83 ppm
+after an hour, ±50 ppm after 100 minutes. With whole seconds it is 2 × 0.6 s:
+±333 ppm after an hour, ±50 ppm after 6.7 h.
+
+The measurement restarts at a reset, `time set`, a `time trim` that changes
+the value, a sync that finds the RTC unset, and a jump too large to be drift:
+more than the two syncs' errors plus 5 000 ppm of the interval, such as a DST
+change.
+
+### Log
+
+Every sync logs the comparison and the decision, then the drift. From the first
+board, with the whole-seconds server, a sync that stepped the RTC after a flash:
+
+```
+Clock sync: server 2026-09-23 09:37:54 (response 1312 ms ago), RTC 2026-09-23 09:38:24.486, offset +28.574 s (RTC minus server, +-600 ms)
+Clock sync: RTC stepped by -28.574 s, as the offset reached the 1000 ms threshold; set to 2026-09-23 09:37:56 (+0 ms)
+Clock drift: measurement starts at this sync, trim +18400 ppm
+```
+
+and a later one that kept it:
+
+```
+Clock sync: server 2026-09-23 09:45:21 (response 1213 ms ago), RTC 2026-09-23 09:45:22.843, offset +0.030 s (RTC minus server, +-600 ms)
+Clock sync: RTC kept, the offset is under the 1000 ms threshold
+Clock drift since the previous sync: -0.127 s over 111 s, -1145 ppm +-10820
+Clock drift since 2026-09-23 09:43:31: -0.127 s over 111 s, -1145 ppm +-10820, -98.9 s/day; LSI 32551.5 +-346.2 Hz at trim +18400 ppm
+Clock trim: too early to judge (+-10820 ppm); +-50 ppm needs 6.7 h of syncs with no reset, time set or time trim
+```
+
+and one with milliseconds:
+
+```
+Clock sync: server 2026-09-23 10:26:57.134 (response 1313 ms ago), RTC 2026-09-23 10:26:58.601, offset +0.054 s (RTC minus server, +-150 ms)
+Clock sync: RTC kept, the offset is under the 250 ms threshold
+Clock drift since the previous sync: +0.154 s over 4 min, +648 ppm +-3156
+Clock drift since 2026-09-23 10:23:00: +0.154 s over 4 min, +648 ppm +-3156, +56.0 s/day; LSI 32609.9 +-101.0 Hz at trim +18400 ppm
+Clock trim: too early to judge (+-3156 ppm); +-50 ppm needs 100 min of syncs with no reset, time set or time trim
+```
+
+That measurement started on a whole-seconds sync, so its ±3156 ppm is
+(600 + 150) ms over 4 minutes.
+
+The last line is the verdict on the trim. Once the error is within ±50 ppm it
+says either that the trim is right to within the error, or which `time trim`
+would cancel the drift. It never applies it: the LSI moves by about 800 ppm
+with the conditions, so a trim taken from one span can be wrong for the next.
 
 ## Planned: Automatic Trim
 
-Each API sync also measures the drift since the previous sync. Just before
-setting the RTC, compare the RTC with the server time:
+The drift measurement above gives what an automatic trim needs, as
+`trim' = (1 + trim) × (1 + ppm) − 1`. It already restarts on `time set`,
+`time trim`, a reset and implausible jumps, and waits for ±50 ppm before
+suggesting anything. Still to decide, so that one bad sample cannot spoil the
+trim:
 
-```
-drift  = (rtc − server) − (offset left by the previous sync)   seconds
-ppm    = drift / seconds since the previous sync × 10⁶
-trim'  = (1 + trim) × (1 + ppm) − 1
-```
-
-Safeguards, so that one bad sample cannot spoil the trim:
-
-- Only when the previous sync was in this boot, and neither `time set` nor
-  `time trim` has run since. Keep the previous sync's time in RAM, and clear it
-  on either command.
-- Only after enough time: with about 0.5 s of network uncertainty, 6 h gives
-  about ±25 ppm.
-- Reject implausible results, such as more than 1 000 ppm from the current trim.
+- Reject results far from the current trim, for example more than 1 000 ppm.
   Those point at a bad timestamp, not at the LSI.
 - Move only part of the way, for example half, so noise averages out and a
   temperature swing does not cause overshoot.
