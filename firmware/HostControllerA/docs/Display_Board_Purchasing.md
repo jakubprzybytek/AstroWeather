@@ -68,7 +68,8 @@ The `MCP6006` + `BC847` stages (`U503`/`U507`/`U511`/`U515`, `Q506`-`Q509`) are 
 | CONNFLY DS1024-1*10R0 (TME `ZL263-10SG`, 1×10 right-angle socket, `J102`) | 5 | 1,469 | 0.945 (5+) | 4.73 |
 | CONNFLY DS1022-1*20RUF1-1 (TME `ZL211-20KG-S`, 1×20 right-angle header, `J104`) | 5 | 1,919 | 0.709 (5+) | 3.55 |
 | JST B6B-PH-K-S (LF)(SN) (`J103`, optional SWD) | 5 | 10,787 | 0.748 (1+) | 3.74 |
-| | | | **Subtotal** | **324.65 zł net (≈ 399.3 zł incl. VAT)** |
+| Microchip MCP6006T-E/OT (`U503`/`U507`/`U511`/`U515`) | 20 | 949 | 0.718 (1+) | 14.36 |
+| | | | **Subtotal** | **339.01 zł net (≈ 417.0 zł incl. VAT)** |
 
 - Order rules: SCT2024CSSG is sold in multiples of 5. SCT2167CSSG has a minimum of 3. ZL263-10SG and ZL211-20KG-S have a minimum of 5.
 - More price breaks (net):
@@ -81,17 +82,17 @@ The `MCP6006` + `BC847` stages (`U503`/`U507`/`U511`/`U515`, `Q506`-`Q509`) are 
   - ZL263-10SG: 20+ 0.755, 100+ 0.573
   - ZL211-20KG-S: 10+ 0.565, 100+ 0.425
   - B6B-PH-K-S (LF)(SN): 10+ 0.661, 25+ 0.608
+  - MCP6006T-E/OT: 25+ 0.654 (25 pieces cost 16.35, more than 20 at the 1+ price)
 - Lead times when stock runs out: SCT2024CSSG 9 weeks, SCT2167CSSG 14 weeks. TPS54202DDCR had more stock expected on 2026-11-10.
 - Standard delivery costs 13.90 zł net (17.10 zł incl. VAT). DPD, GLS and InPost cost 15.90 zł net.
 - Alternative for `Q501`-`Q505`: `SI2333CDS-T1-GE3`, 304 in stock, 10+ 2.495 net.
 - ZL263-10SG: 1×10, 2.54 mm, 90°, THT, gold-plated contacts, 3 A, height 8.4 mm, lead length 3.2 mm.
 - ZL211-20KG-S is a 1×20 header, cut in two for two boards, so 3 are enough for 5 boards. The 5-piece minimum leaves spares.
 - `C602`: the previously used `GRM21BR6YA106KE43L` (±10%) has 0 in stock at TME. The ±20% `...ME43L` is the same part otherwise; tolerance does not matter for VBUS bulk decoupling. Alternative: TDK `C2012X5R1V106K125AC` (35 V X5R ±10%, 114 in stock, 1+ 1.578, 10+ 1.100).
-- The connectors and `C602` were checked on 2026-09-23.
+- The connectors and `C602` were checked on 2026-09-23, the MCP6006 on 2026-09-24. MCP6006T-E/OT has 15,000 more in external stock (2026-11-02).
 
 ## Not yet priced (5 boards)
 
-- MCP6006T-E/OT ×20
 - 0805 capacitors: 100n ×5, 47p ×5
 - 0603 capacitors: 100n ×20
 - 1206 capacitors: 22u ×10
