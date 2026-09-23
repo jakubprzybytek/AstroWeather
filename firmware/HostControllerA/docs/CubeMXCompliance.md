@@ -9,7 +9,9 @@ The governing rule is:
 - Application code belongs in `User/Inc` and `User/Src`.
 - Generated files may contain custom code only inside existing `USER CODE BEGIN` / `USER CODE END` regions.
 - Generated and vendor files must not be modified elsewhere.
-- `External/Clean` and `External/Customized` are read-only references for this migration.
+- The migration compared the tree against two local snapshots, `External/Clean` (freshly generated) and `External/Customized` (the previous customized tree). They were never committed and are not in the repository.
+
+The current ST67 Wi-Fi design that resulted from this migration is described in [WiFi.md](WiFi.md).
 
 The first milestone is a compiling, operational baseline. Memory-leak investigation and cold-restart optimization are intentionally deferred.
 
@@ -35,13 +37,13 @@ ST also states that X-CUBE-ST67W61 USER CODE section coverage is intentionally l
 
 ## Current State
 
-The current tree is effectively the freshly generated `External/Clean` state. The previous customized state is represented by `External/Customized`.
+The migration started from a freshly generated tree, compared against a snapshot of the previous customized tree; neither snapshot is in the repository.
 
 The regeneration removed custom lifecycle and HTTP changes. The User code has since been migrated away from the removed HTTP and network lifecycle APIs. HTTP now uses a User-owned synchronous GET implementation; runtime behavior and the complete cancellation contract remain to be validated.
 
 SPI1 RX/TX DMA configuration was removed by the earlier regeneration and has now been restored through CubeMX. The regenerated configuration uses DMA1 Channel 1 for SPI1 RX and DMA1 Channel 2 for SPI1 TX. Both channels use high-priority, byte-aligned, normal-mode transfers with peripheral increment disabled and memory increment enabled. DMA initialization runs before SPI1 initialization, and both IRQ handlers dispatch to the correct HAL DMA handles at interrupt priority 3.
 
-This matches ST's documented requirement for full-duplex master SPI with high-priority TX and RX DMA, memory increment enabled, and peripheral increment disabled. `ST67_RDY` is configured for rising and falling edge interrupts as documented. The current SPI kernel clock is 16 MHz with a prescaler of 16, producing a 1 MHz SPI clock, safely below ST's 40 MHz maximum.
+This matches ST's documented requirement for full-duplex master SPI with high-priority TX and RX DMA, memory increment enabled, and peripheral increment disabled. `ST67_RDY` is configured for rising and falling edge interrupts as documented. The SPI kernel clock is 16 MHz (HSI). The migration used a prescaler of 16 (1 MHz); since 2026-08-30 it is 8, producing a 2 MHz SPI clock, safely below ST's 40 MHz maximum.
 
 The FreeRTOS heap is configured to 40,000 bytes, matching ST's minimum recommendation for a project generated from scratch.
 
@@ -78,14 +80,14 @@ Still pending:
 | Area | Required action | Safe destination |
 | --- | --- | --- |
 | Application bootstrap | Retain `AstroWeather_Init()` and `AppVariant_Init()` integration | Existing USER blocks in `Core/Src/main.c`; implementations in `User` |
-| USB debug | Retain the CDC bridge to `DebugService_OnUsbRxData()` | Existing USER blocks in `USB_Device/App/usbd_cdc_if.c`; implementation in `User` |
+| USB console | Retain the CDC bridge to `ConsoleService_OnUsbRxData()` | Existing USER blocks in `USB_Device/App/usbd_cdc_if.c`; implementation in `User` |
 | SPI DMA | Complete: RX/TX DMA, DMA IRQs, and priority 3 regenerated and compile-checked | CubeMX `.ioc` configuration followed by regeneration |
 | SPI task stack | **Complete**: use the larger ST67 stack requirement | `USER CODE BEGIN EC` block of `ST67W6X_Network_Driver/Target/w61_driver_config.h` |
 | CM0+ FreeRTOS compatibility | **Complete**: provide `xPortIsInsideInterrupt()` for FreeRTOS older than 10.6 | Existing USER configuration section in `Core/Inc/FreeRTOSConfig.h` |
-| SPI completion and RDY handling | **Complete for compile-time migration**: User-owned RDY rising-edge bridge calls `spi_on_txn_data_ready()`; hardware handshake validation remains | `User/Src/HostController/St67SpiReady.cpp` |
-| Station status | **Complete for compile-time migration**: dedicated User-owned adapter uses public W6X/lwIP interfaces; hardware validation remains | `User/Inc/HostController/St67NetworkAdapter.hpp`, `User/Src/HostController/St67NetworkAdapter.cpp` |
-| HTTP request ownership | **Runtime stress-tested**: User-owned bounded synchronous GET completed 100 persistent HTTP lifecycle cycles with `pass=100 fail=0`; heap returned to `30744` bytes after the run. Cancellation, total deadline, and error-path coverage remain pending | `User/Inc/HostController/HttpClient.hpp`, `User/Src/HostController/HttpClient.cpp` |
-| Network lifecycle | **Runtime validated**: the supported persistent ST67/lwIP infrastructure and repeated HTTP lifecycle completed 100 cycles with no failures or progressive heap loss; station disconnect still occurs after each request | `User/Src/HostController/St67NetworkSession.cpp`, `User/Src/HostController/St67HttpFetchTask.cpp`, `Appli/App/app_config.h` |
+| SPI completion and RDY handling | **Complete for compile-time migration**: User-owned RDY rising-edge bridge calls `spi_on_txn_data_ready()`; hardware handshake validation remains | `User/Src/WiFi/St67SpiReady.cpp` |
+| Station status | **Complete for compile-time migration**: dedicated User-owned adapter uses public W6X/lwIP interfaces; hardware validation remains | `User/Inc/HostController/St67NetworkAdapter.hpp`, `User/Src/WiFi/St67NetworkAdapter.cpp` |
+| HTTP request ownership | **Runtime stress-tested**: User-owned bounded synchronous GET completed 100 persistent HTTP lifecycle cycles with `pass=100 fail=0`; heap returned to `30744` bytes after the run. Cancellation, total deadline, and error-path coverage remain pending | `User/Inc/HostController/HttpClient.hpp`, `User/Src/WiFi/HttpClient.cpp` |
+| Network lifecycle | **Runtime validated**: the supported persistent ST67/lwIP infrastructure and repeated HTTP lifecycle completed 100 cycles with no failures or progressive heap loss; station disconnect still occurs after each request | `User/Src/WiFi/St67NetworkSession.cpp`, `User/Src/WiFi/St67HttpFetchTask.cpp`, `Appli/App/app_config.h` |
 | Cold restart | Defer until supported teardown is available | Revisit only after public APIs or a fully User-owned replacement are identified |
 
 ## Phase 1: Restore the Generated Hardware Baseline
@@ -161,7 +163,7 @@ Expected bridges include:
 - GPIO RDY rising edge to the User-owned ST67 notification path.
 - Optional recoverable SPI error notification.
 
-The generated `spi_port.c` already provides USER blocks around SPI completion and error callbacks. Do not add duplicate HAL callback definitions outside those hooks. The button-related falling-edge callback is owned by `User/Src/Utils/SwitchInput.cpp`; the ST67 rising-edge bridge is in `User/Src/HostController/St67SpiReady.cpp`.
+The generated `spi_port.c` already provides USER blocks around SPI completion and error callbacks. Do not add duplicate HAL callback definitions outside those hooks. The button-related falling-edge callback is owned by `User/Src/Utils/SwitchInput.cpp`; the ST67 rising-edge bridge is in `User/Src/WiFi/St67SpiReady.cpp`.
 
 ## Explicitly Deferred
 
@@ -207,11 +209,13 @@ Build gates:
 2. `Debug-DisplayController`
 3. `Release-HostController`
 
-The configured build toolchain is GNU Arm Embedded with the Ninja generator. The current STM32Cube bundle provides CMake, Ninja, and the compiler on `PATH`:
+The configured build toolchain is GNU Arm Embedded with the Ninja generator. The STM32Cube bundle provides CMake, Ninja, and the compiler; the versioned directories differ between installations. For example:
 
-- CMake: `C:\Users\jakub.przybytek\AppData\Local\stm32cube\bundles\cmake\4.3.1+st.1\bin\cmake.exe`
-- Ninja: `C:\Users\jakub.przybytek\AppData\Local\stm32cube\bundles\ninja\1.13.2+st.1\bin\ninja.exe`
-- GNU Arm: `C:\Users\jakub.przybytek\AppData\Local\stm32cube\bundles\gnu-tools-for-stm32\14.3.1+st.2\bin\arm-none-eabi-gcc.exe`
+- CMake: `C:\Users\<user>\AppData\Local\stm32cube\bundles\cmake\4.3.1+st.1\bin\cmake.exe`
+- Ninja: `C:\Users\<user>\AppData\Local\stm32cube\bundles\ninja\1.13.2+st.1\bin\ninja.exe`
+- GNU Arm: `C:\Users\<user>\AppData\Local\stm32cube\bundles\gnu-tools-for-stm32\14.3.1+st.2\bin\arm-none-eabi-gcc.exe`
+
+See [Development.md](Development.md#prerequisites) for putting them on `PATH` or using the bundled Cube CMake.
 
 Build a preset with:
 
@@ -226,13 +230,13 @@ Runtime gates:
 - Repeated persistent connect/fetch/disconnect cycles do not create tasks or sockets indefinitely.
 - HTTP success, timeout, malformed header, oversized response, and unreachable-host cases complete exactly once.
 - HTTP buffers and sockets are released on success, cancellation, timeout, and error.
-- The optional probe task never runs concurrently with the official driver.
+- The legacy probe task (`St67ProbeTask`) never runs concurrently with the official driver. It is currently never started.
 
 Do not make cold-restart heap stability a release gate until a compliant teardown implementation exists.
 
 ## Risks and Decisions
 
-- The current default full-shutdown lifecycle is incompatible with the smallest safe migration path.
+- The full-shutdown lifecycle, the default before the migration, is incompatible with the smallest safe migration path. Resolved: the default is now `APP_ST67_LIFECYCLE_HTTP_PERSISTENT_STRESS`, and client fetches always use the persistent lifecycle whatever the mode; see [WiFi.md](WiFi.md#lifecycle).
 - The generated HTTP client does not provide the customized ownership and cancellation contract required by the current User code.
 - The existing build artifacts may contain a stale compile database; a fresh CMake build is required for trustworthy diagnostics.
 - The STM32Cube toolchain is now available on `PATH`; fresh builds should be used to replace stale build-artifact diagnostics.

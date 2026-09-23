@@ -10,7 +10,7 @@ The system contains one Host Controller board and up to five Display Controller 
 - SCT2xxx LED drivers connected as one SPI daisy chain.
 - Five active-low multiplexing outputs, `DISPLAY_1_EN` through `DISPLAY_5_EN`.
 
-The Host Controller fetches application data, displays its local portion, and sends the remaining board values to Display Controllers over I2C. A Display Controller receives logical display values over I2C and renders them on its local PCB.
+The Host Controller fetches application data, displays its local portion, and sends the remaining board values to Display Controllers over I2C. A Display Controller is meant to receive logical display values over I2C and render them on its local PCB; that side is not implemented yet. See [Display Controller](#display-controller).
 
 ## Software Architecture
 
@@ -33,7 +33,7 @@ The PCB-backed implementation:
 - Maintains the prepared SPI refresh data.
 - Runs the local multiplexing mechanism.
 
-`AppVariant.cpp` creates this object and starts its refresh mechanism in both firmware variants. The PCB-backed Display Board invokes `HAL_TIM_Base_Start_IT(&htim2)` when its initialization or start method is called.
+The HostController `AppVariant.cpp` creates this object and starts it. `start()` starts the `DisplayRefresh` task (`Task<1024>`, `osPriorityRealtime`) and then calls `HAL_TIM_Base_Start_IT(&htim2)`. The DisplayController variant does not create one yet.
 
 ### Buffer-backed Display Board
 
@@ -52,20 +52,24 @@ Each board exposes four numeric displays indexed from `0` through `3` and five d
 
 Each of the four numeric displays has its own three special indicators: L1 and L2 form the double dots used for time, and L3 is the apostrophe before the last digit. `DISPLAY_1_EN` through `DISPLAY_4_EN` select the four numeric digit positions on every numeric display. `DISPLAY_5_EN` selects the special-indicator position on every numeric display; only the three special-indicator segments are used in this position.
 
-The intended interface is:
+The interface is:
 
 ```cpp
 numeric[i].setFixed(int16_t mantissa, uint8_t precision = 0);
 numeric[i].setValue(int16_t value);
 numeric[i].setValue(float value, uint8_t precision = 0);
 numeric[i].setTime(uint8_t hour, uint8_t minute);
+numeric[i].setTimeUnset();
 numeric[i].setBlank();
 numeric[i].setSegments(NumericSegments{...});
 
 matrix[row].setRow(uint32_t columns);
 
-display.submit();
+display.submit();       // local board, then every remote board over I2C
+display.submitLocal();  // local board only, no I2C traffic
 ```
+
+`submitLocal()` takes the same lock as `submit()`. It is for frequent changes that touch only the local board, such as the current-sense readout, the clock and the refresh progress bar.
 
 Only the lowest 21 bits passed to `setRow()` are used. Bit 0 drives matrix column 1 and bit 20 drives matrix column 21.
 
@@ -78,6 +82,24 @@ positions. Application code represents unavailable numeric API data with the
 decimal-point segment in each of the first four slots and zero in the fifth,
 producing four dots. This is distinct from the normal validation error pattern,
 which uses segment D in the first four slots to produce four underscores.
+
+### Allocation on the Host Controller
+
+The astro refresh writes all four numeric displays and matrix rows 0-3 of every
+board; see [AstroRefresh.md](AstroRefresh.md#display-mapping). On the local
+board, other clients share some of them:
+
+| Local element | Other client | Default |
+| --- | --- | --- |
+| Numeric 2 | Current sense, in mA, ten times a second; see [CurrentSense.md](CurrentSense.md) | on (`adc display`) |
+| Numeric 3 | Clock, `HH:MM`, redrawn each minute; see [RTC.md](RTC.md) | on (`time display`) |
+| Matrix row 4 | Astro refresh progress bar | always |
+
+With the defaults, the forecast's maximum and minimum temperatures for night 0
+are therefore overwritten on the local board: numeric 2 within 100 ms, numeric
+3 at the next minute. The `display` console commands, for testing, write local
+numeric displays and matrix rows and then call `submit()`. There is no field
+ownership; the last writer wins.
 
 ## Numeric Representation
 
@@ -127,6 +149,8 @@ Examples:
 
 The four display positions allow four positive digits or a minus sign and three digits. Values that do not fit after applying the sign and decimal precision are invalid.
 
+**Known defect with magnitudes below 1.** Leading zeroes are blanked up to the last digit, including the zero before the decimal point, so `setFixed(5, 1)` shows `.5` and `setFixed(1, 3)` shows `.  1`. For a negative value the minus sign then goes into the slot that carries the decimal point and replaces it: `setFixed(-5, 1)`, a temperature of -0.5, shows `-5`. The astro refresh draws temperatures this way, so -0.1 to -0.9 °C read as -1 to -9. `tests/NumericDisplayTests.cpp` currently pins the `0.001` case (`.  1`) and a `-0.01` case, so fixing it means changing those expectations too.
+
 ### Float Input
 
 The float overload is an input convenience only. It converts the input to fixed point by rounding `value * 10^precision` to the nearest integer, validates the result, and stores only normalized segment bytes. Float values are never stored in the refresh state or transmitted over I2C.
@@ -143,7 +167,9 @@ slots[4].A = L1 = enabled
 slots[4].B = L2 = enabled
 ```
 
-Time mode always renders four digits as `HHMM`, including leading zeroes. For example, `setTime(3, 7)` stores mantissa `307` and displays `03:07`.
+The hour's leading zero is blank; the minutes always have two digits. For example, `setTime(3, 7)` displays ` 3:07` and `setTime(23, 7)` displays `23:07`. An hour or minute above 99 gives the error pattern. Neither is checked against 23 or 59.
+
+`setTimeUnset()` shows `--:--`: segment G on all four digits, with L1 and L2 lit. The clock uses it until the time has been set.
 
 `setBlank()` clears all five slot bytes.
 
@@ -161,7 +187,7 @@ A board's transport-level logical buffer contains 35 bytes:
 | 25 | 5 | Numeric display 3: five normalized segment slots |
 | 30 | 5 | Numeric display 4: five normalized segment slots |
 
-This buffer contains normalized logical segments, not SPI-ready PCB data. Matrix bits 21 through 23 are unused and must be zero.
+This buffer contains normalized logical segments, not SPI-ready PCB data. Matrix bits 21 through 23 are unused and must be zero. Numeric displays 1 to 4 here, and in the wiring tables below, are indices 0 to 3 of the software interface.
 
 ## PCB Encoding
 
@@ -235,21 +261,18 @@ The display is therefore dark only for the swap, steps 2-6, about 12 us per slot
 
 SPI3 runs at 1 MHz (prescaler 16), so a slot's 56 bits take about 56 us. The SCT2024 accepts up to 25 MHz; above about 4 MHz the SCK/MOSI pins (PB3/PB5) would also need a faster GPIO speed than the current `GPIO_SPEED_FREQ_LOW`. If a transfer fails, the current slot stays lit and the next tick tries again.
 
-The preferred scheduling design is TIM2 providing the 250 Hz slot cadence and a high-priority refresh task performing the short seven-byte SPI transaction. The timer interrupt should only signal the task and must not call blocking SPI functions. SPI DMA may replace the blocking task-level transfer later if measured jitter or CPU use requires it.
+TIM2 provides the 250 Hz slot cadence and the `DisplayRefresh` task (`osPriorityRealtime`) performs the short seven-byte SPI transaction. The timer interrupt only signals the task and never calls blocking SPI functions. SPI DMA could replace the blocking task-level transfer if measured jitter or CPU use ever required it.
 
-TIM2 configuration for the initial 250 Hz slot trigger, assuming the current 16 MHz internal timer clock:
+TIM2 configuration, from the 16 MHz HSI timer clock:
 
 - Prescaler: `15999`, giving a 1 kHz counter clock.
 - Auto-reload period: `3`, giving an update event every 4 counter ticks, or 250 Hz.
-- Counter mode: up-counting.
-- Clock division: divide by 1.
-- Auto-reload preload: disabled initially.
-- Enable the TIM2 update interrupt and its NVIC entry in CubeMX.
-- Start TIM2 with interrupt generation after the display refresh mechanism has been initialized.
+- Counter mode: up-counting, clock division 1, auto-reload preload disabled.
+- TIM2 update interrupt and its NVIC entry enabled in CubeMX.
 
-The update ISR should clear or dispatch the TIM2 update event through the HAL callback and signal the refresh task. Do not use the TIM2 HAL time base for the RTOS tick; TIM1 currently provides the HAL time base.
+`HAL_TIM_PeriodElapsedCallback()` in `main.c` forwards every timer to `Display_PcbTimerElapsed()` from its user-code section, which signals the refresh task for TIM2. TIM1 provides the HAL time base and stays separate.
 
-This is implemented: TIM2's update interrupt signals the `DisplayRefresh` task (`osPriorityRealtime`), which runs the sequence above. The ST67 WiFi driver's own tasks are configured just below it, so WiFi activity cannot hold up the multiplexing; see [CubeMXCompliance.md](CubeMXCompliance.md#st67-driver-task-settings).
+TIM2 is started by `PcbDisplayBoard::start()`, after its task. The ST67 WiFi driver's own tasks are configured just below it, so WiFi activity cannot hold up the multiplexing; see [CubeMXCompliance.md](CubeMXCompliance.md#st67-driver-task-settings).
 
 Logical-to-segment conversion is performed when display state changes, not in the periodic refresh loop. The refresh mechanism reads only prepared slot bytes.
 
@@ -274,51 +297,40 @@ The 35-byte logical payload is serialized in this order: numeric display 1, nume
 
 Command `0x01` means "set display board values" using the logical buffer format defined above. The Display Controller checks this first command/format byte and processes the message only when it is a known value. `0x01` is currently the only known command. Unknown commands are ignored. For command `0x01`, the Display Controller replaces its local logical values and performs its own PCB-specific encoding. There is no application-level response or success message in the initial protocol; normal I2C ACK/NACK behavior still applies.
 
-Each Display Controller has three address-programming pins, named `ADDR_1` through `ADDR_3`. Each pin can be tied to ground, tied to VCC, or left floating, providing 27 possible ternary board IDs. The Display Controller derives its 7-bit I2C slave address from these pins using `0x10 + board_id`, giving addresses `0x10` through `0x2A`.
+Each Display Controller has three address-programming pins, `ADDR_0` (PB10), `ADDR_1` (PB11) and `ADDR_2` (PB14), as named in `Core/Inc/main.h`. Each pin can be tied to ground, tied to VCC, or left floating, providing 27 possible ternary board IDs. The Display Controller derives its 7-bit I2C target address as `0x10 + board_id`, giving addresses `0x10` through `0x2A`.
 
-The Host Controller does not derive these addresses from its own pins. It instantiates one buffer-backed Display Board for each Display Controller and passes that controller's I2C address to the buffer-backed board constructor. The Host-side board objects therefore retain their configured addresses and use them when `Display::submit()` sends the logical buffers.
+The Host Controller does not derive these addresses from its own pins. `AppVariant.cpp` creates one buffer-backed Display Board per remote board at the fixed addresses `0x10` through `0x14`, and `Display::submit()` sends each logical buffer to its board's address.
 
-Address detection uses two reads for each pin:
+Address detection (`Display::detectBoardId()` in `DisplayAddress.cpp`) uses two reads for each pin:
 
-1. Configure the pin as a digital input with an internal pull-down and read it. HIGH means VCC. LOW means either ground or floating.
-2. For pins that read LOW, switch to an internal pull-up and read again. LOW means a strong external ground connection; HIGH means floating.
+1. Configure the pin as a digital input with an internal pull-down and read it. HIGH means VCC, state 2.
+2. Otherwise switch to an internal pull-up and read again. LOW means a strong external ground, state 0; HIGH means floating, state 1.
 
-The three detected states are mapped deterministically to a board ID from `0` through `26`. The exact state-to-bit ordering must be shared by Host and Display Controller firmware.
+The pins are then returned to inputs without pull, and `board_id = ADDR_0 + 3 × ADDR_1 + 9 × ADDR_2`.
 
-The Display Controller checks the first received byte before processing the payload. It reacts only to known commands; currently command `0x01` is the only valid command. Unknown commands and messages with an invalid length are ignored, and the previous logical display state is retained. Initial transport error handling may be limited to detecting HAL/I2C transfer failure and retaining the previous display state.
+On receipt, `deserializeI2c()` in `DisplayI2cProtocol.cpp` accepts only a 36-byte message whose first byte is `0x01`, and decodes it into a temporary state before replacing the destination, so a rejected message leaves the previous state untouched.
+
+`DisplayAddress.cpp` and `deserializeI2c()` are written for the Display Controller but are not called anywhere yet; only `serializeI2c()` is used, by `BufferedDisplayBoard`. None of the three has a native test.
 
 ## Refresh Progress
 
 While an astro refresh runs, the bottom row (row 4) of the Host Controller's
-own matrix shows its progress. Remote boards are not affected; their row 4 is
-always blank. Nothing else uses that row, so the forecast in the numeric
-displays and rows 0-3 stays visible until the new one is published.
-
-The row is split into six segments, one per step, spread to fill all 21
-columns:
+own matrix shows its progress in six segments. Remote boards are not affected;
+their row 4 is always blank. The behaviour, segment boundaries and success and
+failure indications are described in
+[AstroRefresh.md](AstroRefresh.md#progress-bar). Typical step times:
 
 | Segment | Columns | Step | Typical time |
 | --- | --- | --- | --- |
-| 1 | 0-2 | Start the WiFi module (first refresh after boot only) | ~15 s |
+| 1 | 0-2 | Start the WiFi module | ~15 s on the first refresh after boot |
 | 2 | 3-6 | Join WiFi | ~2-3 s |
 | 3 | 7-9 | Get an IP address (DHCP) | < 1 s |
 | 4 | 10-13 | Download (DNS and HTTP) | ~2 s |
 | 5 | 14-16 | Disconnect | ~1 s |
 | 6 | 17-20 | Check, parse and publish | milliseconds |
 
-Finished steps are solid and the current one blinks every 250 ms, so a long
-step still visibly moves. On success the full row lights for 1.5 s, then
-clears. On failure the bar up to and including the step that failed blinks
-every 500 ms for a minute, so the position shows where it went wrong: stuck at
-segment 2 is a WiFi problem, at segment 4 the network or server. The console
-log carries the detail. A new refresh interrupts the blink at once.
-
-The WiFi task reports its step through the request (`FetchStage`, frozen at the
-first failure so cleanup does not overwrite it). The refresh task draws the
-bar itself while it waits on thread flags for the fetch to finish, woken by
-each step change and every 250 ms, so the WiFi task never touches the display.
-Drawing uses `Display::submitLocal()`, which takes the same lock as `submit()`
-but does not send I2C traffic to the remote boards.
+Stuck at segment 2 is a WiFi problem, at segment 4 the network or server; the
+console log carries the detail.
 
 Verified by reading the local board's row 4 over SWD during refreshes: the
 segment values progressed `0x07`/`0x7F` (joining) through `0x3FF`/`0x3FFF`
@@ -328,25 +340,31 @@ segment values progressed `0x07`/`0x7F` (joining) through `0x3FF`/`0x3FFF`
 
 ### Host Controller
 
-`AppVariant.cpp` creates and starts:
+`AppVariant.cpp` creates:
 
-- The local PCB-backed Display Board and its refresh mechanism.
-- The top-level `Display` containing the local board and five remote buffer-backed boards.
-- Client code calls `Display::submit()` after it has finished updating all local and remote board objects. Setters are intentionally unsynchronized, so independent clients may overwrite pending fields; the last update to each field wins. `submit()` serializes the hardware transfer sequence, submits the local logical buffer to the PCB-backed board for encoding and periodic SPI refresh, then sends each remote logical buffer to its configured I2C address.
+- The local PCB-backed Display Board, started with its `DisplayRefresh` task and TIM2.
+- Five buffer-backed boards at I2C addresses `0x10` through `0x14`, on the shared `Device::I2cBus`.
+- The top-level `Display` containing the local board and the five remote boards.
 
-Each remote transfer is bounded by a 50 ms timeout rather than `HAL_MAX_DELAY`, so an unreachable board cannot block the calling task. A board's reachability is logged on transition, and an unreachable board is restated every 30 seconds while it keeps being refreshed; logging every failure could flood the console, while logging only the transition would lose the message entirely for a board missing from boot, which fails before USB CDC has enumerated. Remote boards are refreshed by `Display::submit()` only: astro refreshes and `display` commands. Updates that touch just the local board, such as the current-sense readout and the refresh progress bar, use `Display::submitLocal()` and send nothing over I2C, so an unreachable board is reported when a refresh actually tries to reach it, not continuously.
+Clients call `Display::submit()` after they have finished updating the boards. Setters are intentionally unsynchronized, so independent clients may overwrite pending fields; the last update to each field wins. `submit()` serializes the hardware transfer sequence, submits the local logical buffer to the PCB-backed board for encoding and periodic SPI refresh, then sends each remote logical buffer to its configured I2C address.
+
+Each remote transfer is bounded by a 50 ms timeout rather than `HAL_MAX_DELAY`, so an unreachable board cannot block the calling task. A board's reachability is logged on transition, and an unreachable board is restated every 30 seconds while it keeps being refreshed; logging every failure could flood the console, while logging only the transition would lose the message entirely for a board missing from boot, which fails before USB CDC has enumerated. A failed transfer is not retried; the board gets the data at the next `submit()`.
+
+Remote boards are refreshed by `Display::submit()` only, which only astro refreshes and `display` commands call. Updates that touch just the local board, namely the current-sense readout, the clock and the refresh progress bar, use `Display::submitLocal()` and send nothing over I2C, so an unreachable board is reported when a refresh actually tries to reach it, not continuously.
 
 ### Display Controller
 
-`AppVariant.cpp` creates and starts:
+Not implemented. The DisplayController variant's `AppVariant.cpp` only starts `ConsoleService`, with no display. It creates no PCB-backed board, so its own LEDs are not driven, and it does not configure I2C1 as a target, so it cannot receive command `0x01`. The pieces it would need exist but are unused: `DisplayAddress.cpp` for the board address and `deserializeI2c()` for the message.
 
-- One PCB-backed Display Board and its refresh mechanism.
-- I2C target reception for command `0x01`.
+## Tests
+
+- `tests/NumericDisplayTests.cpp`: `setFixed()`, both `setValue()` overloads, `setTime()` including the blank leading zero and the error pattern, `setTimeUnset()`, `setBlank()` and `setSegments()`.
+- `tests/DisplayCodecTests.cpp`: only the order of the five matrix rows in the prepared frame.
+
+Not covered: the per-display segment wiring, the SPI byte order, I2C serialization and deserialization, board address detection, the refresh timing and transfer failures.
 
 ## Remaining Implementation Work
 
-1. Complete Display Controller I2C target configuration in code. The Host Controller `.ioc` configures I2C1 for transmissions; the Display Controller must reconfigure I2C1 as a target/slave using its runtime address and install the receive/listen callbacks.
-2. Add the TIM2 update interrupt/NVIC entry, `TIM2_IRQHandler`, and refresh-task signal path. TIM2 is already configured for 250 Hz, and the PCB-backed Display Board must call `HAL_TIM_Base_Start_IT(&htim2)` from its initialization or start method. TIM1 currently provides the HAL time base and must remain separate.
-3. Define retry and offline-board behavior for `Display::submit()` when an I2C transfer fails. The call itself and its ordering across all boards are defined above.
-4. Implement and test complete-message reception so an incomplete 28-byte I2C message never partially modifies visible logical state, even though full refresh-frame double buffering is deferred. Command filtering for unknown format bytes is defined above.
-5. Add acceptance tests for numeric formatting, every per-display segment mapping, decimal points, negative values, Error mode, time leading zeroes and double dots, blanking, all matrix rows and boundary bits, seven-byte SPI order, I2C serialization, command filtering, malformed messages, and transfer failures.
+1. Display Controller: create the PCB-backed board, detect the address with `detectBoardAddress()`, configure I2C1 as a target at that address with receive callbacks, and apply complete 36-byte messages through `deserializeI2c()`. The Host Controller `.ioc` configures I2C1 as a controller; the Display Controller must reconfigure it at run time.
+2. Decide whether a failed remote transfer should be retried before the next `submit()`.
+3. Tests for the segment wiring, SPI byte order, I2C serialization round trip, command filtering and malformed messages.
