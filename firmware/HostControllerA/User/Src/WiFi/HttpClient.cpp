@@ -1,5 +1,7 @@
 #include <HostController/HttpClient.hpp>
 
+#include <HostController/HttpResponseParser.hpp>
+
 #include "lwip/inet.h"
 #include "lwip/sockets.h"
 #include "FreeRTOS.h"
@@ -10,8 +12,11 @@
 namespace HostController {
 namespace {
 
-constexpr uint32_t kHeaderCapacity = 2048U;
+using HttpResponse::kHeaderCapacity;
 constexpr uint32_t kChunkCapacity = 1024U;
+
+static_assert(HttpResponse::kNoStatus == HTTP_VERSION_NOT_SUPPORTED,
+              "the parser's no-status code must match http_client.h");
 
 void notifyFailure(const HTTP_connection_t* settings, HTTP_Status_Code_e status,
                    uint32_t received) {
@@ -22,61 +27,6 @@ void notifyFailure(const HTTP_connection_t* settings, HTTP_Status_Code_e status,
     settings->result_fn(settings->callback_arg, status, received, 0U,
                         HTTP_CLIENT_ERR);
   }
-}
-
-bool findHeaderEnd(const uint8_t* data, uint32_t length, uint32_t* offset) {
-  if (length < 4U) {
-    return false;
-  }
-  for (uint32_t index = 3U; index < length; ++index) {
-    if (data[index - 3U] == '\r' && data[index - 2U] == '\n' &&
-        data[index - 1U] == '\r' && data[index] == '\n') {
-      *offset = index + 1U;
-      return true;
-    }
-  }
-  return false;
-}
-
-bool parseResponse(const uint8_t* headers, uint32_t length,
-                   HTTP_Status_Code_e* status, uint32_t* contentLength,
-                   bool* hasContentLength) {
-  const char* text = reinterpret_cast<const char*>(headers);
-  unsigned int code = 0U;
-  if (std::sscanf(text, "HTTP/%*u.%*u %u", &code) != 1 || code > 599U) {
-    return false;
-  }
-  *status = static_cast<HTTP_Status_Code_e>(code);
-  *contentLength = 0U;
-  *hasContentLength = false;
-  const char* end = text + length;
-  const char* line = std::strstr(text, "\r\n");
-  while (line != nullptr && line + 2 < end) {
-    line += 2;
-    if (line[0] == '\r' && line[1] == '\n') {
-      break;
-    }
-    if (std::strncmp(line, "Content-Length:", 15U) == 0) {
-      const char* value = line + 15U;
-      while (value < end && (*value == ' ' || *value == '\t')) {
-        ++value;
-      }
-      char* parsedEnd = nullptr;
-      unsigned long parsed = std::strtoul(value, &parsedEnd, 10);
-      if (parsedEnd == value || parsed > UINT32_MAX ||
-          (parsedEnd < end && *parsedEnd != '\r')) {
-        return false;
-      }
-      *contentLength = static_cast<uint32_t>(parsed);
-      *hasContentLength = true;
-    }
-    const char* next = std::strstr(line, "\r\n");
-    if (next == nullptr || next + 2 > end) {
-      break;
-    }
-    line = next;
-  }
-  return true;
 }
 
 }  // namespace
@@ -139,17 +89,15 @@ int32_t HttpClient_Get(const ip_addr_t* serverAddress, uint16_t port,
   std::memset(headerBuffer, 0, kHeaderCapacity + 1U);
   uint32_t headerLength = 0U;
   uint32_t bodyOffset = 0U;
-  uint32_t contentLength = 0U;
   uint32_t received = 0U;
-  bool hasContentLength = false;
-  HTTP_Status_Code_e status = HTTP_VERSION_NOT_SUPPORTED;
+  HttpResponse::Head head{};
   bool headerComplete = false;
   int32_t result = HTTP_CLIENT_ERR;
 
   while (true) {
     int32_t count = recv(socketHandle, chunk, kChunkCapacity, 0);
     if (count == 0) {
-      if (headerComplete && !hasContentLength) {
+      if (headerComplete && HttpResponse::closeEndsBody(head)) {
         result = HTTP_CLIENT_SUCCESS;
       }
       break;
@@ -159,32 +107,23 @@ int32_t HttpClient_Get(const ip_addr_t* serverAddress, uint16_t port,
     }
     uint32_t chunkOffset = 0U;
     if (!headerComplete) {
-      if (headerLength + static_cast<uint32_t>(count) > kHeaderCapacity) {
-        break;
-      }
-      std::memcpy(headerBuffer + headerLength, chunk, static_cast<size_t>(count));
-      headerLength += static_cast<uint32_t>(count);
-      headerBuffer[headerLength] = 0U;
-      if (!findHeaderEnd(headerBuffer, headerLength, &bodyOffset)) {
+      const HttpResponse::HeaderProgress progress = HttpResponse::appendHeaderBytes(
+          headerBuffer, kHeaderCapacity, &headerLength, chunk,
+          static_cast<uint32_t>(count), settings->max_response_len, &head,
+          &bodyOffset, &chunkOffset);
+      if (progress == HttpResponse::HeaderProgress::NeedMore) {
         continue;
       }
-      if (!parseResponse(headerBuffer, bodyOffset, &status, &contentLength,
-                         &hasContentLength)) {
-        break;
-      }
-      if (hasContentLength && contentLength > settings->max_response_len) {
+      if (progress != HttpResponse::HeaderProgress::Complete) {
         break;
       }
       if (settings->headers_done_fn != nullptr &&
           settings->headers_done_fn(nullptr, settings->callback_arg, headerBuffer,
                                     static_cast<uint16_t>(bodyOffset),
-                                    contentLength) < 0) {
+                                    head.contentLength) < 0) {
         break;
       }
       headerComplete = true;
-      const uint32_t previousLength = headerLength - static_cast<uint32_t>(count);
-      chunkOffset = bodyOffset > previousLength ? bodyOffset - previousLength :
-                         static_cast<uint32_t>(count);
     }
     if (!headerComplete) {
       continue;
@@ -192,15 +131,15 @@ int32_t HttpClient_Get(const ip_addr_t* serverAddress, uint16_t port,
     const uint32_t bodyLength = static_cast<uint32_t>(count) - chunkOffset;
     if (bodyLength > 0U) {
       HTTP_buffer_t body{chunk + chunkOffset, static_cast<int32_t>(bodyLength)};
-      if (received > settings->max_response_len - bodyLength ||
-          (hasContentLength && received + bodyLength > contentLength) ||
+      if (!HttpResponse::acceptsBody(head, received, bodyLength,
+                                     settings->max_response_len) ||
           settings->recv_fn == nullptr ||
           settings->recv_fn(settings->recv_fn_arg, &body, 0) < 0) {
         break;
       }
       received += bodyLength;
     }
-    if (hasContentLength && received == contentLength) {
+    if (HttpResponse::isBodyComplete(head, received)) {
       result = HTTP_CLIENT_SUCCESS;
       break;
     }
@@ -209,7 +148,9 @@ int32_t HttpClient_Get(const ip_addr_t* serverAddress, uint16_t port,
   closesocket(socketHandle);
   vPortFree(headerBuffer);
   vPortFree(chunk);
-  if (!headerComplete || (hasContentLength && received != contentLength) ||
+  const HTTP_Status_Code_e status = static_cast<HTTP_Status_Code_e>(head.statusCode);
+  if (!headerComplete ||
+      (head.hasContentLength && !HttpResponse::isBodyComplete(head, received)) ||
       result != HTTP_CLIENT_SUCCESS) {
     notifyFailure(settings, status, received);
     return HTTP_CLIENT_ERR;

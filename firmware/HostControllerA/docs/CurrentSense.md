@@ -81,7 +81,7 @@ Changes belong in the `.ioc`, followed by regeneration; see
 | File | Responsibility |
 | --- | --- |
 | `User/Inc/Sensors/CurrentSenseTask.hpp`, `User/Src/Sensors/CurrentSenseTask.cpp` | The sampling task, and the HAL ADC complete and error callbacks. |
-| `User/Inc/Sensors/CurrentSenseConversion.hpp` | Pure conversion from ADC counts to mA. Tested by `tests/CurrentSenseConversionTests.cpp`. |
+| `User/Inc/Sensors/CurrentSenseConversion.hpp` | Pure conversions: ADC counts to mA, VDDA from `VREFINT`, the temperature, and the value shown. Tested by `tests/CurrentSenseConversionTests.cpp`. |
 | `User/Src/Console/AdcCommand.cpp` | `adc log` and `adc display`, saved to the EEPROM. |
 | `User/Src/HostController/AppVariant.cpp` | Applies the saved flags, sets the display and starts the task. |
 
@@ -105,8 +105,9 @@ Changes belong in the `.ioc`, followed by regeneration; see
 ### Conversion
 
 `VDDA` comes from the `VREFINT` reading with
-`__HAL_ADC_CALC_VREFANALOG_VOLTAGE()`, which uses the factory `VREFINT_CAL`
-value. A zero `VREFINT` reading falls back to 3300 mV.
+`CurrentSense::vddaMilliVolts()`, `VREFINT_CAL × 3000 / VREFINT_DATA`, the
+arithmetic of `__HAL_ADC_CALC_VREFANALOG_VOLTAGE()`. The task reads the factory
+`VREFINT_CAL` and passes it in. A zero `VREFINT` reading falls back to 3300 mV.
 
 The current is then `CurrentSense::rawToMilliAmps(raw, vddaMilliVolts)`:
 
@@ -118,8 +119,11 @@ in 64-bit integer arithmetic, truncated to whole mA. An earlier 32-bit version
 overflowed. No zero-current offset is subtracted, so the INA180's input offset
 shows as a small reading at no load.
 
-The temperature, in whole °C, comes from `__HAL_ADC_CALC_TEMPERATURE()` with
-the measured VDDA and the factory `TS_CAL` values. It and VDDA are only logged;
+The temperature, in whole °C, comes from `CurrentSense::temperatureCelsius()`,
+the arithmetic of `__HAL_ADC_CALC_TEMPERATURE()`: the reading rescaled to 3.0 V
+with the measured VDDA, then interpolated between the factory `TS_CAL1` (30 °C)
+and `TS_CAL2` (130 °C), which the task reads and passes in. `static_assert`s in
+the task keep the header's calibration constants equal to the device header's. It and VDDA are only logged;
 nothing else uses them yet. [RTC.md](RTC.md#trimming) notes that the
 temperature could explain the LSI drift if the two were logged together.
 
@@ -130,8 +134,9 @@ While `adc display` is on, the default, each valid sample is written to
 the local board alone is refreshed with `Display::submitLocal()`, which sends
 nothing over I2C.
 
-A value above 9999 would show the numeric display's error pattern, an underscore
-on each digit. With a 1.32 A full scale that cannot happen in practice.
+A value above 9999 shows the numeric display's error pattern, an underscore on
+each digit: `CurrentSense::displayMilliAmps()` turns it into a value the display
+rejects. With a 1.32 A full scale that cannot happen in practice.
 
 `adc display off` stops the writes but does not blank the display: it keeps the
 last reading until something else writes numeric 2. The astro refresh does, with
@@ -160,10 +165,14 @@ diagnosing. See [Console.md](Console.md) for the replies.
 ## Tests
 
 `tests/CurrentSenseConversionTests.cpp` checks `rawToMilliAmps()` for raw 0,
-255, 511 and 4095 at the nominal 3.3 V, and 2048 at 3.0 V VDDA.
+255, 511 and 4095 at the nominal 3.3 V, 2048 at 3.0 V and 4095 at 3.6 V VDDA;
+`vddaMilliVolts()` at typical readings and the zero fallback;
+`temperatureCelsius()` at both calibration points, between and below them, at
+3.3 V VDDA and with equal calibration points; and `displayMilliAmps()` either
+side of 9999.
 
-Not covered: the task, the ADC and DMA configuration, the VDDA and temperature
-calculations, and the display output. These have been checked on hardware only,
+Not covered: the task, the ADC and DMA configuration, reading the factory
+calibration values, and the display output. These have been checked on hardware only,
 on the reworked prototype.
 
 ## Troubleshooting History

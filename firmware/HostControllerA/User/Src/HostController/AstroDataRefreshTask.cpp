@@ -3,9 +3,11 @@
 #include <Display/Display.hpp>
 #include <Display/DisplayTypes.hpp>
 #include <HostController/AstroDataParser.hpp>
+#include <HostController/AstroDisplayMapper.hpp>
 #include <HostController/CalendarDate.hpp>
 #include <HostController/ClockTask.hpp>
 #include <St67HttpFetchTask.hpp>
+#include <Utils/Crc32.hpp>
 
 #include <Debug/LogService.hpp>
 
@@ -16,22 +18,6 @@ extern "C" RTC_HandleTypeDef hrtc;
 
 namespace HostController {
 namespace {
-
-uint32_t calculateCrc32(const uint8_t* data, uint32_t length)
-{
-    uint32_t crc = 0xFFFFFFFFU;
-    for (uint32_t index = 0U; index < length; ++index)
-    {
-        crc ^= data[index];
-        for (uint32_t bit = 0U; bit < 8U; ++bit)
-        {
-            crc = (crc & 1U) != 0U
-                ? (crc >> 1U) ^ 0xEDB88320U
-                : (crc >> 1U);
-        }
-    }
-    return crc ^ 0xFFFFFFFFU;
-}
 
 const char* statusName(St67FetchStatus status)
 {
@@ -68,26 +54,6 @@ const char* parseStatusName(AstroParseStatus status)
     case AstroParseStatus::Truncated: return "truncated";
     }
     return "unknown";
-}
-
-void setNumeric(Display::NumericDisplay display,
-                const AstroNumericValue& value)
-{
-    if (!value.available)
-    {
-        Display::NumericSegments unavailable{};
-        unavailable.slots.fill(Display::kSegmentDp);
-        unavailable.slots[4] = 0U;
-        display.setSegments(unavailable);
-    }
-    else if (value.time)
-    {
-        display.setTime(value.hour, value.minute);
-    }
-    else
-    {
-        display.setValue(value.value, 1U);
-    }
 }
 
 void logRawPayload(const uint8_t* data, uint32_t length)
@@ -315,7 +281,7 @@ bool AstroDataRefreshTask::fetchPayload()
         return false;
     }
     const bool integrityValid =
-        calculateCrc32(responseBuffer_, result.length) == result.crc32;
+        Crc32::compute(responseBuffer_, result.length) == result.crc32;
     LogService::instance().logf(
         integrityValid ? LogService::Level::Info : LogService::Level::Error,
         "AstroDataRefresh response crc-valid=%u",
@@ -333,77 +299,13 @@ bool AstroDataRefreshTask::publishDisplay(const AstroData& data)
     {
         return false;
     }
-    for (uint8_t boardIndex = 0U; boardIndex < data.boards.size(); ++boardIndex)
-    {
-        Display::DisplayBoard& board = boardIndex == 0U
-            ? display_->local()
-            : display_->remote(static_cast<uint8_t>(boardIndex - 1U));
-        for (uint8_t numericIndex = 0U;
-             numericIndex < data.boards[boardIndex].numeric.size(); ++numericIndex)
-        {
-            setNumeric(board.numeric(numericIndex),
-                       data.boards[boardIndex].numeric[numericIndex]);
-        }
-        for (uint8_t matrixIndex = 0U; matrixIndex < 4U; ++matrixIndex)
-        {
-            board.matrix(matrixIndex).setRow(data.boards[boardIndex].matrix[matrixIndex]);
-        }
-        // The local bottom row carries the progress bar; see startIndicator().
-        if (boardIndex != 0U)
-        {
-            board.matrix(4U).setRow(0U);
-        }
-    }
+    // Leaves the local bottom row to the progress bar; see AstroProgressBar.
+    AstroDisplayMapper::mapAll(data, *display_);
     display_->submit();
     return true;
 }
 
 namespace {
-
-// Progress bar layout: six segments across the 21-column bottom row, one per
-// step of a refresh. The segment boundaries are spread so the six fill all 21
-// columns; column N is bit N, as for 'display matrix'.
-constexpr uint8_t kProgressRow = 4U;
-constexpr uint8_t kProgressSegments = 6U;
-constexpr uint8_t kProcessingSegment = 5U;  // CRC check, parse and publish
-constexpr uint32_t kProgressBlinkMs = 250U;
-constexpr uint32_t kSuccessHoldMs = 1500U;
-constexpr uint32_t kFailureHoldMs = 60000U;
-constexpr uint32_t kFailureBlinkMs = 500U;
-
-uint32_t columnsBelow(uint32_t end)
-{
-    return (end >= 32U) ? 0xFFFFFFFFU : ((1UL << end) - 1UL);
-}
-
-uint32_t segmentStart(uint8_t segment)
-{
-    return (static_cast<uint32_t>(segment) * Display::kMatrixColumnCount) / kProgressSegments;
-}
-
-// Segments before `current` solid; `current` itself lit only when `currentLit`.
-uint32_t progressColumns(uint8_t current, bool currentLit)
-{
-    uint32_t columns = columnsBelow(segmentStart(current));
-    if (currentLit) {
-        columns |= columnsBelow(segmentStart(static_cast<uint8_t>(current + 1U))) &
-                   ~columnsBelow(segmentStart(current));
-    }
-    return columns;
-}
-
-uint8_t segmentFor(FetchStage stage)
-{
-    switch (stage) {
-    case FetchStage::Queued:
-    case FetchStage::StartingModule: return 0U;
-    case FetchStage::JoiningWifi: return 1U;
-    case FetchStage::GettingIp: return 2U;
-    case FetchStage::Downloading: return 3U;
-    case FetchStage::Disconnecting: return 4U;
-    }
-    return 0U;
-}
 
 const char* fetchStageName(FetchStage stage)
 {
@@ -474,7 +376,7 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
     }
     else
     {
-        showProgressRow(progressColumns(kProcessingSegment, true));
+        showProgressRow(AstroProgressBar::processingColumns());
         AstroData data{};
         const AstroParseStatus status =
             parseAstroData(responseBuffer_, request_.result.length, data);
@@ -521,11 +423,11 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
     // A fetch failure is shown at the step the WiFi task stopped at; anything
     // after the download (CRC, parse, publish) at the last segment.
     if (outcome == RefreshOutcome::Ok) {
-        startIndicator(Indicator::Success, 0U);
+        startIndicator(AstroProgressBar::Indicator::Kind::Success, 0U);
     } else {
-        startIndicator(Indicator::Failure, (outcome == RefreshOutcome::FetchFailed)
-                                               ? segmentFor(request_.stage)
-                                               : kProcessingSegment);
+        startIndicator(AstroProgressBar::Indicator::Kind::Failure,
+                       AstroProgressBar::failedSegment(
+                           outcome == RefreshOutcome::FetchFailed, request_.stage));
     }
     LogService::instance().logf(
         LogService::Level::Info,
@@ -655,10 +557,7 @@ const char* fetchStatusName(St67FetchStatus status)
 void AstroDataRefreshTask::onFetchProgress(FetchStage stage, void* context)
 {
     AstroDataRefreshTask& self = *static_cast<AstroDataRefreshTask*>(context);
-    // The current step blinks, so a long one (module start-up takes ~15 s on the
-    // first refresh after boot) still visibly moves.
-    const bool lit = ((osKernelGetTickCount() / kProgressBlinkMs) % 2U) == 0U;
-    self.showProgressRow(progressColumns(segmentFor(stage), lit));
+    self.showProgressRow(AstroProgressBar::fetchingColumns(stage, osKernelGetTickCount()));
     if (static_cast<uint8_t>(stage) != self.loggedStage_)
     {
         self.loggedStage_ = static_cast<uint8_t>(stage);
@@ -673,40 +572,31 @@ void AstroDataRefreshTask::showProgressRow(uint32_t columns)
     {
         return;
     }
-    display_->local().matrix(kProgressRow).setRow(columns);
+    display_->local().matrix(AstroDisplayMapper::kProgressRow).setRow(columns);
     display_->submitLocal();
     shownRow_ = columns;
 }
 
-void AstroDataRefreshTask::startIndicator(Indicator indicator, uint8_t failedSegment)
+void AstroDataRefreshTask::startIndicator(AstroProgressBar::Indicator::Kind kind,
+                                          uint8_t failedSegment)
 {
-    indicator_ = indicator;
-    failedSegment_ = failedSegment;
-    indicatorLit_ = true;
-    indicatorUntil_ = osKernelGetTickCount() +
-                      ((indicator == Indicator::Success) ? kSuccessHoldMs : kFailureHoldMs);
     // Success: the full bar. Failure: the bar up to and including the step that
     // failed, blinked by stepIndicator().
-    showProgressRow((indicator == Indicator::Success)
-                        ? columnsBelow(Display::kMatrixColumnCount)
-                        : progressColumns(static_cast<uint8_t>(failedSegment + 1U), false));
+    showProgressRow(indicator_.start(kind, failedSegment, osKernelGetTickCount()));
 }
 
 void AstroDataRefreshTask::stepIndicator()
 {
-    if (indicator_ != Indicator::Failure)
+    uint32_t columns = 0U;
+    if (indicator_.step(columns))
     {
-        return;
+        showProgressRow(columns);
     }
-    indicatorLit_ = !indicatorLit_;
-    showProgressRow(indicatorLit_
-                        ? progressColumns(static_cast<uint8_t>(failedSegment_ + 1U), false)
-                        : 0U);
 }
 
 void AstroDataRefreshTask::clearIndicator()
 {
-    indicator_ = Indicator::None;
+    indicator_.cancel();
     showProgressRow(0U);
 }
 
@@ -718,23 +608,15 @@ void AstroDataRefreshTask::run()
         // outcome is shown on the progress row, to blink it and to clear it when
         // it expires. A new refresh request always takes over straight away.
         uint32_t timeout = kScheduleCheckMs;
-        if (indicator_ != Indicator::None)
+        if (indicator_.active())
         {
-            const int32_t left =
-                static_cast<int32_t>(indicatorUntil_ - osKernelGetTickCount());
-            if (left <= 0)
+            const uint32_t now = osKernelGetTickCount();
+            if (indicator_.expired(now))
             {
                 clearIndicator();
                 continue;
             }
-            if (static_cast<uint32_t>(left) < timeout)
-            {
-                timeout = static_cast<uint32_t>(left);
-            }
-            if (indicator_ == Indicator::Failure && timeout > kFailureBlinkMs)
-            {
-                timeout = kFailureBlinkMs;
-            }
+            timeout = indicator_.waitMs(now, timeout);
         }
 
         const uint32_t flags = osThreadFlagsWait(kFlagRun, osFlagsWaitAny, timeout);
@@ -751,7 +633,7 @@ void AstroDataRefreshTask::run()
             taskEXIT_CRITICAL();
             continue;
         }
-        indicator_ = Indicator::None;
+        indicator_.cancel();
         executeRefresh(trigger_);
     }
 }

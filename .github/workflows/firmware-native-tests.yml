@@ -1,0 +1,50 @@
+name: Firmware native tests
+
+on:
+  push:
+    paths:
+      - 'firmware/HostControllerA/**'
+      - '.github/workflows/firmware-native-tests.yml'
+  pull_request:
+    paths:
+      - 'firmware/HostControllerA/**'
+      - '.github/workflows/firmware-native-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware/HostControllerA
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build gcovr
+
+      # The CMake presets carry Windows toolchain paths, so CI configures directly.
+      - name: Configure
+        run: cmake -S . -B build/ci -G Ninja -DBUILD_NATIVE_TESTS=ON -DNATIVE_TESTS_COVERAGE=ON
+
+      - name: Build
+        run: cmake --build build/ci
+
+      - name: Test
+        run: ctest --test-dir build/ci --output-on-failure
+
+      - name: Coverage summary
+        run: |
+          gcovr -r . --filter 'User/' build/ci --txt | tee coverage.txt
+          {
+            echo '### Native test coverage'
+            echo '```'
+            cat coverage.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

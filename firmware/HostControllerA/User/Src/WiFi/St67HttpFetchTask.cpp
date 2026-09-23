@@ -1,9 +1,11 @@
 #include <St67HttpFetchTask.hpp>
 
 #include <Debug/LogService.hpp>
+#include <HostController/St67FetchStatusMap.hpp>
 #include <HostController/St67HttpFetcher.hpp>
 #include <HostController/St67NetworkSession.hpp>
 #include <HostController/St67Runtime.hpp>
+#include <Utils/Crc32.hpp>
 #include <Utils/Task.hpp>
 
 #include "app_config.h"
@@ -14,7 +16,6 @@
 
 #include <cstdarg>
 #include <cstdio>
-#include <cstring>
 
 extern "C" void vLoggingPrintf(uint32_t logLevel,
                                 const uint8_t metadataPrint,
@@ -94,29 +95,12 @@ void publishClientResult(St67Runtime& runtime) {
   result.length = 0U;
   result.crc32 = 0U;
   result.detail = static_cast<int32_t>(runtime.firstFailureStatus);
-  if (runtime.firstFailureStage == nullptr) {
-    result.status = St67FetchStatus::Success;
+  result.status = fetchStatusForFailure(runtime.firstFailureStage, runtime.responseTooLarge);
+  if (result.status == St67FetchStatus::Success) {
     result.length = runtime.clientPayloadLength;
-    result.crc32 = runtime.httpCrc ^ 0xFFFFFFFFU;
+    result.crc32 = Crc32::finish(runtime.httpCrc);
     result.detail = 0;
     result.responseTick = runtime.httpResponseTick;
-  } else if (runtime.responseTooLarge) {
-    result.status = St67FetchStatus::ResponseTooLarge;
-  } else if (std::strcmp(runtime.firstFailureStage, "netif-stop") == 0 ||
-             std::strcmp(runtime.firstFailureStage, "final-state") == 0) {
-    result.status = St67FetchStatus::CleanupFailure;
-  } else if (std::strcmp(runtime.firstFailureStage, "credentials") == 0) {
-    result.status = St67FetchStatus::NoCredentials;
-  } else if (std::strcmp(runtime.firstFailureStage, "connect") == 0 ||
-             std::strcmp(runtime.firstFailureStage, "connect-state") == 0 ||
-             std::strcmp(runtime.firstFailureStage, "dhcp") == 0) {
-    // Station never got online; LastWifiConnect() holds the reason.
-    result.status = St67FetchStatus::NetworkFailure;
-  } else if (std::strcmp(runtime.firstFailureStage, "w6x-init") == 0 ||
-             std::strcmp(runtime.firstFailureStage, "wifi-init") == 0) {
-    result.status = St67FetchStatus::DriverFailure;
-  } else {
-    result.status = St67FetchStatus::HttpFailure;
   }
   St67FetchRequest* request = runtime.clientRequest;
   request->completed = true;

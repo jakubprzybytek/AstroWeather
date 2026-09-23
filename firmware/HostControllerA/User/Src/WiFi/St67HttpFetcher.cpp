@@ -2,7 +2,10 @@
 
 #include <Debug/LogService.hpp>
 #include <HostController/HttpClient.hpp>
+#include <HostController/HttpResponseParser.hpp>
+#include <HostController/St67HttpRules.hpp>
 #include <HostController/St67Runtime.hpp>
+#include <Utils/Crc32.hpp>
 
 #include "app_config.h"
 #include "lwip/dns.h"
@@ -15,19 +18,6 @@ namespace {
 
 constexpr uint32_t kFlagDns = 1U << 4;
 constexpr uint32_t kFlagHttp = 1U << 5;
-
-const char* findBounded(const uint8_t* data, uint16_t length, const char* needle) {
-  const size_t needleLength = std::strlen(needle);
-  if (needleLength == 0U || needleLength > length) {
-    return nullptr;
-  }
-  for (uint16_t offset = 0U; offset <= length - needleLength; ++offset) {
-    if (std::memcmp(data + offset, needle, needleLength) == 0) {
-      return reinterpret_cast<const char*>(data + offset);
-    }
-  }
-  return nullptr;
-}
 
 void dnsCallback(const char* name, const ip_addr_t* address, void* argument) {
   (void)name;
@@ -62,18 +52,12 @@ int32_t httpHeadersCallback(HTTP_state_t* connection, void* argument,
   (void)contentLength;
   St67Runtime& runtime = *static_cast<St67Runtime*>(argument);
   runtime.httpResponseTick = osKernelGetTickCount();
-  const char* contentType = findBounded(headers, headerLength, "Content-Type:");
-  if (contentType == nullptr) {
+  const St67HttpRules::ContentTypeCheck contentType = St67HttpRules::checkContentType(
+      headers, headerLength, APP_ST67_HTTP_EXPECTED_CONTENT_TYPE);
+  if (contentType == St67HttpRules::ContentTypeCheck::Missing) {
     return -1;
   }
-  const char* value = contentType + std::strlen("Content-Type:");
-  const char* end = reinterpret_cast<const char*>(headers) + headerLength;
-  while (value < end && (*value == ' ' || *value == '\t')) {
-    ++value;
-  }
-  const size_t expectedLength = std::strlen(APP_ST67_HTTP_EXPECTED_CONTENT_TYPE);
-  if (value + expectedLength > end ||
-      std::memcmp(value, APP_ST67_HTTP_EXPECTED_CONTENT_TYPE, expectedLength) != 0) {
+  if (contentType == St67HttpRules::ContentTypeCheck::Mismatch) {
     runtime.httpError = HTTP_CLIENT_BAD_PARAM;
     return -1;
   }
@@ -104,14 +88,9 @@ int32_t httpDataCallback(void* argument, HTTP_buffer_t* buffer, int32_t error) {
               static_cast<size_t>(buffer->length));
   *destinationLength += static_cast<uint32_t>(buffer->length);
   runtime.httpReceivedBytes += static_cast<uint32_t>(buffer->length);
-  for (int32_t index = 0; index < buffer->length; ++index) {
-    runtime.httpCrc ^= buffer->data[index];
-    for (uint32_t bit = 0U; bit < 8U; ++bit) {
-      runtime.httpCrc = (runtime.httpCrc & 1U) != 0U
-                            ? (runtime.httpCrc >> 1U) ^ 0xEDB88320U
-                            : (runtime.httpCrc >> 1U);
-    }
-  }
+  runtime.httpCrc = Crc32::update(runtime.httpCrc,
+                                  reinterpret_cast<const uint8_t*>(buffer->data),
+                                  static_cast<uint32_t>(buffer->length));
   return 0;
 }
 
@@ -142,15 +121,8 @@ St67HttpFetcher::St67HttpFetcher(St67Runtime& runtime) : runtime_(runtime) {}
 
 bool St67HttpFetcher::fetch(St67FetchRequest* request) {
   setFetchStage(runtime_, FetchStage::Downloading);
-  if (std::strlen(APP_ST67_HTTP_HOST) == 0U ||
-      std::strlen(APP_ST67_HTTP_HOST) > HTTP_SNI_MAX_SIZE ||
-      std::strstr(APP_ST67_HTTP_HOST, "://") != nullptr ||
-      std::strchr(APP_ST67_HTTP_HOST, ':') != nullptr ||
-      std::strchr(APP_ST67_HTTP_HOST, '\r') != nullptr ||
-      std::strchr(APP_ST67_HTTP_HOST, '\n') != nullptr ||
-      std::strlen(APP_ST67_HTTP_PATH) == 0U || APP_ST67_HTTP_PATH[0] != '/' ||
-      std::strchr(APP_ST67_HTTP_PATH, '\r') != nullptr ||
-      std::strchr(APP_ST67_HTTP_PATH, '\n') != nullptr) {
+  if (!St67HttpRules::isValidTarget(APP_ST67_HTTP_HOST, APP_ST67_HTTP_PATH,
+                                   HTTP_SNI_MAX_SIZE)) {
     LogService::instance().log(LogService::Level::Error,
                                  "ST67 fetch-config invalid");
     return false;
@@ -170,7 +142,7 @@ bool St67HttpFetcher::fetch(St67FetchRequest* request) {
   runtime_.httpPayloadLength = 0U;
   runtime_.clientPayloadLength = 0U;
   runtime_.responseTooLarge = false;
-  runtime_.httpCrc = 0xFFFFFFFFU;
+  runtime_.httpCrc = Crc32::kInitial;
   runtime_.httpResponseTick = 0U;
   runtime_.clientRequest = request;
   HTTP_connection_t settings{};
@@ -188,8 +160,9 @@ bool St67HttpFetcher::fetch(St67FetchRequest* request) {
   if (requestStatus != HTTP_CLIENT_SUCCESS) {
     return false;
   }
-  const bool success = runtime_.httpError == 0 &&
-                       runtime_.httpStatus >= OK && runtime_.httpStatus < 300;
+  const bool success =
+      runtime_.httpError == 0 &&
+      HttpResponse::isSuccessStatus(static_cast<uint32_t>(runtime_.httpStatus));
   return success;
 }
 

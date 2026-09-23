@@ -1,6 +1,7 @@
 #include <HostController/St67NetworkSession.hpp>
 
 #include <Debug/LogService.hpp>
+#include <HostController/St67ConnectDiagnosis.hpp>
 #include <HostController/St67NetworkAdapter.hpp>
 #include <HostController/St67HttpFetchTask.hpp>
 #include <HostController/St67Runtime.hpp>
@@ -28,9 +29,20 @@ St67Runtime* activeRuntime = nullptr;
 Settings::Store* credentialSource = nullptr;
 WifiConnectSummary lastConnect{};
 
-// Set before each connect so a failure with no reason event can be told apart
-// from one that reported WLAN_FW_SUCCESSFUL (0).
-constexpr uint32_t kNoReason = 0xFFFFFFFFU;
+using St67ConnectDiagnosis::kNoReason;
+using St67ConnectDiagnosis::SsidVisibility;
+
+static_assert(St67ConnectDiagnosis::kReasonAuthenticationFailure ==
+                  WLAN_FW_AUTHENTICATION_FAILURE &&
+              St67ConnectDiagnosis::kReasonAuthAlgoFailure == WLAN_FW_AUTH_ALGO_FAILURE &&
+              St67ConnectDiagnosis::kReasonDeauthByApWhenConnection ==
+                  WLAN_FW_DEAUTH_BY_AP_WHEN_CONNECTION &&
+              St67ConnectDiagnosis::kReasonPskHandshakeTimeout ==
+                  WLAN_FW_4WAY_HANDSHAKE_ERROR_PSK_TIMEOUT_FAILURE &&
+              St67ConnectDiagnosis::kReasonNoBssidAndChannel ==
+                  WLAN_FW_SCAN_NO_BSSID_AND_CHANNEL &&
+              St67ConnectDiagnosis::kReasonSecurityNoMatch == WLAN_FW_NETWORK_SECURITY_NOMATCH,
+              "St67ConnectDiagnosis reason codes must match w6x_types.h");
 
 // Bits 0-5 of the fetch task's flags are taken by the trigger, the session and
 // the HTTP fetcher.
@@ -45,8 +57,6 @@ void scanCallback(int32_t status, W6X_WiFi_Scan_Result_t* entry) {
     osThreadFlagsSet(activeRuntime->taskHandle, kFlagScanDone);
   }
 }
-
-enum class SsidVisibility : uint8_t { Visible, NotVisible, Unknown };
 
 // A missing network and a silent one look the same to the station: the
 // connect just times out with no reason code. Scanning for the SSID tells them
@@ -102,68 +112,20 @@ void recordConnect(WifiConnectResult result, const char* ssid, uint32_t reason =
   taskEXIT_CRITICAL();
 }
 
-WifiConnectResult classifyConnectFailure(uint32_t reason) {
-  switch (reason) {
-    case kNoReason:
-      return WifiConnectResult::NoResponse;
-    case WLAN_FW_SCAN_NO_BSSID_AND_CHANNEL:
-      return WifiConnectResult::NetworkNotFound;
-    // Seen on hardware: a wrong WPA2 password makes the access point deauth the
-    // station mid-handshake (7). Some access points let the handshake time out
-    // instead (8).
-    case WLAN_FW_DEAUTH_BY_AP_WHEN_CONNECTION:
-    case WLAN_FW_4WAY_HANDSHAKE_ERROR_PSK_TIMEOUT_FAILURE:
-      return WifiConnectResult::WrongPassword;
-    case WLAN_FW_AUTHENTICATION_FAILURE:
-    case WLAN_FW_AUTH_ALGO_FAILURE:
-    case WLAN_FW_NETWORK_SECURITY_NOMATCH:
-      return WifiConnectResult::SecurityMismatch;
-    default:
-      return WifiConnectResult::Failed;
-  }
-}
-
 // One plain-language line per outcome, saying what to check. The password is
 // never logged.
 void reportConnectFailure(WifiConnectResult result, const char* ssid, uint32_t reason) {
   LogService& log = LogService::instance();
-  switch (result) {
-    case WifiConnectResult::NoCredentials:
-      log.log(LogService::Level::Error,
-              "WiFi not configured: no SSID stored. Set one with 'wifi set <ssid> <password>'.");
+  const char* format = St67ConnectDiagnosis::failureMessageFormat(result);
+  switch (St67ConnectDiagnosis::failureMessageArguments(result)) {
+    case St67ConnectDiagnosis::MessageArguments::None:
+      log.log(LogService::Level::Error, format);
       break;
-    case WifiConnectResult::NetworkNotFound:
-      log.logf(LogService::Level::Error,
-               "WiFi network '%s' not found: no access point with that name is in range. "
-               "Check the SSID; it is case-sensitive.", ssid);
+    case St67ConnectDiagnosis::MessageArguments::Ssid:
+      log.logf(LogService::Level::Error, format, ssid);
       break;
-    case WifiConnectResult::WrongPassword:
-      log.logf(LogService::Level::Error,
-               "WiFi '%s' rejected the connection during the password check, which almost "
-               "always means a wrong password. Re-enter it with 'wifi set'.", ssid);
-      break;
-    case WifiConnectResult::SecurityMismatch:
-      log.logf(LogService::Level::Error,
-               "WiFi '%s' refused authentication. Check the password, and that the network "
-               "uses WPA2 (or is open when no password is set).", ssid);
-      break;
-    case WifiConnectResult::NoResponse:
-      log.logf(LogService::Level::Error,
-               "WiFi '%s' is in range but did not answer the connection request. Try again, "
-               "or restart the access point.", ssid);
-      break;
-    case WifiConnectResult::NoResponseUnchecked:
-      log.logf(LogService::Level::Error,
-               "WiFi '%s' did not answer before the connect timeout. Check the SSID (it is "
-               "case-sensitive) and that the access point is on and in range.", ssid);
-      break;
-    case WifiConnectResult::DhcpFailed:
-      log.logf(LogService::Level::Error,
-               "WiFi joined '%s' but got no IP address from DHCP. Check the router's DHCP "
-               "server.", ssid);
-      break;
-    default:
-      log.logf(LogService::Level::Error, "WiFi '%s' connect failed: %s (reason %lu).", ssid,
+    case St67ConnectDiagnosis::MessageArguments::SsidAndReason:
+      log.logf(LogService::Level::Error, format, ssid,
                (reason == kNoReason) ? "no reason given" : W6X_WiFi_ReasonToStr(&reason),
                static_cast<unsigned long>(reason));
       break;
@@ -345,14 +307,9 @@ bool St67NetworkSession::open() {
     LogService::instance().logf(LogService::Level::Debug, "WiFi connect reason=%s",
                                 (reason == kNoReason) ? "none" : W6X_WiFi_ReasonToStr(
                                     const_cast<uint32_t*>(&reason)));
-    WifiConnectResult result = classifyConnectFailure(reason);
-    if (result == WifiConnectResult::NoResponse) {
-      const SsidVisibility visibility = scanForSsid(credentials.ssid);
-      if (visibility == SsidVisibility::NotVisible) {
-        result = WifiConnectResult::NetworkNotFound;
-      } else if (visibility == SsidVisibility::Unknown) {
-        result = WifiConnectResult::NoResponseUnchecked;
-      }
+    WifiConnectResult result = St67ConnectDiagnosis::classifyConnectFailure(reason);
+    if (St67ConnectDiagnosis::needsScan(result)) {
+      result = St67ConnectDiagnosis::applyScan(result, scanForSsid(credentials.ssid));
     }
     recordConnect(result, credentials.ssid, reason);
     reportConnectFailure(result, credentials.ssid, reason);

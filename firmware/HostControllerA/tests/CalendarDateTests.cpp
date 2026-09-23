@@ -1,19 +1,12 @@
 #include <HostController/CalendarDate.hpp>
 
-#include <cstdlib>
+#include <Expect.hpp>
+
 #include <iostream>
 
 namespace {
 
-int failures = 0;
-
-void expect(bool condition, const char* caseName)
-{
-    if (!condition) {
-        std::cerr << caseName << " failed\n";
-        ++failures;
-    }
-}
+using Test::expect;
 
 void testLeapYears()
 {
@@ -120,10 +113,5 @@ int main()
     testSecondsSince2000();
     testEveryDayRoundTrips();
 
-    if (failures != 0) {
-        std::cerr << failures << " CalendarDate test(s) failed\n";
-        return EXIT_FAILURE;
-    }
-    std::cout << "CalendarDate tests passed\n";
-    return EXIT_SUCCESS;
+    return Test::finish("CalendarDate");
 }

@@ -1,29 +1,17 @@
 #include <Settings/SettingsCodec.hpp>
 
-#include <cstdlib>
+#include <Expect.hpp>
+
 #include <cstring>
-#include <iostream>
 
 namespace {
 
-int failures = 0;
-
-void expect(bool condition, const char* caseName)
-{
-    if (!condition) {
-        std::cerr << caseName << " failed\n";
-        ++failures;
-    }
-}
+using Test::expect;
 
 void expectResult(Settings::DecodeResult actual, Settings::DecodeResult expected,
                   const char* caseName)
 {
-    if (actual != expected) {
-        std::cerr << caseName << " failed: expected result " << static_cast<int>(expected)
-                  << ", got " << static_cast<int>(actual) << '\n';
-        ++failures;
-    }
+    Test::expectEqual(actual, expected, caseName);
 }
 
 // Builds a valid container around a hand-written payload, for the cases that
@@ -244,10 +232,5 @@ int main()
     testClockDisplayOffCostsOneRecord();
     testClockTrimCostsOneRecord();
 
-    if (failures != 0) {
-        std::cerr << failures << " SettingsCodec test(s) failed\n";
-        return EXIT_FAILURE;
-    }
-    std::cout << "SettingsCodec tests passed\n";
-    return EXIT_SUCCESS;
+    return Test::finish("SettingsCodec");
 }

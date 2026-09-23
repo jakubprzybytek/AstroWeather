@@ -28,7 +28,10 @@ implementation phases, is in
 
 | File | Responsibility |
 | --- | --- |
-| `User/Inc/HostController/AstroDataRefreshTask.hpp`, `User/Src/HostController/AstroDataRefreshTask.cpp` | The refresh task: triggers, pipeline, display mapping, progress bar, schedule driver, status summaries. |
+| `User/Inc/HostController/AstroDataRefreshTask.hpp`, `User/Src/HostController/AstroDataRefreshTask.cpp` | The refresh task: triggers, pipeline, schedule driver, status summaries; draws the display mapping and the progress bar. |
+| `User/Inc/HostController/AstroDisplayMapper.hpp`, `User/Src/HostController/AstroDisplayMapper.cpp` | Pure display mapping: `AstroData` to the six boards' numerics and matrix rows. Tested by `tests/AstroDisplayMapperTests.cpp`. |
+| `User/Inc/HostController/AstroProgressBar.hpp`, `User/Src/HostController/AstroProgressBar.cpp` | Pure progress bar: row pattern per step, blink phase, and the outcome indicator's timing. Tested by `tests/AstroProgressBarTests.cpp`. |
+| `User/Inc/Utils/Crc32.hpp` | The CRC-32 of the recheck. Tested by `tests/Crc32Tests.cpp`. |
 | `User/Inc/HostController/AstroData.hpp` | The parsed model: six boards, the server `time` and `lastWeatherFetchTime`. |
 | `User/Inc/HostController/AstroDataParser.hpp`, `User/Src/HostController/AstroDataParser.cpp` | Pure parser, no HAL or RTOS. Tested by `tests/AstroDataParserTests.cpp`. |
 | `User/Inc/HostController/RefreshSchedule.hpp` | Pure schedule arithmetic: slots, retry delays, when a refresh is due. Tested by `tests/RefreshScheduleTests.cpp`. |
@@ -82,7 +85,8 @@ for the refresh to finish; the outcome follows in the log. See
    progress bar. The result is logged:
    `AstroDataRefresh fetch status=<status> http=<code> bytes=<n> crc=<crc> detail=<n>`.
 2. **CRC recheck.** The WiFi task computes a CRC-32 over the body as it
-   receives it; the refresh task recomputes it over its own copy
+   receives it; the refresh task recomputes it over its own copy with
+   `Crc32::compute()`, the standard reflected CRC-32
    (`AstroDataRefresh response crc-valid=0|1`). This checks the hand-over
    between the two tasks, not the network: the API has no checksum, and HTTP
    `Content-Length` is checked by the HTTP client.
@@ -218,7 +222,8 @@ The firmware follows `api-payload.md` except in these details:
 
 ## Display Mapping
 
-Block *n* of the payload goes to one board:
+`AstroDisplayMapper::mapAll()` fills the boards and `publishDisplay()` then
+submits them. Block *n* of the payload goes to one board:
 
 | Block | Board | I2C address |
 | --- | --- | --- |
@@ -242,9 +247,8 @@ pattern, segment D (an underscore) on all four digits, which a value the
 display cannot show gets instead: a temperature outside -99.9 … 999.9, or an
 hour above 99. See [Display.md](Display.md#numeric-representation).
 
-Temperatures between -1 and 0 are drawn wrongly: the display code puts the
-minus sign where the decimal point should be, so -0.5 shows as `-5`, and 0.5
-shows as `.5`. See the known defect in
+Temperatures between -1 and 1 keep the zero before the decimal point: -0.5
+shows as `-0.5` and 0.5 as `0.5`. See
 [Display.md](Display.md#fixed-point-values).
 
 Only a fully parsed payload is published. After a fetch, CRC or parse failure
@@ -289,7 +293,8 @@ progress. The row is split into six segments, one per step:
   stopped at; a CRC, parse or publish failure at segment 6.
 - A new refresh clears the indicator at once.
 
-The refresh task draws the bar itself, from the WiFi task's progress callback
+The patterns and timing are `AstroProgressBar`'s; the refresh task keeps its
+`Indicator` state and draws the bar itself, from the WiFi task's progress callback
 and its own wake-ups, using `Display::submitLocal()`, so it never costs I2C
 traffic and the WiFi task never touches the display. A scheduled refresh shows
 the same bar as a manual one; there are no quiet hours. Typical step times and
@@ -391,6 +396,14 @@ Native tests, run with the other suites; see [Development.md](Development.md).
   counting, missed slots caught up once, backoff and its reset at the next
   slot, tick wrap, no retry without credentials, an unset clock, and clock
   steps both ways.
+- `tests/AstroDisplayMapperTests.cpp`: each numeric kind and `?`, matrix rows,
+  row 4 kept on the local board and cleared on the remotes, each block on its
+  board, and a parsed payload's `*`, `.` and `?` through to the board bits.
+- `tests/AstroProgressBarTests.cpp`: segment layout, the segment per stage, the
+  250 ms blink phases, the failed segment per outcome, the success hold, the
+  failure bar per failed step, its 500 ms toggles and 60 s end, and tick wrap.
+- `tests/Crc32Tests.cpp`: the check value, known vectors, empty input and
+  piecewise updates.
 
 Not covered by tests:
 
@@ -398,7 +411,7 @@ Not covered by tests:
   out-of-order records, bad display indexes, bad times and matrices,
   over-long lines, truncation, and `configurationId` over 20 characters.
 - The refresh task itself: triggers and the busy guard, the pipeline order,
-  the display mapping, the progress bar, and restoring `DR1`.
+  drawing the mapping and the bar on the display, and restoring `DR1`.
 - `astro refresh` and the `status` lines.
 
 These have been checked on hardware only.

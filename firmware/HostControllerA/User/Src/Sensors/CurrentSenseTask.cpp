@@ -12,7 +12,16 @@ constexpr uint32_t kSamplePeriodMs = 100U;
 // Local numeric display that shows the current, in mA, while 'adc display' is on.
 constexpr uint8_t kCurrentDisplayIndex = 2U;
 constexpr uint32_t kAdcSequenceLength = 3U;
-constexpr uint32_t kNominalReferenceMilliVolts = 3300U;
+
+// CurrentSenseConversion.hpp repeats the calibration conditions so it builds
+// without the HAL; they must match the device header.
+static_assert(CurrentSense::kCalibrationMilliVolts == VREFINT_CAL_VREF, "VREFINT_CAL_VREF");
+static_assert(CurrentSense::kCalibrationMilliVolts == TEMPSENSOR_CAL_VREFANALOG,
+              "TEMPSENSOR_CAL_VREFANALOG");
+static_assert(CurrentSense::kTsCal1Celsius == TEMPSENSOR_CAL1_TEMP, "TEMPSENSOR_CAL1_TEMP");
+static_assert(CurrentSense::kTsCal2Celsius == TEMPSENSOR_CAL2_TEMP, "TEMPSENSOR_CAL2_TEMP");
+static_assert(CurrentSense::kTemperatureCalcError == LL_ADC_TEMPERATURE_CALC_ERROR,
+              "LL_ADC_TEMPERATURE_CALC_ERROR");
 }  // namespace
 
 extern "C" ADC_HandleTypeDef hadc1;
@@ -75,13 +84,13 @@ CurrentSenseTask::Sample CurrentSenseTask::readSample()
         return {false, 0U, 0U, 0U, 0U, 0U, 0U};
     }
 
-    const uint32_t referenceMilliVolts =
-        adcValues_[2] == 0U
-            ? kNominalReferenceMilliVolts
-            : __HAL_ADC_CALC_VREFANALOG_VOLTAGE(
-                  adcValues_[2], ADC_RESOLUTION_12B);
-    const int32_t temperatureCelsius = __HAL_ADC_CALC_TEMPERATURE(
-        referenceMilliVolts, adcValues_[1], ADC_RESOLUTION_12B);
+    // Factory calibration values, read here because the conversions are pure;
+    // the sequence runs at 12 bits, the resolution they assume.
+    const uint32_t referenceMilliVolts = CurrentSense::vddaMilliVolts(
+        adcValues_[2], *VREFINT_CAL_ADDR);
+    const int32_t temperatureCelsius = CurrentSense::temperatureCelsius(
+        adcValues_[1], referenceMilliVolts, *TEMPSENSOR_CAL1_ADDR,
+        *TEMPSENSOR_CAL2_ADDR);
     const uint32_t currentMilliAmps = CurrentSense::rawToMilliAmps(
         adcValues_[0], referenceMilliVolts);
 
@@ -110,7 +119,7 @@ void CurrentSenseTask::run()
             if (display_ != nullptr && displayEnabled_)
             {
                 display_->local().numeric(kCurrentDisplayIndex).setValue(
-                    static_cast<int16_t>(sample.currentMilliAmps));
+                    CurrentSense::displayMilliAmps(sample.currentMilliAmps));
                 // Only this board changes, so skip the I2C refresh of every
                 // remote board that submit() would do ten times a second.
                 display_->submitLocal();

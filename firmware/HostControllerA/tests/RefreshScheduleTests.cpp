@@ -1,20 +1,11 @@
 #include <HostController/CalendarDate.hpp>
 #include <HostController/RefreshSchedule.hpp>
 
-#include <cstdlib>
-#include <iostream>
+#include <Expect.hpp>
 
 namespace {
 
-int failures = 0;
-
-void expect(bool condition, const char* caseName)
-{
-    if (!condition) {
-        std::cerr << caseName << " failed\n";
-        ++failures;
-    }
-}
+using Test::expect;
 
 constexpr uint32_t kMinuteMs = 60000U;
 
@@ -177,10 +168,5 @@ int main()
     testUnsetClock();
     testClockSteps();
 
-    if (failures != 0) {
-        std::cerr << failures << " RefreshSchedule test(s) failed\n";
-        return EXIT_FAILURE;
-    }
-    std::cout << "RefreshSchedule tests passed\n";
-    return EXIT_SUCCESS;
+    return Test::finish("RefreshSchedule");
 }

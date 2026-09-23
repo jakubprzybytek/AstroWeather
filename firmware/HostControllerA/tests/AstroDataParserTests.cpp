@@ -1,10 +1,14 @@
 #include <HostController/AstroDataParser.hpp>
 
-#include <cstdlib>
-#include <iostream>
+#include <Expect.hpp>
+
 #include <string>
 
 namespace {
+
+using HostController::AstroParseStatus;
+using Test::expect;
+using Test::expectEqual;
 
 std::string block(unsigned int index)
 {
@@ -26,12 +30,12 @@ std::string validPayload()
     return payload;
 }
 
-void expect(bool condition, const char* name)
+HostController::AstroParseStatus parse(const std::string& payload,
+                                       HostController::AstroData& data)
 {
-    if (!condition) {
-        std::cerr << name << " failed\n";
-        std::exit(EXIT_FAILURE);
-    }
+    return HostController::parseAstroData(
+        reinterpret_cast<const uint8_t*>(payload.data()),
+        static_cast<uint32_t>(payload.size()), data);
 }
 
 void testValidPayload()
@@ -79,14 +83,6 @@ void testUnknownKeysAreIgnored()
         static_cast<uint32_t>(payload.size()), data);
     expect(status == HostController::AstroParseStatus::Success,
            "unknown key");
-}
-
-HostController::AstroParseStatus parse(const std::string& payload,
-                                       HostController::AstroData& data)
-{
-    return HostController::parseAstroData(
-        reinterpret_cast<const uint8_t*>(payload.data()),
-        static_cast<uint32_t>(payload.size()), data);
 }
 
 std::string withTime(const std::string& value)
@@ -176,6 +172,193 @@ void testLastWeatherFetchTime()
     }
 }
 
+AstroParseStatus parse(const std::string& payload)
+{
+    HostController::AstroData data{};
+    return parse(payload, data);
+}
+
+std::string replaced(std::string payload, const std::string& from, const std::string& to)
+{
+    const std::size_t position = payload.find(from);
+    if (position == std::string::npos) {
+        Test::fail(("payload contains " + from).c_str());
+        return payload;
+    }
+    return payload.replace(position, from.size(), to);
+}
+
+// A line holds at most 95 characters, without its line ending.
+void testLineLengthLimit()
+{
+    const std::string key = "future_key=";
+    const std::string longest = key + std::string(95U - key.size(), 'x');
+    std::string payload = validPayload();
+    payload.insert(payload.find("display=0"), longest + "\n");
+    expectEqual(parse(payload), AstroParseStatus::Success, "95-character line accepted");
+
+    // The line reader gives up on an over-long line, which ends the parse
+    // before any block.
+    payload = validPayload();
+    payload.insert(payload.find("display=0"), longest + "x\n");
+    expectEqual(parse(payload), AstroParseStatus::Truncated, "96-character line rejected");
+
+    // The CR of a CRLF ending does not count towards the limit.
+    payload = validPayload();
+    payload.insert(payload.find("display=0"), longest + "\r\n");
+    expectEqual(parse(payload), AstroParseStatus::Success, "95 characters plus CRLF accepted");
+}
+
+// CR is dropped wherever it appears, so CRLF line endings parse the same as LF.
+void testCrlfLineEndings()
+{
+    const std::string lf = validPayload();
+    std::string crlf;
+    for (const char c : lf) {
+        if (c == '\n') {
+            crlf += '\r';
+        }
+        crlf += c;
+    }
+    HostController::AstroData data{};
+    expectEqual(parse(crlf, data), AstroParseStatus::Success, "CRLF payload");
+    expectEqual(data.boards[0].numeric[0].hour, 20U, "CRLF time hour");
+    expectEqual(data.boards[5].matrix[0], 1U, "CRLF matrix row");
+    expect(data.boards[0].numeric[3].available && data.boards[0].numeric[3].value < -1.9F &&
+               data.boards[0].numeric[3].value > -2.1F,
+           "CRLF temperature");
+}
+
+void testBlocksOutOfOrder()
+{
+    std::string payload = replaced(validPayload(), "display=1\n", "display=X\n");
+    payload = replaced(payload, "display=2\n", "display=1\n");
+    payload = replaced(payload, "display=X\n", "display=2\n");
+    expectEqual(parse(payload), AstroParseStatus::InvalidDisplay, "blocks 0, 2, 1");
+
+    expectEqual(parse(replaced(validPayload(), "display=0\n", "display=1\n")),
+                AstroParseStatus::InvalidDisplay, "first block not 0");
+
+    expectEqual(parse(replaced(validPayload(), "board=num4x4_matrix5x21\nnightId=ignored\n",
+                               "nightId=ignored\nboard=num4x4_matrix5x21\n")),
+                AstroParseStatus::MissingRecord, "records out of order");
+}
+
+void testMissingBlock()
+{
+    const std::string payload = validPayload();
+
+    const std::size_t block2 = payload.find("display=2\n");
+    const std::size_t block3 = payload.find("display=3\n");
+    std::string withoutBlock2 = payload;
+    withoutBlock2.erase(block2, block3 - block2);
+    expectEqual(parse(withoutBlock2), AstroParseStatus::InvalidDisplay, "block 2 missing");
+
+    std::string withoutLast = payload;
+    withoutLast.erase(payload.find("display=5\n"));
+    expectEqual(parse(withoutLast), AstroParseStatus::Truncated, "last block missing");
+
+    expectEqual(parse(replaced(payload, "matrix_1=?\n", "")), AstroParseStatus::MissingRecord,
+                "record missing");
+
+    expectEqual(parse(payload + block(6U)), AstroParseStatus::MissingRecord, "extra block 6");
+}
+
+void testTruncatedPayload()
+{
+    const std::string payload = validPayload();
+    const std::size_t block3 = payload.find("display=3\n");
+
+    // Cut at a line end inside block 3, after its matrix_0 record.
+    const std::size_t matrix0End = payload.find('\n', payload.find("matrix_0=", block3));
+    expectEqual(parse(payload.substr(0U, matrix0End + 1U)), AstroParseStatus::Truncated,
+                "cut at a line end mid-block");
+
+    // Cut inside a line: the partial last line is parsed as it is, so the
+    // result is that record's own error rather than Truncated.
+    const std::size_t matrix2 = payload.find("matrix_2=", block3);
+    expectEqual(parse(payload.substr(0U, matrix2 + 15U)), AstroParseStatus::InvalidMatrix,
+                "cut inside a matrix row");
+    const std::size_t temperature = payload.find("numeric_2=18.5", block3);
+    expectEqual(parse(payload.substr(0U, temperature + 12U)), AstroParseStatus::InvalidTemperature,
+                "cut inside a temperature");
+
+    // A payload that ends with the last record but no newline is complete.
+    std::string noFinalNewline = payload;
+    while (!noFinalNewline.empty() && noFinalNewline.back() == '\n') {
+        noFinalNewline.pop_back();
+    }
+    expectEqual(parse(noFinalNewline), AstroParseStatus::Success, "no final newline");
+
+    expectEqual(parse("protocol=1\nconfigurationId=krakow\n"), AstroParseStatus::Truncated,
+                "header only");
+    expectEqual(parse("protocol=1\n"), AstroParseStatus::Truncated, "protocol only");
+
+    HostController::AstroData data{};
+    expectEqual(HostController::parseAstroData(nullptr, 10U, data),
+                AstroParseStatus::InvalidArgument, "null payload");
+    expectEqual(HostController::parseAstroData(reinterpret_cast<const uint8_t*>(payload.data()),
+                                               0U, data),
+                AstroParseStatus::InvalidArgument, "empty payload");
+}
+
+void testConfigurationIdLength()
+{
+    const std::string twenty(20U, 'c');
+    expectEqual(parse(replaced(validPayload(), "configurationId=krakow",
+                               "configurationId=" + twenty)),
+                AstroParseStatus::Success, "20-character configurationId");
+    expectEqual(parse(replaced(validPayload(), "configurationId=krakow",
+                               "configurationId=" + twenty + "c")),
+                AstroParseStatus::MissingRecord, "21-character configurationId");
+    expectEqual(parse(replaced(validPayload(), "configurationId=krakow\n", "")),
+                AstroParseStatus::MissingRecord, "configurationId missing");
+}
+
+void testProtocol()
+{
+    expectEqual(parse(replaced(validPayload(), "protocol=1", "protocol=2")),
+                AstroParseStatus::UnsupportedProtocol, "protocol 2");
+    expectEqual(parse(replaced(validPayload(), "protocol=1\n", "")),
+                AstroParseStatus::MissingRecord, "protocol missing");
+    expectEqual(parse(replaced(validPayload(), "protocol=1", "protocol 1")),
+                AstroParseStatus::Malformed, "record without '='");
+    expectEqual(parse(replaced(validPayload(), "board=num4x4_matrix5x21",
+                               "board=num4x4_matrix5x20")),
+                AstroParseStatus::UnsupportedBoard, "unknown board");
+}
+
+void testUnavailableValues()
+{
+    HostController::AstroData data{};
+
+    // block() has matrix_1=? and an all-'?' matrix_3; both are blank rows.
+    expectEqual(parse(validPayload(), data), AstroParseStatus::Success, "? rows");
+    expectEqual(data.boards[2].matrix[1], 0U, "single ? row blank");
+    expectEqual(data.boards[2].matrix[3], 0U, "all-? row blank");
+
+    // A '?' inside a row is an unlit column.
+    std::string payload = replaced(validPayload(), "matrix_2=.....................",
+                                   "matrix_2=*?*.................*");
+    expectEqual(parse(payload, data), AstroParseStatus::Success, "mixed ? row");
+    expectEqual(data.boards[0].matrix[2], 0x100005U, "mixed ? row value");
+
+    expectEqual(parse(replaced(validPayload(), "matrix_2=.....................", "matrix_2=??")),
+                AstroParseStatus::InvalidMatrix, "short ? row");
+
+    payload = replaced(validPayload(), "numeric_2=18.5", "numeric_2=?");
+    payload = replaced(payload, "numeric_0=20:30", "numeric_0=?");
+    expectEqual(parse(payload, data), AstroParseStatus::Success, "? numerics");
+    expect(!data.boards[0].numeric[0].available, "? time unavailable");
+    expect(!data.boards[0].numeric[2].available, "? temperature unavailable");
+    expect(data.boards[1].numeric[2].available, "next block's temperature available");
+
+    expectEqual(parse(replaced(validPayload(), "numeric_2=18.5", "numeric_2=??")),
+                AstroParseStatus::InvalidTemperature, "?? temperature");
+    expectEqual(parse(replaced(validPayload(), "numeric_0=20:30", "numeric_0=20:3")),
+                AstroParseStatus::InvalidTime, "short time");
+}
+
 } // namespace
 
 int main()
@@ -185,6 +368,13 @@ int main()
     testUnknownKeysAreIgnored();
     testServerTime();
     testLastWeatherFetchTime();
-    std::cout << "AstroDataParser tests passed\n";
-    return EXIT_SUCCESS;
+    testLineLengthLimit();
+    testCrlfLineEndings();
+    testBlocksOutOfOrder();
+    testMissingBlock();
+    testTruncatedPayload();
+    testConfigurationIdLength();
+    testProtocol();
+    testUnavailableValues();
+    return Test::finish("AstroDataParser");
 }

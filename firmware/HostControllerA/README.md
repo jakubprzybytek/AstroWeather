@@ -83,7 +83,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | Local LED board (multiplexing, progress bar) | ⚠️ Works, HW issue | Off digits glow because the slot P-FETs do not fully turn off (H-3) | [Display.md](docs/Display.md) |
 | Sending data to the 5 remote boards over I2C | ✅ Done (host side) | Needs I2C pull-ups, which are `dnp` in the schematic (H-4) | [Display.md](docs/Display.md#i2c-transport) |
 | DisplayController firmware for the remote boards | 🔴 Stub | Only the console task starts and its replies are dropped; no I2C slave, no local display | [Development.md](docs/Development.md#firmware-variants) |
-| Negative temperatures between -1 and 0 | 🟡 Bug | -0.5 °C shows as `-5` | [Display.md](docs/Display.md#fixed-point-values) |
+| Numeric formatting (fixed point, time, `?`) | ✅ Done | -0.5 °C shows as `-0.5`; values that do not fit 4 digits show the error pattern | [Display.md](docs/Display.md#fixed-point-values) |
 | **Time** | | | |
 | RTC clock on numeric display 3, `time` commands | ✅ Done | Lost on power loss (no LSE crystal or backup battery) | [RTC.md](docs/RTC.md) |
 | Clock sync from the server | ✅ Done | | [RTC.md](docs/RTC.md#sync-from-the-api) |
@@ -97,7 +97,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | USB console and logging | ✅ Done | | [Console.md](docs/Console.md) |
 | EEPROM settings | ✅ Done | A read failure is reported as "blank" | [Settings.md](docs/Settings.md) |
 | Firmware version and git hash | 🔴 Not started | Only the build time is stamped | [Development.md](docs/Development.md) |
-| Unit tests | 🟡 Partial | 9 suites for the pure-logic modules; none for the console, Wi-Fi, EEPROM driver or refresh pipeline | [Architecture.md](docs/Architecture.md#unit-tests) |
+| Unit tests | 🟡 Partial | 19 native suites, 95% line coverage of the code they compile, run in CI; console commands and the EEPROM store are next (phases 3-4) | [Testing.md](docs/Testing.md) |
 
 ## Known Limitations
 
@@ -121,6 +121,7 @@ Current:
 - [docs/RTC.md](docs/RTC.md)
 - [docs/Settings.md](docs/Settings.md)
 - [docs/CurrentSense.md](docs/CurrentSense.md)
+- [docs/Testing.md](docs/Testing.md): native unit tests, coverage and the test plan
 - [docs/Firmware-RAM-Usage.md](docs/Firmware-RAM-Usage.md): static RAM breakdown
 - [docs/CubeMXCompliance.md](docs/CubeMXCompliance.md): keeping application
   changes out of generated code

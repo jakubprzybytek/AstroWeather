@@ -1,7 +1,6 @@
 #include <Display/DisplayTypes.hpp>
 
 #include <cmath>
-#include <limits>
 
 namespace Display {
 namespace {
@@ -17,13 +16,34 @@ constexpr uint8_t kDigits[] = {
 };
 constexpr uint8_t kMinus = kSegmentG;
 
+// Digits drawn for a value: all of its significant digits, and at least the
+// digit left of the decimal point, so 0.5 shows as "0.5" and not ".5".
+uint8_t shownDigitCount(uint32_t magnitude, uint8_t precision)
+{
+    uint8_t count = 1U;
+    while (magnitude >= 10U) {
+        magnitude /= 10U;
+        ++count;
+    }
+    return count > precision ? count : static_cast<uint8_t>(precision + 1U);
+}
+
+uint32_t magnitudeOf(int16_t mantissa)
+{
+    return mantissa < 0 ? static_cast<uint32_t>(-static_cast<int32_t>(mantissa))
+                        : static_cast<uint32_t>(mantissa);
+}
+
+// The digits plus the minus sign of a negative value must fit the four
+// digit positions.
 bool fits(int16_t mantissa, uint8_t precision)
 {
-    if (precision > kMaxPrecision || mantissa == std::numeric_limits<int16_t>::min()) {
+    if (precision > kMaxPrecision) {
         return false;
     }
-    const int32_t magnitude = mantissa < 0 ? -static_cast<int32_t>(mantissa) : mantissa;
-    return mantissa < 0 ? magnitude <= 999 : magnitude <= 9999;
+    const uint32_t positions = shownDigitCount(magnitudeOf(mantissa), precision) +
+                               (mantissa < 0 ? 1U : 0U);
+    return positions <= 4U;
 }
 
 } // namespace
@@ -41,29 +61,17 @@ void NumericDisplay::setFixed(int16_t mantissa, uint8_t precision)
         return;
     }
     data_.slots.fill(0U);
-    int32_t magnitude = mantissa;
-    const bool negative = magnitude < 0;
-    if (negative) {
-        magnitude = -magnitude;
+    uint32_t magnitude = magnitudeOf(mantissa);
+    const uint8_t digits = shownDigitCount(magnitude, precision);
+    for (uint8_t digit = 0U; digit < digits; ++digit) {
+        data_.slots[static_cast<uint8_t>(3U - digit)] = kDigits[magnitude % 10U];
+        magnitude /= 10U;
     }
-    uint8_t firstDigitPosition = 4U;
-    for (uint8_t position = negative ? 1U : 0U; position < 4U; ++position) {
-        const uint8_t digit = static_cast<uint8_t>(3U - position);
-        const uint32_t divisor = digit == 0U ? 1U :
-            digit == 1U ? 10U : digit == 2U ? 100U : 1000U;
-        const uint8_t number = static_cast<uint8_t>((magnitude / divisor) % 10);
-        const bool leading = divisor != 1U && number == 0U &&
-                             magnitude < static_cast<int32_t>(divisor * 10U);
-        data_.slots[position] = leading ? 0U : kDigits[number];
-        if (negative && !leading && firstDigitPosition == 4U) {
-            firstDigitPosition = position;
-        }
-        if (precision != 0U && position == static_cast<uint8_t>(3U - precision)) {
-            data_.slots[position] |= 0x80U;
-        }
+    if (precision != 0U) {
+        data_.slots[static_cast<uint8_t>(3U - precision)] |= kSegmentDp;
     }
-    if (negative) {
-        data_.slots[static_cast<uint8_t>(firstDigitPosition - 1U)] = kMinus;
+    if (mantissa < 0) {
+        data_.slots[static_cast<uint8_t>(3U - digits)] = kMinus;
     }
 }
 

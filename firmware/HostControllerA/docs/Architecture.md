@@ -279,34 +279,16 @@ watchdog, so it stays that way until reset.
 
 The native suites in `tests/` build with the `NativeTests` preset
 (`BUILD_NATIVE_TESTS=ON`) and run under CTest; see
-[Development.md](Development.md). Each is a plain executable with its own
-`expect()` helper, no framework.
+[Development.md](Development.md). Decisions are kept out of the tasks: parsing,
+mapping and timing logic lives in small hardware-free units (for example
+`AstroDisplayMapper`, `AstroProgressBar`, `HttpResponseParser`,
+`St67ConnectDiagnosis`), and the tasks only do the I/O around them. Code that
+still needs the HAL, the RTOS or the log links the stand-ins in `tests/stubs`
+and `tests/fakes`.
 
-| Suite | Code under test |
-| --- | --- |
-| `numeric_display_tests` | `Display/DisplayTypes`: numeric value, fixed-point and time formatting |
-| `display_codec_tests` | `Display/DisplayCodec`: logical state to PCB frame encoding |
-| `current_sense_conversion_tests` | `Sensors/CurrentSenseConversion.hpp`: ADC counts to current, temperature, VDDA |
-| `calendar_date_tests` | `HostController/CalendarDate.hpp` |
-| `rtc_trim_tests` | `HostController/RtcTrim.hpp`: trim to prescaler |
-| `clock_sync_tests` | `HostController/ClockSync.hpp`: offset and drift arithmetic |
-| `refresh_schedule_tests` | `HostController/RefreshSchedule.hpp`: slots and retries |
-| `settings_codec_tests` | `Settings/SettingsCodec`: EEPROM image encode and decode |
-| `astro_data_parser_tests` | `HostController/AstroDataParser`: payload parser |
-
-Not covered by any test:
-
-- Console command parsing (`User/Src/Console/`).
-- `Settings::Store` (load, page-diff save, credential locking).
-- The `Eeprom24AA04` driver and `I2cBus`.
-- `DisplayI2cProtocol` and `BufferedDisplayBoard`.
-- `PcbDisplayBoard` multiplexing and the `SCT2xxx` driver.
-- `ClockTask` RTC reads, writes and the sync itself, as opposed to its arithmetic.
-- The refresh pipeline in `AstroDataRefreshTask`: fetch, CRC check, publish,
-  progress bar.
-- `HttpClient` and `St67HttpFetcher`.
-- The Wi-Fi session (`St67NetworkSession`) and the fetch task.
-- `LogService`.
+The suites, what each covers, and what is still untested (console commands,
+`Settings::Store` and the EEPROM driver, `BufferedDisplayBoard`, and the
+bench-only code) are listed in [Testing.md](Testing.md#coverage-by-module).
 
 ## Unused and Dead Code
 
@@ -334,7 +316,7 @@ firmware:
   the refresh task's own buffer instead.
 - **Unused `app_config.h` macros**: `APP_ST67_SCAN_TIMEOUT_MS`,
   `APP_ST67_SCAN_MAX_RESULTS`, `APP_ST67_HTTP_TOTAL_TIMEOUT_MS`,
-  `APP_ST67_HTTP_MAX_HEADER_BYTES` (`HttpClient.cpp` has its own 2048-byte header
-  limit), and `APP_ST67_WIFI_SSID` / `APP_ST67_WIFI_PASSWORD`, which the
+  `APP_ST67_HTTP_MAX_HEADER_BYTES` (`HttpResponseParser.hpp` has its own
+  2048-byte header limit, `kHeaderCapacity`), and `APP_ST67_WIFI_SSID` / `APP_ST67_WIFI_PASSWORD`, which the
   credentials template still defines although the credentials now come from the
   EEPROM (`wifi set`).

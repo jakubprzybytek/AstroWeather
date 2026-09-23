@@ -134,7 +134,7 @@ For values set through the numeric convenience API, the displayed mathematical v
 mantissa / 10^precision
 ```
 
-The sign consumes the leftmost display position and leading zeroes are blank for normal numeric values. The resulting segments are stored directly in the normalized slot bytes.
+The digits are right-aligned. Leading zeroes are blank, except the digit immediately left of the decimal point, which is always shown, so a magnitude below one keeps its `0.`. A negative value's minus sign goes in the position immediately left of its first shown digit. The resulting segments are stored directly in the normalized slot bytes.
 
 Examples:
 
@@ -146,10 +146,14 @@ Examples:
 | `setFixed(1234, 3)` | 1234 | 3 | `1.234` |
 | `setFixed(-999, 0)` | -999 | 0 | `-999` |
 | `setFixed(-999, 1)` | -999 | 1 | `-99.9` |
+| `setFixed(42, 0)` | 42 | 0 | `42`, in the two rightmost positions |
+| `setFixed(5, 1)` | 5 | 1 | `0.5` |
+| `setFixed(-5, 1)` | -5 | 1 | `-0.5` |
+| `setFixed(-1, 2)` | -1 | 2 | `-0.01` |
+| `setFixed(1, 3)` | 1 | 3 | `0.001` |
+| `setFixed(-1, 3)` | -1 | 3 | error pattern |
 
-The four display positions allow four positive digits or a minus sign and three digits. Values that do not fit after applying the sign and decimal precision are invalid.
-
-**Known defect with magnitudes below 1.** Leading zeroes are blanked up to the last digit, including the zero before the decimal point, so `setFixed(5, 1)` shows `.5` and `setFixed(1, 3)` shows `.  1`. For a negative value the minus sign then goes into the slot that carries the decimal point and replaces it: `setFixed(-5, 1)`, a temperature of -0.5, shows `-5`. The astro refresh draws temperatures this way, so -0.1 to -0.9 °C read as -1 to -9. `tests/NumericDisplayTests.cpp` currently pins the `0.001` case (`.  1`) and a `-0.01` case, so fixing it means changing those expectations too.
+The decimal point does not take a display position of its own; it is the DP segment of the digit before it. The four positions therefore hold the shown digits plus, for a negative value, the minus sign. The shown digits are all significant digits of the mantissa, and at least `precision + 1` of them. Values that need more than four positions are invalid and give the error pattern. That makes every negative value with precision 3 invalid, because `-0.001` already needs five positions; use precision 2 or less for negative values.
 
 ### Float Input
 
@@ -310,7 +314,7 @@ The pins are then returned to inputs without pull, and `board_id = ADDR_0 + 3 ×
 
 On receipt, `deserializeI2c()` in `DisplayI2cProtocol.cpp` accepts only a 36-byte message whose first byte is `0x01`, and decodes it into a temporary state before replacing the destination, so a rejected message leaves the previous state untouched.
 
-`DisplayAddress.cpp` and `deserializeI2c()` are written for the Display Controller but are not called anywhere yet; only `serializeI2c()` is used, by `BufferedDisplayBoard`. None of the three has a native test.
+`DisplayAddress.cpp` and `deserializeI2c()` are written for the Display Controller but are not called anywhere yet; only `serializeI2c()` is used, by `BufferedDisplayBoard`. All three have native tests; see [Tests](#tests).
 
 ## Refresh Progress
 
@@ -358,13 +362,14 @@ Not implemented. The DisplayController variant's `AppVariant.cpp` only starts `C
 
 ## Tests
 
-- `tests/NumericDisplayTests.cpp`: `setFixed()`, both `setValue()` overloads, `setTime()` including the blank leading zero and the error pattern, `setTimeUnset()`, `setBlank()` and `setSegments()`.
-- `tests/DisplayCodecTests.cpp`: only the order of the five matrix rows in the prepared frame.
+- `tests/NumericDisplayTests.cpp`: `setFixed()`, including magnitudes below one and values that do not fit, both `setValue()` overloads, `setTime()` including the blank leading zero and the error pattern, `setTimeUnset()`, `setBlank()` and `setSegments()`.
+- `tests/DisplayCodecTests.cpp`: golden vectors from the tables above: every segment of every digit of every numeric display on its documented bit, byte and slot, the indicators, the 21 matrix columns and bits 21-23, and the order of the five matrix rows in the prepared frame.
+- `tests/DisplayI2cProtocolTests.cpp`: the 36-byte layout, the round trip, masking of bits 21-23, and rejection of short, long and null messages and unknown commands, leaving the destination untouched.
+- `tests/DisplayAddressTests.cpp`: all 27 strap combinations through the stub GPIO, the pins left without pull, `boardAddress()` limits and `detectBoardAddress()` on `ADDR_0`-`ADDR_2`.
 
-Not covered: the per-display segment wiring, the SPI byte order, I2C serialization and deserialization, board address detection, the refresh timing and transfer failures.
+Not covered: the refresh timing and transfer failures.
 
 ## Remaining Implementation Work
 
 1. Display Controller: create the PCB-backed board, detect the address with `detectBoardAddress()`, configure I2C1 as a target at that address with receive callbacks, and apply complete 36-byte messages through `deserializeI2c()`. The Host Controller `.ioc` configures I2C1 as a controller; the Display Controller must reconfigure it at run time.
 2. Decide whether a failed remote transfer should be retried before the next `submit()`.
-3. Tests for the segment wiring, SPI byte order, I2C serialization round trip, command filtering and malformed messages.

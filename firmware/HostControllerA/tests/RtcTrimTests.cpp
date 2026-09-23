@@ -1,20 +1,13 @@
 #include <HostController/RtcTrim.hpp>
 
+#include <Expect.hpp>
+
 #include <cmath>
-#include <cstdlib>
 #include <iostream>
 
 namespace {
 
-int failures = 0;
-
-void expect(bool condition, const char* caseName)
-{
-    if (!condition) {
-        std::cerr << caseName << " failed\n";
-        ++failures;
-    }
-}
+using Test::expect;
 
 // Rate error of the resulting 1 Hz tick, in ppm, for an LSI that really is
 // at the trimmed frequency.
@@ -84,10 +77,5 @@ int main()
     testWholeRangeWithinOnePpm();
     testOutOfRangeIsRejected();
 
-    if (failures != 0) {
-        std::cerr << failures << " RtcTrim test(s) failed\n";
-        return EXIT_FAILURE;
-    }
-    std::cout << "RtcTrim tests passed\n";
-    return EXIT_SUCCESS;
+    return Test::finish("RtcTrim");
 }

@@ -120,19 +120,9 @@ cmake --build --preset NativeTests
 ctest --test-dir build/native-tests-local --output-on-failure
 ```
 
-`tests/CMakeLists.txt` registers nine suites, all of which should pass:
-
-| Test | Covers |
-| --- | --- |
-| `numeric_display_tests` | Numeric display formatting |
-| `display_codec_tests` | Encoding the board state into the local display board's frame |
-| `current_sense_conversion_tests` | ADC to current, temperature and supply conversion |
-| `astro_data_parser_tests` | Forecast payload parsing |
-| `settings_codec_tests` | Settings EEPROM image encode and decode |
-| `rtc_trim_tests` | RTC prescaler trim |
-| `clock_sync_tests` | Clock sync from the API time |
-| `calendar_date_tests` | Calendar arithmetic |
-| `refresh_schedule_tests` | Scheduled astro refresh slots and retries |
+All suites registered in `tests/CMakeLists.txt` should pass. The list of
+suites, the coverage preset, the HAL/RTOS stubs and how to add a test are in
+[Testing.md](Testing.md).
 
 If `ctest` is unavailable, run an executable directly, for example:
 

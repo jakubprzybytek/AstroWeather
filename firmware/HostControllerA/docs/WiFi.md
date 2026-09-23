@@ -95,12 +95,16 @@ The driver's own log output goes through `vLoggingPrintf()`, defined in
 
 | File | Responsibility |
 | --- | --- |
-| `User/Src/WiFi/St67HttpFetchTask.cpp`, `User/Inc/HostController/St67HttpFetchTask.hpp` | The task. Public API: `FetchSt67Data`, `StartSt67HttpFetchTask`, `SetSt67CredentialSource`, `TriggerSt67ConnectivityCycle`, `LastWifiConnect`. Runs batches and maps the result. |
+| `User/Src/WiFi/St67HttpFetchTask.cpp`, `User/Inc/HostController/St67HttpFetchTask.hpp` | The task. Public API: `FetchSt67Data`, `StartSt67HttpFetchTask`, `SetSt67CredentialSource`, `TriggerSt67ConnectivityCycle`, `LastWifiConnect`. Runs batches and publishes the result. |
+| `User/Src/WiFi/St67FetchStatusMap.cpp`, `.../St67FetchStatusMap.hpp` | `fetchStatusForFailure()`: first failed stage to `St67FetchStatus`. Pure. |
 | `User/Inc/HostController/St67FetchTypes.hpp` | `St67FetchRequest`, `St67FetchResult`, `St67FetchStatus`, `FetchStage`, the client timeout. |
-| `User/Src/WiFi/St67NetworkSession.cpp`, `.../St67NetworkSession.hpp` | `initialize()`, `open()`, `disconnect()`, `stop()`. Credentials, connect-failure diagnosis, `LastWifiConnect()`. |
+| `User/Src/WiFi/St67NetworkSession.cpp`, `.../St67NetworkSession.hpp` | `initialize()`, `open()`, `disconnect()`, `stop()`. Credentials, the SSID scan, `LastWifiConnect()`. |
+| `User/Src/WiFi/St67ConnectDiagnosis.cpp`, `.../St67ConnectDiagnosis.hpp` | Connect-failure diagnosis: reason code to `WifiConnectResult`, the scan fallback, and the log line for each result. Pure. |
 | `User/Src/WiFi/St67NetworkAdapter.cpp`, `.../St67NetworkAdapter.hpp` | Station state from public APIs only: `W6X_WiFi_Station_GetState()` plus the LwIP `NETIF_STA` netif (up, link, IPv4). |
 | `User/Src/WiFi/St67HttpFetcher.cpp`, `.../St67HttpFetcher.hpp` | Checks the host and path, resolves DNS, runs one GET, checks `Content-Type`, copies the body and computes its CRC-32. |
+| `User/Src/WiFi/St67HttpRules.cpp`, `.../St67HttpRules.hpp` | The fetcher's host/path check (`isValidTarget()`) and `Content-Type` check (`checkContentType()`). Pure. |
 | `User/Src/WiFi/HttpClient.cpp`, `User/Inc/HostController/HttpClient.hpp` | `HttpClient_Get()`: a bounded synchronous HTTP/1.1 GET on an LwIP socket. |
+| `User/Src/WiFi/HttpResponseParser.cpp`, `.../HttpResponseParser.hpp` | `HttpResponse::`: header end, status line, `Content-Length`, the header buffer and body limits, used by `HttpClient_Get()`. Pure. |
 | `User/Inc/HostController/St67Runtime.hpp` | `St67Runtime`: init flags, state, DNS and HTTP results, the first failure, the 4096-byte `httpPayload` buffer, the client request being served. |
 | `User/Src/WiFi/St67SpiReady.cpp` | The `ST67_RDY` rising-edge bridge. |
 | `User/Src/WiFi/St67ProbeTask.cpp` | Dead code: the raw AT/CWLAP probe from before the driver was used. Compiled, never started. |
@@ -169,7 +173,8 @@ end-to-end check; the server sends no checksum and TCP's own is all there is.
 ### Status
 
 The task records the first failing step as a stage name
-(`runtime.firstFailureStage`), keeps going through disconnect, then maps it:
+(`runtime.firstFailureStage`), keeps going through disconnect, then maps it with
+`fetchStatusForFailure()`:
 
 | Status | When |
 | --- | --- |
@@ -324,7 +329,7 @@ Plain HTTP only. HTTPS is planned in
    built in a 512-byte heap buffer. The connect itself has no separate
    timeout beyond LwIP's.
 3. **Headers.** Received in 1024-byte reads into a 2048-byte heap buffer,
-   `kHeaderCapacity` in `HttpClient.cpp`. Everything read until the blank line,
+   `HttpResponse::kHeaderCapacity` in `HttpResponseParser.hpp`. Everything read until the blank line,
    including body bytes that arrive in the same read, must fit in 2048 bytes.
    The status line must be `HTTP/x.y nnn` with `nnn` up to 599.
 4. **Checks.** Success needs a 2xx status and a `Content-Type` that starts with
@@ -348,7 +353,8 @@ the caller's 180 s.
 ## Connect failure diagnosis
 
 A failed `W6X_WiFi_Connect()` is classified from the last Wi-Fi reason code the
-module reported, so the log and `status` can say what to fix:
+module reported, so the log and `status` can say what to fix. The mapping and
+the messages are in `St67ConnectDiagnosis.cpp`:
 
 | Result | Reason code | Log message (abridged) |
 | --- | --- | --- |
@@ -402,7 +408,7 @@ reason code and its name, SSID, tick, and on success RSSI and channel.
 | `APP_ST67_DNS_TIMEOUT_MS` | 5000 | yes |
 | `APP_ST67_HTTP_IO_TIMEOUT_MS` | 5000 | yes, socket send and receive timeouts |
 | `APP_ST67_HTTP_TOTAL_TIMEOUT_MS` | 15000 | **no**; there is no total deadline |
-| `APP_ST67_HTTP_MAX_HEADER_BYTES` | 2048 | **no**; `HttpClient.cpp` hardcodes 2048 |
+| `APP_ST67_HTTP_MAX_HEADER_BYTES` | 2048 | **no**; `HttpResponseParser.hpp` hardcodes 2048 |
 | `APP_ST67_HTTP_MAX_RESPONSE_BYTES` | 4096 | yes: body limit, `httpPayload` and the refresh task's buffer |
 | `APP_ST67_LIFECYCLE_MODE` | 3 | switch 2 batches only |
 | `APP_ST67_PERSISTENT_STRESS_CYCLES` | 100 | mode 1 |
@@ -479,8 +485,9 @@ the customized LwIP teardown, since removed.
 - **Dead code.** `St67ProbeTask.cpp` is compiled but never started;
   `TriggerSt67SmokeTest()` is never called; the generated
   `LWIP/App/http_client.c` is compiled but not called.
-- **No unit tests** cover the WiFi layer. `HttpClient.cpp`'s header and body
-  parsing is the obvious first candidate; it needs its socket calls separated
-  out to run natively.
+- **Unit tests** cover only the WiFi layer's pure parts: the response
+  parser, the host/path and `Content-Type` rules, the connect diagnosis and
+  the stage-to-status mapping (see [Testing.md](Testing.md)). The socket,
+  DNS and driver calls are not tested natively.
 - **The `netif` task at priority 50** is above the display task and has not
   been measured against it.

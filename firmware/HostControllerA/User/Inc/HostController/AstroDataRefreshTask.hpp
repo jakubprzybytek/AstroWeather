@@ -1,6 +1,7 @@
 #pragma once
 
 #include <HostController/AstroData.hpp>
+#include <HostController/AstroProgressBar.hpp>
 #include <HostController/RefreshSchedule.hpp>
 #include <HostController/St67FetchTypes.hpp>
 #include <Utils/Task.hpp>
@@ -99,11 +100,10 @@ private:
 
     // Progress bar on the local board's bottom matrix row. Drawn from this task
     // only, while it waits for the WiFi task, so the WiFi task never touches the
-    // display.
-    enum class Indicator : uint8_t { None, Success, Failure };
+    // display. The patterns and timing are AstroProgressBar's.
     static void onFetchProgress(FetchStage stage, void* context);
     void showProgressRow(uint32_t columns);
-    void startIndicator(Indicator indicator, uint8_t failedSegment);
+    void startIndicator(AstroProgressBar::Indicator::Kind kind, uint8_t failedSegment);
     void stepIndicator();
     void clearIndicator();
 
@@ -118,10 +118,7 @@ private:
     RefreshSummary last_{};
     // Written by this task only; read by others through schedule().
     RefreshSchedule::Scheduler scheduler_{};
-    Indicator indicator_ = Indicator::None;
-    uint32_t indicatorUntil_ = 0U;
-    uint8_t failedSegment_ = 0U;
-    bool indicatorLit_ = false;
+    AstroProgressBar::Indicator indicator_{};
     uint32_t shownRow_ = 0xFFFFFFFFU;  // columns last submitted; none yet
     uint8_t loggedStage_ = 0xFFU;
 };

@@ -1,19 +1,10 @@
 #include <HostController/ClockSync.hpp>
 
-#include <cstdlib>
-#include <iostream>
+#include <Expect.hpp>
 
 namespace {
 
-int failures = 0;
-
-void expect(bool condition, const char* caseName)
-{
-    if (!condition) {
-        std::cerr << caseName << " failed\n";
-        ++failures;
-    }
-}
+using Test::expect;
 
 constexpr int64_t kHourMs = 3600000;
 constexpr int32_t kSecondsError = ClockSync::kWholeSeconds.sampleErrorMs;
@@ -137,10 +128,5 @@ int main()
     testResetAndBackwardsTime();
     testPrecisionPerSync();
 
-    if (failures != 0) {
-        std::cerr << failures << " ClockSync test(s) failed\n";
-        return EXIT_FAILURE;
-    }
-    std::cout << "ClockSync tests passed\n";
-    return EXIT_SUCCESS;
+    return Test::finish("ClockSync");
 }
