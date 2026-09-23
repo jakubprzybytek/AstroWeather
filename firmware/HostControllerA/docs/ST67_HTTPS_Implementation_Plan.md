@@ -1,5 +1,8 @@
 # ST67 HTTPS Implementation Plan
 
+**Status: not started as of 2026-09-23.** The firmware fetches over plain HTTP
+only; the current Wi-Fi stack is described in [WiFi.md](WiFi.md).
+
 ## 1. Goal
 
 Add authenticated HTTPS GET support to the existing ST67 daily-fetch path while
@@ -38,7 +41,8 @@ Relevant ownership boundaries are:
 - `User/Src/WiFi/HttpClient.cpp`: owns the current synchronous TCP socket,
   request write, bounded response parsing, and cleanup.
 - `Appli/App/app_config.h`: non-secret limits and endpoint defaults.
-- `Appli/App/app_credentials.h.template`: local Wi-Fi and endpoint values.
+- `Appli/App/app_credentials.h.template`: local endpoint host and path. Wi-Fi
+  credentials are stored in the EEPROM with `wifi set`; see [Settings.md](Settings.md).
 
 The build selects `ST67_ARCH=W6X_ARCH_T02`. Consequently, TLS runs on the
 STM32 host above LwIP; the ST67 HTTP/network offload APIs are not the transport
@@ -88,18 +92,37 @@ mTLS is out of scope.
 
 ### Certificate time
 
-The MCU currently has no enabled RTC, and the generated SNTP client keeps time
-in its private context rather than establishing a trusted libc clock. Select
-and document one production policy:
+The RTC is enabled, clocked from the LSI and trimmed per board. It is set
+from the `time` record of each successful astro API response; see
+[RTC.md](RTC.md). The generated SNTP client (`LWIP/App/sntp.c`) is not
+started and must stay off, as it would also write the RTC. This changes the
+certificate-time problem but does not solve it:
 
-- provision and retain trusted wall-clock time, then refresh it after network
-  connection; or
-- use a product-approved authenticated time/bootstrap design compatible with
-  the chosen pinning policy.
+- **Bootstrap loop.** Over HTTPS the `time` record arrives only after the
+  handshake. After a power loss the RTC is unset (the backup domain is lost;
+  there is no LSE or battery), so the first handshake has no trusted time to
+  check the certificate's validity period against. A reset or re-flash keeps
+  the time.
+- **Local time, not UTC.** The RTC holds the server configuration's local time
+  with daylight saving applied, and the firmware keeps no time zone. X.509
+  validity is in UTC, so the check needs the offset, or a margin of at least
+  the largest offset.
+- **Accuracy.** Between syncs the LSI drifts by up to about 800 ppm, about
+  70 s a day; this is negligible against certificate lifetimes.
+
+Select and document one production policy, for example:
+
+- with an unset RTC, skip only the validity-period check (never the chain or
+  hostname) on the first connection, set the RTC from that authenticated
+  response, and require full validation afterwards; or
+- have the payload carry UTC (or the offset) as well as local time, so the RTC
+  or a separate UTC value can be checked directly; or
+- use another product-approved authenticated time source compatible with the
+  chosen pinning policy.
 
 Unauthenticated SNTP alone must not be treated as the root of trust for the
-first TLS connection. If enabling RTC is selected, update the `.ioc` manually
-in STM32CubeMX and regenerate before adding application integration.
+first TLS connection. Whatever is chosen, the time a certificate is checked
+against must never come from an unauthenticated response.
 
 ### Entropy
 
@@ -266,7 +289,7 @@ consumers first; do not weaken verification or silently increase buffers.
 
 | File or area | Planned change |
 | --- | --- |
-| `HostControllerA.ioc` | User performs mbedTLS and optional RTC configuration in CubeMX |
+| `HostControllerA.ioc` | User performs mbedTLS configuration in CubeMX (the RTC is already enabled) |
 | Generated CMake/middleware configuration | Regenerated mbedTLS sources, includes, and config; no manual edits outside USER sections |
 | `Appli/App/app_config.h` | Transport selection, HTTPS port, handshake/total deadlines, and TLS limits |
 | `Appli/App/app_credentials.h.template` | Empty host/path values only |
@@ -287,16 +310,18 @@ must remain User-owned and generated files must remain regenerable.
 After CubeMX regeneration and after each implementation increment:
 
 ```bash
-"$CUBE_CMAKE" --build build/Debug-HostController
-"$CUBE_CMAKE" --build build/Release-HostController
-"$CUBE_CMAKE" --build build/Debug-DisplayController
-cmake --build build/native-tests-vscode
-ctest --test-dir build/native-tests-vscode --output-on-failure
+cmake --preset Debug-HostController && cmake --build --preset Debug-HostController
+cmake --preset Release-HostController && cmake --build --preset Release-HostController
+cmake --preset Debug-DisplayController && cmake --build --preset Debug-DisplayController
+cmake --preset NativeTests && cmake --build --preset NativeTests
+ctest --test-dir build/native-tests-local --output-on-failure
 arm-none-eabi-size -A -d build/Debug-HostController/HostControllerA.elf
 git diff --check
 ```
 
-Adjust the native-test build directory only if its configured preset changes.
+Use the bundled Cube CMake in place of `cmake` where it is not on `PATH`; see
+[Development.md](Development.md). The native-test build directory is set by the
+`NativeTests` preset in `CMakePresets.json`.
 Bench results should identify firmware build, endpoint certificate generation,
 cycle count, first failure, timings, bytes/CRC, memory minima, task/stack counts,
 and debug transport counters without recording secrets or payload data.

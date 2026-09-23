@@ -1,6 +1,6 @@
 # Development Workflow
 
-This document is the practical build, flash, debug, and device-communication guide for HostControllerA. It is written so that a developer or AI agent can build the firmware, program the board, exercise the USB CDC interface, and collect evidence that a change works.
+This document is the practical build, flash, debug, and device-communication guide for HostControllerA. It is written so that a developer or AI agent can build the firmware, program the board, reach the USB console, and collect evidence that a change works. The console itself, its output format and every command are described in [Console.md](Console.md).
 
 ## Prerequisites
 
@@ -95,9 +95,24 @@ arm-none-eabi-size build/Debug-HostController/HostControllerA.elf
 
 A successful build should leave the ELF present and print the flash/RAM usage summary. The linker script is `STM32G0B1xx_FLASH.ld` and the firmware target is an STM32G0B1 Cortex-M0+ image.
 
+### Firmware variants
+
+`FIRMWARE_VARIANT` selects which `User/Src/<variant>/AppVariant.cpp` is built:
+
+- **HostController** is the product firmware: display driving, clock, current
+  sense, settings EEPROM, the ST67 WiFi fetch (`User/Src/WiFi/`, built only for
+  this variant) and the USB console with its log.
+- **DisplayController** is currently a stub. It shares the CubeMX
+  initialisation but its `AppVariant_Init()` only starts `ConsoleService`, with
+  no display, EEPROM or settings, and never starts `LogService`, so nothing it
+  does reaches the USB port. See [Console.md](Console.md#displaycontroller).
+
 ### Native tests
 
-Native tests use the `NativeTests` preset and do not require a board:
+Host-side logic is covered by native tests that do not need a board. The
+`NativeTests` preset builds them with the MSYS2 UCRT64 compiler in
+`C:/Progs/msys64/ucrt64` (see `CMakePresets.json`) into
+`build/native-tests-local`:
 
 ```bash
 cmake --preset NativeTests
@@ -105,16 +120,24 @@ cmake --build --preset NativeTests
 ctest --test-dir build/native-tests-local --output-on-failure
 ```
 
-A successful test run should report `astro_data_parser_tests`,
-`numeric_display_tests`, `display_codec_tests`, and
-`current_sense_conversion_tests` as passing. If `ctest` is unavailable, run
-the generated executables directly:
+`tests/CMakeLists.txt` registers nine suites, all of which should pass:
+
+| Test | Covers |
+| --- | --- |
+| `numeric_display_tests` | Numeric display formatting |
+| `display_codec_tests` | Encoding the board state into the local display board's frame |
+| `current_sense_conversion_tests` | ADC to current, temperature and supply conversion |
+| `astro_data_parser_tests` | Forecast payload parsing |
+| `settings_codec_tests` | Settings EEPROM image encode and decode |
+| `rtc_trim_tests` | RTC prescaler trim |
+| `clock_sync_tests` | Clock sync from the API time |
+| `calendar_date_tests` | Calendar arithmetic |
+| `refresh_schedule_tests` | Scheduled astro refresh slots and retries |
+
+If `ctest` is unavailable, run an executable directly, for example:
 
 ```bash
-./build/native-tests-local/tests/astro_data_parser_tests.exe
-./build/native-tests-local/tests/numeric_display_tests.exe
-./build/native-tests-local/tests/display_codec_tests.exe
-./build/native-tests-local/tests/current_sense_conversion_tests.exe
+./build/native-tests-local/tests/settings_codec_tests.exe
 ```
 
 ## Flash and Start Debugging
@@ -173,106 +196,44 @@ SWD connection.
 
 ## Communicate with the Device
 
-The HostController firmware exposes a USB CDC virtual COM port for logs, telemetry, healthcheck echoes, and console commands. The DisplayController variant does not start the HostController debug service.
+The HostController firmware exposes a USB CDC virtual COM port carrying the log
+and the command console. [Console.md](Console.md) covers connecting, the
+`tools/astro_console.py` client, the output format and the full command
+reference. In short:
 
-### Connection settings
+- Use the board's own **USB Serial Device** port (`COM4` on the development
+  workstation), not the ST-LINK virtual COM port, which carries no firmware
+  output. The baud rate is ignored.
+- `python tools/astro_console.py send status` checks that the board is alive;
+  `capture` and `shell` cover longer sessions.
+- Only one application can hold the port at a time. Close Serial Monitor, HTerm
+  or `astro_console.py` before flashing or opening the port elsewhere.
 
-- Find the assigned port in Windows Device Manager. In the verified setup,
-  `COM4` is the active USB Serial Device carrying the firmware console;
-  `COM3` is the ST-LINK virtual COM port and produced no application output.
-- Baud rate is ignored by USB CDC; `115200` is a conventional value.
-- Send lines terminated with `\n` or `\r\n`.
-- Only one application can hold the COM port at a time; see [Console CLI tool](#console-cli-tool).
-- The port sometimes vanishes or refuses to open, particularly after repeated
-  flashing; see
-  [COM port disappears or will not open](#com-port-disappears-or-will-not-open).
+### First-time setup
 
-### Interactive monitor
+The firmware has no built-in WiFi credentials. They default to empty, are set
+from the console with `wifi set`, stored in the settings EEPROM, and read on
+every connect. See [WiFi.md](WiFi.md).
 
-The `eclipse-cdt.serial-monitor` extension can be used for manual checks:
+The API host and path are still compile-time values. `Appli/App/app_config.h`
+includes `Appli/App/app_credentials.h` when it exists and takes
+`APP_ST67_HTTP_HOST` and `APP_ST67_HTTP_PATH` from it; without the file both are
+empty and every fetch fails. The file is git-ignored, so on a fresh checkout copy
+`Appli/App/app_credentials.h.template` to `app_credentials.h` and fill in the
+host and path. The `APP_ST67_WIFI_SSID` and `APP_ST67_WIFI_PASSWORD` defines in
+the same file are no longer used by the firmware.
 
-1. Open the Command Palette.
-2. Run **Serial Monitor: Start Monitoring**.
-3. Select the board's COM port and any baud rate, such as `115200`.
-4. Send `help` followed by Enter.
+After flashing a new board:
 
-### Console CLI tool
-
-`tools/astro_console.py` wraps the connect/send/read pattern below into a
-reusable CLI, so ad-hoc capture scripts don't need to be rewritten for each
-check. It requires `pyserial` (see Prerequisites). Run it from the
-`HostControllerA` repository root.
-
-By default it auto-detects the console port by excluding any port whose
-description contains `ST-LINK`/`STLink` (the ST-LINK virtual COM port), and
-picks the remaining single candidate. Pass `--port COM4` (before the
-subcommand) to override auto-detection, or if more than one non-ST-LINK port
-is present.
-
-List candidate ports:
-
-```bash
-python tools/astro_console.py list
+```text
+wifi set MyNetwork mypassphrase
+time trim <ppm>
+status
 ```
 
-Send one or more commands and print the response (waits `--wait` seconds,
-default `2`, after each):
-
-```bash
-python tools/astro_console.py send help
-python tools/astro_console.py send "adc log on" "adc log off"
-```
-
-Open an interactive shell: typed lines are sent as commands, device output
-streams live, `Ctrl+C` exits:
-
-```bash
-python tools/astro_console.py shell
-```
-
-Capture device output for a fixed duration, optionally sending a command
-partway through and writing the result to a file instead of stdout:
-
-```bash
-python tools/astro_console.py capture --duration 20 --command "astro refresh" --output capture.txt
-```
-
-Only one application can hold the COM port at a time. Close VS Code Serial
-Monitor or any other terminal (e.g. HTerm) before running this tool, and
-stop the tool before opening the port elsewhere.
-
-For anything the CLI doesn't cover, the same connect/send/read pattern can be
-scripted directly with `pyserial`:
-
-```python
-import serial
-import time
-
-PORT = "COM4"
-BAUD = 115200
-DURATION = 15
-SEND_AT = 3
-
-with serial.Serial(PORT, BAUD, timeout=0.2) as ser:
-    start = time.monotonic()
-    sent = False
-    data = bytearray()
-
-    while time.monotonic() - start < DURATION:
-        elapsed = time.monotonic() - start
-        if not sent and elapsed >= SEND_AT:
-            ser.write(b"help\r\n")
-            ser.flush()
-            sent = True
-        chunk = ser.read(256)
-        if chunk:
-            data.extend(chunk)
-
-print(data.decode(errors="replace"))
-```
-
-Do not commit throwaway one-off scripts written this way; extend
-`tools/astro_console.py` instead if the capability is worth keeping.
+`wifi set` saves and immediately runs a connection test. `time trim` applies
+this board's measured LSI error; see [RTC.md](RTC.md#trimming). Both are kept
+in the EEPROM across power cycles.
 
 ### COM port disappears or will not open
 
@@ -289,7 +250,7 @@ rather than a fault in this firmware. Typical symptoms:
 
 The open failure is `FileNotFoundError` (the device is gone), not
 `PermissionError` (another application holds the port). For the latter, close
-the other holder instead; see [Console CLI tool](#console-cli-tool).
+the other holder instead.
 
 Reading the RTC over SWD (`python tools/rtc_offset.py`) is another way to see
 that the firmware is alive while the console is unreachable.
@@ -373,158 +334,6 @@ Get-ItemProperty 'HKLM:\HARDWARE\DEVICEMAP\SERIALCOMM'
   before flashing.
 - Prefer `-hardRst` over `-rst` when a reset is needed as part of flashing.
 
-### Useful commands
-
-The command set can change; send `help` first. Current commands include:
-
-```text
-help
-help <group>
-status
-stats on|off
-display set <index> <value> <precision>
-display time <index> <HH:MM>
-display blank <index>
-astro refresh
-time show
-time set <YYYY-MM-DD> <HH:MM[:SS]>
-time trim <ppm>
-time display on
-time display off
-adc log on
-adc log off
-adc display on
-adc display off
-eeprom probe
-eeprom scan
-eeprom dump
-eeprom read <hex-offset> [hex-length]
-eeprom write <hex-offset> <hexbytes>
-eeprom erase
-settings show
-settings save
-settings defaults
-wifi set <ssid> [password]
-wifi test
-wifi clear
-```
-
-`adc log`, `adc display`, `time display`, `time trim` and the `wifi` commands write straight through to the
-settings EEPROM, so they survive a power cycle and are re-applied at startup. A
-blank or corrupt chip falls back to defaults rather than refusing to boot.
-
-[Settings.md](Settings.md) specifies the stored format, and anything adding a
-new persisted setting should follow
-[Adding a new setting](Settings.md#adding-a-new-setting) there.
-
-The clock is its own subject: [RTC.md](RTC.md) covers the `time` commands, how
-each board's LSI is trimmed, what survives a reset, and how to measure the
-drift with `tools/rtc_offset.py`.
-
-Note that `wifi set` is echoed to the log like any other console line, and
-`eeprom dump` shows the stored password in the clear.
-
-### WiFi setup
-
-The firmware has no built-in WiFi credentials: they default to empty and are
-set from the console, stored in the settings EEPROM, and read on every connect.
-`Appli/App/app_credentials.h` is no longer used.
-
-```text
-wifi set MyNetwork mypassphrase
-wifi set "My Network" "my pass phrase"
-wifi set CafeGuest
-```
-
-Quote values containing spaces. The SSID is 1-32 characters; the WPA2 password
-8-63, or left out for an open network. `wifi set` saves, then immediately runs a
-connection test (a refresh tagged `wifi-test`) and ends with a one-line verdict;
-`wifi test` repeats the test. Invalid input is rejected with the specific
-reason before anything is saved.
-
-A failed connection is reported in plain words, taken from the ST67 module's
-Wi-Fi reason code:
-
-| Situation | Message |
-| --- | --- |
-| Nothing stored | `WiFi not configured: no SSID stored. Set one with 'wifi set <ssid> <password>'.` |
-| Wrong SSID or out of range | `WiFi network '<ssid>' not found: no access point with that name is in range. ...` |
-| Wrong password | `WiFi '<ssid>' rejected the connection during the password check, which almost always means a wrong password. ...` |
-| Authentication or security type mismatch | `WiFi '<ssid>' refused authentication. ...` |
-| Joined but no IP address | `WiFi joined '<ssid>' but got no IP address from DHCP. ...` |
-
-Behaviour verified against the bench access point: a missing SSID reports
-reason 12 (`SCAN_NO_BSSID_AND_CHANNEL`) and a wrong password reason 7
-(`DEAUTH_BY_AP_WHEN_CONNECTION`). A connect can also time out with no reason at
-all; the firmware then scans for the SSID to decide between "not found" and
-"in range but did not answer". `status` shows the stored SSID and how the last
-connection went.
-
-Every completed input line produces an echo similar to:
-
-```text
-[0:00:01:23]: received text
-```
-
-Logs have this form:
-
-```text
-[days:hours:minutes:seconds] [INFO] message
-[days:hours:minutes:seconds] [WARN] message
-[days:hours:minutes:seconds] [ERR] message
-[days:hours:minutes:seconds] [DEBUG] message
-```
-
-`status` prints a one-screen summary, for example:
-
-```text
-OK status
-firmware   HostController, built 2026-09-21 11:17:26
-uptime     0d 00:03:11
-heap       24752 B free, 19352 B lowest since boot
-stats      off
-eeprom     answering at 0x50, 512 bytes
-settings   loaded at boot: ok; adc log off, adc display on, time display on, trim +18400 ppm
-wifi       'lemo' stored; last connect ok 0d 00:03:05 ago (channel 2, -39 dBm)
-astro      last refresh ok, 0d 00:02:25 ago, from console
-remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
-```
-
-The EEPROM and remote boards are probed live when the command runs, not taken
-from earlier results. WiFi has no link state of its own, so the `astro` line,
-which gives the outcome of the last refresh, is the evidence that the network
-path works. The build time is stamped on every build by `cmake/BuildInfo.cmake`,
-so it identifies the flashed image even after an incremental build. A side
-effect is that every build relinks, even when no source has changed.
-
-`help` prints a grouped index; `help <group>` (for example `help eeprom`) prints details and examples for one group. Each reply is kept under the 16-line log queue so no lines are dropped.
-
-Opening the port prints a welcome message, so a connected but idle device is visibly alive. `[STATS]`, `[MEM]` and `[STACK]` telemetry is off at boot; `stats on` emits it every 5 seconds regardless of other traffic, interleaved with command responses. See [USB_CDC_Debug_Service.md](USB_CDC_Debug_Service.md).
-
-Verified USB CDC command sequence on `COM4`:
-
-```text
-astro refresh
-astro refresh
-```
-
-The first command returns immediately with:
-
-```text
-OK astro-refresh=started
-```
-
-The second command, while the first refresh is active, returns:
-
-```text
-ERR astro-refresh-busy
-```
-
-The refresh then reports asynchronous ST67/network results through the log.
-Successful command-path testing was observed; a separate run failed at ST67
-initialization with `sem_if_ready not received`, so that transport failure is
-distinct from console-trigger validation.
-
 ## Validation Checklist
 
 Use the narrowest checks appropriate to the change:
@@ -534,10 +343,21 @@ Use the narrowest checks appropriate to the change:
 3. Confirm the expected ELF exists and run `arm-none-eabi-size` on it.
 4. Stop any old debug session, then press F5 with **HostController Debug** selected.
 5. Confirm the Debug Console reports a successful ST-LINK connection and program download.
-6. Identify the USB CDC COM port and capture startup output, e.g. `python tools/astro_console.py capture --duration 10`.
-7. Send `help` (`python tools/astro_console.py send help`) and verify an echo/command response.
-8. Send `status` or the command relevant to the change and retain the output.
-9. For communication changes, leave the capture running long enough to observe the five-second telemetry behavior and any warnings/errors.
+6. Wait a few seconds for USB to enumerate, then open the console and check the
+   welcome line shows the new build time, e.g.
+   `python tools/astro_console.py capture --duration 10`.
+7. Send `status` (`python tools/astro_console.py send status`) and check the
+   `OK status` reply.
+8. Send the command relevant to the change and retain the output.
+9. For communication or timing changes, run `stats on` and leave the capture
+   running long enough to see several five-second reports, the `dropped` and
+   `busyDrop` counters and any warnings or errors.
 10. Stop the debug session before disconnecting the probe or reopening the COM port in another tool.
 
-For a change that affects only host-side logic, run the native CTest suite as well. For a firmware behavior change, the build plus a programmed-board serial capture is the minimum meaningful validation.
+For a change that affects only host-side logic, run the native test suite as
+well. For a firmware behavior change, the build plus a programmed-board console
+capture is the minimum meaningful validation.
+
+If a WiFi fetch fails with `[ERR] sem_if_ready not received`, the ST67 module
+did not signal ready when the driver started. That is a module or SPI transport
+problem, separate from the console path; see [WiFi.md](WiFi.md).

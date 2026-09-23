@@ -204,8 +204,16 @@ These must hold for the compatibility rules above to work.
 
 `Settings::Store::load()` collapses these into `Ok`, `Defaulted` or
 `ReadFailed`, and keeps the detailed result available through `lastDecode()`
-for logging. `settings show` reports it as `boot-load=`, which describes what
-was found at startup and not the chip's present content.
+for logging. `settings show` reports it as `boot-load=`, `status` in its
+`settings` line, and the console's welcome message as
+`Settings loaded from EEPROM: <result>`. All three describe what was found at
+startup, not the chip's present content.
+
+An EEPROM **read failure** at startup also sets `lastDecode()` to `Blank`
+(`SettingsStore.cpp`), so those three places report it as `blank`, the same as
+a never-written chip. Only the startup log line, `Settings load=read-failed
+stored=blank`, tells the two apart, and it is emitted before USB has
+enumerated; see [Startup](#startup).
 
 A failure is never fatal: the firmware boots on defaults, and the next save
 overwrites the bad image.
@@ -269,6 +277,8 @@ wear concern at console-command rates.
 
 ## Console Interface
 
+The exact replies are in [Console.md](Console.md).
+
 | Command | Effect |
 | --- | --- |
 | `settings show` | Print current values and the startup load result. The password is reported only as `<set>` or `<unset>`. |
@@ -284,7 +294,7 @@ wear concern at console-command rates.
 
 The raw image can be inspected with `eeprom dump` and `eeprom read`, which is
 the quickest way to confirm a new record encodes as intended. See
-[Development.md](Development.md#useful-commands).
+[Console.md](Console.md#eeprom).
 
 ## Code Layout
 
@@ -311,6 +321,10 @@ the empty-WiFi case.
 The unknown-tag and absent-record cases are what pin down the compatibility
 rules. Do not delete them.
 
+`SettingsStore` is not tested: the page diff in `save()`, its write-everything
+fallback when the read fails, and the read-failure path of `load()` have been
+checked on hardware only.
+
 ## Startup
 
 `Settings::Store::load()` is called from `AppVariant_Init()`, which runs before
@@ -331,9 +345,14 @@ loaded state from the console.
   a sequence number, loading the newest valid copy and saving over the older.
   That is not implemented: it changes the container, so it would be container
   version 2.
-- **Credentials are stored and transported in the clear.** `wifi set` is echoed
-  to the log like any other console line, and `eeprom dump` prints the stored
-  password. `settings show` masks it, but that is the only place it is hidden.
+- **Credentials are stored and transported in the clear.** The password
+  crosses the USB console as typed, and `eeprom dump` and `eeprom read` print
+  it from the chip. The firmware does not echo or log command lines: the
+  `wifi set` reply repeats the SSID but gives the password only as
+  `password=<set>`, and `settings show`, `status` and the startup log never
+  print it. One exception: an unrecognised `settings` or `wifi` command is
+  answered with `ERR unknown command '<first 40 characters>'`, so a mistyped
+  `wifi set` can echo part of a password.
 - **Unknown tags are not preserved across a save.** The image is re-encoded from
   the in-RAM `Values`, so any record this firmware does not recognise is
   dropped. Flashing an older build, saving, then flashing a newer one loses the

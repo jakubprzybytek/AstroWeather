@@ -260,8 +260,7 @@ and the frequency is what that makes the LSI:
   configuration's local time with daylight saving applied, so a DST change
   reaches the clock at the next fetch after it.
 - **Synced only as often as something fetches.** The scheduled refresh runs
-  every 6 hours (see
-  [Astro_Data_Refresh_Implementation_Plan.md](Astro_Data_Refresh_Implementation_Plan.md#11-scheduled-refresh)),
+  every 6 hours (see [AstroRefresh.md](AstroRefresh.md#schedule)),
   and switch 1, `astro refresh` and `wifi test` fetch in between. Each of
   those may step the RTC.
 - **The drift measurement is in RAM.** A reset or flashing restarts it, though
