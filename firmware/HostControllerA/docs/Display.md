@@ -240,6 +240,7 @@ The encoder reads normalized A-G and DP segment values, then applies the wiring 
 
 - `DISPLAY_1_EN` through `DISPLAY_4_EN` select numeric digit positions 1 through 4 and dot-matrix rows 1 through 4.
 - `DISPLAY_5_EN` selects the special-indicator position for numeric displays and dot-matrix row 5. Only L1, L2, and L3 are populated in the numeric-display position selected by `DISPLAY_5_EN`.
+- Hardware matrix rows count from the bottom, the opposite of the logical rows: `DISPLAY_1_EN` drives the bottom row, which shows logical row 4, and `DISPLAY_5_EN` drives the top row, which shows logical row 0. `DisplayCodec::encodePcb()` reverses the order (slot `n` carries logical row `4 - n`), so the local board's row 4 progress bar appears at the bottom.
 - All `DISPLAY_x_EN` outputs are active-low: drive them high to disable and low to enable.
 - The numeric minus sign uses segment G.
 - On each numeric display, special indicators L1 and L2 are the two dots between the second and third digits; L3 is the apostrophe before the fourth digit.
