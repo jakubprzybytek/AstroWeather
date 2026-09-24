@@ -84,7 +84,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | Local LED board (multiplexing, progress bar) | ⚠️ Works, HW issue | Off digits glow because the slot P-FETs do not fully turn off (H-3) | [Display.md](docs/Display.md) |
 | Sending data to the 5 remote boards over I2C | ✅ Done (host side) | Needs I2C pull-ups, which are `dnp` in the schematic (H-4) | [Display.md](docs/Display.md#i2c-transport) |
 | DisplayController firmware for the remote boards | 🔴 Stub | Only the console task starts and its replies are dropped; no I2C slave, no local display | [Development.md](docs/Development.md#firmware-variants) |
-| Low-brightness step (`LOW_POWER_ENABLE`) | ✅ Done | `display low on\|off` (saved) or switch 2 (not saved), for all boards; it still follows the light sensor. Cuts LED current by about half (measured 59–65 → 28 mA with all LEDs lit). Remote boards need the DisplayController firmware from 2026-09-24, which releases their `PB8` (M-4) | [Display.md](docs/Display.md#low-brightness) |
+| Low-brightness step (`LOW_POWER_ENABLE`) | ✅ Done | `display low on\|off` or switch 2, both saved, for all boards; it still follows the light sensor. Cuts LED current by about half (measured 59–65 → 28 mA with all LEDs lit). Remote boards need the DisplayController firmware from 2026-09-24, which releases their `PB8` (M-4) | [Display.md](docs/Display.md#low-brightness) |
 | Numeric formatting (fixed point, time, `?`) | ✅ Done | -0.5 °C shows as `-0.5`; values that do not fit 4 digits show the error pattern | [Display.md](docs/Display.md#fixed-point-values) |
 | **Time** | | | |
 | RTC clock on numeric display 3, `time` commands | ✅ Done | Lost on power loss (no LSE crystal or backup battery) | [RTC.md](docs/RTC.md) |

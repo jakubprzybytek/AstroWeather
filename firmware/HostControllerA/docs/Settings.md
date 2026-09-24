@@ -274,7 +274,7 @@ If the read fails, every page is written rather than skipping the save.
 The encoder always produces a full-length image with `0xFF` padding, so the
 result is deterministic and no stale bytes are left behind a shortened payload.
 
-Saves happen synchronously from the console task whenever a setting changes.
+Saves happen synchronously whenever a setting changes: from the console task, and for low brightness also from `MainLoopTask` when switch 2 is pressed. `save()` holds the store's lock across the read-compare-write, so two saves cannot interleave their pages.
 The 24AA04H is rated for more than 1 million erase/write cycles, so per-change saves are not a
 wear concern at console-command rates.
 

@@ -36,7 +36,7 @@ CommandResult handleLowBrightnessCommand(const char* line, Settings::Store* stor
     if (on || off) {
         LowBrightness::set(on);
         if (store != nullptr) {
-            store->values().lowBrightness = on;
+            store->setLowBrightness(on);
             persist(store);
         }
         LogService::instance().sendLine(on ? "OK display-low=on" : "OK display-low=off");

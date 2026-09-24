@@ -311,7 +311,7 @@ remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 | `astro` **HC** | `no refresh since boot; try 'astro refresh'`, `first refresh running now`, or `last refresh <outcome>, <age> ago, from <trigger>`. Outcomes are `ok`, `fetch-failed`, `crc-failed`, `parse-failed` and `publish-failed`; a fetch failure adds its cause in brackets, such as `(no HTTP response)` or `(http 404)`. Triggers are `switch1`, `console`, `scheduled` and `wifi-test`. `; another running now` is appended while a refresh is in progress. |
 | `weather` **HC** | When the server last fetched the weather, from the last good response, with its age if the clock is set. Otherwise `last fetch time unknown until a refresh succeeds`, `... not reported by the server`, `... malformed in the response`, or `none on the server at the last refresh`. |
 | `schedule` **HC** | The next slot and the last success. `next` reads `once the clock is set` before the time is known; after failures it reads `retry <n> in <s> s`, `retry <n> now` or `no WiFi credentials, then <HH:MM>`. `last ok` reads `none since power-up` until a refresh succeeds. See [AstroRefresh.md](AstroRefresh.md). |
-| `brightness` **HC** | `normal` or `low`: the state in use, which switch 2 may have changed from the saved one in the `settings` line. See [display low](#display). |
+| `brightness` **HC** | `normal` or `low`: the state in use. It normally matches `low brightness` in the `settings` line, since both controls save; see [display low](#display). |
 | `remote` | Each remote display board, probed now on I2C: `yes` if it answered. `no display boards in this variant` without a display. |
 
 WiFi has no link state of its own, so the `astro` line is the evidence that the
@@ -471,7 +471,7 @@ are updated by `astro refresh`. Details in [Display.md](Display.md).
 | `display blank <n>` | Switches display `n` off. |
 | `display matrix <row> <bits>` | One row (0–4, 0 at the top) of the 5×21 matrix. `bits` is a string of `0` and `1`, character N lighting column N; missing columns are off and extra ones ignored. |
 | `display low on\|off` **HC** | Low brightness on every board: drives `LOW_POWER_ENABLE`. Saved, and applied at boot. Replies `OK display-low=on` or `OK display-low=off`. |
-| `display low` **HC** | `OK display-low=<in use> saved=<saved>`, e.g. `OK display-low=on saved=off` after a switch 2 press, which toggles without saving. |
+| `display low` **HC** | `OK display-low=<in use> saved=<saved>`, e.g. `OK display-low=on saved=on`. Switch 2 also saves, so the two differ only if a save failed, which logs `Settings save failed`. |
 
 The other commands reply `OK display`. Out-of-range values or an unknown `display`
 subcommand get `ERR invalid-argument`. Display 3 is also driven by the clock,

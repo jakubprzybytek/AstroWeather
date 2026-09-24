@@ -348,7 +348,7 @@ LED brightness is analog. The light-sensor divider sets `LED_BRIGHTNESS`, which 
 Only the Host Controller drives the pin, through `LowBrightness::set()`/`toggle()` in `User/Src/HostController/LowBrightness.cpp`. Two controls change it:
 
 - `display low on|off` on the console sets it and saves it (settings tag `DisplayFlags`, see [Settings.md](Settings.md#tag-registry)). `AppVariant_Init()` applies the saved state before the local board starts. `display low` reports the state in use and the saved one, and `status` shows it as `brightness normal|low`. See [Console.md](Console.md#display).
-- Switch 2 toggles it and logs `Low brightness on` or `off`, without saving, so a reset returns to the saved state.
+- Switch 2 toggles it, logs `Low brightness on` or `off`, and saves it the same way from `MainLoopTask`. `Settings::Store::save()` holds the store's lock, so a press cannot interleave its EEPROM page writes with a console save. The switch is debounced in hardware only. `SWITCH_2` is `SW301`: pulled up through `R306` (10k) and filtered by `R308` (10k) and `C308` (100 nF), so τ ≈ 1 ms on press and 2 ms on release, into the Schmitt-trigger input. A bounce longer than that toggles twice and saves twice.
 
 Measured on the host board on 2026-09-24, with all LEDs lit (`8.888` on the four numeric displays, full matrix) and alternating the two states three times in the same light, at 5 V:
 

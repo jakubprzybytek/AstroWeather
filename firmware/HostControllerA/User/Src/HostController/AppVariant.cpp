@@ -96,7 +96,7 @@ void AppVariant_Init() {
   HostController::StartSt67HttpFetchTask();
   HostController::AstroDataRefreshTask::instance().init(&display);
   HostController::AstroDataRefreshTask::instance().start();
-  MainLoopTask::instance().init(led2);
+  MainLoopTask::instance().init(led2, &settingsStore);
   MainLoopTask::instance().start();
   Utils::SwitchInput::instance().attach(
       MainLoopTask::instance().getHandle(), MainLoopTask::kEventSwitch1,

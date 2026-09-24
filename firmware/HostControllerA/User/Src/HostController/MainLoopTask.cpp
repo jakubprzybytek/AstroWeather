@@ -3,6 +3,7 @@
 #include <HostController/AstroDataRefreshTask.hpp>
 #include <HostController/LowBrightness.hpp>
 #include <Debug/LogService.hpp>
+#include <Settings/SettingsStore.hpp>
 #include <Utils/Led.hpp>
 
 MainLoopTask& MainLoopTask::instance()
@@ -16,9 +17,10 @@ MainLoopTask::MainLoopTask()
 {
 }
 
-void MainLoopTask::init(Led& led)
+void MainLoopTask::init(Led& led, Settings::Store* settings)
 {
     led_ = &led;
+    settings_ = settings;
 }
 
 void MainLoopTask::run()
@@ -50,6 +52,18 @@ void MainLoopTask::run()
             const bool low = LowBrightness::toggle();
             LogService::instance().logf(LogService::Level::Info,
                                         "Low brightness %s", low ? "on" : "off");
+            // Saved like 'display low on|off', so the choice survives a reset.
+            if (settings_ != nullptr)
+            {
+                settings_->setLowBrightness(low);
+                const HAL_StatusTypeDef status = settings_->save();
+                if (status != HAL_OK)
+                {
+                    LogService::instance().logf(LogService::Level::Error,
+                                                "Settings save failed status=%u",
+                                                static_cast<unsigned>(status));
+                }
+            }
             if (led_ != nullptr)
             {
                 led_->blink(50U);

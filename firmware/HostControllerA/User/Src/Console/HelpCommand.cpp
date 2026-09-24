@@ -69,8 +69,8 @@ const char* const kDisplay[] = {
     "    character N lighting column N; missing columns are off, extras ignored.",
 #if defined(FIRMWARE_VARIANT_HostController)
     "display low [on|off]",
-    "    Low brightness on every board. Saved; switch 2 toggles it without",
-    "    saving. 'display low' shows the state in use and the saved one.",
+    "    Low brightness on every board. Saved; switch 2 toggles and saves it.",
+    "    'display low' shows the state in use and the saved one.",
 #endif
     "set, time, blank and matrix change this board only; 'astro refresh' the rest.",
 };

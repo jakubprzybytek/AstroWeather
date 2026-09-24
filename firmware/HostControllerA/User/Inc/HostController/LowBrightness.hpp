@@ -7,9 +7,10 @@
 // The net is bussed to all boards, so only the HostController drives it; the
 // DisplayController releases its PB8 at startup (Hardware_Review.md M-4).
 //
-// The console's 'display low on|off' saves the state, and AppVariant applies it
-// at boot; a switch 2 toggle is not saved. Safe to call from
-// any task, since the write is a single BSRR store.
+// Both controls, the console's 'display low on|off' and switch 2, save the
+// state, and AppVariant applies it at boot. This module only drives the pin;
+// the callers save. Safe to call from any task, since the write is a single
+// BSRR store.
 namespace LowBrightness {
 
 void set(bool enabled);

@@ -19,6 +19,10 @@ LoadResult Store::load()
 
 HAL_StatusTypeDef Store::save()
 {
+    // Held across the read-compare-write, so saves from the console and from
+    // MainLoopTask (switch 2) cannot interleave their page writes into an image
+    // with a bad CRC.
+    MutexGuard guard(mutex_);
     uint8_t desired[kImageSize];
     if (encode(values_, desired, sizeof(desired)) != kImageSize) {
         return HAL_ERROR;
@@ -69,6 +73,12 @@ void Store::copyWifiCredentials(char* ssid, std::size_t ssidSize, char* password
     MutexGuard guard(mutex_);
     copyBounded(ssid, ssidSize, values_.wifiSsid);
     copyBounded(password, passwordSize, values_.wifiPassword);
+}
+
+void Store::setLowBrightness(bool enabled)
+{
+    MutexGuard guard(mutex_);
+    values_.lowBrightness = enabled;
 }
 
 void Store::resetToDefaults()

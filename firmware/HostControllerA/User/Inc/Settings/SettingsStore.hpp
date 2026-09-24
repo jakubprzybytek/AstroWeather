@@ -32,20 +32,24 @@ public:
 
     // Encodes the current values and writes only the 16-byte pages that differ,
     // so flipping one flag costs a single page (~5 ms) rather than all 8 pages
-    // of the image. Returns HAL_OK when nothing needed writing.
+    // of the image. Returns HAL_OK when nothing needed writing. Safe to call
+    // from more than one task: saves are serialized by the store's lock.
     HAL_StatusTypeDef save();
 
     Values& values() { return values_; }
     const Values& values() const { return values_; }
 
-    // WiFi credentials are the one part of Values read by another task: the
-    // console writes them and the WiFi task reads them when it connects. These
-    // go through the lock so neither can see a half-written string. Callers on
-    // the console task may still read values() directly, since only that task
-    // writes.
+    // WiFi credentials are read by another task: the console writes them and
+    // the WiFi task reads them when it connects. These go through the lock so
+    // neither can see a half-written string. Other fields are written only by
+    // the console task, except low brightness (see setLowBrightness()), so
+    // callers on the console task may still read values() directly.
     void setWifiCredentials(const char* ssid, const char* password);
     void copyWifiCredentials(char* ssid, std::size_t ssidSize, char* password,
                              std::size_t passwordSize) const;
+    // Low brightness is changed by the console and by switch 2 in MainLoopTask,
+    // so it is set under the lock like the credentials.
+    void setLowBrightness(bool enabled);
     void resetToDefaults();
 
     // Detail behind a Defaulted load, for logging.
