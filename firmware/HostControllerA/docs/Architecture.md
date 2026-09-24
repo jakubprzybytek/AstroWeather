@@ -31,7 +31,7 @@ there stay inside `USER CODE` sections (see [CubeMXCompliance.md](CubeMXComplian
 5. `osKernelStart()`.
 
 `AstroWeather_Init()` starts the `Led1` `BlinkingLed` task on `LED_1`
-(250 ms toggle, a heartbeat) and calls `AppVariant_Init()`, which each firmware
+(on 20 ms, off 1980 ms: a heartbeat every 2 s) and calls `AppVariant_Init()`, which each firmware
 variant implements once.
 
 All of `AppVariant_Init()` runs before the scheduler starts. The objects it
