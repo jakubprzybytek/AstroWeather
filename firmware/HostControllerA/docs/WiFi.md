@@ -14,8 +14,8 @@ then kept running; see [Lifecycle](#lifecycle). The SSID and password come from
 the EEPROM (`wifi set`), the server host and path from a compile-time header.
 
 The only regular client is the astro refresh; see
-[AstroRefresh.md](AstroRefresh.md). Switch 2 starts a stress batch that is a
-bench test, not a product feature; see [Switch 2](#switch-2-stress-batch).
+[AstroRefresh.md](AstroRefresh.md). The task can also run a stress batch, a
+bench test that nothing triggers at present; see [Stress batch](#stress-batch).
 
 Only the HostController image has WiFi. `User/Src/WiFi` is compiled for the
 HostController variant only (`CMakeLists.txt`).
@@ -150,7 +150,7 @@ const bool ok = FetchSt67Data(&request_, &onProgress, this);
   keeps the request until it finishes: the request and buffer must stay alive,
   and later calls return `Busy` until then.
 - Only one request at a time. A second call while one is pending, or while a
-  switch 2 batch runs, returns `Busy` at once. Nothing is queued.
+  stress batch runs, returns `Busy` at once. Nothing is queued.
 - `capacity` must be 1..`APP_ST67_HTTP_MAX_RESPONSE_BYTES` (4096) and `buffer`
   non-null, or the call returns `InvalidArgument`.
 - It returns `true` exactly when `result.status` is `Success`.
@@ -179,7 +179,7 @@ The task records the first failing step as a stage name
 | Status | When |
 | --- | --- |
 | `Success` | no failure |
-| `Busy` | a fetch or a switch 2 batch is already running |
+| `Busy` | a fetch or a stress batch is already running |
 | `InvalidArgument` | null request or buffer, capacity 0 or over 4096 |
 | `NoCredentials` | no SSID stored (stage `credentials`); checked before the module is powered |
 | `DriverFailure` | `W6X_Init()` or `W6X_WiFi_Init()` failed (`w6x-init`, `wifi-init`) |
@@ -258,9 +258,9 @@ regeneration.
 
 A **client fetch always runs as `PersistentStress` for 1 cycle**, whatever
 `APP_ST67_LIFECYCLE_MODE` says, and never calls `stop()`.
-`APP_ST67_LIFECYCLE_MODE` only chooses what a switch 2 batch does:
+`APP_ST67_LIFECYCLE_MODE` only chooses what a stress batch does:
 
-| Value | Mode | Switch 2 batch |
+| Value | Mode | Stress batch |
 | --- | --- | --- |
 | 0 | `SINGLE_FULL_SHUTDOWN` | `APP_ST67_COLD_RESTART_STRESS_CYCLES` (20) cycles, each init, join, fetch, disconnect, `stop()`, back to back. Despite the name, not a single cycle. |
 | 1 | `PERSISTENT_STRESS` | `APP_ST67_PERSISTENT_STRESS_CYCLES` (100) cycles on one init, `APP_ST67_INTER_CYCLE_DELAY_MS` (1 s) apart, one `stop()` at the end. |
@@ -337,7 +337,7 @@ Plain HTTP only. HTTPS is planned in
    `Content-Length` over 4096 is refused. Header names are matched
    case-sensitively, as `Content-Type:` and `Content-Length:`.
 5. **Body.** Copied straight into the caller's buffer (or `httpPayload` for a
-   switch 2 batch) while the CRC is updated. With `Content-Length` the body
+   stress batch) while the CRC is updated. With `Content-Length` the body
    must be exactly that long; without it the body ends when the server closes
    the connection. Chunked encoding is not supported: a chunked body would be
    passed on with its chunk markers.
@@ -410,7 +410,7 @@ reason code and its name, SSID, tick, and on success RSSI and channel.
 | `APP_ST67_HTTP_TOTAL_TIMEOUT_MS` | 15000 | **no**; there is no total deadline |
 | `APP_ST67_HTTP_MAX_HEADER_BYTES` | 2048 | **no**; `HttpResponseParser.hpp` hardcodes 2048 |
 | `APP_ST67_HTTP_MAX_RESPONSE_BYTES` | 4096 | yes: body limit, `httpPayload` and the refresh task's buffer |
-| `APP_ST67_LIFECYCLE_MODE` | 3 | switch 2 batches only |
+| `APP_ST67_LIFECYCLE_MODE` | 3 | stress batches only |
 | `APP_ST67_PERSISTENT_STRESS_CYCLES` | 100 | mode 1 |
 | `APP_ST67_COLD_RESTART_STRESS_CYCLES` | 20 | modes 0 and 2 |
 | `APP_ST67_HTTP_PERSISTENT_STRESS_CYCLES` | 100 | mode 3 |
@@ -419,10 +419,13 @@ reason code and its name, SSID, tick, and on success RSSI and channel.
 | `APP_ST67_HTTP_HOST`, `APP_ST67_HTTP_PATH` | `""` unless set in `app_credentials.h` | yes |
 | `APP_ST67_HTTP_EXPECTED_CONTENT_TYPE` | `"text/plain; charset=utf-8"` | yes |
 
-## Switch 2 stress batch
+## Stress batch
 
-**Bench and test behaviour, not a product feature.** Pressing switch 2 makes
-`MainLoopTask` call `TriggerSt67ConnectivityCycle()`, which starts a batch in
+**Bench and test behaviour, not a product feature, and currently not
+triggered.** Switch 2 used to start it; since 2026-09-24 it only toggles low
+brightness ([Display.md](Display.md#low-brightness)), and nothing calls
+`TriggerSt67ConnectivityCycle()`. The code is kept for bench use: calling it
+starts a batch in
 `APP_ST67_LIFECYCLE_MODE`: by default 100 join, DHCP, fetch and disconnect
 cycles, 1 s apart, then `stop()`, which powers the module down. With the
 server answering in a second or two, that takes several minutes.
@@ -431,7 +434,7 @@ server answering in a second or two, that takes several minutes.
 - It cannot be cancelled, except by a reset.
 - While it runs, every `FetchSt67Data()` returns `Busy`, so scheduled
   refreshes, switch 1, `astro refresh` and `wifi test` all fail.
-- A second press during a batch is ignored and logs
+- A second trigger during a batch is ignored and logs
   `ST67 batch trigger rejected: active`.
 - It ends with `ST67 batch-final mode=3 pass=<n> fail=<n> first=<cycle>
   stage=<stage> status=<w6x> heap=<start>/<end> min=<low> tasks=<start>/<end>`,
@@ -468,7 +471,7 @@ the customized LwIP teardown, since removed.
   cycles in Phase 3. The cause was not found. Since the regeneration
   `MX_LWIP_DeInit()` and the private LwIP teardown are gone, so `stop()` only
   deinitializes W6X; restarting W6X under a running LwIP (modes 0 and 2, and
-  the first fetch after a switch 2 batch) is untested.
+  the first fetch after a stress batch) is untested.
 - **HTTP error paths untested at runtime:** DNS failure, connection refused,
   timeouts, malformed, truncated, oversized and chunked responses, loss of the
   network mid-transfer. None has been exercised on the bench.

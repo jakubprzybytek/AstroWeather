@@ -10,6 +10,7 @@
 #include <Console/SettingsCommand.hpp>
 #include <Console/StatusCommand.hpp>
 #if defined(FIRMWARE_VARIANT_HostController)
+#include <Console/LowBrightnessCommand.hpp>
 #include <Console/TimeCommand.hpp>
 #endif
 #include <Debug/FirmwareInfo.hpp>
@@ -206,6 +207,11 @@ void ConsoleService::execute(const char* line)
     }
     if (timeResult == Console::CommandResult::InvalidArgument) {
         reply("ERR invalid-argument");
+        return;
+    }
+
+    // Ahead of the display group, which would take 'display low' as a bad argument.
+    if (Console::handleLowBrightnessCommand(line, settings_) == Console::CommandResult::Ok) {
         return;
     }
 #endif

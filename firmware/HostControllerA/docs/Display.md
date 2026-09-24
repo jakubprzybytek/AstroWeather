@@ -341,6 +341,26 @@ Verified by reading the local board's row 4 over SWD during refreshes: the
 segment values progressed `0x07`/`0x7F` (joining) through `0x3FF`/`0x3FFF`
 (downloading) and `0x1FFFF` (disconnecting) to `0x1FFFFF` (success).
 
+## Low Brightness
+
+LED brightness is analog. The light-sensor divider sets `LED_BRIGHTNESS`, which runs to every board on pin 10 of `J102`/`J104`. On each board, one current-set stage per driver (`MCP6006` + `BC847`, `U503`/`Q506` and the rest) turns that voltage into the SCT `REXT` current. The firmware does not set a brightness value. It has one lever: `LOW_POWER_ENABLE` (`PB8`, pin 9 of the same connectors), which switches on `Q701`. `Q701` shorts `R705` at the bottom of the divider and lowers `LED_BRIGHTNESS` by a fixed ratio, from about 1.17 V to 0.49 V in bright light. The level still follows the ambient light.
+
+Only the Host Controller drives the pin, through `LowBrightness::set()`/`toggle()` in `User/Src/HostController/LowBrightness.cpp`. Two controls change it:
+
+- `display low on|off` on the console sets it and saves it (settings tag `DisplayFlags`, see [Settings.md](Settings.md#tag-registry)). `AppVariant_Init()` applies the saved state before the local board starts. `display low` reports the state in use and the saved one, and `status` shows it as `brightness normal|low`. See [Console.md](Console.md#display).
+- Switch 2 toggles it and logs `Low brightness on` or `off`, without saving, so a reset returns to the saved state.
+
+Measured on the host board on 2026-09-24, with all LEDs lit (`8.888` on the four numeric displays, full matrix) and alternating the two states three times in the same light, at 5 V:
+
+| State | Board current | LEDs (minus the 14 mA with all LEDs off) |
+| --- | --- | --- |
+| Normal | 73–79 mA | 59–65 mA |
+| Low | 42 mA | 28 mA |
+
+Low brightness cut the LED current by about 53% (to 0.45 of normal), or the whole board's current by about 45%. With all LEDs off, both states draw 14 mA. The divider alone predicts 0.32–0.42 of normal, depending on the light (1.5 kΩ instead of 4.7 kΩ at the bottom), so the current-set stages do not scale exactly with `LED_BRIGHTNESS`. The ratio will differ in other light levels.
+
+The net is bussed to every board, so the Display Controller turns its own `PB8` into an input at startup rather than leave it as the push-pull low output that the shared `MX_GPIO_Init()` makes it ([Hardware review](../../../KiCad/Hardware_Review.md) M-4).
+
 ## Variant Lifecycle
 
 ### Host Controller
@@ -359,7 +379,7 @@ Remote boards are refreshed by `Display::submit()` only, which only astro refres
 
 ### Display Controller
 
-Not implemented. The DisplayController variant's `AppVariant.cpp` only starts `ConsoleService`, with no display. It creates no PCB-backed board, so its own LEDs are not driven, and it does not configure I2C1 as a target, so it cannot receive command `0x01`. The pieces it would need exist but are unused: `DisplayAddress.cpp` for the board address and `deserializeI2c()` for the message.
+Not implemented. The DisplayController variant's `AppVariant.cpp` only releases `LOW_POWER_ENABLE` (see [Low Brightness](#low-brightness)) and starts `ConsoleService`, with no display. It creates no PCB-backed board, so its own LEDs are not driven, and it does not configure I2C1 as a target, so it cannot receive command `0x01`. The pieces it would need exist but are unused: `DisplayAddress.cpp` for the board address and `deserializeI2c()` for the message.
 
 ## Tests
 

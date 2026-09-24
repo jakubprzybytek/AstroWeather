@@ -55,6 +55,11 @@ void applyRecord(uint8_t tag, const uint8_t* value, std::size_t length, Values& 
             values.clockDisplayEnabled = (value[0] & kClockFlagDisplay) != 0U;
         }
         break;
+    case static_cast<uint8_t>(Tag::DisplayFlags):
+        if (length >= 1U) {
+            values.lowBrightness = (value[0] & kDisplayFlagLowBrightness) != 0U;
+        }
+        break;
     case static_cast<uint8_t>(Tag::WifiSsid):
         copyString(values.wifiSsid, sizeof(values.wifiSsid), value, length);
         break;
@@ -117,6 +122,13 @@ std::size_t encode(const Values& values, uint8_t* image, std::size_t size)
     if (!values.clockDisplayEnabled) {
         const uint8_t clockFlags = 0U;
         if (!appendRecord(payload, sizeof(payload), used, Tag::ClockFlags, &clockFlags, 1U)) {
+            return 0U;
+        }
+    }
+    // Likewise only when set: normal brightness is the default.
+    if (values.lowBrightness) {
+        const uint8_t displayFlags = kDisplayFlagLowBrightness;
+        if (!appendRecord(payload, sizeof(payload), used, Tag::DisplayFlags, &displayFlags, 1U)) {
             return 0U;
         }
     }

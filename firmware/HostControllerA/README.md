@@ -20,6 +20,7 @@ shows it on seven-segment and dot-matrix LED displays.
 - It keeps its settings, including the Wi-Fi credentials and the clock trim, in
   an I2C EEPROM.
 - It measures the board's supply current, die temperature and VDDA.
+- Switch 2 toggles a low-brightness step on every board.
 
 ## Hardware
 
@@ -30,7 +31,7 @@ shows it on seven-segment and dot-matrix LED displays.
 | 24AA04 | 512-byte I2C EEPROM for settings, on I2C1 at `0x50` |
 | SCT2xxx | LED drivers in one SPI3 daisy chain, multiplexed in five slots |
 | INA180A2 | Current-sense amplifier into ADC1 channel 10 (`PB2`) |
-| `SWITCH_1`, `SWITCH_2` | Push buttons on `PB12`, `PB13` |
+| `SWITCH_1`, `SWITCH_2` | Push buttons on `PB12` (astro refresh) and `PB13` (low brightness) |
 | `LED_1`, `LED_2` | Heartbeat (`PC13`) and switch feedback (`PB9`) |
 | USB FS | CDC virtual COM port for the console |
 
@@ -83,6 +84,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | Local LED board (multiplexing, progress bar) | ⚠️ Works, HW issue | Off digits glow because the slot P-FETs do not fully turn off (H-3) | [Display.md](docs/Display.md) |
 | Sending data to the 5 remote boards over I2C | ✅ Done (host side) | Needs I2C pull-ups, which are `dnp` in the schematic (H-4) | [Display.md](docs/Display.md#i2c-transport) |
 | DisplayController firmware for the remote boards | 🔴 Stub | Only the console task starts and its replies are dropped; no I2C slave, no local display | [Development.md](docs/Development.md#firmware-variants) |
+| Low-brightness step (`LOW_POWER_ENABLE`) | ✅ Done | `display low on\|off` (saved) or switch 2 (not saved), for all boards; it still follows the light sensor. Cuts LED current by about half (measured 59–65 → 28 mA with all LEDs lit). Remote boards need the DisplayController firmware from 2026-09-24, which releases their `PB8` (M-4) | [Display.md](docs/Display.md#low-brightness) |
 | Numeric formatting (fixed point, time, `?`) | ✅ Done | -0.5 °C shows as `-0.5`; values that do not fit 4 digits show the error pattern | [Display.md](docs/Display.md#fixed-point-values) |
 | **Time** | | | |
 | RTC clock on numeric display 3, `time` commands | ✅ Done | Lost on power loss (no LSE crystal or backup battery) | [RTC.md](docs/RTC.md) |
@@ -101,9 +103,6 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 
 ## Known Limitations
 
-- **Switch 2 starts a bench stress batch**, by default 100 Wi-Fi connect and
-  HTTP fetch cycles, not a user function. It cannot be cancelled and refreshes
-  are rejected as busy while it runs. See [WiFi.md](docs/WiFi.md).
 - **The prototype host board carries hand rework** that the design files do not
   show yet: `VREF+` rewired to VDD (C-1) and the current-sense net taken to PB2
   (H-1). Boards built from the current files need the same changes.

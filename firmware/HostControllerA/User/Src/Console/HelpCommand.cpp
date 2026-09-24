@@ -61,16 +61,18 @@ const char* const kDisplay[] = {
     "    Fixed-point number on numeric display n (0-3). value is an integer",
     "    from -999 to 9999; precision (0-3) is how many digits follow the point.",
     "    e.g. 'display set 0 1234 2' shows 12.34, 'display set 1 -45 0' shows -45",
-    "display time <n> <HH:MM>",
+    "display time <n> <HH:MM>    e.g. 'display time 2 21:45'",
     "    Time on display n. HH and MM accept 00-99 and are not checked as a clock.",
-    "    e.g. 'display time 2 21:45'",
-    "display blank <n>",
-    "    Switch numeric display n off. e.g. 'display blank 3'",
-    "display matrix <row> <bits>",
+    "display blank <n>           switch numeric display n off",
+    "display matrix <row> <bits> e.g. 'display matrix 0 111000111000111000111'",
     "    One row of the 5x21 matrix, row 0 at the top. bits is a string of 0/1,",
     "    character N lighting column N; missing columns are off, extras ignored.",
-    "    e.g. 'display matrix 0 111000111000111000111'",
-    "Only this board is affected. Remote boards are updated by 'astro refresh'.",
+#if defined(FIRMWARE_VARIANT_HostController)
+    "display low [on|off]",
+    "    Low brightness on every board. Saved; switch 2 toggles it without",
+    "    saving. 'display low' shows the state in use and the saved one.",
+#endif
+    "set, time, blank and matrix change this board only; 'astro refresh' the rest.",
 };
 
 #if defined(FIRMWARE_VARIANT_HostController)
@@ -125,7 +127,7 @@ const char* const kSettings[] = {
     "    after 'boot-load=' reported an error, or after 'eeprom erase'.",
     "settings defaults",
     "    Reset everything and save: adc log off, adc display on, time display",
-    "    on, no clock trim, no WiFi. Takes effect at the next boot.",
+    "    on, normal brightness, no clock trim, no WiFi. Applies at the next boot.",
 };
 
 const char* const kWifi[] = {

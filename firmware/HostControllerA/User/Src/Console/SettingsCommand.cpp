@@ -36,14 +36,16 @@ CommandResult saveAndReport(Settings::Store& store, const char* what)
 void showSettings(const Settings::Store& store)
 {
     const Settings::Values& values = store.values();
-    char message[96];
+    char message[128];
 
     std::snprintf(message, sizeof(message),
-                  "OK settings adc-log=%s adc-display=%s time-display=%s time-trim=%+ldppm",
+                  "OK settings adc-log=%s adc-display=%s time-display=%s time-trim=%+ldppm "
+                  "display-low=%s",
                   values.adcLogEnabled ? "on" : "off",
                   values.adcDisplayEnabled ? "on" : "off",
                   values.clockDisplayEnabled ? "on" : "off",
-                  static_cast<long>(values.clockTrimPpm));
+                  static_cast<long>(values.clockTrimPpm),
+                  values.lowBrightness ? "on" : "off");
     LogService::instance().sendLine(message);
 
     // The password is never printed back, only whether one is held and how long

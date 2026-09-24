@@ -1,8 +1,8 @@
 #include <HostController/MainLoopTask.hpp>
 
 #include <HostController/AstroDataRefreshTask.hpp>
+#include <HostController/LowBrightness.hpp>
 #include <Debug/LogService.hpp>
-#include <St67HttpFetchTask.hpp>
 #include <Utils/Led.hpp>
 
 MainLoopTask& MainLoopTask::instance()
@@ -47,11 +47,13 @@ void MainLoopTask::run()
         {
             LogService::instance().log(LogService::Level::Info,
                                        "MainLoopTask SWITCH_2 press");
+            const bool low = LowBrightness::toggle();
+            LogService::instance().logf(LogService::Level::Info,
+                                        "Low brightness %s", low ? "on" : "off");
             if (led_ != nullptr)
             {
                 led_->blink(50U);
             }
-            HostController::TriggerSt67ConnectivityCycle();
         }
     }
 }

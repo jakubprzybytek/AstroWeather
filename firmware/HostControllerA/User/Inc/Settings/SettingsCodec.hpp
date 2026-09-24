@@ -51,6 +51,7 @@ enum class Tag : uint8_t {
     WifiSsid = 0x10,      // 1..32 bytes, not NUL terminated
     WifiPassword = 0x11,  // 1..63 bytes, not NUL terminated
     ClockFlags = 0x20,    // 1 byte: bit0 clock display enabled
+    DisplayFlags = 0x21,  // 1 byte: bit0 low brightness
     End = 0xFF,           // an erased EEPROM reads 0xFF, so this terminates for free
 };
 
@@ -62,12 +63,15 @@ constexpr uint8_t kAdcFlagDisplay = 0x02U;
 
 constexpr uint8_t kClockFlagDisplay = 0x01U;
 
+constexpr uint8_t kDisplayFlagLowBrightness = 0x01U;
+
 // Defaults here are the values the firmware uses when nothing is stored, and
 // must match the task defaults they are applied to.
 struct Values {
     bool adcLogEnabled = false;
     bool adcDisplayEnabled = true;
     bool clockDisplayEnabled = true;
+    bool lowBrightness = false;
     int32_t clockTrimPpm = 0;
     char wifiSsid[kMaxSsidLength + 1U] = {};
     char wifiPassword[kMaxPasswordLength + 1U] = {};

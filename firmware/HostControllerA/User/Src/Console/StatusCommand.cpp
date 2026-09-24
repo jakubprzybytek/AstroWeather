@@ -8,6 +8,7 @@
 #include <HostController/AstroDataRefreshTask.hpp>
 #include <HostController/CalendarDate.hpp>
 #include <HostController/ClockTask.hpp>
+#include <HostController/LowBrightness.hpp>
 #include <HostController/St67HttpFetchTask.hpp>
 #endif
 
@@ -22,7 +23,7 @@ namespace Console {
 namespace {
 
 // The whole reply is one burst, so it must stay under the 16-line log queue;
-// see HelpCommand.cpp. It is currently 12 lines.
+// see HelpCommand.cpp. It is currently 13 lines.
 
 void line(const char* format, ...)
 {
@@ -92,10 +93,10 @@ void reportEeprom(Device::Eeprom24AA04* eeprom, Settings::Store* settings)
     }
     const Settings::Values& values = settings->values();
     line("settings   loaded at boot: %s; adc log %s, adc display %s, time display %s, "
-         "trim %+ld ppm",
+         "trim %+ld ppm, low brightness %s",
          Settings::Store::describe(settings->lastDecode()), values.adcLogEnabled ? "on" : "off",
          values.adcDisplayEnabled ? "on" : "off", values.clockDisplayEnabled ? "on" : "off",
-         static_cast<long>(values.clockTrimPpm));
+         static_cast<long>(values.clockTrimPpm), values.lowBrightness ? "on" : "off");
     reportWifi(values);
 }
 
@@ -260,6 +261,7 @@ CommandResult handleStatusCommand(const char* command, Display::Display* display
     reportAstro();
     reportWeatherFetch(HostController::AstroDataRefreshTask::instance().lastRefresh());
     reportSchedule();
+    line("brightness %s", LowBrightness::isEnabled() ? "low" : "normal");
 #endif
     reportRemoteBoards(display);
     return CommandResult::Ok;

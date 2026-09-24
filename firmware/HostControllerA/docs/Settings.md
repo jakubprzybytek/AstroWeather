@@ -126,6 +126,7 @@ must match it.
 | `0x10` | `WifiSsid` | 1–32 | SSID bytes, not NUL terminated. |
 | `0x11` | `WifiPassword` | 1–63 | Passphrase bytes, not NUL terminated. |
 | `0x20` | `ClockFlags` | 1 | Bit 0 = clock shown on local numeric display 3. Remaining bits reserved, write 0. Written only when it differs from the default, so normally absent. |
+| `0x21` | `DisplayFlags` | 1 | Bit 0 = low brightness (`LOW_POWER_ENABLE` driven high); see [Display.md](Display.md#low-brightness). Remaining bits reserved, write 0. Written only when set. |
 | `0xFF` | *reserved* | — | End of records. Never allocate. |
 
 Suggested grouping for future allocations, to keep related settings together:
@@ -231,6 +232,7 @@ bug to spot.
 | `adcDisplayEnabled` | `true` | `CurrentSenseTask::displayEnabled_` |
 | `clockDisplayEnabled` | `true` | `ClockTask::displayEnabled_` |
 | `clockTrimPpm` | `0` | `ClockTask::trimPpm_` |
+| `lowBrightness` | `false` | `LowBrightness`'s `enabled`, and the reset level of `PB8` |
 | `wifiSsid` | empty | — |
 | `wifiPassword` | empty | — |
 
@@ -244,9 +246,10 @@ plus two bytes of framing.
 | `AdcFlags` | 3 |
 | `ClockTrim`, only when a trim is set | 6 |
 | `ClockFlags`, only when the clock display is off | 3 |
+| `DisplayFlags`, only when low brightness is on | 3 |
 | WiFi, typical (15-char SSID, 20-char password) | 39 |
 | WiFi, worst case (32 + 63) | 99 |
-| **Worst case total** | **111 of 122** |
+| **Worst case total** | **114 of 122** |
 
 A measured image on hardware with SSID `AstroNet` and a 13-character password
 occupied 34 bytes of 128, leaving 94 free. With no WiFi configured the image is

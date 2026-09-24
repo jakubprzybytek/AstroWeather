@@ -36,6 +36,7 @@ void testRoundTrip()
     written.adcDisplayEnabled = false;
     written.clockDisplayEnabled = false;
     written.clockTrimPpm = -18372;
+    written.lowBrightness = true;
     std::strcpy(written.wifiSsid, "AstroNet");
     std::strcpy(written.wifiPassword, "correcthorsebattery");
 
@@ -50,6 +51,7 @@ void testRoundTrip()
     expect(!read.adcDisplayEnabled, "round trip adc display");
     expect(!read.clockDisplayEnabled, "round trip clock display");
     expect(read.clockTrimPpm == -18372, "round trip negative clock trim");
+    expect(read.lowBrightness, "round trip low brightness");
     expect(std::strcmp(read.wifiSsid, "AstroNet") == 0, "round trip ssid");
     expect(std::strcmp(read.wifiPassword, "correcthorsebattery") == 0, "round trip password");
 }
@@ -67,6 +69,7 @@ void testBlankChipYieldsDefaults()
     expect(read.adcDisplayEnabled, "blank chip restores adc display default");
     expect(read.clockDisplayEnabled, "blank chip restores clock display default");
     expect(read.clockTrimPpm == 0, "blank chip restores clock trim default");
+    expect(!read.lowBrightness, "blank chip restores normal brightness");
     expect(read.wifiSsid[0] == '\0', "blank chip leaves ssid empty");
 }
 
@@ -140,6 +143,24 @@ void testImageWithoutClockRecordKeepsDefault()
     expect(read.clockTrimPpm == 0, "absent clock trim record leaves no trim");
 }
 
+void testImageWithoutDisplayRecordKeepsDefault()
+{
+    // Content written before the low-brightness setting existed.
+    const uint8_t payload[] = {
+        static_cast<uint8_t>(Settings::Tag::AdcFlags), 0x01U, Settings::kAdcFlagLog,
+        static_cast<uint8_t>(Settings::Tag::ClockFlags), 0x01U, 0x00U,
+    };
+    uint8_t image[Settings::kImageSize];
+    buildImage(image, payload, sizeof(payload));
+
+    Settings::Values read;
+    read.lowBrightness = true;  // must be replaced by the default
+    expectResult(Settings::decode(image, sizeof(image), read), Settings::DecodeResult::Ok,
+                 "image without display record decodes");
+    expect(!read.lowBrightness, "absent display record leaves normal brightness");
+    expect(!read.clockDisplayEnabled, "records before it still apply");
+}
+
 void testTruncatedRecordIsRejected()
 {
     const uint8_t payload[] = {
@@ -168,6 +189,10 @@ void testFutureVersionIsRejected()
 void testMaximumLengthFieldsFit()
 {
     Settings::Values written;
+    // Every optional record present, so this is the true worst case.
+    written.clockTrimPpm = 18372;
+    written.clockDisplayEnabled = false;
+    written.lowBrightness = true;
     std::memset(written.wifiSsid, 'S', Settings::kMaxSsidLength);
     written.wifiSsid[Settings::kMaxSsidLength] = '\0';
     std::memset(written.wifiPassword, 'P', Settings::kMaxPasswordLength);
@@ -183,6 +208,8 @@ void testMaximumLengthFieldsFit()
     expect(std::strlen(read.wifiSsid) == Settings::kMaxSsidLength, "max ssid survives");
     expect(std::strlen(read.wifiPassword) == Settings::kMaxPasswordLength,
            "max password survives");
+    expect(image[5] == 114U, "worst case payload is 114 of 122 bytes");
+    expect(read.lowBrightness, "worst case keeps low brightness");
 }
 
 void testUnconfiguredWifiCostsNothing()
@@ -215,6 +242,18 @@ void testClockDisplayOffCostsOneRecord()
     expect(image[5] == 6U, "clock display off adds one 3-byte record");
 }
 
+void testLowBrightnessCostsOneRecord()
+{
+    Settings::Values written;
+    uint8_t image[Settings::kImageSize] = {};
+    Settings::encode(written, image, sizeof(image));
+    expect(image[5] == 3U, "normal brightness writes no display record");
+
+    written.lowBrightness = true;
+    Settings::encode(written, image, sizeof(image));
+    expect(image[5] == 6U, "low brightness adds one 3-byte record");
+}
+
 } // namespace
 
 int main()
@@ -225,12 +264,14 @@ int main()
     testUnknownTagIsSkipped();
     testMissingRecordKeepsDefault();
     testImageWithoutClockRecordKeepsDefault();
+    testImageWithoutDisplayRecordKeepsDefault();
     testTruncatedRecordIsRejected();
     testFutureVersionIsRejected();
     testMaximumLengthFieldsFit();
     testUnconfiguredWifiCostsNothing();
     testClockDisplayOffCostsOneRecord();
     testClockTrimCostsOneRecord();
+    testLowBrightnessCostsOneRecord();
 
     return Test::finish("SettingsCodec");
 }

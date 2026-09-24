@@ -67,7 +67,8 @@ scheduler runs and then only sleeps.
 
 ### DisplayController init order
 
-`User/Src/DisplayController/AppVariant.cpp` only calls
+`User/Src/DisplayController/AppVariant.cpp` turns `LOW_POWER_EN` (`PB8`)
+into an input, since the host drives that bussed net, then calls
 `ConsoleService::instance().init(nullptr)` and `start()`. `LogService` is never
 initialised or started, so its queue does not exist and every console reply
 and log line is dropped: the USB port enumerates but prints nothing. There is no
@@ -239,6 +240,7 @@ From `Core/Inc/main.h` and `HostControllerA.ioc`.
 | USB FS device, CDC | `PA11` DM, `PA12` DP | Console |
 | GPIO EXTI | `PB12` `SWITCH_1`, `PB13` `SWITCH_2` | Switches, falling edge |
 | GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat, switch feedback |
+| GPIO | `PB8` `LOW_POWER_EN` | Low-brightness step for every board, set by `display low` and toggled by switch 2 (HostController only; see [Display.md](Display.md#low-brightness)) |
 | GPIO inputs | `PB10`, `PB11`, `PB14` = `ADDR_0`..`ADDR_2` | Board address straps, read only by the unused `detectBoardAddress()` |
 | SWD | `PA13`, `PA14` | Debug |
 | TIM1 | none | HAL time base |
@@ -247,7 +249,6 @@ Configured but unused:
 
 - **USART2** (`PA2` `ST67_TX`, `PA3` `ST67_RX`, 921600 baud) is initialised by
   `MX_USART2_UART_Init()`; nothing uses `huart2`. The module is driven over SPI.
-- **`LOW_POWER_EN`** (`PB8`) is an output that no code drives.
 - **`ST67_BOOT`** (`PB1`) is an output driven only by the unused
   `St67ProbeTask`, so it stays at its reset level.
 
@@ -297,6 +298,9 @@ firmware:
 
 - **`St67ProbeTask`** (`User/Src/WiFi/St67ProbeTask.cpp`): the raw-SPI probe from
   bring-up. `StartSt67ProbeTask()` is never called, so the linker discards it.
+- **`TriggerSt67ConnectivityCycle()`**: starts the WiFi stress batch
+  ([WiFi.md](WiFi.md#stress-batch)). No callers since switch 2 was given to low
+  brightness; kept for bench use.
 - **`TriggerSt67SmokeTest()`**: an old alias of `TriggerSt67ConnectivityCycle()`
   with no callers.
 - **`Display::detectBoardAddress()`** (`User/Src/Display/DisplayAddress.cpp`):

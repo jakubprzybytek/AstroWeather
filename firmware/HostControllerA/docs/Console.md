@@ -281,7 +281,7 @@ under the 16-line log queue.
 
 ### status
 
-A one-screen summary, 12 lines on the HostController:
+A one-screen summary, 13 lines on the HostController:
 
 ```text
 OK status
@@ -290,11 +290,12 @@ uptime     0d 00:03:11
 heap       24752 B free, 19352 B lowest since boot
 stats      off
 eeprom     answering at 0x50, 512 bytes
-settings   loaded at boot: ok; adc log off, adc display on, time display on, trim +18400 ppm
+settings   loaded at boot: ok; adc log off, adc display on, time display on, trim +18400 ppm, low brightness off
 wifi       'MyNetwork' stored; last connect ok 0d 00:03:05 ago (channel 2, -39 dBm)
 astro      last refresh ok, 0d 00:02:25 ago, from console
 weather    last fetched by the server 2026-09-23 09:05:12 +02:00, 1 h 07 min ago
 schedule   every 6 h from 00:10; next 12:10; last ok 2026-09-23 10:10
+brightness normal
 remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 ```
 
@@ -310,6 +311,7 @@ remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 | `astro` **HC** | `no refresh since boot; try 'astro refresh'`, `first refresh running now`, or `last refresh <outcome>, <age> ago, from <trigger>`. Outcomes are `ok`, `fetch-failed`, `crc-failed`, `parse-failed` and `publish-failed`; a fetch failure adds its cause in brackets, such as `(no HTTP response)` or `(http 404)`. Triggers are `switch1`, `console`, `scheduled` and `wifi-test`. `; another running now` is appended while a refresh is in progress. |
 | `weather` **HC** | When the server last fetched the weather, from the last good response, with its age if the clock is set. Otherwise `last fetch time unknown until a refresh succeeds`, `... not reported by the server`, `... malformed in the response`, or `none on the server at the last refresh`. |
 | `schedule` **HC** | The next slot and the last success. `next` reads `once the clock is set` before the time is known; after failures it reads `retry <n> in <s> s`, `retry <n> now` or `no WiFi credentials, then <HH:MM>`. `last ok` reads `none since power-up` until a refresh succeeds. See [AstroRefresh.md](AstroRefresh.md). |
+| `brightness` **HC** | `normal` or `low`: the state in use, which switch 2 may have changed from the saved one in the `settings` line. See [display low](#display). |
 | `remote` | Each remote display board, probed now on I2C: `yes` if it answered. `no display boards in this variant` without a display. |
 
 WiFi has no link state of its own, so the `astro` line is the evidence that the
@@ -377,7 +379,7 @@ Details in [Settings.md](Settings.md).
 | `settings defaults` | `OK settings-defaults` |
 
 ```text
-OK settings adc-log=off adc-display=on time-display=on time-trim=+18400ppm
+OK settings adc-log=off adc-display=on time-display=on time-trim=+18400ppm display-low=off
 OK settings wifi-ssid=MyNetwork wifi-password=<set>
 OK settings boot-load=ok
 ```
@@ -389,7 +391,7 @@ what the EEPROM held at power-up, not its present content.
 `settings save` rewrites the stored copy, which is needed only after
 `boot-load` reported an error or after `eeprom erase`; the other commands save
 as they change. `settings defaults` resets every value and saves: adc log off,
-adc display on, time display on, trim 0, no WiFi. The running tasks keep their
+adc display on, time display on, trim 0, normal brightness, no WiFi. The running tasks keep their
 current behaviour until the next boot.
 
 Any other line starting with `settings` gets
@@ -459,8 +461,8 @@ display board that is present; see [Settings.md](Settings.md#storage-medium).
 
 ### display
 
-Drives the local board only. Remote boards are updated by `astro refresh`.
-Details in [Display.md](Display.md).
+`set`, `time`, `blank` and `matrix` drive the local board only. Remote boards
+are updated by `astro refresh`. Details in [Display.md](Display.md).
 
 | Command | Effect |
 | --- | --- |
@@ -468,8 +470,10 @@ Details in [Display.md](Display.md).
 | `display time <n> <HH:MM>` | A time on display `n`. `HH` and `MM` accept 00–99 and are not checked as a clock. |
 | `display blank <n>` | Switches display `n` off. |
 | `display matrix <row> <bits>` | One row (0–4, 0 at the top) of the 5×21 matrix. `bits` is a string of `0` and `1`, character N lighting column N; missing columns are off and extra ones ignored. |
+| `display low on\|off` **HC** | Low brightness on every board: drives `LOW_POWER_ENABLE`. Saved, and applied at boot. Replies `OK display-low=on` or `OK display-low=off`. |
+| `display low` **HC** | `OK display-low=<in use> saved=<saved>`, e.g. `OK display-low=on saved=off` after a switch 2 press, which toggles without saving. |
 
-Each replies `OK display`. Out-of-range values or an unknown `display`
+The other commands reply `OK display`. Out-of-range values or an unknown `display`
 subcommand get `ERR invalid-argument`. Display 3 is also driven by the clock,
 and the matrix by refresh progress, so a manual setting there may soon be
 overwritten.

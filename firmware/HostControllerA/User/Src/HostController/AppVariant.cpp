@@ -9,6 +9,7 @@
 #include <Display/Display.hpp>
 #include <Display/PcbDisplayBoard.hpp>
 #include <HostController/ClockTask.hpp>
+#include <HostController/LowBrightness.hpp>
 #include <HostController/MainLoopTask.hpp>
 #include <HostController/AstroDataRefreshTask.hpp>
 #include <Debug/LogService.hpp>
@@ -79,6 +80,8 @@ void AppVariant_Init() {
   ConsoleService::instance().setEeprom(&settingsEeprom);
   ConsoleService::instance().setSettings(&settingsStore);
   ConsoleService::instance().start();
+  // Before the displays light up, so a saved low brightness applies from the first frame.
+  LowBrightness::set(settingsStore.values().lowBrightness);
   localBoard.start();
   ClockTask::instance().setDisplayEnabled(settingsStore.values().clockDisplayEnabled);
   if (!ClockTask::instance().setTrim(settingsStore.values().clockTrimPpm)) {
