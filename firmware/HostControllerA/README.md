@@ -17,8 +17,8 @@ shows it on seven-segment and dot-matrix LED displays.
   every successful fetch steps the clock to the server's time and logs the drift.
   The time is shown as `HH:MM` on numeric display 3.
 - It offers a USB CDC console for logs, status and commands.
-- It keeps its settings, including the Wi-Fi credentials and the clock trim, in
-  an I2C EEPROM.
+- It keeps its settings, including the Wi-Fi credentials, the server address and
+  the clock trim, in an I2C EEPROM.
 - It measures the board's supply current, die temperature and VDDA.
 - Switch 2 toggles a low-brightness step on every board.
 
@@ -52,8 +52,9 @@ One CMake project builds either image, selected by `FIRMWARE_VARIANT`:
 
 1. Copy `Appli/App/app_credentials.h.template` to `Appli/App/app_credentials.h`
    (ignored by git) and set `APP_ST67_HTTP_HOST`, a bare host name, and
-   `APP_ST67_HTTP_PATH`, starting with `/`. The SSID and password macros in the
-   template are no longer used.
+   `APP_ST67_HTTP_PATH`, starting with `/`. These are the built-in server; a
+   board can be pointed elsewhere later with `api host` and `api path`. The SSID
+   and password macros in the template are no longer used.
 2. Build, flash and open the console as described in
    [docs/Development.md](docs/Development.md), for example with the
    `Debug-HostController` preset.
@@ -74,6 +75,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | **Connectivity** | | | |
 | Wi-Fi connection (ST67W611M1): join, DHCP, failure diagnosis | ✅ Done | Credentials are set with `wifi set` and saved to the EEPROM | [WiFi.md](docs/WiFi.md) |
 | Fetch data over HTTP | ✅ Done | Plain HTTP on port 80 only | [WiFi.md](docs/WiFi.md) |
+| Server host and path from the console | ✅ Done | `api host`, `api path`, saved; the built-in values from `app_credentials.h` are the fallback | [WiFi.md](docs/WiFi.md#server) |
 | Fetch data over HTTPS | 🔴 Not started | Planned; mbedTLS is not linked | [HTTPS plan](docs/ST67_HTTPS_Implementation_Plan.md) |
 | Module power saving between fetches | 🔴 Not started | The module and LwIP stay up between fetches | [WiFi.md](docs/WiFi.md#open-items) |
 | **Astro data** | | | |

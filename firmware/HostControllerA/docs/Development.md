@@ -205,12 +205,13 @@ The firmware has no built-in WiFi credentials. They default to empty, are set
 from the console with `wifi set`, stored in the settings EEPROM, and read on
 every connect. See [WiFi.md](WiFi.md).
 
-The API host and path are still compile-time values. `Appli/App/app_config.h`
-includes `Appli/App/app_credentials.h` when it exists and takes
-`APP_ST67_HTTP_HOST` and `APP_ST67_HTTP_PATH` from it; without the file both are
-empty and every fetch fails. The file is git-ignored, so on a fresh checkout copy
-`Appli/App/app_credentials.h.template` to `app_credentials.h` and fill in the
-host and path. The `APP_ST67_WIFI_SSID` and `APP_ST67_WIFI_PASSWORD` defines in
+The API host and path are set from the console with `api host` and `api path`
+and saved in the EEPROM. Their built-in fallbacks are compile-time values:
+`Appli/App/app_config.h` includes `Appli/App/app_credentials.h` when it exists
+and takes `APP_ST67_HTTP_HOST` and `APP_ST67_HTTP_PATH` from it. The file is
+git-ignored, so on a fresh checkout copy `Appli/App/app_credentials.h.template`
+to `app_credentials.h` and fill in the host and path; without it a board works
+only once `api host` and `api path` are set. The `APP_ST67_WIFI_SSID` and `APP_ST67_WIFI_PASSWORD` defines in
 the same file are no longer used by the firmware.
 
 After flashing a new board:

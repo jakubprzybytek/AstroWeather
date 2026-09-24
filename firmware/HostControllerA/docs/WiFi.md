@@ -109,7 +109,8 @@ The driver's own log output goes through `vLoggingPrintf()`, defined in
 | `User/Src/WiFi/St67SpiReady.cpp` | The `ST67_RDY` rising-edge bridge. |
 | `User/Src/WiFi/St67ProbeTask.cpp` | Dead code: the raw AT/CWLAP probe from before the driver was used. Compiled, never started. |
 | `Appli/App/app_config.h` | Timeouts, limits, lifecycle mode. See [Configuration](#configuration). |
-| `Appli/App/app_credentials.h.template` | Template for the git-ignored `app_credentials.h`: HTTP host and path. |
+| `Appli/App/app_credentials.h.template` | Template for the git-ignored `app_credentials.h`: the built-in HTTP host and path. |
+| `User/Src/HostController/ApiTarget.cpp`, `User/Inc/HostController/ApiTarget.hpp` | `resolveApiTarget()`: the saved `api host` / `api path`, each falling back to the built-in value. |
 
 `AppVariant.cpp` calls `SetSt67CredentialSource(&settingsStore)` and then
 `StartSt67HttpFetchTask()`. The task waits `APP_ST67_STARTUP_DELAY_MS` (4 s)
@@ -298,11 +299,21 @@ template are left over from before `wifi set` and are not used.
 
 ### Server
 
-`APP_ST67_HTTP_HOST` and `APP_ST67_HTTP_PATH` are compile-time values. Copy
-`Appli/App/app_credentials.h.template` to `Appli/App/app_credentials.h`,
-which git ignores, and fill them in. `app_config.h` includes it when it exists;
-without it both are empty and every fetch fails as `HttpFailure` with
-`ST67 fetch-config invalid`.
+The host and path are set on the console with `api host <host>` and
+`api path <path>`, saved in the EEPROM (tags `ApiHost`, `ApiPath`; see
+[Settings.md](Settings.md#tag-registry)), and read at the start of every fetch,
+so a change applies from the next one. `api show` and the `api` line of
+`status` show what is used; see [Console.md](Console.md#api).
+
+Each part that is not saved falls back to its built-in value,
+`APP_ST67_HTTP_HOST` / `APP_ST67_HTTP_PATH`. Those come from
+`Appli/App/app_credentials.h`, a git-ignored copy of
+`Appli/App/app_credentials.h.template`, which `app_config.h` includes when it
+exists. With neither a saved nor a built-in value, every fetch fails as
+`HttpFailure` with `ST67 fetch-config invalid`. The port is always 80.
+
+Each fetch logs the target at `Debug` level: `ST67 fetch http://<host><path>
+(saved|built-in)`, where `saved` means at least one part was saved.
 
 Before each fetch the fetcher rejects:
 
@@ -416,7 +427,7 @@ reason code and its name, SSID, tick, and on success RSSI and channel.
 | `APP_ST67_HTTP_PERSISTENT_STRESS_CYCLES` | 100 | mode 3 |
 | `APP_ST67_INTER_CYCLE_DELAY_MS` | 1000 | modes 1 and 3 |
 | `APP_ST67_WIFI_SSID`, `APP_ST67_WIFI_PASSWORD` | `""` | **no**; credentials come from the EEPROM |
-| `APP_ST67_HTTP_HOST`, `APP_ST67_HTTP_PATH` | `""` unless set in `app_credentials.h` | yes |
+| `APP_ST67_HTTP_HOST`, `APP_ST67_HTTP_PATH` | `""` unless set in `app_credentials.h`; the fallback for `api host` / `api path` | yes |
 | `APP_ST67_HTTP_EXPECTED_CONTENT_TYPE` | `"text/plain; charset=utf-8"` | yes |
 
 ## Stress batch

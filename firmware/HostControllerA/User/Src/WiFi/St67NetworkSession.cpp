@@ -407,6 +407,8 @@ bool St67NetworkSession::stop() {
 
 void SetSt67CredentialSource(Settings::Store* store) { credentialSource = store; }
 
+Settings::Store* St67CredentialSource() { return credentialSource; }
+
 WifiConnectSummary LastWifiConnect() {
   taskENTER_CRITICAL();
   const WifiConnectSummary summary = lastConnect;

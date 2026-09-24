@@ -3,6 +3,7 @@
 #include <Debug/LogService.hpp>
 #include <HostController/HttpClient.hpp>
 #include <HostController/HttpResponseParser.hpp>
+#include <HostController/St67HttpFetchTask.hpp>
 #include <HostController/St67HttpRules.hpp>
 #include <HostController/St67Runtime.hpp>
 #include <Utils/Crc32.hpp>
@@ -94,11 +95,11 @@ int32_t httpDataCallback(void* argument, HTTP_buffer_t* buffer, int32_t error) {
   return 0;
 }
 
-bool resolveHost(St67Runtime& runtime) {
+bool resolveHost(St67Runtime& runtime, const char* host) {
   osThreadFlagsClear(kFlagDns);
   runtime.dnsPending = true;
   runtime.dnsStatus = ERR_INPROGRESS;
-  const err_t status = dns_gethostbyname(APP_ST67_HTTP_HOST, &runtime.dnsAddress,
+  const err_t status = dns_gethostbyname(host, &runtime.dnsAddress,
                                          &dnsCallback, &runtime);
   if (status == ERR_OK) {
     runtime.dnsPending = false;
@@ -121,14 +122,17 @@ St67HttpFetcher::St67HttpFetcher(St67Runtime& runtime) : runtime_(runtime) {}
 
 bool St67HttpFetcher::fetch(St67FetchRequest* request) {
   setFetchStage(runtime_, FetchStage::Downloading);
-  if (!St67HttpRules::isValidTarget(APP_ST67_HTTP_HOST, APP_ST67_HTTP_PATH,
-                                   HTTP_SNI_MAX_SIZE)) {
+  target_ = resolveApiTarget(St67CredentialSource());
+  LogService::instance().logf(LogService::Level::Debug, "ST67 fetch http://%s%s (%s)",
+                              target_.host, target_.path,
+                              (target_.hostSaved || target_.pathSaved) ? "saved" : "built-in");
+  if (!St67HttpRules::isValidTarget(target_.host, target_.path, HTTP_SNI_MAX_SIZE)) {
     LogService::instance().log(LogService::Level::Error,
                                  "ST67 fetch-config invalid");
     return false;
   }
   const uint32_t startedAt = HAL_GetTick();
-  if (!resolveHost(runtime_) || !IP_IS_V4(&runtime_.dnsAddress) ||
+  if (!resolveHost(runtime_, target_.host) || !IP_IS_V4(&runtime_.dnsAddress) ||
       ip4_addr_get_u32(ip_2_ip4(&runtime_.dnsAddress)) == 0U) {
     LogService::instance().logf(LogService::Level::Error,
                                   "ST67 dns failed elapsed=%lums",
@@ -146,7 +150,7 @@ bool St67HttpFetcher::fetch(St67FetchRequest* request) {
   runtime_.httpResponseTick = 0U;
   runtime_.clientRequest = request;
   HTTP_connection_t settings{};
-  settings.server_name = const_cast<char*>(APP_ST67_HTTP_HOST);
+  settings.server_name = target_.host;
   settings.timeout = APP_ST67_HTTP_IO_TIMEOUT_MS;
   settings.max_response_len = APP_ST67_HTTP_MAX_RESPONSE_BYTES;
   settings.callback_arg = &runtime_;
@@ -155,8 +159,8 @@ bool St67HttpFetcher::fetch(St67FetchRequest* request) {
   settings.recv_fn = &httpDataCallback;
   settings.recv_fn_arg = &runtime_;
   const int32_t requestStatus = HttpClient_Get(
-      &runtime_.dnsAddress, APP_ST67_HTTP_PORT, APP_ST67_HTTP_HOST,
-      APP_ST67_HTTP_PATH, &settings);
+      &runtime_.dnsAddress, APP_ST67_HTTP_PORT, target_.host,
+      target_.path, &settings);
   if (requestStatus != HTTP_CLIENT_SUCCESS) {
     return false;
   }

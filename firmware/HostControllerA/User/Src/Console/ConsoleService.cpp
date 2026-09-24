@@ -2,6 +2,7 @@
 
 #include <Console/AdcCommand.hpp>
 #if defined(FIRMWARE_VARIANT_HostController)
+#include <Console/ApiCommand.hpp>
 #include <Console/AstroCommand.hpp>
 #endif
 #include <Console/DisplayCommand.hpp>
@@ -207,6 +208,10 @@ void ConsoleService::execute(const char* line)
     }
     if (timeResult == Console::CommandResult::InvalidArgument) {
         reply("ERR invalid-argument");
+        return;
+    }
+
+    if (Console::handleApiCommand(line, settings_) == Console::CommandResult::Ok) {
         return;
     }
 

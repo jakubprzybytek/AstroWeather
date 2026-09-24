@@ -38,6 +38,8 @@ void testRoundTrip()
     written.clockTrimPpm = -18372;
     written.lowBrightness = true;
     std::strcpy(written.wifiSsid, "AstroNet");
+    std::strcpy(written.apiHost, "api.example.com");
+    std::strcpy(written.apiPath, "/astro/wroclaw");
     std::strcpy(written.wifiPassword, "correcthorsebattery");
 
     uint8_t image[Settings::kImageSize] = {};
@@ -54,6 +56,8 @@ void testRoundTrip()
     expect(read.lowBrightness, "round trip low brightness");
     expect(std::strcmp(read.wifiSsid, "AstroNet") == 0, "round trip ssid");
     expect(std::strcmp(read.wifiPassword, "correcthorsebattery") == 0, "round trip password");
+    expect(std::strcmp(read.apiHost, "api.example.com") == 0, "round trip api host");
+    expect(std::strcmp(read.apiPath, "/astro/wroclaw") == 0, "round trip api path");
 }
 
 void testBlankChipYieldsDefaults()
@@ -71,6 +75,8 @@ void testBlankChipYieldsDefaults()
     expect(read.clockTrimPpm == 0, "blank chip restores clock trim default");
     expect(!read.lowBrightness, "blank chip restores normal brightness");
     expect(read.wifiSsid[0] == '\0', "blank chip leaves ssid empty");
+    expect(read.apiHost[0] == '\0' && read.apiPath[0] == '\0',
+           "blank chip leaves the api target built-in");
 }
 
 void testCorruptedByteIsRejected()
@@ -161,6 +167,40 @@ void testImageWithoutDisplayRecordKeepsDefault()
     expect(!read.clockDisplayEnabled, "records before it still apply");
 }
 
+void testImageWrittenAt128BytesDecodes()
+{
+    // An image saved when the region was 128 bytes: header and records at the
+    // start, and behind them whatever the upper bytes held - here leftovers
+    // from a raw 'eeprom write'. The CRC covers only payloadLen bytes, so the
+    // leftovers are ignored.
+    const uint8_t payload[] = {
+        static_cast<uint8_t>(Settings::Tag::AdcFlags), 0x01U, Settings::kAdcFlagLog,
+        static_cast<uint8_t>(Settings::Tag::WifiSsid), 0x04U, 'L', 'e', 'm', 'o',
+    };
+    uint8_t image[Settings::kImageSize];
+    buildImage(image, payload, sizeof(payload));
+    std::memset(&image[128], 0xA5, Settings::kImageSize - 128U);
+
+    Settings::Values read;
+    expectResult(Settings::decode(image, sizeof(image), read), Settings::DecodeResult::Ok,
+                 "128-byte-era image decodes");
+    expect(read.adcLogEnabled, "128-byte-era adc flags survive");
+    expect(std::strcmp(read.wifiSsid, "Lemo") == 0, "128-byte-era ssid survives");
+    expect(read.apiHost[0] == '\0', "128-byte-era image has no api host");
+}
+
+void testApiTargetCostsNothingUntilSet()
+{
+    Settings::Values written;
+    uint8_t image[Settings::kImageSize] = {};
+    Settings::encode(written, image, sizeof(image));
+    expect(image[5] == 3U, "built-in api target writes no record");
+
+    std::strcpy(written.apiPath, "/astro/x");
+    Settings::encode(written, image, sizeof(image));
+    expect(image[5] == 13U, "a saved path alone adds one record");
+}
+
 void testTruncatedRecordIsRejected()
 {
     const uint8_t payload[] = {
@@ -193,6 +233,8 @@ void testMaximumLengthFieldsFit()
     written.clockTrimPpm = 18372;
     written.clockDisplayEnabled = false;
     written.lowBrightness = true;
+    std::memset(written.apiHost, 'h', Settings::kMaxApiHostLength);
+    std::memset(written.apiPath, 'p', Settings::kMaxApiPathLength);
     std::memset(written.wifiSsid, 'S', Settings::kMaxSsidLength);
     written.wifiSsid[Settings::kMaxSsidLength] = '\0';
     std::memset(written.wifiPassword, 'P', Settings::kMaxPasswordLength);
@@ -208,7 +250,9 @@ void testMaximumLengthFieldsFit()
     expect(std::strlen(read.wifiSsid) == Settings::kMaxSsidLength, "max ssid survives");
     expect(std::strlen(read.wifiPassword) == Settings::kMaxPasswordLength,
            "max password survives");
-    expect(image[5] == 114U, "worst case payload is 114 of 122 bytes");
+    expect(image[5] == 246U, "worst case payload is 246 of 250 bytes");
+    expect(std::strlen(read.apiHost) == Settings::kMaxApiHostLength, "max api host survives");
+    expect(std::strlen(read.apiPath) == Settings::kMaxApiPathLength, "max api path survives");
     expect(read.lowBrightness, "worst case keeps low brightness");
 }
 
@@ -265,6 +309,8 @@ int main()
     testMissingRecordKeepsDefault();
     testImageWithoutClockRecordKeepsDefault();
     testImageWithoutDisplayRecordKeepsDefault();
+    testImageWrittenAt128BytesDecodes();
+    testApiTargetCostsNothingUntilSet();
     testTruncatedRecordIsRejected();
     testFutureVersionIsRejected();
     testMaximumLengthFieldsFit();

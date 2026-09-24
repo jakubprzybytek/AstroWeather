@@ -44,9 +44,6 @@ void testValidHosts()
     expect(validHost("example.com"), "a short host");
     expect(validHost("192.168.1.10"), "an IPv4 address");
     expect(validHost(std::string(64U, 'a')), "a 64-character host");
-    // Current behaviour: only scheme, port and CR/LF are looked for.
-    expect(validHost("exa mple.com"), "a space in the host is not rejected");
-    expect(validHost("example.com/astro"), "a slash in the host is not rejected");
 }
 
 void testInvalidHosts()
@@ -59,6 +56,9 @@ void testInvalidHosts()
     expect(!validHost("[::1]"), "IPv6 literal (has colons)");
     expect(!validHost("example.com\r"), "host with CR");
     expect(!validHost("example.com\nX: y"), "host with LF");
+    expect(!validHost("exa mple.com"), "host with a space");
+    expect(!validHost("example.com\t"), "host with a tab");
+    expect(!validHost("example.com/astro"), "host with a path");
 }
 
 void testPaths()
@@ -66,8 +66,8 @@ void testPaths()
     expect(validPath("/"), "root path");
     expect(validPath("/astro/wroclaw"), "the configured path");
     expect(validPath("/astro?city=wroclaw&days=2"), "path with a query");
-    // Current behaviour: spaces are not rejected, and would be sent unescaped.
-    expect(validPath("/a b"), "a space in the path is not rejected");
+    expect(!validPath("/a b"), "path with a space");
+    expect(!validPath("/a\tb"), "path with a tab");
     expect(!validPath(""), "empty path");
     expect(!validPath("astro/wroclaw"), "path without a leading slash");
     expect(!validPath("http://example.com/astro"), "absolute URL as the path");

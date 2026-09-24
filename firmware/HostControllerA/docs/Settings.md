@@ -59,14 +59,18 @@ serializing all I2C1 traffic.
 
 ## Image Layout
 
-The settings image is a fixed 128-byte region at offset `000h`. The remaining
-384 bytes of the part are unused. A fixed header carries integrity information,
-and the payload after it is a sequence of variable-length records.
+The settings image is a fixed 256-byte region at offset `000h`, the lower
+block of the part. The upper 256 bytes are unused. A fixed header carries
+integrity information, and the payload after it is a sequence of
+variable-length records.
 
-The 128-byte size predates the move to the 512-byte part and is kept
-deliberately: it is a container parameter, since `payloadLen` and the CRC are
-defined against it, so growing it is a container change that needs a version
-bump. See [When the version must change](#when-the-version-must-change).
+Until 2026-09-24 the image was 128 bytes. Growing it to 256 needed no version
+bump and no migration: the CRC covers only the version, `payloadLen` and the
+`payloadLen` bytes of payload, never the padding behind them, so an image
+written at 128 bytes is also a valid 256-byte image. Whatever the bytes behind
+it held, such as test data from raw `eeprom write`s, is ignored. 256 is the
+limit for this header, because `payloadLen` is a single byte. See
+[When the version must change](#when-the-version-must-change).
 
 ```
 offset  size  field
@@ -75,7 +79,7 @@ offset  size  field
 0x04    1     version     container format version, currently 1
 0x05    1     payloadLen  number of payload bytes that follow
 0x06    N     payload     sequence of tag/length/value records
-0x06+N  ...   padding     0xFF to the end of the 128-byte image
+0x06+N  ...   padding     0xFF to the end of the 256-byte image
 ```
 
 The CRC deliberately sits *before* the fields it protects so that everything it
@@ -125,6 +129,8 @@ must match it.
 | `0x02` | `ClockTrim` | 4 | Signed LSI error in ppm, big endian; see [RTC.md](RTC.md#trimming). Written only when non-zero. |
 | `0x10` | `WifiSsid` | 1–32 | SSID bytes, not NUL terminated. |
 | `0x11` | `WifiPassword` | 1–63 | Passphrase bytes, not NUL terminated. |
+| `0x12` | `ApiHost` | 1–64 | API server host name, not NUL terminated. Absent: the built-in `APP_ST67_HTTP_HOST`. |
+| `0x13` | `ApiPath` | 1–64 | API path starting with `/`, not NUL terminated. Absent: the built-in `APP_ST67_HTTP_PATH`. |
 | `0x20` | `ClockFlags` | 1 | Bit 0 = clock shown on local numeric display 3. Remaining bits reserved, write 0. Written only when it differs from the default, so normally absent. |
 | `0x21` | `DisplayFlags` | 1 | Bit 0 = low brightness (`LOW_POWER_ENABLE` driven high); see [Display.md](Display.md#low-brightness). Remaining bits reserved, write 0. Written only when set. |
 | `0xFF` | *reserved* | — | End of records. Never allocate. |
@@ -170,9 +176,10 @@ that field at its compile-time default.
 
 Bump `kContainerVersion` only if the **container** changes, not when settings
 are added or removed. That means a change to the header layout, the CRC
-algorithm or coverage, the image size or location, or the record framing
-itself. Such a change should be
-rare. A decoder that meets a version it does not recognise reports
+algorithm or coverage, the image location, or the record framing itself, or a
+payload over 255 bytes, which needs a wider `payloadLen`. Growing the image up
+to 256 bytes is not one of them (see [Image Layout](#image-layout)). Such a
+change should be rare. A decoder that meets a version it does not recognise reports
 `BadVersion` and falls back to defaults, so an unexpected bump silently discards
 the user's settings.
 
@@ -235,10 +242,11 @@ bug to spot.
 | `lowBrightness` | `false` | `LowBrightness`'s `enabled`, and the reset level of `PB8` |
 | `wifiSsid` | empty | — |
 | `wifiPassword` | empty | — |
+| `apiHost`, `apiPath` | empty | the built-in `APP_ST67_HTTP_HOST` / `APP_ST67_HTTP_PATH`, via `HostController::resolveApiTarget()` |
 
 ## Space budget
 
-Within the 128-byte image, available payload is `128 - 6 = 122` bytes. Each record costs its value length
+Within the 256-byte image, available payload is `256 - 6 = 250` bytes. Each record costs its value length
 plus two bytes of framing.
 
 | Content | Payload cost |
@@ -249,26 +257,30 @@ plus two bytes of framing.
 | `DisplayFlags`, only when low brightness is on | 3 |
 | WiFi, typical (15-char SSID, 20-char password) | 39 |
 | WiFi, worst case (32 + 63) | 99 |
-| **Worst case total** | **114 of 122** |
+| API host, only when saved (up to 64) | up to 66 |
+| API path, only when saved (up to 64) | up to 66 |
+| **Worst case total** | **246 of 250** |
 
 A measured image on hardware with SSID `AstroNet` and a 13-character password
-occupied 34 bytes of 128, leaving 94 free. With no WiFi configured the image is
+occupied 34 bytes, when the image was 128 bytes. With no WiFi configured the image is
 9 bytes.
 
 This is why the payload is TLV and not a packed struct. A struct would have to
 reserve the worst case for credentials whether or not any were set, permanently
-consuming 99 of the 122 available bytes and leaving almost nothing for later
-additions.
+consuming 99 bytes, and the API target another 130.
 
 When adding a setting, check the worst case still fits, and prefer omitting a
 record over writing a default value.
 
 ## Write Behaviour
 
-`Settings::Store::save()` encodes the full 128-byte image, reads the current
+`Settings::Store::save()` encodes the full 256-byte image, reads the current
 contents, and writes only the 16-byte pages that differ. Toggling a single flag
 therefore costs one page and one write cycle, roughly 5 ms, rather than all
-8 pages of the image.
+16 pages of the image. The first save after the move from 128 bytes also
+writes the upper pages, filling them with `0xFF` padding. The two working
+images live in the `Store` object, not on the calling task's stack, since
+`save()` runs on `MainLoopTask` (switch 2) as well as the console task.
 If the read fails, every page is written rather than skipping the save.
 
 The encoder always produces a full-length image with `0xFF` padding, so the

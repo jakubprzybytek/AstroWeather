@@ -273,15 +273,15 @@ Commands marked **HC** exist only in the HostController build. `help` and
 | --- | --- |
 | `help` | `OK help`, then an index of the commands and the group names. |
 | `help <group>` | `OK help <group>`, then details and examples for that group. |
-| `help <unknown>` | `ERR unknown help group '<name>'; Groups: stats, display, astro, time, adc, settings, wifi, eeprom` |
+| `help <unknown>` | `ERR unknown help group '<name>'; Groups: stats, display, astro, api, time, adc, settings, wifi, eeprom` |
 
-The groups are `stats`, `display`, `astro` (HC), `time` (HC), `adc`,
+The groups are `stats`, `display`, `astro` (HC), `api` (HC), `time` (HC), `adc`,
 `settings`, `wifi` and `eeprom`. Help is split into groups to keep each reply
 under the 16-line log queue.
 
 ### status
 
-A one-screen summary, 13 lines on the HostController:
+A one-screen summary, 14 lines on the HostController:
 
 ```text
 OK status
@@ -295,6 +295,7 @@ wifi       'MyNetwork' stored; last connect ok 0d 00:03:05 ago (channel 2, -39 d
 astro      last refresh ok, 0d 00:02:25 ago, from console
 weather    last fetched by the server 2026-09-23 09:05:12 +02:00, 1 h 07 min ago
 schedule   every 6 h from 00:10; next 12:10; last ok 2026-09-23 10:10
+api        http://api.example.com/astro/wroclaw (built-in)
 brightness normal
 remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 ```
@@ -311,6 +312,7 @@ remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 | `astro` **HC** | `no refresh since boot; try 'astro refresh'`, `first refresh running now`, or `last refresh <outcome>, <age> ago, from <trigger>`. Outcomes are `ok`, `fetch-failed`, `crc-failed`, `parse-failed` and `publish-failed`; a fetch failure adds its cause in brackets, such as `(no HTTP response)` or `(http 404)`. Triggers are `switch1`, `console`, `scheduled` and `wifi-test`. `; another running now` is appended while a refresh is in progress. |
 | `weather` **HC** | When the server last fetched the weather, from the last good response, with its age if the clock is set. Otherwise `last fetch time unknown until a refresh succeeds`, `... not reported by the server`, `... malformed in the response`, or `none on the server at the last refresh`. |
 | `schedule` **HC** | The next slot and the last success. `next` reads `once the clock is set` before the time is known; after failures it reads `retry <n> in <s> s`, `retry <n> now` or `no WiFi credentials, then <HH:MM>`. `last ok` reads `none since power-up` until a refresh succeeds. See [AstroRefresh.md](AstroRefresh.md). |
+| `api` **HC** | The URL the next fetch uses, `(saved)` if `api host` or `api path` is saved, else `(built-in)`. See [api](#api). |
 | `brightness` **HC** | `normal` or `low`: the state in use. It normally matches `low brightness` in the `settings` line, since both controls save; see [display low](#display). |
 | `remote` | Each remote display board, probed now on I2C: `yes` if it answered. `no display boards in this variant` without a display. |
 
@@ -339,6 +341,30 @@ See [Statistics](#statistics) for the report format.
 line starting with `astro` gets `ERR invalid-argument`. The refresh task logs
 `AstroDataRefresh trigger accepted source=console` (or
 `... ignored: active source=console` as a warning) just before the reply.
+
+### api
+
+**HC.** The server the astro refresh fetches from. Details in
+[WiFi.md](WiFi.md#server).
+
+| Command | Reply |
+| --- | --- |
+| `api` or `api show` | Two lines: `OK api host=<host> (saved\|built-in)` and `OK api path=<path> (saved\|built-in)`. |
+| `api host <host>` | `OK api-host=<host>`. A bare host name, 1–64 characters, no scheme, port, path or whitespace. Saved. |
+| `api path <path>` | `OK api-path=<path>`. Starts with `/`, 1–64 characters, no whitespace. Saved. |
+| `api default` | `OK api-default`, then the `api show` lines. Forgets both saved values. |
+
+Each part not saved uses its built-in value, `APP_ST67_HTTP_HOST` or
+`APP_ST67_HTTP_PATH` from `app_credentials.h`. A change applies from the next
+fetch and does not start one; run `astro refresh` to try it. A wrong path shows
+up there as `fetch-failed (http 404)`.
+
+A value that breaks the rules is refused with the reason, for example
+`ERR api-host: give the bare host name, without http:// (HTTP only, port 80), ...`
+or `ERR api-path: must start with / and be 1-64 characters with no spaces, ...`.
+`api host` or `api path` with no value gets `ERR api-host: missing value. ...`,
+any other `api` line `ERR unknown command '<line>'; see 'help api'.`, and a
+failed save `ERR settings-unavailable`.
 
 ### time
 
@@ -374,25 +400,29 @@ Details in [Settings.md](Settings.md).
 
 | Command | Reply |
 | --- | --- |
-| `settings show` | Three lines, shown below. |
+| `settings show` | Five lines, shown below. |
 | `settings save` | `OK settings-save` |
 | `settings defaults` | `OK settings-defaults` |
 
 ```text
 OK settings adc-log=off adc-display=on time-display=on time-trim=+18400ppm display-low=off
 OK settings wifi-ssid=MyNetwork wifi-password=<set>
+OK settings api-host=<built-in>
+OK settings api-path=/astro/wroclaw
 OK settings boot-load=ok
 ```
 
 `settings show` prints the values the firmware is using. The password appears
-only as `<set>` or `<unset>`, and an empty SSID as `<unset>`. `boot-load` is
+only as `<set>` or `<unset>`, and an empty SSID as `<unset>`. An API host or
+path that is not saved shows as `<built-in>`. `boot-load` is
 what the EEPROM held at power-up, not its present content.
 
 `settings save` rewrites the stored copy, which is needed only after
 `boot-load` reported an error or after `eeprom erase`; the other commands save
 as they change. `settings defaults` resets every value and saves: adc log off,
-adc display on, time display on, trim 0, normal brightness, no WiFi. The running tasks keep their
-current behaviour until the next boot.
+adc display on, time display on, trim 0, normal brightness, no WiFi, built-in
+API host and path. The running tasks keep their current behaviour until the
+next boot, except the API target, which the next fetch reads.
 
 Any other line starting with `settings` gets
 `ERR unknown command '<line>'; see 'help settings'.`

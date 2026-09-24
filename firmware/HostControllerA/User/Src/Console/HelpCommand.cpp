@@ -30,6 +30,7 @@ const char* const kIndex[] = {
     "  display ...       numbers, times and matrix rows on this board",
 #if defined(FIRMWARE_VARIANT_HostController)
     "  astro refresh     fetch the sky forecast and publish it to all boards",
+    "  api ...           show or set the server host and path (saved)",
     "  time ...          show, set and trim the clock; show it on display 3",
 #endif
     "  adc ...           current-sense logging and readout (saved)",
@@ -37,7 +38,7 @@ const char* const kIndex[] = {
     "  wifi ...          set, test or clear WiFi credentials (saved)",
     "  eeprom ...        raw EEPROM access, for bring-up and debugging",
 #if defined(FIRMWARE_VARIANT_HostController)
-    "Groups: stats, display, astro, time, adc, settings, wifi, eeprom",
+    "Groups: stats, display, astro, api, time, adc, settings, wifi, eeprom",
 #else
     "Groups: stats, display, adc, settings, wifi, eeprom",
 #endif
@@ -76,6 +77,18 @@ const char* const kDisplay[] = {
 };
 
 #if defined(FIRMWARE_VARIANT_HostController)
+const char* const kApi[] = {
+    "api show          the host and path fetched from, each marked saved or built-in",
+    "api host <host>",
+    "    Save the server host name: no http://, port or path; HTTP on port 80.",
+    "    e.g. 'api host api.example.com'",
+    "api path <path>",
+    "    Save the path, starting with /, up to 64 characters. e.g. 'api path /astro/wroclaw'",
+    "api default",
+    "    Forget both saved values and use the built-in ones from app_credentials.h.",
+    "Changes apply from the next fetch; run 'astro refresh' to try them.",
+};
+
 const char* const kAstro[] = {
     "astro refresh",
     "    Fetch the astronomy forecast over WiFi and publish it to every board.",
@@ -126,8 +139,8 @@ const char* const kSettings[] = {
     "    wifi commands save as they change. Use it to rewrite the stored copy",
     "    after 'boot-load=' reported an error, or after 'eeprom erase'.",
     "settings defaults",
-    "    Reset everything and save: adc log off, adc display on, time display",
-    "    on, normal brightness, no clock trim, no WiFi. Applies at the next boot.",
+    "    Reset everything and save: adc log off, adc display on, time display on,",
+    "    normal brightness, no clock trim, no WiFi, built-in api. Applies at next boot.",
 };
 
 const char* const kWifi[] = {
@@ -172,6 +185,7 @@ const Group kGroups[] = {
     group("display", kDisplay),
 #if defined(FIRMWARE_VARIANT_HostController)
     group("astro", kAstro),
+    group("api", kApi),
     group("time", kTime),
 #endif
     group("adc", kAdc),

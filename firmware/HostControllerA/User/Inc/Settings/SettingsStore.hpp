@@ -47,6 +47,12 @@ public:
     void setWifiCredentials(const char* ssid, const char* password);
     void copyWifiCredentials(char* ssid, std::size_t ssidSize, char* password,
                              std::size_t passwordSize) const;
+    // The API host and path are read by the WiFi task on every fetch, so they
+    // go through the lock too. An empty string means "not saved".
+    void setApiHost(const char* host);
+    void setApiPath(const char* path);
+    void copyApiTarget(char* host, std::size_t hostSize, char* path,
+                       std::size_t pathSize) const;
     // Low brightness is changed by the console and by switch 2 in MainLoopTask,
     // so it is set under the lock like the credentials.
     void setLowBrightness(bool enabled);
@@ -62,6 +68,12 @@ private:
     Values values_{};
     DecodeResult lastDecode_ = DecodeResult::Blank;
     mutable Mutex mutex_;
+    // Working images for load() and save(), kept here rather than on the stack:
+    // save() runs on the console task and on MainLoopTask (switch 2), and two
+    // 256-byte images there would crowd MainLoopTask's 1536-byte stack.
+    // load() runs once before the scheduler; save() uses them under mutex_.
+    uint8_t desired_[kImageSize] = {};
+    uint8_t current_[kImageSize] = {};
 };
 
 } // namespace Settings

@@ -11,10 +11,14 @@ class Store;
 
 namespace HostController {
 
-// Where the station takes its SSID and password from. Read on every connect,
-// so a 'wifi set' takes effect on the next attempt. Set before the fetch task
-// starts; with no source, or nothing stored, connecting fails as NoCredentials.
+// Where the station takes its SSID and password, and the fetch its API host
+// and path, from. Read on every connect and fetch, so 'wifi set' and 'api ...'
+// take effect on the next attempt. Set before the fetch task starts; with no
+// source, or no SSID stored, connecting fails as NoCredentials, and the API
+// target falls back to the built-in one.
 void SetSt67CredentialSource(Settings::Store* store);
+// The store set above, or null.
+Settings::Store* St67CredentialSource();
 
 // Why the last station connect ended the way it did, classified from the
 // module's Wi-Fi reason code so the console can say what to fix.

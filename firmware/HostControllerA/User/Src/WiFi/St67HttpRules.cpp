@@ -24,11 +24,11 @@ const char* findBounded(const uint8_t* data, uint16_t length, const char* needle
 }  // namespace
 
 bool isValidTarget(const char* host, const char* path, size_t maxHostLength) {
+  // Whitespace and CR/LF would break the request line or the Host header.
   return !(std::strlen(host) == 0U || std::strlen(host) > maxHostLength ||
-           std::strstr(host, "://") != nullptr || std::strchr(host, ':') != nullptr ||
-           std::strchr(host, '\r') != nullptr || std::strchr(host, '\n') != nullptr ||
+           std::strstr(host, "://") != nullptr || std::strpbrk(host, ":/ \t\r\n") != nullptr ||
            std::strlen(path) == 0U || path[0] != '/' ||
-           std::strchr(path, '\r') != nullptr || std::strchr(path, '\n') != nullptr);
+           std::strpbrk(path, " \t\r\n") != nullptr);
 }
 
 ContentTypeCheck checkContentType(const uint8_t* headers, uint16_t length,

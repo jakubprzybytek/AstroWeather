@@ -5,6 +5,7 @@
 #include <Device/Eeprom24AA04.hpp>
 #include <Settings/SettingsStore.hpp>
 #if defined(FIRMWARE_VARIANT_HostController)
+#include <HostController/ApiTarget.hpp>
 #include <HostController/AstroDataRefreshTask.hpp>
 #include <HostController/CalendarDate.hpp>
 #include <HostController/ClockTask.hpp>
@@ -23,7 +24,7 @@ namespace Console {
 namespace {
 
 // The whole reply is one burst, so it must stay under the 16-line log queue;
-// see HelpCommand.cpp. It is currently 13 lines.
+// see HelpCommand.cpp. It is currently 14 lines.
 
 void line(const char* format, ...)
 {
@@ -261,6 +262,11 @@ CommandResult handleStatusCommand(const char* command, Display::Display* display
     reportAstro();
     reportWeatherFetch(HostController::AstroDataRefreshTask::instance().lastRefresh());
     reportSchedule();
+    {
+        const HostController::ApiTarget target = HostController::resolveApiTarget(settings);
+        line("api        http://%s%s (%s)", target.host, target.path,
+             (target.hostSaved || target.pathSaved) ? "saved" : "built-in");
+    }
     line("brightness %s", LowBrightness::isEnabled() ? "low" : "normal");
 #endif
     reportRemoteBoards(display);

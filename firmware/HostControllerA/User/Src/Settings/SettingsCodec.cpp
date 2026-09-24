@@ -66,6 +66,12 @@ void applyRecord(uint8_t tag, const uint8_t* value, std::size_t length, Values& 
     case static_cast<uint8_t>(Tag::WifiPassword):
         copyString(values.wifiPassword, sizeof(values.wifiPassword), value, length);
         break;
+    case static_cast<uint8_t>(Tag::ApiHost):
+        copyString(values.apiHost, sizeof(values.apiHost), value, length);
+        break;
+    case static_cast<uint8_t>(Tag::ApiPath):
+        copyString(values.apiPath, sizeof(values.apiPath), value, length);
+        break;
     default:
         // Unknown tag, so an older build can still read a chip written by a
         // newer one. The record is skipped, not an error.
@@ -146,6 +152,20 @@ std::size_t encode(const Values& values, uint8_t* image, std::size_t size)
     if (passwordLength != 0U &&
         !appendRecord(payload, sizeof(payload), used, Tag::WifiPassword,
                       reinterpret_cast<const uint8_t*>(values.wifiPassword), passwordLength)) {
+        return 0U;
+    }
+
+    // Likewise an API host or path left at the built-in default costs nothing.
+    const std::size_t hostLength = boundedLength(values.apiHost, kMaxApiHostLength);
+    if (hostLength != 0U &&
+        !appendRecord(payload, sizeof(payload), used, Tag::ApiHost,
+                      reinterpret_cast<const uint8_t*>(values.apiHost), hostLength)) {
+        return 0U;
+    }
+    const std::size_t pathLength = boundedLength(values.apiPath, kMaxApiPathLength);
+    if (pathLength != 0U &&
+        !appendRecord(payload, sizeof(payload), used, Tag::ApiPath,
+                      reinterpret_cast<const uint8_t*>(values.apiPath), pathLength)) {
         return 0U;
     }
 

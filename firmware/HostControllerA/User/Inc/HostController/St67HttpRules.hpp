@@ -11,7 +11,8 @@ namespace HostController {
 namespace St67HttpRules {
 
 // A bare host name: non-empty, at most maxHostLength characters, no scheme,
-// no port and no CR/LF. The path must start with '/' and have no CR/LF.
+// port, path, whitespace or CR/LF. The path must start with '/' and have no
+// whitespace or CR/LF.
 bool isValidTarget(const char* host, const char* path, size_t maxHostLength);
 
 enum class ContentTypeCheck : uint8_t {

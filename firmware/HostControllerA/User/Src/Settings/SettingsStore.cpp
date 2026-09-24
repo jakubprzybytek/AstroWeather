@@ -6,14 +6,13 @@ namespace Settings {
 
 LoadResult Store::load()
 {
-    uint8_t image[kImageSize];
-    if (eeprom_.read(0U, image, static_cast<uint16_t>(sizeof(image))) != HAL_OK) {
+    if (eeprom_.read(0U, current_, static_cast<uint16_t>(sizeof(current_))) != HAL_OK) {
         values_ = Values{};
         lastDecode_ = DecodeResult::Blank;
         return LoadResult::ReadFailed;
     }
 
-    lastDecode_ = decode(image, sizeof(image), values_);
+    lastDecode_ = decode(current_, sizeof(current_), values_);
     return (lastDecode_ == DecodeResult::Ok) ? LoadResult::Ok : LoadResult::Defaulted;
 }
 
@@ -23,23 +22,21 @@ HAL_StatusTypeDef Store::save()
     // MainLoopTask (switch 2) cannot interleave their page writes into an image
     // with a bad CRC.
     MutexGuard guard(mutex_);
-    uint8_t desired[kImageSize];
-    if (encode(values_, desired, sizeof(desired)) != kImageSize) {
+    if (encode(values_, desired_, sizeof(desired_)) != kImageSize) {
         return HAL_ERROR;
     }
 
     // Read the current image so only changed pages are rewritten. If the read
     // fails, fall back to writing everything rather than skipping the save.
-    uint8_t current[kImageSize];
     const bool haveCurrent =
-        eeprom_.read(0U, current, static_cast<uint16_t>(sizeof(current))) == HAL_OK;
+        eeprom_.read(0U, current_, static_cast<uint16_t>(sizeof(current_))) == HAL_OK;
 
     constexpr uint16_t kPage = Device::Eeprom24AA04::kPageSize;
     for (uint16_t offset = 0U; offset < kImageSize; offset = static_cast<uint16_t>(offset + kPage)) {
-        if (haveCurrent && std::memcmp(&current[offset], &desired[offset], kPage) == 0) {
+        if (haveCurrent && std::memcmp(&current_[offset], &desired_[offset], kPage) == 0) {
             continue;
         }
-        const HAL_StatusTypeDef status = eeprom_.write(offset, &desired[offset], kPage);
+        const HAL_StatusTypeDef status = eeprom_.write(offset, &desired_[offset], kPage);
         if (status != HAL_OK) {
             return status;
         }
@@ -73,6 +70,26 @@ void Store::copyWifiCredentials(char* ssid, std::size_t ssidSize, char* password
     MutexGuard guard(mutex_);
     copyBounded(ssid, ssidSize, values_.wifiSsid);
     copyBounded(password, passwordSize, values_.wifiPassword);
+}
+
+void Store::setApiHost(const char* host)
+{
+    MutexGuard guard(mutex_);
+    copyBounded(values_.apiHost, sizeof(values_.apiHost), host);
+}
+
+void Store::setApiPath(const char* path)
+{
+    MutexGuard guard(mutex_);
+    copyBounded(values_.apiPath, sizeof(values_.apiPath), path);
+}
+
+void Store::copyApiTarget(char* host, std::size_t hostSize, char* path,
+                          std::size_t pathSize) const
+{
+    MutexGuard guard(mutex_);
+    copyBounded(host, hostSize, values_.apiHost);
+    copyBounded(path, pathSize, values_.apiPath);
 }
 
 void Store::setLowBrightness(bool enabled)
