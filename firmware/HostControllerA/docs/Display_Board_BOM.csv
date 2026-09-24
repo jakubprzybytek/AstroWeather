@@ -1,5 +1,8 @@
 Section,References,Qty per board,Value,Part / MPN,Footprint,Notes
-MCU,U302,1,STM32G0B1CET6,STM32G0B1CET6,LQFP-48 7x7,
+MCU,U302,1,STM32G0B1CET6N,STM32G0B1CET6N (Farnell 3772955) - needs the VDDIO2 wiring below; a STM32G0B1CET6 needs none of it,LQFP-48 7x7,the CET6 ships from 2027-01-18 at Farnell (checked 2026-09-24)
+MCU (CET6N only),C306,1,100n,any 0805 100n X7R (like C601),0805,decouples VDDIO2 (pin 31); needs the wire from pin 31 to +3.3V - see Display_Board_Purchasing.md
+MCU (CET6N only),C307,1,0R,0R jumper,0805,ties pin 30 (VSS on the CET6N) to GND
+MCU (CET6N only),"R304,R305",0,DNP,,0805,never fit R304: it would put VBUS_IN on VDDIO2
 MCU,"C101,C301,C305",3,100n,MLCC X7R 50V,0603,decoupling + NRST
 MCU,C302,1,4u7,Samsung CL21A475KAQNNNE (25V X5R),0805,
 MCU,J103,1,SWD,JST B6B-PH-K-S,JST PH 1x06 2.00mm vertical,programming; optional if you use pogo pins
@@ -38,3 +41,7 @@ Optional,"D301,D302 + R310,R311",2+2,LED + 2k2,,0805,status LEDs
 Optional,"SW301,SW302 + R306-R309 + C308,C309",2+4+2,button + 10k + 100n,CK PTS636SK25SMTRLFS,,buttons
 Optional,U301,1,AT24CS01-STUM,AT24CS01-STUM,SOT-23-5,EEPROM on I2C - not needed on display board
 Optional,"R301,R302",2,DNP,,0805,I2C pull-ups - leave unfitted
+USB (optional),J106,1,USB-C,GCT USB4216-03-A (TME 1260 in stock),GCT USB4216,USB CDC console; data only - the board stays powered from the chain
+USB (optional),"R102,R103",2,5k1,Yageo RC0805FR-075K1L (TME),0805,CC pull-downs (Rd): the PC then supplies VBUS to the isolated VBUS_IN net
+USB (optional),"D101,D102",2,D_TVS,low-capacitance bidirectional ESD e.g. Nexperia PESD5V0U1BA (about 3 pF),SOD-323,hard to source (TME 2 pcs; Farnell from 2026-12-20); USB works without them - avoid ~35 pF parts such as PESD5V0S1BA on D+/D-
+USB (optional),R101,0,DNP,,1206,never fit on a display board: it would join the PC's VBUS to the chain VBUS (Hardware_Review.md M-3)
