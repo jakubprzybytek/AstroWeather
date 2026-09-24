@@ -32,7 +32,7 @@ Display,R502,1,1k,1%,0805,SCT clock filter
 Display current set,"U503,U507,U511,U515",4,MCP6006,MCP6006T-E/OT,SOT-23-5,required: sets SCT REXT current from LED_BRIGHTNESS (J102/J104 pin 10)
 Display current set,"Q506,Q507,Q508,Q509",4,BC847,"BC847B,215 (Nexperia)",SOT-23,required (see above)
 Display current set,"R503,R506,R509,R512",4,1k,1%,0805,required (see above)
-Display current set,"R504,R507,R510,R513",4,4k7 / 10k,1%,0805,value undecided in schematic
+Display current set,"R504,R507,R510,R513",4,4k7,1%,0805,4k7 chosen 2026-09-24; schematic still says 4k7 / 10k
 Optional,Y301 + C303 + C304 + R303,1+2+1,8MHz / 20p / 0R,Abracon ABM3B-8.000MHZ,5.0x3.2mm,HSE not used by current firmware (HSI) - skip
 Optional,"D301,D302 + R310,R311",2+2,LED + 2k2,,0805,status LEDs
 Optional,"SW301,SW302 + R306-R309 + C308,C309",2+4+2,button + 10k + 100n,CK PTS636SK25SMTRLFS,,buttons
