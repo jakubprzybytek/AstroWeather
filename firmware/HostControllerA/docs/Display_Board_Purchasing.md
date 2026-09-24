@@ -32,7 +32,7 @@ The `MCP6006` + `BC847` stages (`U503`/`U507`/`U511`/`U515`, `Q506`-`Q509`) are 
 
 | Item | Decision |
 |---|---|
-| `L601` | Bourns `SRR6838A-330M` (33 µH, Isat 1.02 A) |
+| `L601` | Bourns `SRR6838A-330M` (33 µH, Isat 1.02 A). A tight fit on the SRP7028A footprint, but proven on the prototype. Kept at 33 µH for its lower ripple (≈ 60 mA p-p at 5 V → 3.7 V). Considered and rejected: `SRR6838A-100M` (10 µH, Isat 1.72 A, DCR 35 mΩ, Farnell 4655293), the TPS54202 datasheet value, with more saturation margin but ≈ 190 mA p-p ripple |
 | `D501` | Not fitted, pads shorted |
 | `U601` | `TPS54202DDCR` replaces `TPS54302` (out of stock at TME and withdrawn at Farnell). Pin-compatible, and `EN` floats to enable: confirmed in `Hardware_Review.md` M-2. Rechecked 2026-09-24: TPS54302DDCR still 0 at TME; at Farnell the DDCR is not listed and the DDCT is withdrawn |
 | `Q501`-`Q505` | `SI2333CDS-T1-E3` replaces `Si2333DDS` (TME has 1, Farnell lead time 56 weeks) |
@@ -104,10 +104,11 @@ Dropped from the order: 0805 capacitors 1u ×25, 10u ×5 (`C503`), 10p ×5 (`C50
 
 ## Open items
 
-1. **`L601` footprint:** the PCB uses `L_Bourns_SRP7028A_7.3x6.6mm`, which may not match the SRR6838A pads. Check the SRR6838A datasheet land pattern. `SRP7028A-330M` (Farnell 3373372, 5.09 zł incl. VAT) fits the current footprint.
+None. Recheck stock and prices on both carts just before ordering.
 
 Closed:
 
+- **`L601` footprint:** the SRR6838A-330M fits the `L_Bourns_SRP7028A_7.3x6.6mm` pads, tightly, and works on the prototype. `SRP7028A-330M` (Farnell 3373372) would match the footprint exactly if ever needed.
 - **TPS54202 swap:** confirmed pin-compatible, with `EN` floating to enable; see the `U601` decision.
 - **Faint glow on switched-off digits:** none visible on the prototype host board, whose `Q501`-`Q505` gates are driven straight from 3.3 V GPIOs against a 3.7 V source. The margin is still thin, so a gate driver is listed for the next PCB revision in `Hardware_Review.md` H-3.
 
