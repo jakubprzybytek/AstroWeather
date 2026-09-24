@@ -103,7 +103,9 @@ A successful build should leave the ELF present and print the flash/RAM usage su
   sense, settings EEPROM, the ST67 WiFi fetch (`User/Src/WiFi/`, built only for
   this variant) and the USB console with its log.
 - **DisplayController** is currently a stub. It shares the CubeMX
-  initialisation but its `AppVariant_Init()` only starts `ConsoleService`, with
+  initialisation but its `AppVariant_Init()` only releases `LOW_POWER_EN`
+  (`PB8`, set to an input, since the host drives that bussed net) and starts
+  `ConsoleService`, with
   no display, EEPROM or settings, and never starts `LogService`, so nothing it
   does reaches the USB port. See [Console.md](Console.md#displaycontroller).
 

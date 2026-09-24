@@ -31,7 +31,7 @@ public:
     LoadResult load();
 
     // Encodes the current values and writes only the 16-byte pages that differ,
-    // so flipping one flag costs a single page (~5 ms) rather than all 8 pages
+    // so flipping one flag costs a single page (~5 ms) rather than all 16 pages
     // of the image. Returns HAL_OK when nothing needed writing. Safe to call
     // from more than one task: saves are serialized by the store's lock.
     HAL_StatusTypeDef save();

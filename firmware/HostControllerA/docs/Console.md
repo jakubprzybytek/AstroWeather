@@ -236,10 +236,13 @@ Each handler is tried in turn; the first that recognises the line owns it:
 3. `stats on`, `stats off` (in `ConsoleService.cpp`)
 4. `astro ...` (`AstroCommand.cpp`), HostController only
 5. `time ...` (`TimeCommand.cpp`), HostController only
-6. `adc ...` (`AdcCommand.cpp`)
-7. `settings ...` and `wifi ...` (`SettingsCommand.cpp`)
-8. `eeprom ...` (`EepromCommand.cpp`)
-9. `display ...` (`DisplayCommand.cpp`)
+6. `api ...` (`ApiCommand.cpp`), HostController only
+7. `display low [on|off]` (`LowBrightnessCommand.cpp`), HostController only;
+   ahead of `display`, which would take it as a bad argument
+8. `adc ...` (`AdcCommand.cpp`)
+9. `settings ...` and `wifi ...` (`SettingsCommand.cpp`)
+10. `eeprom ...` (`EepromCommand.cpp`)
+11. `display ...` (`DisplayCommand.cpp`)
 
 A line no handler recognises gets `ERR invalid-command`. Commands are
 case-sensitive. Fixed commands such as `stats on` or `settings show` must match
@@ -467,7 +470,7 @@ Any other line starting with `wifi` gets
 
 Raw access to the 512-byte 24AA04 settings EEPROM at `0x50`, for bring-up and
 debugging. Offsets and lengths are hex, matching the addresses `eeprom dump`
-prints. `000`–`07F` holds the settings image; see
+prints. `000`–`0FF` holds the settings image; see
 [Settings.md](Settings.md#image-layout).
 
 | Command | Reply |
@@ -482,7 +485,7 @@ prints. `000`–`07F` holds the settings image; see
 A range past the end of the chip, malformed hex, or an unknown `eeprom` line
 gets `ERR invalid-argument`. A chip that does not answer gets
 `ERR eeprom-unavailable`. `eeprom erase` wipes the settings: the next boot uses
-defaults unless `settings save` is run first. `eeprom write` into `000`–`07F`
+defaults unless `settings save` is run first. `eeprom write` into `000`–`0FF`
 changes the stored settings, and a bad CRC makes the next boot fall back to
 defaults.
 
@@ -560,7 +563,7 @@ Longer text is truncated by `snprintf`.
 | `User/Src/Debug/LogService.cpp` | Log queue, CDC transmit, statistics. |
 | `User/Src/Console/ConsoleService.cpp` | RX ring, line assembly, command queue, dispatch, welcome. |
 | `User/Inc/Console/ConsoleServiceBridge.h` | C entry points called from `usbd_cdc_if.c`. |
-| `User/Src/Console/*Command.cpp` | One handler per command group. |
+| `User/Src/Console/*Command.cpp` | One handler per command group; `LowBrightnessCommand.cpp` takes `display low` ahead of `DisplayCommand.cpp`. |
 | `User/Src/Debug/FirmwareInfo.cpp` | Variant name and build time for the welcome and `status`. |
 | `USB_Device/App/usbd_cdc_if.c` | CubeMX CDC glue; changes only inside `USER CODE` sections. |
 | `tools/astro_console.py` | Host client. |

@@ -81,7 +81,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | **Astro data** | | | |
 | Payload parser (protocol 1, 6 blocks) | ✅ Done | Unit tested | [AstroRefresh.md](docs/AstroRefresh.md) |
 | Refresh every 6 hours with retry and catch-up | ✅ Done | The last success is lost on power loss | [AstroRefresh.md](docs/AstroRefresh.md#schedule) |
-| Refresh from switch 1 or the console | ✅ Done | The switch is not debounced; a second press while busy is rejected | [AstroRefresh.md](docs/AstroRefresh.md) |
+| Refresh from switch 1 or the console | ✅ Done | The switch is debounced only in hardware (RC); a second press while busy is rejected | [AstroRefresh.md](docs/AstroRefresh.md) |
 | **Display** | | | |
 | Local LED board (multiplexing, progress bar) | ⚠️ Works, HW issue | Off digits glow because the slot P-FETs do not fully turn off (H-3) | [Display.md](docs/Display.md) |
 | Sending data to the 5 remote boards over I2C | ✅ Done (host side) | Needs I2C pull-ups, which are `dnp` in the schematic (H-4) | [Display.md](docs/Display.md#i2c-transport) |

@@ -159,7 +159,7 @@ const char* const kWifi[] = {
 
 const char* const kEeprom[] = {
     "Raw access to the 512-byte settings EEPROM. Offsets and lengths are hex,",
-    "matching the addresses 'eeprom dump' prints. 000-07F holds the settings.",
+    "matching the addresses 'eeprom dump' prints. 000-0FF holds the settings.",
     "eeprom probe      check the chip answers; reports address, size, page size",
     "eeprom scan       list every device answering on the I2C bus",
     "eeprom dump       print all 512 bytes, 16 per line",

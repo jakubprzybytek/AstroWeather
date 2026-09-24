@@ -11,7 +11,8 @@ One task, `St67HttpFetchTask`, owns the module. Every fetch joins the network,
 gets an address by DHCP, downloads one plain-HTTP response into the caller's
 buffer and disconnects. The module and LwIP are started on the first fetch and
 then kept running; see [Lifecycle](#lifecycle). The SSID and password come from
-the EEPROM (`wifi set`), the server host and path from a compile-time header.
+the EEPROM (`wifi set`), the server host and path from the EEPROM (`api host`,
+`api path`), each falling back to a compile-time default; see [Server](#server).
 
 The only regular client is the astro refresh; see
 [AstroRefresh.md](AstroRefresh.md). The task can also run a stress batch, a
@@ -318,9 +319,12 @@ Each fetch logs the target at `Debug` level: `ST67 fetch http://<host><path>
 Before each fetch the fetcher rejects:
 
 - a host that is empty, longer than `HTTP_SNI_MAX_SIZE`, or contains `://`,
-  `:`, CR or LF. So no scheme and no port: the port is `APP_ST67_HTTP_PORT`
-  (80);
-- a path that is empty, does not start with `/`, or contains CR or LF.
+  `:`, `/`, a space, tab, CR or LF. So no scheme, no port and no path: the port
+  is `APP_ST67_HTTP_PORT` (80);
+- a path that is empty, does not start with `/`, or contains a space, tab, CR
+  or LF.
+
+The `api host` and `api path` commands apply the same rules before saving.
 
 ## HTTP
 
@@ -497,7 +501,8 @@ the customized LwIP teardown, since removed.
 - **HTTPS** is not started; see
   [ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md).
 - **Dead code.** `St67ProbeTask.cpp` is compiled but never started;
-  `TriggerSt67SmokeTest()` is never called; the generated
+  `TriggerSt67ConnectivityCycle()` and its alias `TriggerSt67SmokeTest()` are
+  never called (kept for bench use); the generated
   `LWIP/App/http_client.c` is compiled but not called.
 - **Unit tests** cover only the WiFi layer's pure parts: the response
   parser, the host/path and `Content-Type` rules, the connect diagnosis and

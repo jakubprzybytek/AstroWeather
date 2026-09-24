@@ -5,7 +5,8 @@
 The Host Controller keeps a small set of user-configurable settings in an
 on-board EEPROM so that they survive a power cycle. Settings are read once
 during startup and applied to the owning tasks before the scheduler runs, and
-they are written back immediately whenever a console command changes one.
+they are written back immediately whenever a console command or switch 2
+changes one.
 
 Currently persisted:
 
@@ -13,7 +14,9 @@ Currently persisted:
 - Current-sense display output on/off (`adc display`).
 - Clock display on/off (`time display`).
 - Clock trim, the measured LSI error in ppm (`time trim`).
+- Low brightness (`display low`, switch 2).
 - WiFi SSID and password.
+- API host and path (`api host`, `api path`).
 
 The storage format is designed so that adding a further setting requires no
 format version change and no migration code. That property is the main subject
@@ -166,7 +169,9 @@ that field at its compile-time default.
 6. Apply the value at startup in `AppVariant_Init()`, before the owning task is
    started.
 7. Persist it from whichever console command changes it, by updating
-   `store.values()` and calling `store.save()`.
+   `store.values()` and calling `store.save()`. If a task other than the
+   console reads or writes the field, add a setter or copier on `Store` that
+   takes `mutex_`, as `setLowBrightness()` and `copyApiTarget()` do.
 8. Add native test cases to `tests/SettingsCodecTests.cpp`. At minimum a round
    trip, and a case proving an image written *without* the new record still
    decodes and leaves the new field at its default.
@@ -306,6 +311,10 @@ The exact replies are in [Console.md](Console.md).
 | `adc display on\|off` | Toggle and save. |
 | `time display on\|off` | Toggle and save. HostController only. |
 | `time trim <ppm>` | Apply and save. HostController only. |
+| `display low on\|off` | Apply and save. HostController only. |
+| Switch 2 | Toggle low brightness and save. HostController only. |
+| `api host <host>`, `api path <path>` | Check and save; used from the next fetch. HostController only. |
+| `api default` | Drop the saved host and path and save. HostController only. |
 
 The raw image can be inspected with `eeprom dump` and `eeprom read`, which is
 the quickest way to confirm a new record encodes as intended. See
@@ -320,6 +329,8 @@ the quickest way to confirm a new record encodes as intended. See
 | `User/Inc/Settings/SettingsStore.hpp` | `Store`, `LoadResult` |
 | `User/Src/Settings/SettingsStore.cpp` | EEPROM read/write, page diffing |
 | `User/Src/Console/SettingsCommand.cpp` | `settings` and `wifi` commands |
+| `User/Src/Console/ApiCommand.cpp`, `LowBrightnessCommand.cpp` | `api` and `display low` commands, which also save |
+| `User/Src/HostController/ApiTarget.cpp` | `resolveApiTarget()`: saved API host and path, or the built-in ones |
 | `tests/SettingsCodecTests.cpp` | Native tests |
 
 The codec is deliberately free of HAL dependencies so it builds and runs on the
@@ -330,8 +341,11 @@ host. Keep it that way: all EEPROM access belongs in `SettingsStore`.
 `tests/SettingsCodecTests.cpp` runs under the `NativeTests` preset alongside the
 other native suites. It currently covers round trip, blank chip, a corrupted
 byte, an unknown tag between known ones, an absent record, a record running past
-the payload, an unrecognised container version, worst-case field lengths, and
-the empty-WiFi case.
+the payload, an unrecognised container version, worst-case field lengths with
+every optional record present, the empty-WiFi case, images written without the
+clock or display records, an image written when the region was 128 bytes, the
+API target costing nothing until set, and the one-record cost of clock trim,
+clock display off and low brightness.
 
 The unknown-tag and absent-record cases are what pin down the compatibility
 rules. Do not delete them.

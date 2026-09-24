@@ -49,17 +49,20 @@ create their FreeRTOS mutexes from static storage at that point.
 3. `CurrentSenseTask`: logging and display flags from settings, the display,
    then `start()`.
 4. `ConsoleService`: `init(&display)`, EEPROM and settings pointers, `start()`.
-5. `localBoard.start()`: enables the SCT outputs, starts the `DisplayRefresh`
+5. `LowBrightness::set()` applies the saved low brightness to `PB8`, before the
+   displays light up.
+6. `localBoard.start()`: enables the SCT outputs, starts the `DisplayRefresh`
    task and TIM2.
-6. `ClockTask`: display flag and trim from settings (an error is logged if the
+7. `ClockTask`: display flag and trim from settings (an error is logged if the
    trim is rejected), the display, `start()`.
-7. `SetSt67CredentialSource(&settingsStore)`, then `StartSt67HttpFetchTask()`.
+8. `SetSt67CredentialSource(&settingsStore)`, then `StartSt67HttpFetchTask()`.
    The credential source must be set first, since the fetch task reads the
    credentials on every connect.
-8. `AstroDataRefreshTask`: `init(&display)` restores the last successful
+9. `AstroDataRefreshTask`: `init(&display)` restores the last successful
    refresh time from backup register DR1 when the RTC is set, then `start()`.
-9. `MainLoopTask`: `init(led2)`, `start()`.
-10. `SwitchInput::attach()` routes the `SWITCH_1`/`SWITCH_2` EXTI interrupts to
+10. `MainLoopTask`: `init(led2, &settingsStore)` (switch 2 saves low
+    brightness), `start()`.
+11. `SwitchInput::attach()` routes the `SWITCH_1`/`SWITCH_2` EXTI interrupts to
     `MainLoopTask` as thread flags.
 
 `defaultTask` initialises the USB device (`MX_USB_Device_Init()`) once the
@@ -146,7 +149,7 @@ CMSIS-RTOS2 priorities are FreeRTOS priorities (`configMAX_PRIORITIES` is 56):
 | `LogService` | `Debug/LogService.cpp` | Normal (24) | 1536 | static | Drains the log queue to USB CDC; `stats` output |
 | `ConsoleService` | `Console/ConsoleService.cpp` | Normal (24) | 2048 | static | Assembles and runs console commands |
 | `AstroDataRefresh` | `HostController/AstroDataRefreshTask.cpp` | Normal (24) | 3072 | static | Refresh pipeline, 6-hourly schedule, progress bar |
-| `MainLoopTask` | `HostController/MainLoopTask.cpp` | Normal (24) | 1536 | static | Switch presses |
+| `MainLoopTask` | `HostController/MainLoopTask.cpp` | Normal (24) | 1536 | static | Switch presses: switch 1 requests a refresh, switch 2 toggles low brightness and saves it |
 | `CurrentSense` | `Sensors/CurrentSenseTask.cpp` | BelowNormal (16) | 2048 | static | ADC every 100 ms |
 | `Clock` | `HostController/ClockTask.cpp` | BelowNormal (16) | 1024 | static | RTC, `HH:MM` on display 3 |
 | `St67HttpFetch` | `WiFi/St67HttpFetchTask.cpp` | BelowNormal (16) | 2560 | static | Owns the ST67 session and the HTTP fetch |
@@ -202,7 +205,7 @@ All are `Utils::Mutex` (priority inheritance, static storage).
 | `Display::submitMutex_` | The SPI/I2C transfer sequence of `submit()` and `submitLocal()`. Setters are not locked; concurrent writers are last-writer-wins. |
 | `PcbDisplayBoard::frameMutex_` | The prepared local frame, between `submit()` and the `DisplayRefresh` task. |
 | `ClockTask::rtcMutex_` | RTC reads and writes, from the clock task, the console and the refresh task's clock sync. |
-| `Settings::Store::mutex_` | The Wi-Fi SSID and password, written by the console (`wifi set`) and copied by the fetch task on every connect. Other settings are written only by the console task and are not locked. |
+| `Settings::Store::mutex_` | The Wi-Fi SSID and password and the API host and path, written by the console and copied by the fetch task on every connect or fetch; low brightness, written by the console and by `MainLoopTask` (switch 2); and the whole of `save()`, so a console save and a switch 2 save cannot interleave their page writes. Other settings are written only by the console task and are not locked. |
 
 Short state shared with other tasks, such as the refresh `active_` flag, the
 schedule summary and the last Wi-Fi connect result, is guarded with
@@ -288,8 +291,8 @@ still needs the HAL, the RTOS or the log links the stand-ins in `tests/stubs`
 and `tests/fakes`.
 
 The suites, what each covers, and what is still untested (console commands,
-`Settings::Store` and the EEPROM driver, `BufferedDisplayBoard`, and the
-bench-only code) are listed in [Testing.md](Testing.md#coverage-by-module).
+`Settings::Store` and the EEPROM driver, `BufferedDisplayBoard`, `LowBrightness`,
+`resolveApiTarget()`, and the bench-only code) are listed in [Testing.md](Testing.md#coverage-by-module).
 
 ## Unused and Dead Code
 

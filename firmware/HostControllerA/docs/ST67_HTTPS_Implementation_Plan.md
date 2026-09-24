@@ -41,7 +41,7 @@ Relevant ownership boundaries are:
 - `User/Src/WiFi/HttpClient.cpp`: owns the current synchronous TCP socket,
   request write, bounded response parsing, and cleanup.
 - `Appli/App/app_config.h`: non-secret limits and endpoint defaults.
-- `Appli/App/app_credentials.h.template`: local endpoint host and path. Wi-Fi
+- `Appli/App/app_credentials.h.template`: built-in fallback host and path. Wi-Fi
   credentials are stored in the EEPROM with `wifi set`; see [Settings.md](Settings.md).
 
 The build selects `ST67_ARCH=W6X_ARCH_T02`. Consequently, TLS runs on the
@@ -137,7 +137,8 @@ MAC address, ADC noise without analysis, or a fixed seed.
 Start with TLS 1.2 and the smallest cipher/signature set supported by the
 production endpoint and mbedTLS package. Add TLS 1.3 only if required and after
 measuring its flash/RAM cost. Require SNI and hostname verification using
-`APP_ST67_HTTP_HOST`; ALPN should advertise only `http/1.1`.
+the resolved API host (`ApiTarget::host`: the saved `api host`, or
+`APP_ST67_HTTP_HOST` as the fallback); ALPN should advertise only `http/1.1`.
 
 ## 4. Phase 1: Enable mbedTLS Through CubeMX
 
@@ -202,7 +203,7 @@ success/failure requests do not fragment the FreeRTOS heap.
 2. Extend the `HttpClient_Get` request contract to receive transport, trust
    material, and the total deadline without exposing mbedTLS types to
    `St67HttpFetcher`.
-3. Continue resolving `APP_ST67_HTTP_HOST` through LwIP DNS and pass the original
+3. Continue resolving the API host (`resolveApiTarget()`) through LwIP DNS and pass the original
    hostname separately for the HTTP `Host` header, SNI, and certificate hostname
    verification. Never verify against the resolved IP address.
 4. Add TLS-specific fetch results or detail codes for configuration, entropy,

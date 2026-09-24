@@ -28,7 +28,8 @@ namespace {
 
 void line(const char* format, ...)
 {
-    char text[128];
+    // Room for the api line: a 64-character host and path plus the prefix.
+    char text[168];
     va_list arguments;
     va_start(arguments, format);
     std::vsnprintf(text, sizeof(text), format, arguments);

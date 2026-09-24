@@ -2,24 +2,25 @@
 
 ## Summary
 
-Measured on 2026-09-23 from the Debug HostController build in
-`build/claude-host/` (`HostControllerA.elf` linked 2026-09-23 12:43; it
-includes the scheduled astro refresh committed in `03f2ebd`), using
-`arm-none-eabi-size` from GNU Tools for STM32 14.3.1:
+Measured on 2026-09-24 from the Debug HostController build in
+`build/Debug-HostController/` (`HostControllerA.elf` linked 2026-09-24 13:01; it
+includes the `api` settings and low brightness), using `arm-none-eabi-size`
+from GNU Tools for STM32 14.3.1:
 
 | Item | Bytes |
 | --- | ---: |
 | RAM capacity, STM32G0B1CETx | 147456 (144 KiB) |
 | `.data` | 616 |
-| `.bss` | 132016 |
+| `.bss` | 132792 |
 | `._user_heap_stack`: C heap `0x200` + main stack `0x400` | 1536 |
-| **Total statically reserved** | **134168** |
-| **Remaining** | **13288** |
-| Static RAM usage | about **91.0%** |
+| **Total statically reserved** | **134944** |
+| **Remaining** | **12512** |
+| Static RAM usage | about **91.5%** |
 
 The previous measurement, on 2026-08-30 from `build/Debug-HostController/`,
-was 131564 bytes of `.data + .bss` and 14352 bytes remaining, so static use
-has grown by about 1 KB since.
+was 131564 bytes of `.data + .bss` and 14352 bytes remaining. On 2026-09-23
+it was 132632 with 13288 remaining; the 776 bytes since are mostly the settings
+store's two 256-byte working images and the API host and path.
 
 The percentage describes address-space reservation at link time; it does not
 mean every byte is in use at every moment. About 73.5 KB of it is two heaps,
@@ -33,13 +34,14 @@ From `arm-none-eabi-nm -S --size-sort` on the same ELF:
 | --- | ---: | --- |
 | FreeRTOS heap (`ucHeap`) | 40000 | `configTOTAL_HEAP_SIZE` in `Core/Inc/FreeRTOSConfig.h` |
 | LwIP heap (`ram_heap`) | 33551 | `MEM_SIZE` calculated in `LWIP/Target/lwipopts.h` |
-| `AstroDataRefreshTask` object | 7704 | 3072-byte stack, 4096-byte response buffer and state; `User/Inc/HostController/AstroDataRefreshTask.hpp` |
-| `St67HttpFetchTask` object | 7208 | 2560-byte stack and `St67Runtime`, including its own 4096-byte `httpPayload`; `User/Src/WiFi/St67HttpFetchTask.cpp` |
+| `AstroDataRefreshTask` object | 7712 | 3072-byte stack, 4096-byte response buffer and state; `User/Inc/HostController/AstroDataRefreshTask.hpp` |
+| `St67HttpFetchTask` object | 7336 | 2560-byte stack and `St67Runtime`, including its own 4096-byte `httpPayload`, and the fetcher's `ApiTarget`; `User/Src/WiFi/St67HttpFetchTask.cpp` |
 | `LogService` object | 5504 | 1536-byte stack and a 16-entry queue of 201-byte events; `User/Inc/Debug/LogService.hpp` |
 | `ConsoleService` object | 4000 | 2048-byte stack, 8-entry command queue of 128-byte lines, 256-byte RX ring; `User/Inc/Console/ConsoleService.hpp` |
 | USB CDC buffers | 4096 | `UserRxBufferFS` and `UserTxBufferFS`, 2048 bytes each |
 | `CurrentSenseTask` object | 2480 | 2048-byte stack |
 | `MainLoopTask` object | 1960 | 1536-byte stack |
+| `settingsStore` (`Settings::Store`) | 840 | `Values` (including the 65-byte API host and path), two 256-byte working images for `load()`/`save()`, the mutex; `User/Inc/Settings/SettingsStore.hpp` |
 | `localBoard` (`PcbDisplayBoard`) | 1648 | 1024-byte `DisplayRefresh` stack, logical and prepared frames |
 | `ClockTask` object | 1600 | 1024-byte stack |
 | `led1` (`BlinkingLed`) | 1200 | 768-byte stack |
@@ -244,6 +246,6 @@ configuration change.
 
 ## Current Recommendation
 
-About 13 KB remain. Before adding RAM-hungry features, first take the cheap
+About 12.5 KB remain. Before adding RAM-hungry features, first take the cheap
 4 KB from holding the payload once, then measure `heapMin` under the worst-case
 WiFi workload before touching the FreeRTOS heap, the LwIP heap or task stacks.

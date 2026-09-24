@@ -265,7 +265,8 @@ test that pins one says "current behaviour".
 - The `Content-Type` check is a prefix search anywhere in the headers: extra
   parameters pass, case and spacing must match exactly, and a header such as
   `X-Content-Type:` can match first.
-- The host check accepts spaces and `/`; the path check accepts spaces.
+- Fixed 2026-09-24: the host check now rejects whitespace and `/`, and the path
+  check whitespace.
 
 **Fetch status** (`st67_fetch_status_map_tests`):
 
