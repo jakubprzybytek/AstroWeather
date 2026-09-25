@@ -1,7 +1,7 @@
 #include <Console/LowBrightnessCommand.hpp>
 
 #include <Debug/LogService.hpp>
-#include <HostController/LowBrightness.hpp>
+#include <Display/LowBrightness.hpp>
 #include <Settings/SettingsStore.hpp>
 
 #include <cstdio>

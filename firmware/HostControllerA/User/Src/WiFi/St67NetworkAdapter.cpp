@@ -1,4 +1,4 @@
-#include <HostController/St67NetworkAdapter.hpp>
+#include <WiFi/St67NetworkAdapter.hpp>
 
 #include "lwip.h"
 #include "lwip/netif.h"

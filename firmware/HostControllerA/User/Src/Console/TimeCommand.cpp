@@ -1,8 +1,8 @@
 #include <Console/TimeCommand.hpp>
 
 #include <Debug/LogService.hpp>
-#include <HostController/CalendarDate.hpp>
-#include <HostController/ClockTask.hpp>
+#include <Clock/CalendarDate.hpp>
+#include <Clock/ClockTask.hpp>
 #include <Settings/SettingsStore.hpp>
 
 #include <cstdio>

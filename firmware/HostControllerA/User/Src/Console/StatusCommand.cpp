@@ -4,14 +4,12 @@
 #include <Debug/LogService.hpp>
 #include <Device/Eeprom24AA04.hpp>
 #include <Settings/SettingsStore.hpp>
-#if defined(FIRMWARE_VARIANT_HostController)
-#include <HostController/ApiTarget.hpp>
-#include <HostController/AstroDataRefreshTask.hpp>
-#include <HostController/CalendarDate.hpp>
-#include <HostController/ClockTask.hpp>
-#include <HostController/LowBrightness.hpp>
-#include <HostController/St67HttpFetchTask.hpp>
-#endif
+#include <Astro/ApiTarget.hpp>
+#include <Astro/AstroDataRefreshTask.hpp>
+#include <Clock/CalendarDate.hpp>
+#include <Clock/ClockTask.hpp>
+#include <Display/LowBrightness.hpp>
+#include <WiFi/St67HttpFetchTask.hpp>
 
 #include "FreeRTOS.h"
 #include "cmsis_os2.h"
@@ -54,7 +52,6 @@ void reportWifi(const Settings::Values& values)
         line("wifi       not configured; set credentials with 'wifi set <ssid> <password>'");
         return;
     }
-#if defined(FIRMWARE_VARIANT_HostController)
     using namespace HostController;
     const WifiConnectSummary last = LastWifiConnect();
     if (last.result == WifiConnectResult::NeverTried) {
@@ -72,9 +69,6 @@ void reportWifi(const Settings::Values& values)
         line("wifi       '%s' stored; last connect FAILED %s ago: %s", values.wifiSsid, ago,
              wifiConnectResultName(last.result));
     }
-#else
-    line("wifi       '%s' stored", values.wifiSsid);
-#endif
 }
 
 void reportEeprom(Device::Eeprom24AA04* eeprom, Settings::Store* settings)
@@ -102,7 +96,6 @@ void reportEeprom(Device::Eeprom24AA04* eeprom, Settings::Store* settings)
     reportWifi(values);
 }
 
-#if defined(FIRMWARE_VARIANT_HostController)
 void reportSchedule()
 {
     using namespace HostController;
@@ -214,7 +207,6 @@ void reportAstro()
              refreshTriggerName(last.trigger), last.running ? "; another running now" : "");
     }
 }
-#endif
 
 void reportRemoteBoards(Display::Display* display)
 {
@@ -259,7 +251,6 @@ CommandResult handleStatusCommand(const char* command, Display::Display* display
          static_cast<unsigned long>(xPortGetMinimumEverFreeHeapSize()));
     line("stats      %s", LogService::instance().statsEnabled() ? "on, every 5 s" : "off");
     reportEeprom(eeprom, settings);
-#if defined(FIRMWARE_VARIANT_HostController)
     reportAstro();
     reportWeatherFetch(HostController::AstroDataRefreshTask::instance().lastRefresh());
     reportSchedule();
@@ -269,7 +260,6 @@ CommandResult handleStatusCommand(const char* command, Display::Display* display
              (target.hostSaved || target.pathSaved) ? "saved" : "built-in");
     }
     line("brightness %s", LowBrightness::isEnabled() ? "low" : "normal");
-#endif
     reportRemoteBoards(display);
     return CommandResult::Ok;
 }

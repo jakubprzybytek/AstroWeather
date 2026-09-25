@@ -1,4 +1,4 @@
-#include <HostController/AstroProgressBar.hpp>
+#include <Astro/AstroProgressBar.hpp>
 
 #include <Expect.hpp>
 

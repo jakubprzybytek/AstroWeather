@@ -1,7 +1,7 @@
 // Classifying a failed station connect from the module's reason code and an
 // SSID scan, and the plain-language line logged for each outcome.
 
-#include <HostController/St67ConnectDiagnosis.hpp>
+#include <WiFi/St67ConnectDiagnosis.hpp>
 
 #include <Expect.hpp>
 

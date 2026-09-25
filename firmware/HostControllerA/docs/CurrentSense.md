@@ -10,8 +10,8 @@ second, together with the MCU's internal temperature sensor and `VREFINT`, and
 by default shows the current in mA on numeric display 2 of the local board.
 `adc log on` also logs every sample.
 
-Only the HostController firmware starts the task. The DisplayController
-variant builds the same `MX_ADC1_Init()` but does not use the ADC.
+Only the HostController firmware has the task; the DisplayController project
+has no ADC configured.
 
 The measurement works on the prototype host board, which has a hand rework:
 `VREF+` (U302 pin 5) is tied to GND in the schematic and PCB, and has been
@@ -83,7 +83,7 @@ Changes belong in the `.ioc`, followed by regeneration; see
 | `User/Inc/Sensors/CurrentSenseTask.hpp`, `User/Src/Sensors/CurrentSenseTask.cpp` | The sampling task, and the HAL ADC complete and error callbacks. |
 | `User/Inc/Sensors/CurrentSenseConversion.hpp` | Pure conversions: ADC counts to mA, VDDA from `VREFINT`, the temperature, and the value shown. Tested by `tests/CurrentSenseConversionTests.cpp`. |
 | `User/Src/Console/AdcCommand.cpp` | `adc log` and `adc display`, saved to the EEPROM. |
-| `User/Src/HostController/AppVariant.cpp` | Applies the saved flags, sets the display and starts the task. |
+| `User/Src/AstroWeather.cpp` | Applies the saved flags, sets the display and starts the task. |
 
 `CurrentSenseTask` is a `Task<2048>` at `osPriorityBelowNormal`.
 

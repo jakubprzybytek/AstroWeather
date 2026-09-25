@@ -1,5 +1,5 @@
-#include <HostController/AstroDisplayMapper.hpp>
-#include <HostController/AstroDataParser.hpp>
+#include <Astro/AstroDisplayMapper.hpp>
+#include <Astro/AstroDataParser.hpp>
 
 #include <Expect.hpp>
 

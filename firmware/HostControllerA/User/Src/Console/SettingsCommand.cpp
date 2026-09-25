@@ -2,9 +2,7 @@
 
 #include <Debug/LogService.hpp>
 #include <Settings/SettingsStore.hpp>
-#if defined(FIRMWARE_VARIANT_HostController)
-#include <HostController/AstroDataRefreshTask.hpp>
-#endif
+#include <Astro/AstroDataRefreshTask.hpp>
 
 #include <cstdarg>
 #include <cstddef>
@@ -124,7 +122,6 @@ void reply(const char* format, ...)
 // credentials and reports any failure in plain words. HostController only.
 void startWifiTest(const char* ssid)
 {
-#if defined(FIRMWARE_VARIANT_HostController)
     using namespace HostController;
     const RefreshRequestResult result =
         AstroDataRefreshTask::instance().requestRefresh(RefreshTrigger::WifiTest);
@@ -135,9 +132,6 @@ void startWifiTest(const char* ssid)
     } else {
         reply("The WiFi task is not ready yet; run 'wifi test' in a moment.");
     }
-#else
-    (void)ssid;
-#endif
 }
 
 // 'wifi set <ssid> [password]'. Replies are sent from here, so the specific

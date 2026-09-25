@@ -1,4 +1,4 @@
-#include <St67ProbeTask.hpp>
+#include <WiFi/St67ProbeTask.hpp>
 
 #include <Debug/LogService.hpp>
 #include <Utils/Task.hpp>

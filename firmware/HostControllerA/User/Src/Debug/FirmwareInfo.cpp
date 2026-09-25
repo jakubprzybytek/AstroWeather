@@ -2,11 +2,7 @@
 
 const char* firmwareVariant()
 {
-#if defined(FIRMWARE_VARIANT_HostController)
     return "HostController";
-#else
-    return "DisplayController";
-#endif
 }
 
 // Defined in BuildInfo.cpp, which the build regenerates every time.

@@ -1,6 +1,6 @@
 #include <Console/AstroCommand.hpp>
 
-#include <HostController/AstroDataRefreshTask.hpp>
+#include <Astro/AstroDataRefreshTask.hpp>
 
 #include <cstring>
 

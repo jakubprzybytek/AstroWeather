@@ -3,7 +3,7 @@
 // listed; several map to HttpFailure although nothing HTTP went wrong, which is
 // current behaviour (docs/WiFi.md, "Failure mapping").
 
-#include <HostController/St67FetchStatusMap.hpp>
+#include <WiFi/St67FetchStatusMap.hpp>
 
 #include <Expect.hpp>
 

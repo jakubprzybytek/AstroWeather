@@ -3,7 +3,7 @@
 ## Summary
 
 Measured on 2026-09-24 from the Debug HostController build in
-`build/Debug-HostController/` (`HostControllerA.elf` linked 2026-09-24 13:01; it
+`build/Debug/` (`HostControllerA.elf` linked 2026-09-24 13:01; it
 includes the `api` settings and low brightness), using `arm-none-eabi-size`
 from GNU Tools for STM32 14.3.1:
 
@@ -17,7 +17,7 @@ from GNU Tools for STM32 14.3.1:
 | **Remaining** | **12512** |
 | Static RAM usage | about **91.5%** |
 
-The previous measurement, on 2026-08-30 from `build/Debug-HostController/`,
+The previous measurement, on 2026-08-30 from `build/Debug/`,
 was 131564 bytes of `.data + .bss` and 14352 bytes remaining. On 2026-09-23
 it was 132632 with 13288 remaining; the 776 bytes since are mostly the settings
 store's two 256-byte working images and the API host and path.
@@ -34,7 +34,7 @@ From `arm-none-eabi-nm -S --size-sort` on the same ELF:
 | --- | ---: | --- |
 | FreeRTOS heap (`ucHeap`) | 40000 | `configTOTAL_HEAP_SIZE` in `Core/Inc/FreeRTOSConfig.h` |
 | LwIP heap (`ram_heap`) | 33551 | `MEM_SIZE` calculated in `LWIP/Target/lwipopts.h` |
-| `AstroDataRefreshTask` object | 7712 | 3072-byte stack, 4096-byte response buffer and state; `User/Inc/HostController/AstroDataRefreshTask.hpp` |
+| `AstroDataRefreshTask` object | 7712 | 3072-byte stack, 4096-byte response buffer and state; `User/Inc/Astro/AstroDataRefreshTask.hpp` |
 | `St67HttpFetchTask` object | 7336 | 2560-byte stack and `St67Runtime`, including its own 4096-byte `httpPayload`, and the fetcher's `ApiTarget`; `User/Src/WiFi/St67HttpFetchTask.cpp` |
 | `LogService` object | 5504 | 1536-byte stack and a 16-entry queue of 201-byte events; `User/Inc/Debug/LogService.hpp` |
 | `ConsoleService` object | 4000 | 2048-byte stack, 8-entry command queue of 128-byte lines, 256-byte RX ring; `User/Inc/Console/ConsoleService.hpp` |

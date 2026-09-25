@@ -18,8 +18,8 @@ The only regular client is the astro refresh; see
 [AstroRefresh.md](AstroRefresh.md). The task can also run a stress batch, a
 bench test that nothing triggers at present; see [Stress batch](#stress-batch).
 
-Only the HostController image has WiFi. `User/Src/WiFi` is compiled for the
-HostController variant only (`CMakeLists.txt`).
+Only the HostController has WiFi: `User/Src/WiFi` belongs to this project and
+is not part of the shared `../Common` code.
 
 This document replaces the ST67 phase plans, now in
 [archive](archive/ST67_Daily_Fetch_Implementation_Plan.md). HTTPS is a separate
@@ -63,7 +63,7 @@ The driver's SPI port (`ST67W6X_Network_Driver/Target/spi_port.c`) is
 generated. The rising edge of `ST67_RDY` reaches the driver through
 `HAL_GPIO_EXTI_Rising_Callback()` in `User/Src/WiFi/St67SpiReady.cpp`, which
 calls `spi_on_txn_data_ready()`. The falling-edge callback belongs to the
-switches (`User/Src/Utils/SwitchInput.cpp`).
+switches (`../Common/Src/Utils/SwitchInput.cpp`).
 
 ### Task priorities and stacks
 
@@ -96,24 +96,24 @@ The driver's own log output goes through `vLoggingPrintf()`, defined in
 
 | File | Responsibility |
 | --- | --- |
-| `User/Src/WiFi/St67HttpFetchTask.cpp`, `User/Inc/HostController/St67HttpFetchTask.hpp` | The task. Public API: `FetchSt67Data`, `StartSt67HttpFetchTask`, `SetSt67CredentialSource`, `TriggerSt67ConnectivityCycle`, `LastWifiConnect`. Runs batches and publishes the result. |
+| `User/Src/WiFi/St67HttpFetchTask.cpp`, `User/Inc/WiFi/St67HttpFetchTask.hpp` | The task. Public API: `FetchSt67Data`, `StartSt67HttpFetchTask`, `SetSt67CredentialSource`, `TriggerSt67ConnectivityCycle`, `LastWifiConnect`. Runs batches and publishes the result. |
 | `User/Src/WiFi/St67FetchStatusMap.cpp`, `.../St67FetchStatusMap.hpp` | `fetchStatusForFailure()`: first failed stage to `St67FetchStatus`. Pure. |
-| `User/Inc/HostController/St67FetchTypes.hpp` | `St67FetchRequest`, `St67FetchResult`, `St67FetchStatus`, `FetchStage`, the client timeout. |
+| `User/Inc/WiFi/St67FetchTypes.hpp` | `St67FetchRequest`, `St67FetchResult`, `St67FetchStatus`, `FetchStage`, the client timeout. |
 | `User/Src/WiFi/St67NetworkSession.cpp`, `.../St67NetworkSession.hpp` | `initialize()`, `open()`, `disconnect()`, `stop()`. Credentials, the SSID scan, `LastWifiConnect()`. |
 | `User/Src/WiFi/St67ConnectDiagnosis.cpp`, `.../St67ConnectDiagnosis.hpp` | Connect-failure diagnosis: reason code to `WifiConnectResult`, the scan fallback, and the log line for each result. Pure. |
 | `User/Src/WiFi/St67NetworkAdapter.cpp`, `.../St67NetworkAdapter.hpp` | Station state from public APIs only: `W6X_WiFi_Station_GetState()` plus the LwIP `NETIF_STA` netif (up, link, IPv4). |
 | `User/Src/WiFi/St67HttpFetcher.cpp`, `.../St67HttpFetcher.hpp` | Checks the host and path, resolves DNS, runs one GET, checks `Content-Type`, copies the body and computes its CRC-32. |
 | `User/Src/WiFi/St67HttpRules.cpp`, `.../St67HttpRules.hpp` | The fetcher's host/path check (`isValidTarget()`) and `Content-Type` check (`checkContentType()`). Pure. |
-| `User/Src/WiFi/HttpClient.cpp`, `User/Inc/HostController/HttpClient.hpp` | `HttpClient_Get()`: a bounded synchronous HTTP/1.1 GET on an LwIP socket. |
+| `User/Src/WiFi/HttpClient.cpp`, `User/Inc/WiFi/HttpClient.hpp` | `HttpClient_Get()`: a bounded synchronous HTTP/1.1 GET on an LwIP socket. |
 | `User/Src/WiFi/HttpResponseParser.cpp`, `.../HttpResponseParser.hpp` | `HttpResponse::`: header end, status line, `Content-Length`, the header buffer and body limits, used by `HttpClient_Get()`. Pure. |
-| `User/Inc/HostController/St67Runtime.hpp` | `St67Runtime`: init flags, state, DNS and HTTP results, the first failure, the 4096-byte `httpPayload` buffer, the client request being served. |
+| `User/Inc/WiFi/St67Runtime.hpp` | `St67Runtime`: init flags, state, DNS and HTTP results, the first failure, the 4096-byte `httpPayload` buffer, the client request being served. |
 | `User/Src/WiFi/St67SpiReady.cpp` | The `ST67_RDY` rising-edge bridge. |
 | `User/Src/WiFi/St67ProbeTask.cpp` | Dead code: the raw AT/CWLAP probe from before the driver was used. Compiled, never started. |
 | `Appli/App/app_config.h` | Timeouts, limits, lifecycle mode. See [Configuration](#configuration). |
 | `Appli/App/app_credentials.h.template` | Template for the git-ignored `app_credentials.h`: the built-in HTTP host and path. |
-| `User/Src/HostController/ApiTarget.cpp`, `User/Inc/HostController/ApiTarget.hpp` | `resolveApiTarget()`: the saved `api host` / `api path`, each falling back to the built-in value. |
+| `User/Src/Astro/ApiTarget.cpp`, `User/Inc/Astro/ApiTarget.hpp` | `resolveApiTarget()`: the saved `api host` / `api path`, each falling back to the built-in value. |
 
-`AppVariant.cpp` calls `SetSt67CredentialSource(&settingsStore)` and then
+`AstroWeather.cpp` calls `SetSt67CredentialSource(&settingsStore)` and then
 `StartSt67HttpFetchTask()`. The task waits `APP_ST67_STARTUP_DELAY_MS` (4 s)
 after it starts; a request made earlier waits with it.
 

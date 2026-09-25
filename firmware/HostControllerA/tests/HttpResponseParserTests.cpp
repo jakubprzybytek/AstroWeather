@@ -2,7 +2,7 @@
 // Content-Length, the 2048-byte header buffer and the body limits. Several
 // cases pin current behaviour rather than what HTTP allows; they say so.
 
-#include <HostController/HttpResponseParser.hpp>
+#include <WiFi/HttpResponseParser.hpp>
 
 #include <Expect.hpp>
 

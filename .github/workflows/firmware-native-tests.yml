@@ -3,11 +3,15 @@ name: Firmware native tests
 on:
   push:
     paths:
+      - 'firmware/Common/**'
       - 'firmware/HostControllerA/**'
+      - 'firmware/DisplayController/**'
       - '.github/workflows/firmware-native-tests.yml'
   pull_request:
     paths:
+      - 'firmware/Common/**'
       - 'firmware/HostControllerA/**'
+      - 'firmware/DisplayController/**'
       - '.github/workflows/firmware-native-tests.yml'
   workflow_dispatch:
 
@@ -17,9 +21,25 @@ permissions:
 jobs:
   native-tests:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The shared code has its own test project; the host project tests
+          # its own code and compiles the shared sources it depends on.
+          - project: Common
+            configure_args: ''
+            coverage_filter: 'Src/'
+          - project: HostControllerA
+            configure_args: '-DBUILD_NATIVE_TESTS=ON'
+            coverage_filter: 'User/'
+          - project: DisplayController
+            configure_args: '-DBUILD_NATIVE_TESTS=ON'
+            coverage_filter: 'User/'
+    name: native-tests (${{ matrix.project }})
     defaults:
       run:
-        working-directory: firmware/HostControllerA
+        working-directory: firmware/${{ matrix.project }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -31,7 +51,7 @@ jobs:
 
       # The CMake presets carry Windows toolchain paths, so CI configures directly.
       - name: Configure
-        run: cmake -S . -B build/ci -G Ninja -DBUILD_NATIVE_TESTS=ON -DNATIVE_TESTS_COVERAGE=ON
+        run: cmake -S . -B build/ci -G Ninja ${{ matrix.configure_args }} -DNATIVE_TESTS_COVERAGE=ON
 
       - name: Build
         run: cmake --build build/ci
@@ -41,9 +61,9 @@ jobs:
 
       - name: Coverage summary
         run: |
-          gcovr -r . --filter 'User/' build/ci --txt | tee coverage.txt
+          gcovr -r . --filter '${{ matrix.coverage_filter }}' build/ci --txt | tee coverage.txt
           {
-            echo '### Native test coverage'
+            echo '### Native test coverage (${{ matrix.project }})'
             echo '```'
             cat coverage.txt
             echo '```'

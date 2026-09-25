@@ -1,5 +1,5 @@
-#include <HostController/CalendarDate.hpp>
-#include <HostController/RefreshSchedule.hpp>
+#include <Clock/CalendarDate.hpp>
+#include <Astro/RefreshSchedule.hpp>
 
 #include <Expect.hpp>
 

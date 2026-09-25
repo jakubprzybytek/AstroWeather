@@ -23,6 +23,11 @@ cmake --build --preset NativeTests
 ctest --test-dir build/native-tests-local --output-on-failure
 ```
 
+The suites for the code shared with the DisplayController are a separate CMake
+project with the same presets: run the same three commands from `../Common`.
+The DisplayController's own suites (its screens and stale-data timeout) run the
+same way from `../DisplayController`.
+
 ### Coverage
 
 The `NativeTests-Coverage` preset builds the same suites with `--coverage`
@@ -44,16 +49,17 @@ tracks those.
 
 ### Continuous Integration
 
-`.github/workflows/firmware-native-tests.yml` builds and runs the suites with
-coverage on Ubuntu for every push and pull request that touches
-`firmware/HostControllerA/`, and writes the `gcovr` summary to the job
-summary. It configures CMake directly because the presets carry Windows
-toolchain paths.
+`.github/workflows/firmware-native-tests.yml` builds and runs the suites of
+`firmware/Common`, `firmware/HostControllerA` and `firmware/DisplayController`
+with coverage on Ubuntu for every push and pull request that touches any of
+them, and writes the
+`gcovr` summaries to the job summary. It configures CMake directly because the
+presets carry Windows toolchain paths.
 
 ## Writing a Test
 
 Each suite is one `tests/<Name>Tests.cpp` with a `main()`, registered in
-`tests/CMakeLists.txt`:
+`tests/CMakeLists.txt` (or, for shared code, in `../Common/tests/CMakeLists.txt`):
 
 ```cmake
 add_native_test(<name>
@@ -64,15 +70,23 @@ add_native_test(<name>
 )
 ```
 
-- `SUT` paths are relative to the project root. `User/Inc` and
-  `tests/support` are always on the include path.
-- `STUBS` adds `tests/stubs` and `Core/Inc`, so the real `main.h` compiles
-  against a stand-in HAL, and links the stub implementations.
-- `FAKE_LOG` links the recording `LogService` fake (and implies `STUBS`).
+- `SUT` paths are relative to the project root; shared sources are reached as
+  `../Common/Src/...`. `../Common/Inc`, `User/Inc` and `../Common/tests/support`
+  are always on the include path.
+- `STUBS` adds `../Common/tests/stubs` and `Core/Inc`, so the real `main.h`
+  compiles against a stand-in HAL, and links the stub implementations. The
+  shared code's own suites compile against `../Common/tests/board/main.h`, a
+  stand-in with the pin labels both boards define.
+- `FAKE_LOG` links the recording `LogService` fake from `tests/fakes` (and
+  implies `STUBS`).
+
+`add_native_test()` is defined once, in `../Common/tests/NativeTest.cmake`; each
+`tests/CMakeLists.txt` sets the project root, include and `main.h` directories
+before including it.
 
 ### Assertions
 
-`tests/support/Expect.hpp` provides:
+`../Common/tests/support/Expect.hpp` provides:
 
 | Helper | Use |
 | --- | --- |
@@ -86,7 +100,7 @@ failing case.
 
 ### Stubs
 
-`tests/stubs/` holds stand-ins for `stm32g0xx_hal.h`, `cmsis_os2.h`,
+`../Common/tests/stubs/` holds stand-ins for `stm32g0xx_hal.h`, `cmsis_os2.h`,
 `FreeRTOS.h`, `queue.h` and `task.h`. Nothing is scheduled: threads are never
 created and mutexes always succeed. `StubHal.hpp` steers them from a test:
 
@@ -111,7 +125,10 @@ console commands and task code link in a test.
 ## Coverage by Module
 
 Line coverage from the `NativeTests-Coverage` preset on 2026-09-23: 95% over
-the 24 files the suites compile (983 lines).
+the 24 files the suites compile (983 lines). Since 2026-09-25 the
+`numeric_display_tests`, `display_codec_tests`, `display_i2c_protocol_tests`,
+`display_address_tests` and `crc32_tests` suites live in `../Common/tests`; the
+rest in `tests/`.
 
 | Module | Suite | Line coverage |
 | --- | --- | --- |
@@ -166,7 +183,7 @@ run reports every failing case instead of stopping at the first.
 | Suite | What it pins |
 | --- | --- |
 | `display_i2c_protocol_tests` | Serialize/deserialize round trip, 36-byte message, command `0x01`; null, wrong-size and wrong-command messages rejected without touching the destination; bits 21-23 masked |
-| `display_address_tests` | All 27 strap combinations (high = 2, floating = 1, low = 0), pins left without pull, `0x10 + id` and 0 for id 27 or more |
+| `display_address_tests` | All 27 strap combinations (high = 2, floating = 1, low = 0), pins left analog without pull, `0x10 + id` and 0 for id 27 or more |
 | `display_codec_tests` | Golden vectors from the wiring tables in [Display.md](Display.md): every segment of every digit, L1-L3, the 21 matrix columns, the matrix row order (bottom row first) |
 | `astro_data_parser_tests` | 95-character line limit, CRLF, blocks out of order or missing, truncated payload, `configurationId` of 20 and 21 characters, `protocol=2`, `?` rows and numerics |
 | `numeric_display_tests` | The fixed-point rules after the fix below |

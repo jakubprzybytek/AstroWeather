@@ -1,19 +1,15 @@
 #include <Console/ConsoleService.hpp>
 
 #include <Console/AdcCommand.hpp>
-#if defined(FIRMWARE_VARIANT_HostController)
 #include <Console/ApiCommand.hpp>
 #include <Console/AstroCommand.hpp>
-#endif
 #include <Console/DisplayCommand.hpp>
 #include <Console/EepromCommand.hpp>
 #include <Console/HelpCommand.hpp>
 #include <Console/SettingsCommand.hpp>
 #include <Console/StatusCommand.hpp>
-#if defined(FIRMWARE_VARIANT_HostController)
 #include <Console/LowBrightnessCommand.hpp>
 #include <Console/TimeCommand.hpp>
-#endif
 #include <Debug/FirmwareInfo.hpp>
 #include <Settings/SettingsStore.hpp>
 #include <Debug/LogService.hpp>
@@ -179,7 +175,6 @@ void ConsoleService::execute(const char* line)
         LogService::instance().setStatsEnabled(enabled);
         return;
     }
-#if defined(FIRMWARE_VARIANT_HostController)
     const Console::CommandResult astroResult = Console::handleAstroCommand(line);
     if (astroResult == Console::CommandResult::Ok) {
         reply("OK astro-refresh=started");
@@ -219,7 +214,6 @@ void ConsoleService::execute(const char* line)
     if (Console::handleLowBrightnessCommand(line, settings_) == Console::CommandResult::Ok) {
         return;
     }
-#endif
     const Console::CommandResult adcResult = Console::handleAdcCommand(line, settings_);
     if (adcResult == Console::CommandResult::Ok) {
         if (std::strcmp(line, "adc log on") == 0) {

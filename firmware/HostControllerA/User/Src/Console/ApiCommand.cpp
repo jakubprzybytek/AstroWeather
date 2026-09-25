@@ -1,8 +1,8 @@
 #include <Console/ApiCommand.hpp>
 
 #include <Debug/LogService.hpp>
-#include <HostController/ApiTarget.hpp>
-#include <HostController/St67HttpRules.hpp>
+#include <Astro/ApiTarget.hpp>
+#include <WiFi/St67HttpRules.hpp>
 #include <Settings/SettingsStore.hpp>
 
 #include <cstdarg>

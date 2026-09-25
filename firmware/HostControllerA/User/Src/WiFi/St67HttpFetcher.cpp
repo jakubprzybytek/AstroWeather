@@ -1,11 +1,11 @@
-#include <HostController/St67HttpFetcher.hpp>
+#include <WiFi/St67HttpFetcher.hpp>
 
 #include <Debug/LogService.hpp>
-#include <HostController/HttpClient.hpp>
-#include <HostController/HttpResponseParser.hpp>
-#include <HostController/St67HttpFetchTask.hpp>
-#include <HostController/St67HttpRules.hpp>
-#include <HostController/St67Runtime.hpp>
+#include <WiFi/HttpClient.hpp>
+#include <WiFi/HttpResponseParser.hpp>
+#include <WiFi/St67HttpFetchTask.hpp>
+#include <WiFi/St67HttpRules.hpp>
+#include <WiFi/St67Runtime.hpp>
 #include <Utils/Crc32.hpp>
 
 #include "app_config.h"

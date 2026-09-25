@@ -11,7 +11,9 @@ subsystem in depth.
 The firmware is C++17 on top of the STM32CubeMX-generated C code for an
 STM32G0B1CETx (Cortex-M0+, 16 MHz from HSI16, 512 KB flash, 144 KB RAM),
 FreeRTOS through CMSIS-RTOS2, the ST67W6X network driver and LwIP. Application
-code lives under `User/`; CubeMX owns `Core/`, `Drivers/`, `Middlewares/`,
+code lives under `User/` and, for the parts shared with the DisplayController
+firmware, under `../Common/` (see [Shared Code](#shared-code)); CubeMX owns
+`Core/`, `Drivers/`, `Middlewares/`,
 `LWIP/`, `USB_Device/` and `ST67W6X_Network_Driver/`, and application changes
 there stay inside `USER CODE` sections (see [CubeMXCompliance.md](CubeMXCompliance.md)).
 
@@ -30,17 +32,14 @@ there stay inside `USER CODE` sections (see [CubeMXCompliance.md](CubeMXComplian
    `RTOS_THREADS` user section.
 5. `osKernelStart()`.
 
-`AstroWeather_Init()` starts the `Led1` `BlinkingLed` task on `LED_1`
-(on 20 ms, off 1980 ms: a heartbeat every 2 s) and calls `AppVariant_Init()`, which each firmware
-variant implements once.
-
-All of `AppVariant_Init()` runs before the scheduler starts. The objects it
+All of `AstroWeather_Init()` runs before the scheduler starts. The objects it
 uses are file-scope statics, constructed before `main()`; their `Mutex` members
 create their FreeRTOS mutexes from static storage at that point.
 
-### HostController init order
+### Init order
 
-`User/Src/HostController/AppVariant.cpp`, in order:
+`AstroWeather_Init()` first starts the `Led1` `BlinkingLed` task on `LED_1`
+(on 20 ms, off 1980 ms: a heartbeat every 2 s), then, in order:
 
 1. `LogService` `init()` (creates the log queue) and `start()`.
 2. `settingsStore.load()` reads the EEPROM; the outcome, not the values, is
@@ -51,8 +50,9 @@ create their FreeRTOS mutexes from static storage at that point.
 4. `ConsoleService`: `init(&display)`, EEPROM and settings pointers, `start()`.
 5. `LowBrightness::set()` applies the saved low brightness to `PB8`, before the
    displays light up.
-6. `localBoard.start()`: enables the SCT outputs, starts the `DisplayRefresh`
-   task and TIM2.
+6. The local board gets the "no data" state (`Display::noDataState()`, see
+   [Display.md](Display.md#no-data)), then `localBoard.start()` enables the SCT
+   outputs and starts the `DisplayRefresh` task and TIM2.
 7. `ClockTask`: display flag and trim from settings (an error is logged if the
    trim is rejected), the display, `start()`.
 8. `SetSt67CredentialSource(&settingsStore)`, then `StartSt67HttpFetchTask()`.
@@ -68,36 +68,29 @@ create their FreeRTOS mutexes from static storage at that point.
 `defaultTask` initialises the USB device (`MX_USB_Device_Init()`) once the
 scheduler runs and then only sleeps.
 
-### DisplayController init order
+## Shared Code
 
-`User/Src/DisplayController/AppVariant.cpp` turns `LOW_POWER_EN` (`PB8`)
-into an input, since the host drives that bussed net, then calls
-`ConsoleService::instance().init(nullptr)` and `start()`. `LogService` is never
-initialised or started, so its queue does not exist and every console reply
-and log line is dropped: the USB port enumerates but prints nothing. There is no
-I2C slave, no local display refresh and no switch handling yet. `Led1` still
-blinks, since `AstroWeather_Init()` is shared.
+The remote display boards run the separate
+[DisplayController](../../DisplayController/README.md) project: an STM32G070
+with its own CubeMX configuration, presets and `User/` tree. Code both images
+need lives in `../Common` and is compiled into each project against that
+project's HAL, `main.h` and FreeRTOS configuration
+(`Common/CommonSources.cmake`), so the two CubeMX projects must keep the same
+labels for the pins it uses.
 
-## Firmware Variants
+| Location | Contents |
+| --- | --- |
+| `../Common/Src/Display/`, `Inc/Display/` | `DisplayTypes`, `DisplayCodec`, `DisplayI2cProtocol`, `DisplayAddress`, the `DisplayBoard` interface and `PcbDisplayBoard` |
+| `../Common/Src/Device/` | `SCT2xxx` |
+| `../Common/Src/Utils/`, `Inc/Utils/` | `Task`, `TaskBase`, `Mutex`, `Led`, `SwitchInput`, `Crc32` |
+| `../Common/Src/Debug/` | `BlinkingLed` |
+| `../Common/tests/` | Their native tests, and the HAL/RTOS stubs, `Expect.hpp` and `add_native_test()` that this project's tests reuse |
 
-One CMake project builds either image, chosen by the `FIRMWARE_VARIANT` cache
-variable (`HostController`, the default, or `DisplayController`; anything else
-is a configure error). The presets `Debug-HostController`,
-`Debug-DisplayController`, `Release-HostController` and
-`Release-DisplayController` set it; see [Development.md](Development.md).
-
-| Source | HostController | DisplayController |
-| --- | --- | --- |
-| `User/Src/**` except the three below | Yes | Yes |
-| `User/Src/HostController/` | Yes | No |
-| `User/Src/DisplayController/` | No | Yes |
-| `User/Src/WiFi/` | Yes | No |
-| CubeMX code, including the ST67 driver, LwIP and USB | Yes | Yes |
-
-The variant also adds `User/Inc/<variant>` to the include path and defines
-`FIRMWARE_VARIANT_<variant>`, which the console uses to hide commands the
-DisplayController does not have. Both images compile the whole CubeMX library,
-including the network stack; in the DisplayController nothing calls it.
+Everything else under `User/` is host-only: `Astro/` (the refresh task, parser,
+mapper, progress bar and schedule), `Clock/`, `WiFi/`, `Console/`, `Settings/`,
+`Sensors/`, `LogService`, the EEPROM driver and `I2cBus`, the aggregate
+`Display` with its `BufferedDisplayBoard`s, `LowBrightness` and `MainLoopTask`.
+Shared code must not depend on any of these, in particular not on `LogService`.
 
 Every build also regenerates `BuildInfo.cpp` with the build time
 (`cmake/BuildInfo.cmake`), reported by the console. There is no version number
@@ -106,7 +99,7 @@ or git hash.
 ## Static Object Graph
 
 The HostController objects are defined at file scope in
-`User/Src/HostController/AppVariant.cpp`. `i2c1Bus` is declared first because
+`User/Src/AstroWeather.cpp`. `i2c1Bus` is declared first because
 objects in one translation unit are constructed in declaration order and the
 others hold a reference to it.
 
@@ -128,7 +121,7 @@ and is reached through `StartSt67HttpFetchTask()`, `FetchSt67Data()` and
 
 ## Tasks
 
-`Task<N>` in `User/Inc/Utils/Task.hpp` holds its stack and control block as
+`Task<N>` in `../Common/Inc/Utils/Task.hpp` holds its stack and control block as
 members, so application tasks are allocated statically. **`N` is in bytes**,
 passed straight to `osThreadNew()` as `stack_size`. `TaskBase` keeps a registry
 of up to 16 such tasks, which `stats on` walks to report stack headroom.
@@ -148,10 +141,10 @@ CMSIS-RTOS2 priorities are FreeRTOS priorities (`configMAX_PRIORITIES` is 56):
 | `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | heap | Starts USB, then idles |
 | `LogService` | `Debug/LogService.cpp` | Normal (24) | 1536 | static | Drains the log queue to USB CDC; `stats` output |
 | `ConsoleService` | `Console/ConsoleService.cpp` | Normal (24) | 2048 | static | Assembles and runs console commands |
-| `AstroDataRefresh` | `HostController/AstroDataRefreshTask.cpp` | Normal (24) | 3072 | static | Refresh pipeline, 6-hourly schedule, progress bar |
-| `MainLoopTask` | `HostController/MainLoopTask.cpp` | Normal (24) | 1536 | static | Switch presses: switch 1 requests a refresh, switch 2 toggles low brightness and saves it |
+| `AstroDataRefresh` | `Astro/AstroDataRefreshTask.cpp` | Normal (24) | 3072 | static | Refresh pipeline, 6-hourly schedule, progress bar |
+| `MainLoopTask` | `MainLoopTask.cpp` | Normal (24) | 1536 | static | Switch presses: switch 1 requests a refresh, switch 2 toggles low brightness and saves it |
 | `CurrentSense` | `Sensors/CurrentSenseTask.cpp` | BelowNormal (16) | 2048 | static | ADC every 100 ms |
-| `Clock` | `HostController/ClockTask.cpp` | BelowNormal (16) | 1024 | static | RTC, `HH:MM` on display 3 |
+| `Clock` | `Clock/ClockTask.cpp` | BelowNormal (16) | 1024 | static | RTC, `HH:MM` on display 3 |
 | `St67HttpFetch` | `WiFi/St67HttpFetchTask.cpp` | BelowNormal (16) | 2560 | static | Owns the ST67 session and the HTTP fetch |
 | `Led1` | `Debug/BlinkingLed.cpp` | Low (8) | 768 | static | Heartbeat on `LED_1` |
 | `Tmr Svc` | FreeRTOS | 2 | 1024 | static | FreeRTOS timer service |
@@ -162,8 +155,7 @@ The four middleware tasks are created on the first fetch: `Modem_Process` and
 `MX_LWIP_Init()`. After an ordinary refresh the module and LwIP stay up, so they
 persist. The driver priorities 46 and 47 are overridden in
 `ST67W6X_Network_Driver/Target/w61_driver_config.h` to keep them below
-`DisplayRefresh`; `netif` still runs at 50, above it. The DisplayController
-creates only `defaultTask`, `ConsoleService`, `Led1` and the FreeRTOS tasks.
+`DisplayRefresh`; `netif` still runs at 50, above it.
 
 ## Inter-task Communication
 
@@ -287,8 +279,9 @@ The native suites in `tests/` build with the `NativeTests` preset
 mapping and timing logic lives in small hardware-free units (for example
 `AstroDisplayMapper`, `AstroProgressBar`, `HttpResponseParser`,
 `St67ConnectDiagnosis`), and the tasks only do the I/O around them. Code that
-still needs the HAL, the RTOS or the log links the stand-ins in `tests/stubs`
-and `tests/fakes`.
+still needs the HAL, the RTOS or the log links the stand-ins in
+`../Common/tests/stubs` and `tests/fakes`. The suites for the shared code are
+a separate project in `../Common`.
 
 The suites, what each covers, and what is still untested (console commands,
 `Settings::Store` and the EEPROM driver, `BufferedDisplayBoard`, `LowBrightness`,
@@ -306,9 +299,9 @@ firmware:
   brightness; kept for bench use.
 - **`TriggerSt67SmokeTest()`**: an old alias of `TriggerSt67ConnectivityCycle()`
   with no callers.
-- **`Display::detectBoardAddress()`** (`User/Src/Display/DisplayAddress.cpp`):
+- **`Display::detectBoardAddress()`** (`../Common/Src/Display/DisplayAddress.cpp`):
   reads the `ADDR_0`..`ADDR_2` straps, meant for the DisplayController I2C
-  slave; no callers.
+  target; no callers in this project.
 - **`LWIP/App/sntp.c`, `LWIP/App/altls_mbedtls.c`**: compiled by the CubeMX CMake
   list, with no callers; discarded at link time.
 - **`LWIP/App/dhcp_server_raw.c`**: linked, because the soft-AP link-up callback

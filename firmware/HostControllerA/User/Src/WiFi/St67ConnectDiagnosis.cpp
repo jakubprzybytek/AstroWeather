@@ -1,4 +1,4 @@
-#include <HostController/St67ConnectDiagnosis.hpp>
+#include <WiFi/St67ConnectDiagnosis.hpp>
 
 namespace HostController {
 namespace St67ConnectDiagnosis {

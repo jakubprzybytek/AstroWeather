@@ -28,19 +28,19 @@ implementation phases, is in
 
 | File | Responsibility |
 | --- | --- |
-| `User/Inc/HostController/AstroDataRefreshTask.hpp`, `User/Src/HostController/AstroDataRefreshTask.cpp` | The refresh task: triggers, pipeline, schedule driver, status summaries; draws the display mapping and the progress bar. |
-| `User/Inc/HostController/AstroDisplayMapper.hpp`, `User/Src/HostController/AstroDisplayMapper.cpp` | Pure display mapping: `AstroData` to the six boards' numerics and matrix rows. Tested by `tests/AstroDisplayMapperTests.cpp`. |
-| `User/Inc/HostController/AstroProgressBar.hpp`, `User/Src/HostController/AstroProgressBar.cpp` | Pure progress bar: row pattern per step, blink phase, and the outcome indicator's timing. Tested by `tests/AstroProgressBarTests.cpp`. |
-| `User/Inc/Utils/Crc32.hpp` | The CRC-32 of the recheck. Tested by `tests/Crc32Tests.cpp`. |
-| `User/Inc/HostController/AstroData.hpp` | The parsed model: six boards, the server `time` and `lastWeatherFetchTime`. |
-| `User/Inc/HostController/AstroDataParser.hpp`, `User/Src/HostController/AstroDataParser.cpp` | Pure parser, no HAL or RTOS. Tested by `tests/AstroDataParserTests.cpp`. |
-| `User/Inc/HostController/RefreshSchedule.hpp` | Pure schedule arithmetic: slots, retry delays, when a refresh is due. Tested by `tests/RefreshScheduleTests.cpp`. |
-| `User/Src/HostController/MainLoopTask.cpp` | Switch 1 → `requestRefresh(RefreshTrigger::Switch1)`. |
+| `User/Inc/Astro/AstroDataRefreshTask.hpp`, `User/Src/Astro/AstroDataRefreshTask.cpp` | The refresh task: triggers, pipeline, schedule driver, status summaries; draws the display mapping and the progress bar. |
+| `User/Inc/Astro/AstroDisplayMapper.hpp`, `User/Src/Astro/AstroDisplayMapper.cpp` | Pure display mapping: `AstroData` to the six boards' numerics and matrix rows. Tested by `tests/AstroDisplayMapperTests.cpp`. |
+| `User/Inc/Astro/AstroProgressBar.hpp`, `User/Src/Astro/AstroProgressBar.cpp` | Pure progress bar: row pattern per step, blink phase, and the outcome indicator's timing. Tested by `tests/AstroProgressBarTests.cpp`. |
+| `../Common/Inc/Utils/Crc32.hpp` | The CRC-32 of the recheck. Tested by `../Common/tests/Crc32Tests.cpp`. |
+| `User/Inc/Astro/AstroData.hpp` | The parsed model: six boards, the server `time` and `lastWeatherFetchTime`. |
+| `User/Inc/Astro/AstroDataParser.hpp`, `User/Src/Astro/AstroDataParser.cpp` | Pure parser, no HAL or RTOS. Tested by `tests/AstroDataParserTests.cpp`. |
+| `User/Inc/Astro/RefreshSchedule.hpp` | Pure schedule arithmetic: slots, retry delays, when a refresh is due. Tested by `tests/RefreshScheduleTests.cpp`. |
+| `User/Src/MainLoopTask.cpp` | Switch 1 → `requestRefresh(RefreshTrigger::Switch1)`. |
 | `User/Src/Console/AstroCommand.cpp` | `astro refresh`. |
 | `User/Src/Console/SettingsCommand.cpp` | `wifi set` and `wifi test`, which request a `WifiTest` refresh. |
 | `User/Src/Console/StatusCommand.cpp` | The `astro`, `weather` and `schedule` lines of `status`. |
 | `User/Src/WiFi/St67HttpFetchTask.cpp` | The network fetch that the refresh waits on; see [WiFi.md](WiFi.md). |
-| `User/Src/HostController/AppVariant.cpp` | Calls `init(&display)` after the WiFi fetch task has started, then starts the task. |
+| `User/Src/AstroWeather.cpp` | Calls `init(&display)` after the WiFi fetch task has started, then starts the task. |
 
 `AstroDataRefreshTask` is a `Task<3072>` at `osPriorityNormal`. The parsed
 `AstroData` (about 700 B), the clock sync and the formatted log lines all sit on
@@ -405,7 +405,7 @@ Native tests, run with the other suites; see [Development.md](Development.md).
 - `tests/AstroProgressBarTests.cpp`: segment layout, the segment per stage, the
   250 ms blink phases, the failed segment per outcome, the success hold, the
   failure bar per failed step, its 500 ms toggles and 60 s end, and tick wrap.
-- `tests/Crc32Tests.cpp`: the check value, known vectors, empty input and
+- `../Common/tests/Crc32Tests.cpp`: the check value, known vectors, empty input and
   piecewise updates.
 
 Not covered by tests:

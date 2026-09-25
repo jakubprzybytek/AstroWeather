@@ -1,10 +1,10 @@
-#include <HostController/St67NetworkSession.hpp>
+#include <WiFi/St67NetworkSession.hpp>
 
 #include <Debug/LogService.hpp>
-#include <HostController/St67ConnectDiagnosis.hpp>
-#include <HostController/St67NetworkAdapter.hpp>
-#include <HostController/St67HttpFetchTask.hpp>
-#include <HostController/St67Runtime.hpp>
+#include <WiFi/St67ConnectDiagnosis.hpp>
+#include <WiFi/St67NetworkAdapter.hpp>
+#include <WiFi/St67HttpFetchTask.hpp>
+#include <WiFi/St67Runtime.hpp>
 #include <Settings/SettingsStore.hpp>
 
 #include "app_config.h"

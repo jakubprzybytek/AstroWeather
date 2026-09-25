@@ -1,4 +1,4 @@
-#include <HostController/ClockSync.hpp>
+#include <Clock/ClockSync.hpp>
 
 #include <Expect.hpp>
 

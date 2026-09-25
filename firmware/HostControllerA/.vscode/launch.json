@@ -12,7 +12,7 @@
             "preBuild": "${command:st-stm32-ide-debug-launch.build}",
             "imagesAndSymbols": [
                 {
-                    "imageFileName": "${workspaceFolder}/build/Debug-HostController/HostControllerA.elf"
+                    "imageFileName": "${workspaceFolder}/build/Debug/HostControllerA.elf"
                 }
             ],
             "verbose": false
@@ -25,7 +25,7 @@
             "preBuild": "${command:st-stm32-ide-debug-launch.build}",
             "imagesAndSymbols": [
                 {
-                    "imageFileName": "${workspaceFolder}/build/Release-HostController/HostControllerA.elf"
+                    "imageFileName": "${workspaceFolder}/build/Release/HostControllerA.elf"
                 }
             ],
             "verbose": false

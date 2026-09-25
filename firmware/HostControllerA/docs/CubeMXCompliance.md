@@ -47,7 +47,7 @@ This matches ST's documented requirement for full-duplex master SPI with high-pr
 
 The FreeRTOS heap is configured to 40,000 bytes, matching ST's minimum recommendation for a project generated from scratch.
 
-The top-level `CMakeLists.txt` already discovers shared and variant-specific sources under `User/Src` and includes `User/Inc`. New User modules should therefore be picked up without modifying generated CMake files.
+The top-level `CMakeLists.txt` discovers the sources under `User/Src` and the shared `../Common/Src`, and includes `User/Inc` and `../Common/Inc`. New User modules are therefore picked up without modifying generated CMake files.
 
 ## Migration Status (2026-08-26)
 
@@ -58,7 +58,7 @@ Completed and build-checked:
 - Added `SPI_THREAD_STACK_SIZE=1536U` to the top-level target compile definitions. *(Later found to have no effect; see [ST67 driver task settings](#st67-driver-task-settings).)*
 - Added the missing empty `logshell_ctrl.h` compatibility header under `User/Inc`; the generated TLS source includes this header but no current root source uses its API.
 - Replaced the removed private station-status and network-running checks with the User-owned `St67NetworkAdapter`, which uses public W6X and lwIP interfaces, and made the default lifecycle persistent.
-- `Debug-HostController`, `Debug-DisplayController`, and `Release-HostController` build successfully. `git diff --check` passes.
+- `Debug` and `Release` build successfully. `git diff --check` passes.
 - Hardware smoke test passed: ST67 initialization, callback registration, Wi-Fi association, DHCP, SPI/RDY traffic, HTTP GET (`200`, 83 bytes), and response CRC validation all completed successfully.
 - The HTTP fetch task no longer overflows its 2560-byte stack; the observed post-request watermark was 848 bytes. HTTP transport buffers are heap-owned and were released after the request, with the batch heap returning from 39080 bytes to 39080 bytes.
 - Diagnosed and corrected repeated HTTP-request failures: single client-triggered requests now use one persistent lifecycle cycle and leave the supported ST67/lwIP infrastructure initialized. The station still disconnects after each request, but the unsupported full `W6X_DeInit()` path is no longer used between requests.
@@ -68,7 +68,7 @@ Completed and build-checked:
 
 Current build status:
 
-- All three configured build presets pass. The User-owned HTTP implementation currently uses bounded synchronous GET requests with socket send/receive timeouts.
+- Both configured build presets pass. The User-owned HTTP implementation currently uses bounded synchronous GET requests with socket send/receive timeouts.
 
 Still pending:
 
@@ -79,14 +79,14 @@ Still pending:
 
 | Area | Required action | Safe destination |
 | --- | --- | --- |
-| Application bootstrap | Retain `AstroWeather_Init()` and `AppVariant_Init()` integration | Existing USER blocks in `Core/Src/main.c`; implementations in `User` |
+| Application bootstrap | Retain the `AstroWeather_Init()` integration | Existing USER blocks in `Core/Src/main.c`; implementations in `User` |
 | USB console | Retain the CDC bridge to `ConsoleService_OnUsbRxData()` | Existing USER blocks in `USB_Device/App/usbd_cdc_if.c`; implementation in `User` |
 | SPI DMA | Complete: RX/TX DMA, DMA IRQs, and priority 3 regenerated and compile-checked | CubeMX `.ioc` configuration followed by regeneration |
 | SPI task stack | **Complete**: use the larger ST67 stack requirement | `USER CODE BEGIN EC` block of `ST67W6X_Network_Driver/Target/w61_driver_config.h` |
 | CM0+ FreeRTOS compatibility | **Complete**: provide `xPortIsInsideInterrupt()` for FreeRTOS older than 10.6 | Existing USER configuration section in `Core/Inc/FreeRTOSConfig.h` |
 | SPI completion and RDY handling | **Complete for compile-time migration**: User-owned RDY rising-edge bridge calls `spi_on_txn_data_ready()`; hardware handshake validation remains | `User/Src/WiFi/St67SpiReady.cpp` |
-| Station status | **Complete for compile-time migration**: dedicated User-owned adapter uses public W6X/lwIP interfaces; hardware validation remains | `User/Inc/HostController/St67NetworkAdapter.hpp`, `User/Src/WiFi/St67NetworkAdapter.cpp` |
-| HTTP request ownership | **Runtime stress-tested**: User-owned bounded synchronous GET completed 100 persistent HTTP lifecycle cycles with `pass=100 fail=0`; heap returned to `30744` bytes after the run. Cancellation, total deadline, and error-path coverage remain pending | `User/Inc/HostController/HttpClient.hpp`, `User/Src/WiFi/HttpClient.cpp` |
+| Station status | **Complete for compile-time migration**: dedicated User-owned adapter uses public W6X/lwIP interfaces; hardware validation remains | `User/Inc/WiFi/St67NetworkAdapter.hpp`, `User/Src/WiFi/St67NetworkAdapter.cpp` |
+| HTTP request ownership | **Runtime stress-tested**: User-owned bounded synchronous GET completed 100 persistent HTTP lifecycle cycles with `pass=100 fail=0`; heap returned to `30744` bytes after the run. Cancellation, total deadline, and error-path coverage remain pending | `User/Inc/WiFi/HttpClient.hpp`, `User/Src/WiFi/HttpClient.cpp` |
 | Network lifecycle | **Runtime validated**: the supported persistent ST67/lwIP infrastructure and repeated HTTP lifecycle completed 100 cycles with no failures or progressive heap loss; station disconnect still occurs after each request | `User/Src/WiFi/St67NetworkSession.cpp`, `User/Src/WiFi/St67HttpFetchTask.cpp`, `Appli/App/app_config.h` |
 | Cold restart | Defer until supported teardown is available | Revisit only after public APIs or a fully User-owned replacement are identified |
 
@@ -98,11 +98,11 @@ Still pending:
 4. Complete: verify the generated DMA mapping, HAL links, initialization order, and IRQ dispatch.
 5. **Complete:** added the ST-documented `xPortIsInsideInterrupt()` compatibility definition for this Cortex-M0+ and FreeRTOS 10.3.1 configuration in the preserved USER include section of `Core/Inc/FreeRTOSConfig.h`.
 6. **Complete:** `SPI_THREAD_STACK_SIZE=1536U`. First added as a compile definition in the top-level `CMakeLists.txt`, which never took effect; now set in the driver's configuration header. See [ST67 driver task settings](#st67-driver-task-settings).
-7. **Complete:** `Debug-HostController`, `Debug-DisplayController`, and `Release-HostController` build successfully.
+7. **Complete:** `Debug` and `Release` build successfully.
 
 Do not manually recreate DMA handles, MSP links, IRQ forwarding, or peripheral initialization in generated files.
 
-The DMA-specific generated units compile successfully. The FreeRTOS compatibility and stack-size fixes are in place, the network-session code uses public lwIP APIs, and the HTTP fetcher uses the User-owned GET implementation. All three fresh build presets pass. Runtime validation remains outstanding.
+The DMA-specific generated units compile successfully. The FreeRTOS compatibility and stack-size fixes are in place, the network-session code uses public lwIP APIs, and the HTTP fetcher uses the User-owned GET implementation. Both build presets pass. Runtime validation remains outstanding.
 
 ## Phase 2: Remove Compile-Time Dependencies on Generated Extensions
 
@@ -163,7 +163,7 @@ Expected bridges include:
 - GPIO RDY rising edge to the User-owned ST67 notification path.
 - Optional recoverable SPI error notification.
 
-The generated `spi_port.c` already provides USER blocks around SPI completion and error callbacks. Do not add duplicate HAL callback definitions outside those hooks. The button-related falling-edge callback is owned by `User/Src/Utils/SwitchInput.cpp`; the ST67 rising-edge bridge is in `User/Src/WiFi/St67SpiReady.cpp`.
+The generated `spi_port.c` already provides USER blocks around SPI completion and error callbacks. Do not add duplicate HAL callback definitions outside those hooks. The button-related falling-edge callback is owned by `../Common/Src/Utils/SwitchInput.cpp`; the ST67 rising-edge bridge is in `User/Src/WiFi/St67SpiReady.cpp`.
 
 ## Explicitly Deferred
 
@@ -205,9 +205,9 @@ git diff -- HostControllerA.ioc Core cmake/stm32cubemx
 
 Build gates:
 
-1. `Debug-HostController`
-2. `Debug-DisplayController`
-3. `Release-HostController`
+1. `Debug`
+2. `Release`
+3. The `../DisplayController` project's `Debug`, whenever `../Common` changed
 
 The configured build toolchain is GNU Arm Embedded with the Ninja generator. The STM32Cube bundle provides CMake, Ninja, and the compiler; the versioned directories differ between installations. For example:
 
@@ -220,7 +220,7 @@ See [Development.md](Development.md#prerequisites) for putting them on `PATH` or
 Build a preset with:
 
 ```text
-cmake --build --preset Debug-HostController
+cmake --build --preset Debug
 ```
 
 Runtime gates:

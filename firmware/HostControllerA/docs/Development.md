@@ -27,8 +27,8 @@ Use the bundled Cube CMake executable when needed:
 
 ```bash
 CUBE_CMAKE="/c/Users/jakub/.vscode/extensions/stmicroelectronics.stm32cube-ide-build-cmake-1.46.0-win32-x64/resources/cube-cmake/win32/x86_64/cube-cmake.exe"
-"$CUBE_CMAKE" --preset Debug-HostController
-"$CUBE_CMAKE" --build --preset Debug-HostController
+"$CUBE_CMAKE" --preset Debug
+"$CUBE_CMAKE" --build --preset Debug
 ```
 
 On another installation, add the CMake and Ninja `tools/bin` directories for
@@ -57,57 +57,42 @@ A connected ST-LINK probe and a USB cable are required for flashing and USB CDC 
 
 ## Build Firmware
 
-The CMake presets select the firmware variant and build type. Configure and build the desired preset:
+The CMake presets select the build type. Configure and build the desired preset:
 
 ```bash
-# Debug HostController
-cmake --preset Debug-HostController
-cmake --build --preset Debug-HostController
+# Debug
+cmake --preset Debug
+cmake --build --preset Debug
 
-# Debug DisplayController
-cmake --preset Debug-DisplayController
-cmake --build --preset Debug-DisplayController
-
-# Release HostController
-cmake --preset Release-HostController
-cmake --build --preset Release-HostController
-
-# Release DisplayController
-cmake --preset Release-DisplayController
-cmake --build --preset Release-DisplayController
+# Release
+cmake --preset Release
+cmake --build --preset Release
 ```
 
 The primary firmware artifact is an ELF file:
 
 ```text
-build/Debug-HostController/HostControllerA.elf
-build/Debug-DisplayController/HostControllerA.elf
-build/Release-HostController/HostControllerA.elf
-build/Release-DisplayController/HostControllerA.elf
+build/Debug/HostControllerA.elf
+build/Release/HostControllerA.elf
 ```
 
 For a quick post-build check:
 
 ```bash
-test -f build/Debug-HostController/HostControllerA.elf
-arm-none-eabi-size build/Debug-HostController/HostControllerA.elf
+test -f build/Debug/HostControllerA.elf
+arm-none-eabi-size build/Debug/HostControllerA.elf
 ```
 
 A successful build should leave the ELF present and print the flash/RAM usage summary. The linker script is `STM32G0B1xx_FLASH.ld` and the firmware target is an STM32G0B1 Cortex-M0+ image.
 
-### Firmware variants
+### Shared code and the DisplayController
 
-`FIRMWARE_VARIANT` selects which `User/Src/<variant>/AppVariant.cpp` is built:
-
-- **HostController** is the product firmware: display driving, clock, current
-  sense, settings EEPROM, the ST67 WiFi fetch (`User/Src/WiFi/`, built only for
-  this variant) and the USB console with its log.
-- **DisplayController** is currently a stub. It shares the CubeMX
-  initialisation but its `AppVariant_Init()` only releases `LOW_POWER_EN`
-  (`PB8`, set to an input, since the host drives that bussed net) and starts
-  `ConsoleService`, with
-  no display, EEPROM or settings, and never starts `LogService`, so nothing it
-  does reaches the USB port. See [Console.md](Console.md#displaycontroller).
+The remote display boards run the separate `../DisplayController` project: an
+STM32G070 with its own CubeMX configuration, the same `Debug` and `Release`
+presets, and `build/Debug/DisplayController.elf` as its artifact (see its
+[README](../../DisplayController/README.md)). Code used by both images lives in
+`../Common` and is compiled into each project, so a change there should be
+built in both; see [Architecture.md](Architecture.md#shared-code).
 
 ### Native tests
 
@@ -122,9 +107,10 @@ cmake --build --preset NativeTests
 ctest --test-dir build/native-tests-local --output-on-failure
 ```
 
-All suites registered in `tests/CMakeLists.txt` should pass. The list of
-suites, the coverage preset, the HAL/RTOS stubs and how to add a test are in
-[Testing.md](Testing.md).
+All suites registered in `tests/CMakeLists.txt` should pass. The shared code
+has its own suites in `../Common`, run with the same three commands from that
+directory. The list of suites, the coverage preset, the HAL/RTOS stubs and how
+to add a test are in [Testing.md](Testing.md).
 
 If `ctest` is unavailable, run an executable directly, for example:
 
@@ -137,7 +123,7 @@ If `ctest` is unavailable, run an executable directly, for example:
 The repository has a VS Code launch configuration named **HostController Debug** in `.vscode/launch.json`. It uses the `stlinkgdbtarget` adapter, runs the STM32 debug-launch pre-build command, and programs/debugs:
 
 ```text
-build/Debug-HostController/HostControllerA.elf
+build/Debug/HostControllerA.elf
 ```
 
 To build, flash, and start a debug session:
@@ -150,7 +136,7 @@ To build, flash, and start a debug session:
 
 The F5 launch is the preferred flashing method for this repository because it uses the configured ST-LINK debug adapter and the correct ELF/symbol file. It also rebuilds through the configured `preBuild` command.
 
-The configured launch file currently provides F5 entries for HostController Debug and HostController Release only. DisplayController has build presets but no corresponding launch entry in `.vscode/launch.json`.
+The launch file provides F5 entries for HostController Debug and HostController Release. The DisplayController project has its own `.vscode/launch.json` with the same two entries for `build/Debug/DisplayController.elf` and `build/Release/DisplayController.elf`.
 
 ### Stop a debug session
 
@@ -174,7 +160,7 @@ first, then `workbench.action.debug.start`.
 The project does not define a custom flash target. A standalone STM32CubeProgrammer command would normally be:
 
 ```bash
-STM32_Programmer_CLI -c port=SWD -w build/Debug-HostController/HostControllerA.elf -v -rst
+STM32_Programmer_CLI -c port=SWD -w build/Debug/HostControllerA.elf -v -rst
 ```
 
 The CLI is installed on the current workstation at:
@@ -257,7 +243,7 @@ the problem is on the Windows side.
 
 ```bash
 # The address changes between builds, so resolve it from the ELF.
-arm-none-eabi-nm build/Debug-HostController/HostControllerA.elf | grep " xTickCount"
+arm-none-eabi-nm build/Debug/HostControllerA.elf | grep " xTickCount"
 
 STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x4
 STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x4

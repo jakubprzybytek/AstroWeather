@@ -28,20 +28,14 @@ const char* const kIndex[] = {
     "  status            firmware, uptime, memory, EEPROM, WiFi, astro, boards",
     "  stats on|off      memory, stack and log statistics every 5 s (off at boot)",
     "  display ...       numbers, times and matrix rows on this board",
-#if defined(FIRMWARE_VARIANT_HostController)
     "  astro refresh     fetch the sky forecast and publish it to all boards",
     "  api ...           show or set the server host and path (saved)",
     "  time ...          show, set and trim the clock; show it on display 3",
-#endif
     "  adc ...           current-sense logging and readout (saved)",
     "  settings ...      show, save or reset the saved settings",
     "  wifi ...          set, test or clear WiFi credentials (saved)",
     "  eeprom ...        raw EEPROM access, for bring-up and debugging",
-#if defined(FIRMWARE_VARIANT_HostController)
     "Groups: stats, display, astro, api, time, adc, settings, wifi, eeprom",
-#else
-    "Groups: stats, display, adc, settings, wifi, eeprom",
-#endif
 };
 
 const char* const kStats[] = {
@@ -68,15 +62,12 @@ const char* const kDisplay[] = {
     "display matrix <row> <bits> e.g. 'display matrix 0 111000111000111000111'",
     "    One row of the 5x21 matrix, row 0 at the top. bits is a string of 0/1,",
     "    character N lighting column N; missing columns are off, extras ignored.",
-#if defined(FIRMWARE_VARIANT_HostController)
     "display low [on|off]",
     "    Low brightness on every board. Saved; switch 2 toggles and saves it.",
     "    'display low' shows the state in use and the saved one.",
-#endif
     "set, time, blank and matrix change this board only; 'astro refresh' the rest.",
 };
 
-#if defined(FIRMWARE_VARIANT_HostController)
 const char* const kApi[] = {
     "api show          the host and path fetched from, each marked saved or built-in",
     "api host <host>",
@@ -100,9 +91,7 @@ const char* const kAstro[] = {
     "Progress fills a bar on this board's bottom matrix row step by step; the",
     "full bar shows success, and a failure blinks where it stopped for a minute.",
 };
-#endif
 
-#if defined(FIRMWARE_VARIANT_HostController)
 const char* const kTime[] = {
     "time show         date and time to the millisecond, and the trim in use",
     "time set <YYYY-MM-DD> <HH:MM[:SS]>",
@@ -117,7 +106,6 @@ const char* const kTime[] = {
     "    Show the time on numeric display 3. Saved. An astro refresh may",
     "    overwrite display 3; the time returns at the next minute.",
 };
-#endif
 
 const char* const kAdc[] = {
     "adc log on|off",
@@ -183,11 +171,9 @@ constexpr Group group(const char* name, const char* const (&lines)[N])
 const Group kGroups[] = {
     group("stats", kStats),
     group("display", kDisplay),
-#if defined(FIRMWARE_VARIANT_HostController)
     group("astro", kAstro),
     group("api", kApi),
     group("time", kTime),
-#endif
     group("adc", kAdc),
     group("settings", kSettings),
     group("wifi", kWifi),

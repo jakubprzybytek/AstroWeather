@@ -2,7 +2,7 @@
 // check. Cases marked "current behaviour" pin what the code does today, not
 // what HTTP allows.
 
-#include <HostController/St67HttpRules.hpp>
+#include <WiFi/St67HttpRules.hpp>
 
 #include <Expect.hpp>
 

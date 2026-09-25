@@ -1,4 +1,4 @@
-#include <HostController/RtcTrim.hpp>
+#include <Clock/RtcTrim.hpp>
 
 #include <Expect.hpp>
 

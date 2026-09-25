@@ -1,6 +1,6 @@
-#include <HostController/HttpClient.hpp>
+#include <WiFi/HttpClient.hpp>
 
-#include <HostController/HttpResponseParser.hpp>
+#include <WiFi/HttpResponseParser.hpp>
 
 #include "lwip/inet.h"
 #include "lwip/sockets.h"

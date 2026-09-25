@@ -1,10 +1,10 @@
-#include <St67HttpFetchTask.hpp>
+#include <WiFi/St67HttpFetchTask.hpp>
 
 #include <Debug/LogService.hpp>
-#include <HostController/St67FetchStatusMap.hpp>
-#include <HostController/St67HttpFetcher.hpp>
-#include <HostController/St67NetworkSession.hpp>
-#include <HostController/St67Runtime.hpp>
+#include <WiFi/St67FetchStatusMap.hpp>
+#include <WiFi/St67HttpFetcher.hpp>
+#include <WiFi/St67NetworkSession.hpp>
+#include <WiFi/St67Runtime.hpp>
 #include <Utils/Crc32.hpp>
 #include <Utils/Task.hpp>
 

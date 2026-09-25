@@ -10,7 +10,7 @@ The system contains one Host Controller board and up to five Display Controller 
 - SCT2xxx LED drivers connected as one SPI daisy chain.
 - Five active-low multiplexing outputs, `DISPLAY_1_EN` through `DISPLAY_5_EN`.
 
-The Host Controller fetches application data, displays its local portion, and sends the remaining board values to Display Controllers over I2C. A Display Controller is meant to receive logical display values over I2C and render them on its local PCB; that side is not implemented yet. See [Display Controller](#display-controller).
+The Host Controller fetches application data, displays its local portion, and sends the remaining board values to Display Controllers over I2C. A Display Controller receives logical display values over I2C and renders them on its local PCB; see [Display Controller](#display-controller).
 
 ## Software Architecture
 
@@ -33,7 +33,7 @@ The PCB-backed implementation:
 - Maintains the prepared SPI refresh data.
 - Runs the local multiplexing mechanism.
 
-The HostController `AppVariant.cpp` creates this object and starts it. `start()` starts the `DisplayRefresh` task (`Task<1024>`, `osPriorityRealtime`) and then calls `HAL_TIM_Base_Start_IT(&htim2)`. The DisplayController variant does not create one yet.
+The HostController `AstroWeather.cpp` creates this object and starts it. `start()` starts the `DisplayRefresh` task (`Task<1024>`, `osPriorityRealtime`) and then calls `HAL_TIM_Base_Start_IT(&htim2)`. The DisplayController creates one too, on SPI1 and TIM6.
 
 ### Buffer-backed Display Board
 
@@ -41,10 +41,11 @@ The buffer-backed implementation exists only on the Host Controller. It stores l
 
 ### Code Ownership
 
-All application-side display code is located under `/User`:
+The display code is split between the shared `../Common` tree, compiled into both the host and the DisplayController, and this project's `User`:
 
-- `/User/Device` contains low-level device implementations, such as the SCT2xxx driver.
-- `/User/Display` contains all display-related code, including Display, Display Board variants, numeric and matrix content types, encoding, refresh, and I2C display transport logic.
+- `../Common/Src/Device` holds the SCT2xxx driver.
+- `../Common/Src/Display` holds the logical content types, the PCB encoding, the multiplexing refresh (`PcbDisplayBoard`), the I2C message format and the address straps.
+- `User/Src/Display` holds the host-only parts: the aggregate `Display`, the buffer-backed remote boards (`BufferedDisplayBoard`) and `LowBrightness`. `User/Src/Device` holds `I2cBus` and the EEPROM driver.
 
 ## Public Interface
 
@@ -177,6 +178,15 @@ The hour's leading zero is blank; the minutes always have two digits. For exampl
 
 `setBlank()` clears all five slot bytes.
 
+### No Data
+
+`setNoData()` lights segment G on the last digit only (`   -`), with every other digit, dot and indicator off, so it cannot be mistaken for the unset clock `--:--` or the error pattern. `Display::noDataState()` is a whole board in this state: every numeric display `   -` and the matrix blank.
+
+Every board starts in it:
+
+- The host's local board shows it from boot until the first astro refresh. The current readout (numeric display 2) and the clock (display 3) take over their displays straight away, so in practice displays 0 and 1 and the matrix show it until the first refresh.
+- A Display Controller shows it after its boot screens until the first frame from the host, and again when no frame has arrived for 7 hours. The host sends to the remote boards only on an astro refresh or a `display` command, so the timeout is just over the 6-hour refresh interval; one missed refresh is enough to show it. See [DisplayController Architecture](../../DisplayController/docs/Architecture.md#screens).
+
 If a setter receives an invalid value, it stores the error pattern: segment D enabled in each of the four digit slots and the indicator slot blank.
 
 ## Logical Board Buffer
@@ -304,14 +314,14 @@ Command `0x01` means "set display board values" using the logical buffer format 
 
 Each Display Controller has three address-programming pins, `ADDR_0` (PB10), `ADDR_1` (PB11) and `ADDR_2` (PB14), as named in `Core/Inc/main.h`. Each pin can be tied to ground, tied to VCC, or left floating, providing 27 possible ternary board IDs. The Display Controller derives its 7-bit I2C target address as `0x10 + board_id`, giving addresses `0x10` through `0x2A`.
 
-The Host Controller does not derive these addresses from its own pins. `AppVariant.cpp` creates one buffer-backed Display Board per remote board at the fixed addresses `0x10` through `0x14`, and `Display::submit()` sends each logical buffer to its board's address.
+The Host Controller does not derive these addresses from its own pins. `AstroWeather.cpp` creates one buffer-backed Display Board per remote board at the fixed addresses `0x10` through `0x14`, and `Display::submit()` sends each logical buffer to its board's address.
 
 Address detection (`Display::detectBoardId()` in `DisplayAddress.cpp`) uses two reads for each pin:
 
 1. Configure the pin as a digital input with an internal pull-down and read it. HIGH means VCC, state 2.
 2. Otherwise switch to an internal pull-up and read again. LOW means a strong external ground, state 0; HIGH means floating, state 1.
 
-The pins are then returned to inputs without pull, and `board_id = ADDR_0 + 3 × ADDR_1 + 9 × ADDR_2`.
+The pins are then left in analog mode, so a strap tied to VCC draws no pull current and an open one leaves no floating digital input, and `board_id = ADDR_0 + 3 × ADDR_1 + 9 × ADDR_2`.
 
 On receipt, `deserializeI2c()` in `DisplayI2cProtocol.cpp` accepts only a 36-byte message whose first byte is `0x01`, and decodes it into a temporary state before replacing the destination, so a rejected message leaves the previous state untouched.
 
@@ -345,9 +355,9 @@ segment values progressed `0x07`/`0x7F` (joining) through `0x3FF`/`0x3FFF`
 
 LED brightness is analog. The light-sensor divider sets `LED_BRIGHTNESS`, which runs to every board on pin 10 of `J102`/`J104`. On each board, one current-set stage per driver (`MCP6006` + `BC847`, `U503`/`Q506` and the rest) turns that voltage into the SCT `REXT` current. The firmware does not set a brightness value. It has one lever: `LOW_POWER_ENABLE` (`PB8`, pin 9 of the same connectors), which switches on `Q701`. `Q701` shorts `R705` at the bottom of the divider and lowers `LED_BRIGHTNESS` by a fixed ratio, from about 1.17 V to 0.49 V in bright light. The level still follows the ambient light.
 
-Only the Host Controller drives the pin, through `LowBrightness::set()`/`toggle()` in `User/Src/HostController/LowBrightness.cpp`. Two controls change it:
+Only the Host Controller drives the pin, through `LowBrightness::set()`/`toggle()` in `User/Src/Display/LowBrightness.cpp`. Two controls change it:
 
-- `display low on|off` on the console sets it and saves it (settings tag `DisplayFlags`, see [Settings.md](Settings.md#tag-registry)). `AppVariant_Init()` applies the saved state before the local board starts. `display low` reports the state in use and the saved one, and `status` shows it as `brightness normal|low`. See [Console.md](Console.md#display).
+- `display low on|off` on the console sets it and saves it (settings tag `DisplayFlags`, see [Settings.md](Settings.md#tag-registry)). `AstroWeather_Init()` applies the saved state before the local board starts. `display low` reports the state in use and the saved one, and `status` shows it as `brightness normal|low`. See [Console.md](Console.md#display).
 - Switch 2 toggles it, logs `Low brightness on` or `off`, and saves it the same way from `MainLoopTask`. `Settings::Store::save()` holds the store's lock, so a press cannot interleave its EEPROM page writes with a console save. The switch is debounced in hardware only. `SWITCH_2` is `SW301`: pulled up through `R306` (10k) and filtered by `R308` (10k) and `C308` (100 nF), so τ ≈ 1 ms on press and 2 ms on release, into the Schmitt-trigger input. A bounce longer than that toggles twice and saves twice.
 
 Measured on the host board on 2026-09-24, with all LEDs lit (`8.888` on the four numeric displays, full matrix) and alternating the two states three times in the same light, at 5 V:
@@ -359,13 +369,13 @@ Measured on the host board on 2026-09-24, with all LEDs lit (`8.888` on the four
 
 Low brightness cut the LED current by about 53% (to 0.45 of normal), or the whole board's current by about 45%. With all LEDs off, both states draw 14 mA. The divider alone predicts 0.32–0.42 of normal, depending on the light (1.5 kΩ instead of 4.7 kΩ at the bottom), so the current-set stages do not scale exactly with `LED_BRIGHTNESS`. The ratio will differ in other light levels.
 
-The net is bussed to every board, so the Display Controller turns its own `PB8` into an input at startup rather than leave it as the push-pull low output that the shared `MX_GPIO_Init()` makes it ([Hardware review](../../../KiCad/Hardware_Review.md) M-4).
+The net is bussed to every board, so the Display Controller's CubeMX configuration leaves its own `PB8` in analog mode and never drives it ([Hardware review](../../../KiCad/Hardware_Review.md) M-4).
 
-## Variant Lifecycle
+## Lifecycle
 
 ### Host Controller
 
-`AppVariant.cpp` creates:
+`AstroWeather.cpp` creates:
 
 - The local PCB-backed Display Board, started with its `DisplayRefresh` task and TIM2.
 - Five buffer-backed boards at I2C addresses `0x10` through `0x14`, on the shared `Device::I2cBus`.
@@ -379,14 +389,14 @@ Remote boards are refreshed by `Display::submit()` only, which only astro refres
 
 ### Display Controller
 
-Not implemented. The DisplayController variant's `AppVariant.cpp` only releases `LOW_POWER_ENABLE` (see [Low Brightness](#low-brightness)) and starts `ConsoleService`, with no display. It creates no PCB-backed board, so its own LEDs are not driven, and it does not configure I2C1 as a target, so it cannot receive command `0x01`. The pieces it would need exist but are unused: `DisplayAddress.cpp` for the board address and `deserializeI2c()` for the message.
+The separate [DisplayController](../../DisplayController/README.md) project creates one PCB-backed board on SPI1 and TIM6, reads its address from the straps, and listens on I2C1 at that address. Each 36-byte message is received in interrupts and decoded by its `DisplayApp` task with `deserializeI2c()`; a valid command `0x01` replaces the board's logical state and is shown, anything else is counted and dropped. It also shows boot screens (all segments, then its address), the "no data" state, and test screens on its switches. Built and unit tested, not yet run on a display board; see its [Architecture.md](../../DisplayController/docs/Architecture.md).
 
 ## Tests
 
-- `tests/NumericDisplayTests.cpp`: `setFixed()`, including magnitudes below one and values that do not fit, both `setValue()` overloads, `setTime()` including the blank leading zero and the error pattern, `setTimeUnset()`, `setBlank()` and `setSegments()`.
-- `tests/DisplayCodecTests.cpp`: golden vectors from the tables above: every segment of every digit of every numeric display on its documented bit, byte and slot, the indicators, the 21 matrix columns and bits 21-23, and the order of the five matrix rows in the prepared frame.
-- `tests/DisplayI2cProtocolTests.cpp`: the 36-byte layout, the round trip, masking of bits 21-23, and rejection of short, long and null messages and unknown commands, leaving the destination untouched.
-- `tests/DisplayAddressTests.cpp`: all 27 strap combinations through the stub GPIO, the pins left without pull, `boardAddress()` limits and `detectBoardAddress()` on `ADDR_0`-`ADDR_2`.
+- `../Common/tests/NumericDisplayTests.cpp`: `setFixed()`, including magnitudes below one and values that do not fit, both `setValue()` overloads, `setTime()` including the blank leading zero and the error pattern, `setTimeUnset()`, `setBlank()`, `setSegments()`, `setNoData()` and `noDataState()`.
+- `../Common/tests/DisplayCodecTests.cpp`: golden vectors from the tables above: every segment of every digit of every numeric display on its documented bit, byte and slot, the indicators, the 21 matrix columns and bits 21-23, and the order of the five matrix rows in the prepared frame.
+- `../Common/tests/DisplayI2cProtocolTests.cpp`: the 36-byte layout, the round trip, masking of bits 21-23, and rejection of short, long and null messages and unknown commands, leaving the destination untouched.
+- `../Common/tests/DisplayAddressTests.cpp`: all 27 strap combinations through the stub GPIO, the pins left analog without pull, `boardAddress()` limits and `detectBoardAddress()` on `ADDR_0`-`ADDR_2`.
 
 Not covered: the refresh timing and transfer failures.
 

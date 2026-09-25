@@ -10,9 +10,8 @@ things:
 - **The console.** `ConsoleService` reads lines typed on the host, runs them as
   commands, and replies through the same log.
 
-Both are HostController features in practice. The DisplayController variant
-starts `ConsoleService` but never starts `LogService`, so it parses commands
-and then drops every reply; see [DisplayController](#displaycontroller).
+Both are HostController features. The DisplayController project has no USB and
+no console yet; see [DisplayController](#displaycontroller).
 
 For building and flashing, and for recovering a COM port that has vanished, see
 [Development.md](Development.md).
@@ -148,7 +147,7 @@ message is truncated to 95 characters. Driver messages usually end in their own
 ## Log Service
 
 `LogService` (`User/Src/Debug/LogService.cpp`) is a `Task<1536>` at normal
-priority, started first in the HostController's `AppVariant_Init()`.
+priority, started first in the HostController's `AstroWeather_Init()`.
 
 Producers call `log()`, `logf()` or `sendLine()` from task context. The call
 formats the prefix and message into a 200-byte record, puts it on a static
@@ -529,13 +528,12 @@ console has no authentication.
 
 ## DisplayController
 
-The DisplayController's `AppVariant_Init()` starts `ConsoleService` with no
-display, EEPROM or settings store, and does not start `LogService`. Commands are
-still received and dispatched, but `LogService` has no queue, so every reply and
-the welcome are discarded. Commands that need a missing device would answer
-`ERR display-unavailable`, `ERR eeprom-unavailable` or
-`ERR settings-unavailable` (the last for all `settings` and `wifi` commands),
-and the `astro` and `time` commands are not built.
+The DisplayController is a separate project (`../DisplayController`) on an
+STM32G070, which has no USB, and it does not build the console or the log. A
+console over USART2 is planned; see
+[Display_Board_Purchasing.md](Display_Board_Purchasing.md#console-over-uart).
+`ConsoleService` keeps its `ERR display-unavailable`, `ERR eeprom-unavailable`
+and `ERR settings-unavailable` replies for a start without those devices.
 
 ## Fixed Limits
 
@@ -564,7 +562,7 @@ Longer text is truncated by `snprintf`.
 | `User/Src/Console/ConsoleService.cpp` | RX ring, line assembly, command queue, dispatch, welcome. |
 | `User/Inc/Console/ConsoleServiceBridge.h` | C entry points called from `usbd_cdc_if.c`. |
 | `User/Src/Console/*Command.cpp` | One handler per command group; `LowBrightnessCommand.cpp` takes `display low` ahead of `DisplayCommand.cpp`. |
-| `User/Src/Debug/FirmwareInfo.cpp` | Variant name and build time for the welcome and `status`. |
+| `User/Src/Debug/FirmwareInfo.cpp` | Firmware name and build time for the welcome and `status`. |
 | `USB_Device/App/usbd_cdc_if.c` | CubeMX CDC glue; changes only inside `USER CODE` sections. |
 | `tools/astro_console.py` | Host client. |
 

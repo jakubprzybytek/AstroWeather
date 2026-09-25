@@ -1,0 +1,45 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "NativeTests",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/native-tests-local",
+            "environment": {
+                "MSYSTEM": "UCRT64",
+                "PATH": "C:\\Progs\\msys64\\ucrt64\\bin;C:\\Progs\\msys64\\usr\\bin;$penv{PATH}"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_COMPILER": "C:/Progs/msys64/ucrt64/bin/c++.exe",
+                "CMAKE_MAKE_PROGRAM": "C:/Progs/msys64/ucrt64/bin/ninja.exe"
+            }
+        },
+        {
+            "name": "NativeTests-Coverage",
+            "inherits": "NativeTests",
+            "binaryDir": "${sourceDir}/build/native-tests-coverage",
+            "cacheVariables": {
+                "NATIVE_TESTS_COVERAGE": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "NativeTests",
+            "configurePreset": "NativeTests",
+            "environment": {
+                "MSYSTEM": "UCRT64",
+                "PATH": "C:\\Progs\\msys64\\ucrt64\\bin;C:\\Progs\\msys64\\usr\\bin;$penv{PATH}"
+            }
+        },
+        {
+            "name": "NativeTests-Coverage",
+            "configurePreset": "NativeTests-Coverage",
+            "environment": {
+                "MSYSTEM": "UCRT64",
+                "PATH": "C:\\Progs\\msys64\\ucrt64\\bin;C:\\Progs\\msys64\\usr\\bin;$penv{PATH}"
+            }
+        }
+    ]
+}

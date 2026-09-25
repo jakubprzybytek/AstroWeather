@@ -173,7 +173,7 @@ Keep HTTP parsing independent from the byte transport.
    contract with `connect`, `writeAll`, `read`, `close`, and error reporting.
    Preserve the public fetch/result behavior during this step.
 2. Keep the current LwIP socket implementation as `PlainTcpTransport`.
-3. Add a User-owned `TlsTransport` under `User/Inc/HostController` and
+3. Add a User-owned `TlsTransport` under `User/Inc/WiFi` and
    `User/Src/WiFi` using the CubeMX-provided mbedTLS APIs.
 4. Give each request its own `mbedtls_ssl_context`. A shared immutable or
    serialized TLS configuration/CA chain may be considered only after ownership
@@ -259,8 +259,7 @@ configuration.
 Use a controlled HTTPS endpoint whose CA, hostname, response size, content type,
 and failure modes are known.
 
-1. Build `Debug-HostController`, `Release-HostController`, and
-   `Debug-DisplayController`; run native tests and `git diff --check`.
+1. Build `Debug` and `Release`; run native tests and `git diff --check`.
 2. Compare ELF/map flash, `.data`, and `.bss` with the recorded plain-HTTP
    baseline.
 3. Run one successful HTTPS GET and confirm DNS, TCP, SNI, chain validation,
@@ -294,11 +293,11 @@ consumers first; do not weaken verification or silently increase buffers.
 | Generated CMake/middleware configuration | Regenerated mbedTLS sources, includes, and config; no manual edits outside USER sections |
 | `Appli/App/app_config.h` | Transport selection, HTTPS port, handshake/total deadlines, and TLS limits |
 | `Appli/App/app_credentials.h.template` | Empty host/path values only |
-| `User/Inc/HostController/HttpClient.hpp` | Transport-neutral request options and result contract |
+| `User/Inc/WiFi/HttpClient.hpp` | Transport-neutral request options and result contract |
 | `User/Src/WiFi/HttpClient.cpp` | Shared bounded HTTP request/response logic over a transport |
-| `User/Inc/HostController/TlsTransport.hpp` | User-owned TLS transport boundary |
+| `User/Inc/WiFi/TlsTransport.hpp` | User-owned TLS transport boundary |
 | `User/Src/WiFi/TlsTransport.cpp` | Per-request mbedTLS setup, verified handshake, I/O, deadlines, cleanup |
-| `User/Inc/HostController/TrustedCa.hpp` and corresponding source | Const DER trust anchor(s) and documented rotation metadata |
+| `User/Inc/WiFi/TrustedCa.hpp` and corresponding source | Const DER trust anchor(s) and documented rotation metadata |
 | `User/Src/WiFi/St67HttpFetcher.cpp` | Select transport, pass hostname/trust policy, map TLS failures |
 | `tests/` | Transport-independent HTTP parser tests and TLS policy tests where feasible |
 | `docs/Firmware-RAM-Usage.md` | Post-mbedTLS link and runtime measurements |
@@ -311,12 +310,11 @@ must remain User-owned and generated files must remain regenerable.
 After CubeMX regeneration and after each implementation increment:
 
 ```bash
-cmake --preset Debug-HostController && cmake --build --preset Debug-HostController
-cmake --preset Release-HostController && cmake --build --preset Release-HostController
-cmake --preset Debug-DisplayController && cmake --build --preset Debug-DisplayController
+cmake --preset Debug && cmake --build --preset Debug
+cmake --preset Release && cmake --build --preset Release
 cmake --preset NativeTests && cmake --build --preset NativeTests
 ctest --test-dir build/native-tests-local --output-on-failure
-arm-none-eabi-size -A -d build/Debug-HostController/HostControllerA.elf
+arm-none-eabi-size -A -d build/Debug/HostControllerA.elf
 git diff --check
 ```
 

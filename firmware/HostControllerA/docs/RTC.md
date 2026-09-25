@@ -16,8 +16,8 @@ across fetches and what that says about the trim. See
 is kept over a reset or flashing. After a power loss display 3 shows `--:--`
 until the next fetch or `time set`. See [Reset and power loss](#reset-and-power-loss).
 
-Only the HostController firmware has the clock. The DisplayController variant
-builds the same `MX_RTC_Init()` but does not use the RTC.
+Only the HostController firmware has the clock; the DisplayController project
+has no RTC configured.
 
 ## Clock Source
 
@@ -66,14 +66,14 @@ defines the marker. That is the only change to generated code; see
 
 | File | Responsibility |
 | --- | --- |
-| `User/Inc/HostController/ClockTask.hpp`, `User/Src/HostController/ClockTask.cpp` | Draws the time, sets the time and trim, and owns RTC access. |
-| `User/Inc/HostController/RtcTrim.hpp` | Pure maths: trim in ppm → prescalers and calibration. Tested by `tests/RtcTrimTests.cpp`. |
-| `User/Inc/HostController/CalendarDate.hpp` | Pure maths: leap years, month lengths, the weekday the RTC needs, and dates to seconds and back. Tested by `tests/CalendarDateTests.cpp`. |
-| `User/Inc/HostController/ClockSync.hpp` | Pure maths for the API sync: the constants, and the drift tracker. Tested by `tests/ClockSyncTests.cpp`. |
-| `User/Src/HostController/AstroDataParser.cpp` | Parses the payload's `time` record. |
-| `User/Src/HostController/AstroDataRefreshTask.cpp` | Calls `ClockTask::syncToServer()` after each successful parse. |
+| `User/Inc/Clock/ClockTask.hpp`, `User/Src/Clock/ClockTask.cpp` | Draws the time, sets the time and trim, and owns RTC access. |
+| `User/Inc/Clock/RtcTrim.hpp` | Pure maths: trim in ppm → prescalers and calibration. Tested by `tests/RtcTrimTests.cpp`. |
+| `User/Inc/Clock/CalendarDate.hpp` | Pure maths: leap years, month lengths, the weekday the RTC needs, and dates to seconds and back. Tested by `tests/CalendarDateTests.cpp`. |
+| `User/Inc/Clock/ClockSync.hpp` | Pure maths for the API sync: the constants, and the drift tracker. Tested by `tests/ClockSyncTests.cpp`. |
+| `User/Src/Astro/AstroDataParser.cpp` | Parses the payload's `time` record. |
+| `User/Src/Astro/AstroDataRefreshTask.cpp` | Calls `ClockTask::syncToServer()` after each successful parse. |
 | `User/Src/Console/TimeCommand.cpp` | The `time` console commands. |
-| `User/Src/HostController/AppVariant.cpp` | Applies the stored display setting and trim, then starts the task. |
+| `User/Src/AstroWeather.cpp` | Applies the stored display setting and trim, then starts the task. |
 | `tools/rtc_offset.py` | Measures the RTC against the PC clock over SWD. |
 
 `ClockTask` redraws only when the minute changes. It sleeps until the next

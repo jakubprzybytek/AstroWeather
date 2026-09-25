@@ -166,7 +166,7 @@ that field at its compile-time default.
    settings free. See [Space budget](#space-budget).
 5. In `applyRecord()`, handle the new tag. Validate `length` before reading the
    value; a record on the chip may be any length.
-6. Apply the value at startup in `AppVariant_Init()`, before the owning task is
+6. Apply the value at startup in `AstroWeather_Init()`, before the owning task is
    started.
 7. Persist it from whichever console command changes it, by updating
    `store.values()` and calling `store.save()`. If a task other than the
@@ -330,7 +330,7 @@ the quickest way to confirm a new record encodes as intended. See
 | `User/Src/Settings/SettingsStore.cpp` | EEPROM read/write, page diffing |
 | `User/Src/Console/SettingsCommand.cpp` | `settings` and `wifi` commands |
 | `User/Src/Console/ApiCommand.cpp`, `LowBrightnessCommand.cpp` | `api` and `display low` commands, which also save |
-| `User/Src/HostController/ApiTarget.cpp` | `resolveApiTarget()`: saved API host and path, or the built-in ones |
+| `User/Src/Astro/ApiTarget.cpp` | `resolveApiTarget()`: saved API host and path, or the built-in ones |
 | `tests/SettingsCodecTests.cpp` | Native tests |
 
 The codec is deliberately free of HAL dependencies so it builds and runs on the
@@ -356,7 +356,7 @@ checked on hardware only.
 
 ## Startup
 
-`Settings::Store::load()` is called from `AppVariant_Init()`, which runs before
+`Settings::Store::load()` is called from `AstroWeather_Init()`, which runs before
 `osKernelStart()`. This is safe because EEPROM reads take no `osDelay` and the
 I2C bus mutex is uncontended at that point, so acquiring it takes the
 non-blocking path.
