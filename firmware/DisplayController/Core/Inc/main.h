@@ -57,40 +57,42 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define LED1_Pin GPIO_PIN_13
-#define LED1_GPIO_Port GPIOC
+#define LED_1_Pin GPIO_PIN_13
+#define LED_1_GPIO_Port GPIOC
 #define ADDR_0_Pin GPIO_PIN_10
 #define ADDR_0_GPIO_Port GPIOB
 #define ADDR_1_Pin GPIO_PIN_11
 #define ADDR_1_GPIO_Port GPIOB
 #define SWITCH_1_Pin GPIO_PIN_12
 #define SWITCH_1_GPIO_Port GPIOB
+#define SWITCH_1_EXTI_IRQn EXTI4_15_IRQn
 #define SWITCH_2_Pin GPIO_PIN_13
 #define SWITCH_2_GPIO_Port GPIOB
+#define SWITCH_2_EXTI_IRQn EXTI4_15_IRQn
 #define ADDR_2_Pin GPIO_PIN_14
 #define ADDR_2_GPIO_Port GPIOB
-#define DISPLAY_2_Pin GPIO_PIN_15
-#define DISPLAY_2_GPIO_Port GPIOA
-#define DISPLAY_5_Pin GPIO_PIN_0
-#define DISPLAY_5_GPIO_Port GPIOD
-#define DISPLAY_3_Pin GPIO_PIN_1
-#define DISPLAY_3_GPIO_Port GPIOD
-#define DISPLAY_4_Pin GPIO_PIN_2
-#define DISPLAY_4_GPIO_Port GPIOD
-#define DISPLAY_1_Pin GPIO_PIN_3
-#define DISPLAY_1_GPIO_Port GPIOD
+#define DISPLAY_2_EN_Pin GPIO_PIN_15
+#define DISPLAY_2_EN_GPIO_Port GPIOA
+#define DISPLAY_5_EN_Pin GPIO_PIN_0
+#define DISPLAY_5_EN_GPIO_Port GPIOD
+#define DISPLAY_3_EN_Pin GPIO_PIN_1
+#define DISPLAY_3_EN_GPIO_Port GPIOD
+#define DISPLAY_4_EN_Pin GPIO_PIN_2
+#define DISPLAY_4_EN_GPIO_Port GPIOD
+#define DISPLAY_1_EN_Pin GPIO_PIN_3
+#define DISPLAY_1_EN_GPIO_Port GPIOD
 #define SCT_CLK_Pin GPIO_PIN_3
 #define SCT_CLK_GPIO_Port GPIOB
 #define SCT_SDI_Pin GPIO_PIN_5
 #define SCT_SDI_GPIO_Port GPIOB
-#define SCT_LA_Pin GPIO_PIN_6
-#define SCT_LA_GPIO_Port GPIOB
-#define SCT_EN_Pin GPIO_PIN_7
-#define SCT_EN_GPIO_Port GPIOB
-#define LOW_POWER_ENABLE_FLOAT_Pin GPIO_PIN_8
-#define LOW_POWER_ENABLE_FLOAT_GPIO_Port GPIOB
-#define LED2_Pin GPIO_PIN_9
-#define LED2_GPIO_Port GPIOB
+#define SCT_LATCH_Pin GPIO_PIN_6
+#define SCT_LATCH_GPIO_Port GPIOB
+#define SCT_ENABLE_Pin GPIO_PIN_7
+#define SCT_ENABLE_GPIO_Port GPIOB
+#define LOW_POWER_ENABLE_Pin GPIO_PIN_8
+#define LOW_POWER_ENABLE_GPIO_Port GPIOB
+#define LED_2_Pin GPIO_PIN_9
+#define LED_2_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
