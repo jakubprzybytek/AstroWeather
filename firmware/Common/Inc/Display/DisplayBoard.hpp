@@ -2,6 +2,8 @@
 
 #include <Display/DisplayTypes.hpp>
 
+#include <array>
+
 namespace Display {
 
 class DisplayBoard {
@@ -32,10 +34,18 @@ public:
         // Refresh interrupts that found the previous pass's shift still
         // running and kept the old data: the interrupt was later than a pass.
         uint32_t lateShifts;
+        // Refresh interrupts later than the pass they start, which was then
+        // restarted rather than left to the timer's full range.
+        uint32_t lateInterrupts;
         // Longest run of the refresh interrupt, from SysTick.
         uint32_t maxInterruptMicros;
+        // The pass lengths in use, percent of a slot; see DisplayCodec.hpp.
+        std::array<uint8_t, 4> passPercent;
     };
     virtual bool refreshStats(RefreshStats&) const { return false; }
+    // Changes the pass lengths, for tuning the levels by eye. False when the
+    // board does not refresh LEDs or the table is invalid.
+    virtual bool setPassPercent(const std::array<uint8_t, 4>&) { return false; }
 
 protected:
     LogicalBoardState state_{};

@@ -42,7 +42,7 @@ From `arm-none-eabi-nm -S --size-sort` on the same ELF:
 | `CurrentSenseTask` object | 2480 | 2048-byte stack |
 | `MainLoopTask` object | 1960 | 1536-byte stack |
 | `settingsStore` (`Settings::Store`) | 840 | `Values` (including the 65-byte API host and path), two 256-byte working images for `load()`/`save()`, the mutex; `User/Inc/Settings/SettingsStore.hpp` |
-| `localBoard` (`PcbDisplayBoard`) | 1648 | 1024-byte `DisplayRefresh` stack, logical and prepared frames |
+| `localBoard` (`PcbDisplayBoard`) | ~800 | Content and attributes, two 280-byte sets of prepared pass frames, the sequencer; no task since the refresh moved into TIM2's interrupt |
 | `ClockTask` object | 1600 | 1024-byte stack |
 | `led1` (`BlinkingLed`) | 1200 | 768-byte stack |
 | FreeRTOS static support | about 3400 | Idle stack 512, timer stack 1024, their TCBs 384 each, ready lists 1120 |
@@ -100,7 +100,6 @@ Application tasks, with static stacks inside their objects:
 | `ConsoleService` | 2048 | Normal | `ConsoleService.hpp` |
 | `LogService` | 1536 | Normal | `LogService.hpp` |
 | `MainLoopTask` | 1536 | Normal | `MainLoopTask.hpp` |
-| `DisplayRefresh` | 1024 | Realtime | `PcbDisplayBoard.hpp` |
 | `Clock` | 1024 | BelowNormal | `ClockTask.hpp` |
 | `Led1` | 768 | Low | `BlinkingLed.hpp`, in `User/Src/AstroWeather.cpp` |
 

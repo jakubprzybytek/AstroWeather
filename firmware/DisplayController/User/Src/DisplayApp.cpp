@@ -96,6 +96,7 @@ void DisplayApp::publishRefreshStats()
     if (board_.refreshStats(stats)) {
         g_displayStats.refreshFrames = stats.frames;
         g_displayStats.lateShifts = stats.lateShifts;
+        g_displayStats.lateInterrupts = stats.lateInterrupts;
         g_displayStats.maxInterruptMicros = stats.maxInterruptMicros;
     }
 }

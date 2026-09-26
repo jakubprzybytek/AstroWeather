@@ -16,6 +16,10 @@ constexpr uint32_t kRetryDelayMs = 1000U;
 constexpr uint32_t kSecondsPerMinute = 60U;
 // Never a real minute, so the next pass always draws.
 constexpr uint8_t kNothingShown = 0xFFU;
+
+// The colon (L1 and L2, the indicator slot's A and B) blinks at the display's
+// blink rate, 1 Hz; the digits stay.
+constexpr Display::NumericSegments kColonBlink{{0U, 0U, 0U, 0U, 0x03U}};
 constexpr uint32_t kMsPerSecond = 1000U;
 constexpr int64_t kMsPerHour = 3600000;
 // Beyond this the offset is not measured as drift: the RTC is simply set.
@@ -485,6 +489,7 @@ void ClockTask::run()
             if (display_ != nullptr)
             {
                 display_->local().numeric(kDisplayIndex).setTimeUnset();
+                display_->local().attributes().setNumericBlink(kDisplayIndex, kColonBlink);
                 display_->submitLocal();
             }
             shownMinute = kNothingShown;
@@ -504,6 +509,8 @@ void ClockTask::run()
         if (time.minute != shownMinute && display_ != nullptr)
         {
             display_->local().numeric(kDisplayIndex).setTime(time.hour, time.minute);
+            // Every redraw, since an astro refresh resets the numerics' attributes.
+            display_->local().attributes().setNumericBlink(kDisplayIndex, kColonBlink);
             display_->submitLocal();
             shownMinute = time.minute;
         }

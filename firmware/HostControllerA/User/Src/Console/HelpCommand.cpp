@@ -52,20 +52,20 @@ const char* const kStats[] = {
 };
 
 const char* const kDisplay[] = {
-    "display set <n> <value> <precision>",
-    "    Fixed-point number on numeric display n (0-3). value is an integer",
-    "    from -999 to 9999; precision (0-3) is how many digits follow the point.",
-    "    e.g. 'display set 0 1234 2' shows 12.34, 'display set 1 -45 0' shows -45",
-    "display time <n> <HH:MM>    e.g. 'display time 2 21:45'",
-    "    Time on display n. HH and MM accept 00-99 and are not checked as a clock.",
-    "display blank <n>           switch numeric display n off",
-    "display matrix <row> <bits> e.g. 'display matrix 0 111000111000111000111'",
-    "    One row of the 5x21 matrix, row 0 at the top. bits is a string of 0/1,",
-    "    character N lighting column N; missing columns are off, extras ignored.",
-    "display low [on|off]",
-    "    Low brightness on every board. Saved; switch 2 toggles and saves it.",
-    "    'display low' shows the state in use and the saved one.",
-    "set, time, blank and matrix change this board only; 'astro refresh' the rest.",
+    "display show <n> <value>     numeric n (0-3): a number with up to 3 decimals,",
+    "    a time HH:MM, ? (the unavailable pattern) or blank. e.g. 'display show 0 12.34'",
+    "display row <r> <cells>      matrix row r (0-4, 0 at the top), one character per",
+    "    column as the forecast payload: 0-3 level, * full and blinking, . or ? off",
+    "display blink <n> off|colon|all    blink nothing, the colon, or all of display n",
+    "display level <n> <0-3>            brightness of display n; 3 is full",
+    "display test                       everything lit: levels 0-3 across the matrix",
+    "    and the digits, colons and some columns blinking",
+    "display clear                      everything off, no blink, full level",
+    "display passes [<a> <b> <c> <d>]   show or set the pass lengths behind the levels,",
+    "    percent of a slot summing to 100; default 12 39 19 30",
+    "display low [on|off]               low brightness on every board; saved, and",
+    "    switch 2 toggles it. 'display low' shows the state in use and the saved one.",
+    "All but 'low' change this board only; 'astro refresh' redraws every board.",
 };
 
 const char* const kApi[] = {

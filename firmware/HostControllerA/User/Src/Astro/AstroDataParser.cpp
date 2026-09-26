@@ -221,27 +221,48 @@ bool parseTemperature(const char* text, float& result)
     return std::isfinite(result);
 }
 
-bool parseMatrix(const char* text, uint32_t& result)
+// Protocol 2 cells: `0`-`3` a level, `*` level 3 blinking, `?` unavailable
+// (off). A whole-row `?` is all off.
+bool parseMatrixCells(const char* text, AstroMatrixRow& result)
 {
+    result = {};
     if (valueEquals(text, "?"))
     {
-        result = 0U;
         return true;
     }
     if (std::strlen(text) != Display::kMatrixColumnCount)
     {
         return false;
     }
-    result = 0U;
     for (uint8_t index = 0U; index < Display::kMatrixColumnCount; ++index)
     {
-        if (text[index] == '*')
+        const char cell = text[index];
+        const uint32_t bit = 1UL << index;
+        uint8_t level = 0U;
+        if (cell >= '0' && cell <= '3')
         {
-            result |= 1UL << index;
+            level = static_cast<uint8_t>(cell - '0');
         }
-        else if (text[index] != '.' && text[index] != '?')
+        else if (cell == '*')
+        {
+            level = Display::kLevelFull;
+            result.blink |= bit;
+        }
+        else if (cell != '?')
         {
             return false;
+        }
+        if (level != 0U)
+        {
+            result.lit |= bit;
+        }
+        if ((level & 1U) != 0U)
+        {
+            result.level0 |= bit;
+        }
+        if ((level & 2U) != 0U)
+        {
+            result.level1 |= bit;
         }
     }
     return true;
@@ -274,6 +295,11 @@ AstroParseStatus parseNumeric(const char* text, AstroNumericValue& output,
 }
 
 } // namespace
+
+bool parseMatrixRow(const char* text, AstroMatrixRow& row)
+{
+    return parseMatrixCells(text, row);
+}
 
 AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
                                 AstroData& output)
@@ -317,7 +343,7 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
             {
                 return AstroParseStatus::MissingRecord;
             }
-            if (!valueEquals(value, "1"))
+            if (!valueEquals(value, "2"))
             {
                 return AstroParseStatus::UnsupportedProtocol;
             }
@@ -441,7 +467,7 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
         }
         else if (field >= 5U && field <= 8U)
         {
-            if (!parseMatrix(value, board.matrix[field - 5U]))
+            if (!parseMatrixRow(value, board.matrix[field - 5U]))
             {
                 return AstroParseStatus::InvalidMatrix;
             }

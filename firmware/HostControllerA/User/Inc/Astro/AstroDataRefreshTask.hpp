@@ -102,9 +102,8 @@ private:
     // only, while it waits for the WiFi task, so the WiFi task never touches the
     // display. The patterns and timing are AstroProgressBar's.
     static void onFetchProgress(FetchStage stage, void* context);
-    void showProgressRow(uint32_t columns);
+    void showProgressRow(const AstroProgressBar::Row& row);
     void startIndicator(AstroProgressBar::Indicator::Kind kind, uint8_t failedSegment);
-    void stepIndicator();
     void clearIndicator();
 
     static constexpr uint32_t kFlagRun = 1U << 0;
@@ -119,7 +118,7 @@ private:
     // Written by this task only; read by others through schedule().
     RefreshSchedule::Scheduler scheduler_{};
     AstroProgressBar::Indicator indicator_{};
-    uint32_t shownRow_ = 0xFFFFFFFFU;  // columns last submitted; none yet
+    AstroProgressBar::Row shownRow_{0xFFFFFFFFU, 0xFFFFFFFFU};  // last submitted; none yet
     uint8_t loggedStage_ = 0xFFU;
 };
 

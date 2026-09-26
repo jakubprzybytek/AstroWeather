@@ -17,12 +17,17 @@ uint32_t segmentStart(uint8_t segment)
     return (static_cast<uint32_t>(segment) * Display::kMatrixColumnCount) / kSegments;
 }
 
+uint32_t segmentColumns(uint8_t segment)
+{
+    return columnsBelow(segmentStart(static_cast<uint8_t>(segment + 1U))) &
+           ~columnsBelow(segmentStart(segment));
+}
+
 uint32_t progressColumns(uint8_t current, bool currentLit)
 {
     uint32_t columns = columnsBelow(segmentStart(current));
     if (currentLit) {
-        columns |= columnsBelow(segmentStart(static_cast<uint8_t>(current + 1U))) &
-                   ~columnsBelow(segmentStart(current));
+        columns |= segmentColumns(current);
     }
     return columns;
 }
@@ -46,17 +51,17 @@ uint8_t segmentFor(HostController::FetchStage stage)
     return 0U;
 }
 
-uint32_t fetchingColumns(HostController::FetchStage stage, uint32_t tick)
+Row fetchingRow(HostController::FetchStage stage)
 {
     // The current step blinks, so a long one (module start-up takes ~15 s on the
     // first refresh after boot) still visibly moves.
-    const bool lit = ((tick / kProgressBlinkMs) % 2U) == 0U;
-    return progressColumns(segmentFor(stage), lit);
+    const uint8_t segment = segmentFor(stage);
+    return {progressColumns(segment, true), segmentColumns(segment)};
 }
 
-uint32_t processingColumns()
+Row processingRow()
 {
-    return progressColumns(kProcessingSegment, true);
+    return {progressColumns(kProcessingSegment, true), 0U};
 }
 
 uint8_t failedSegment(bool fetchFailed, HostController::FetchStage stage)
@@ -64,15 +69,15 @@ uint8_t failedSegment(bool fetchFailed, HostController::FetchStage stage)
     return fetchFailed ? segmentFor(stage) : kProcessingSegment;
 }
 
-uint32_t Indicator::start(Kind kind, uint8_t failedSegment, uint32_t now)
+Row Indicator::start(Kind kind, uint8_t failedSegment, uint32_t now)
 {
     kind_ = kind;
-    failedSegment_ = failedSegment;
-    lit_ = true;
     until_ = now + ((kind == Kind::Success) ? kSuccessHoldMs : kFailureHoldMs);
-    return (kind == Kind::Success)
-               ? fullColumns()
-               : progressColumns(static_cast<uint8_t>(failedSegment + 1U), false);
+    if (kind == Kind::Success) {
+        return {fullColumns(), 0U};
+    }
+    const uint32_t bar = progressColumns(static_cast<uint8_t>(failedSegment + 1U), false);
+    return {bar, bar};
 }
 
 bool Indicator::expired(uint32_t now) const
@@ -83,24 +88,10 @@ bool Indicator::expired(uint32_t now) const
 uint32_t Indicator::waitMs(uint32_t now, uint32_t maxWaitMs) const
 {
     const int32_t left = static_cast<int32_t>(until_ - now);
-    uint32_t wait = maxWaitMs;
-    if (left > 0 && static_cast<uint32_t>(left) < wait) {
-        wait = static_cast<uint32_t>(left);
+    if (left > 0 && static_cast<uint32_t>(left) < maxWaitMs) {
+        return static_cast<uint32_t>(left);
     }
-    if (kind_ == Kind::Failure && wait > kFailureBlinkMs) {
-        wait = kFailureBlinkMs;
-    }
-    return wait;
-}
-
-bool Indicator::step(uint32_t& columns)
-{
-    if (kind_ != Kind::Failure) {
-        return false;
-    }
-    lit_ = !lit_;
-    columns = lit_ ? progressColumns(static_cast<uint8_t>(failedSegment_ + 1U), false) : 0U;
-    return true;
+    return maxWaitMs;
 }
 
 } // namespace AstroProgressBar

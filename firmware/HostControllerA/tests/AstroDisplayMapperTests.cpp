@@ -75,7 +75,8 @@ AstroBoardData blockData(uint8_t block)
     data.numeric[2] = plainValue(10.5F + static_cast<float>(block));
     data.numeric[3] = plainValue(-3.0F - static_cast<float>(block));
     for (uint8_t row = 0U; row < 4U; ++row) {
-        data.matrix[row] = (static_cast<uint32_t>(block) << 8U) | (1UL << row) | (1UL << 20U);
+        const uint32_t lit = (static_cast<uint32_t>(block) << 8U) | (1UL << row) | (1UL << 20U);
+        data.matrix[row] = {lit, lit, lit, 0U};  // all at level 3
     }
     return data;
 }
@@ -134,23 +135,48 @@ void testUnavailableNumeric()
 
 void testMatrixRows()
 {
-    // Rows as parsed: '*' is a set bit, '.' and '?' clear ones, column i bit i.
+    // Rows as parsed, column i bit i: the lit columns, their level planes and
+    // which blink.
     AstroBoardData data{};
-    data.matrix[0] = 0x155555U;  // "*.*.*.*.*.*.*.*.*.*.*"
-    data.matrix[1] = 0U;         // a whole-row "?", or all '.'
-    data.matrix[2] = 0x1FFFFFU;  // all '*'
-    data.matrix[3] = 0x000001U;  // '*' then '.' / '?'
+    data.matrix[0] = {0x155555U, 0x155555U, 0x155555U, 0U};       // "303030..." at full
+    data.matrix[1] = {0U, 0U, 0U, 0U};                             // a whole-row "?"
+    data.matrix[2] = {0x1FFFFFU, 0x1FFFFFU, 0x1FFFFFU, 0x1FFFFFU}; // all '*'
+    data.matrix[3] = {0x000007U, 0x000005U, 0x000006U, 0U};       // "123" then off
     DisplayBoardState board{};
+    board.attributes().setMatrixBlink(1, 0x1FFFFFU);  // stale, from before
     AstroDisplayMapper::mapBoard(data, false, board);
     expectEqual(board.state().matrix[0], 0x155555U, "matrix row 0");
     expectEqual(board.state().matrix[1], 0U, "matrix row 1 all clear");
     expectEqual(board.state().matrix[2], 0x1FFFFFU, "matrix row 2 all set");
-    expectEqual(board.state().matrix[3], 0x000001U, "matrix row 3");
+    expectEqual(board.state().matrix[3], 0x000007U, "matrix row 3");
 
-    // Bits beyond the 21 columns are dropped by MatrixRow.
-    data.matrix[0] = 0xFFFFFFFFU;
+    const Display::BoardAttributes& attributes = board.attributes();
+    expectEqual(attributes.matrixLevel(0, 0), 3U, "row 0 column 0 full");
+    expectEqual(attributes.matrixLevel(0, 1), 3U, "unlit column left at full level");
+    expectEqual(attributes.blink.matrix[1], 0U, "stale blink cleared by the row");
+    expectEqual(attributes.blink.matrix[2], 0x1FFFFFU, "row 2 blinks");
+    expectEqual(attributes.matrixLevel(3, 0), 1U, "row 3 column 0 level 1");
+    expectEqual(attributes.matrixLevel(3, 1), 2U, "row 3 column 1 level 2");
+    expectEqual(attributes.matrixLevel(3, 2), 3U, "row 3 column 2 level 3");
+    expectEqual(attributes.matrixLevel(3, 3), 3U, "row 3 unlit column full");
+
+    // Bits beyond the 21 columns are dropped.
+    data.matrix[0] = {0xFFFFFFFFU, 0xFFFFFFFFU, 0xFFFFFFFFU, 0xFFFFFFFFU};
     AstroDisplayMapper::mapBoard(data, false, board);
     expectEqual(board.state().matrix[0], Display::kMatrixMask, "matrix row masked to 21 columns");
+    expectEqual(attributes.blink.matrix[0], Display::kMatrixMask, "blink masked to 21 columns");
+    expectEqual(attributes.level0.matrix[0], Display::kMatrixMask, "level plane masked");
+}
+
+void testNumericAttributesReset()
+{
+    AstroBoardData data = blockData(0U);
+    DisplayBoardState board{};
+    board.attributes().setNumericBlink(3, Display::NumericSegments{{0U, 0U, 0U, 0U, 0x03U}});
+    board.attributes().setNumericLevel(1, 1U);
+    AstroDisplayMapper::mapBoard(data, false, board);
+    expectEqual(board.attributes().blink.numeric[3].slots[4], 0U, "numeric blink reset");
+    expectEqual(board.attributes().numericLevel(1, 0, 0), 3U, "numeric level reset to full");
 }
 
 void testProgressRow()
@@ -179,7 +205,7 @@ void expectBoard(const DisplayBoardState& board, uint8_t block, const char* case
     expect(sameSegments(state.numeric[2], expectedValue(data.numeric[2].value)), caseName);
     expect(sameSegments(state.numeric[3], expectedValue(data.numeric[3].value)), caseName);
     for (uint8_t row = 0U; row < 4U; ++row) {
-        expectEqual(state.matrix[row], data.matrix[row], caseName);
+        expectEqual(state.matrix[row], data.matrix[row].lit, caseName);
     }
 }
 
@@ -211,17 +237,17 @@ void testAllBlocks()
 // Parser and mapper together, from payload characters to board bits.
 void testParsedPayload()
 {
-    std::string payload = "protocol=1\nconfigurationId=test\n\n";
+    std::string payload = "protocol=2\nconfigurationId=test\n\n";
     for (unsigned int index = 0U; index < 6U; ++index) {
         // Column `index` marks the block, so a block on the wrong board shows.
-        std::string marked(21U, '.');
-        marked[index] = '*';
+        std::string marked(21U, '0');
+        marked[index] = '3';
         payload += "display=" + std::to_string(index) +
                    "\nboard=num4x4_matrix5x21\nnightId=n\n"
                    "numeric_0=20:30\nnumeric_1=?\n"
                    "matrix_0=" + marked + "\n"
                    "matrix_1=?\n"
-                   "matrix_2=*.?*.?*.?*.?*.?*.?*.?\n"
+                   "matrix_2=3?1000000000000000002\n"
                    "matrix_3=?????????????????????\n"
                    "numeric_2=18.5\nnumeric_3=?\n\n";
     }
@@ -240,8 +266,14 @@ void testParsedPayload()
                                           : boards.remoteBoards[board - 1U].state();
         expectEqual(state.matrix[0], 1UL << board, "parsed block marker on its board");
         expectEqual(state.matrix[1], 0U, "parsed whole-row ? is all off");
-        // '*' on, '.' and '?' off: columns 0, 3, 6, ... 18.
-        expectEqual(state.matrix[2], 0x049249U, "parsed * . ? row");
+        // "3?1" then off, "2" at the end: columns 0, 2 and 20 lit.
+        expectEqual(state.matrix[2], 0x100005U, "parsed 3 ? 1 ... 2 row");
+        const Display::BoardAttributes& attributes =
+            (board == 0U) ? boards.localBoard.attributes()
+                          : boards.remoteBoards[board - 1U].attributes();
+        expectEqual(attributes.matrixLevel(2, 0), 3U, "parsed level 3");
+        expectEqual(attributes.matrixLevel(2, 2), 1U, "parsed level 1");
+        expectEqual(attributes.matrixLevel(2, 20), 2U, "parsed level 2");
         expectEqual(state.matrix[3], 0U, "parsed row of ? is all off");
         expectEqual(state.matrix[4], board == 0U ? 0x000003U : 0U, "parsed row 4");
         expect(sameSegments(state.numeric[0], expectedTime(20U, 30U)), "parsed time");
@@ -261,6 +293,7 @@ int main()
     testNumericKinds();
     testUnavailableNumeric();
     testMatrixRows();
+    testNumericAttributesReset();
     testProgressRow();
     testAllBlocks();
     testParsedPayload();

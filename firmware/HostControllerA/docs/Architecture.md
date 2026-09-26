@@ -52,7 +52,7 @@ create their FreeRTOS mutexes from static storage at that point.
    displays light up.
 6. The local board gets the "no data" state (`Display::noDataState()`, see
    [Display.md](Display.md#no-data)), then `localBoard.start()` enables the SCT
-   outputs and starts the `DisplayRefresh` task and TIM2.
+   outputs and starts TIM2, whose interrupt refreshes the board from then on.
 7. `ClockTask`: display flag and trim from settings (an error is logged if the
    trim is rejected), the display, `start()`.
 8. `SetSt67CredentialSource(&settingsStore)`, then `StartSt67HttpFetchTask()`.
@@ -114,7 +114,7 @@ others hold a reference to it.
 | `settingsStore` | `Settings::Store` | `settingsEeprom` and the in-RAM `Values` |
 | `led2` | `Led` | `LED_2`, blinked by `MainLoopTask` |
 
-The tasks other than `DisplayRefresh` and `Led1` are singletons reached through
+The tasks other than `Led1` are singletons reached through
 `instance()`. The fetch task is private to `User/Src/WiFi/St67HttpFetchTask.cpp`
 and is reached through `StartSt67HttpFetchTask()`, `FetchSt67Data()` and
 `TriggerSt67ConnectivityCycle()`.
@@ -129,11 +129,15 @@ Middleware tasks come from the FreeRTOS heap and are not in that registry.
 
 CMSIS-RTOS2 priorities are FreeRTOS priorities (`configMAX_PRIORITIES` is 56):
 `osPriorityLow` = 8, `BelowNormal` = 16, `Normal` = 24, `Normal4` = 28,
-`Realtime` = 48, `Realtime7` = 55.
+`Realtime` = 48.
+
+The local display is not refreshed by a task: `Display::PcbDisplayBoard`
+runs the multiplexing from TIM2's update interrupt, with SPI3 transfers by
+DMA, so its timing depends on interrupt latency only; see
+[Display.md](Display.md#refresh-operation).
 
 | Task name | Owner | Priority | Stack (bytes) | Allocation | Does |
 | --- | --- | --- | ---: | --- | --- |
-| `DisplayRefresh` | `Display::PcbDisplayBoard` | Realtime7 (55) | 1024 | static | Multiplexes the local board, one slot per TIM2 tick |
 | `netif` | `LWIP/App/lwip_netif.c` | 50 | 2048 | heap | Passes received frames from the ST67 driver to LwIP |
 | `Modem_Process` | ST67 driver `w61_at_common.c` | 47 | 2048 | heap | AT response and event handling |
 | `spi_xfer_engine` | ST67 driver `spi_iface.c` | 46 | 1536 | heap | SPI1 transfers to the module |
@@ -154,8 +158,9 @@ The four middleware tasks are created on the first fetch: `Modem_Process` and
 `spi_xfer_engine` by `W6X_Init()`, `tcpip_thread` and `netif` by
 `MX_LWIP_Init()`. After an ordinary refresh the module and LwIP stay up, so they
 persist. The driver priorities 46 and 47 are overridden in
-`ST67W6X_Network_Driver/Target/w61_driver_config.h` to keep them below
-`DisplayRefresh`; `netif` still runs at 50, above it.
+`ST67W6X_Network_Driver/Target/w61_driver_config.h`, from when the display
+refresh was a task they had to stay below; it now runs from TIM2's interrupt
+and no task priority affects it.
 
 ## Inter-task Communication
 
@@ -166,7 +171,6 @@ queues and five mutexes.
 
 | Receiver | Set by | Meaning |
 | --- | --- | --- |
-| `DisplayRefresh` | TIM2 period ISR through `Display_PcbTimerElapsed()` | Refresh the next multiplex slot |
 | `MainLoopTask` | `HAL_GPIO_EXTI_Falling_Callback()` via `SwitchInput` | `kEventSwitch1`, `kEventSwitch2` |
 | `CurrentSense` | ADC DMA complete / error callbacks | Conversion done or failed |
 | `ConsoleService` | USB CDC RX and line-state callbacks | Command queued, host connected |
@@ -195,7 +199,7 @@ All are `Utils::Mutex` (priority inheritance, static storage).
 | --- | --- |
 | `I2cBus::mutex_` | One I2C1 transfer at a time: the EEPROM and the five remote boards, driven from the console and refresh tasks. The clock and current-sense tasks only use `submitLocal()` and never touch I2C. Held per transfer, not per operation. |
 | `Display::submitMutex_` | The SPI/I2C transfer sequence of `submit()` and `submitLocal()`. Setters are not locked; concurrent writers are last-writer-wins. |
-| `PcbDisplayBoard::frameMutex_` | The prepared local frame, between `submit()` and the `DisplayRefresh` task. |
+| `PcbDisplayBoard::submitMutex_` | One `submit()` at a time encoding into the back frame set; the refresh interrupt takes no lock and swaps the sets at a frame boundary. |
 | `ClockTask::rtcMutex_` | RTC reads and writes, from the clock task, the console and the refresh task's clock sync. |
 | `Settings::Store::mutex_` | The Wi-Fi SSID and password and the API host and path, written by the console and copied by the fetch task on every connect or fetch; low brightness, written by the console and by `MainLoopTask` (switch 2); and the whole of `save()`, so a console save and a switch 2 save cannot interleave their page writes. Other settings are written only by the console task and are not locked. |
 

@@ -176,12 +176,14 @@ void logParsedData(const AstroData& data)
         }
         for (uint8_t matrixIndex = 0U; matrixIndex < board.matrix.size(); ++matrixIndex)
         {
+            const AstroMatrixRow& row = board.matrix[matrixIndex];
             LogService::instance().logf(
                 LogService::Level::Info,
-                "AstroDataRefresh display=%u matrix_%u=0x%08lx",
+                "AstroDataRefresh display=%u matrix_%u lit=%06lx l0=%06lx l1=%06lx blink=%06lx",
                 static_cast<unsigned int>(displayIndex),
-                static_cast<unsigned int>(matrixIndex),
-                static_cast<unsigned long>(board.matrix[matrixIndex]));
+                static_cast<unsigned int>(matrixIndex), static_cast<unsigned long>(row.lit),
+                static_cast<unsigned long>(row.level0), static_cast<unsigned long>(row.level1),
+                static_cast<unsigned long>(row.blink));
         }
     }
 }
@@ -378,7 +380,7 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
     }
     else
     {
-        showProgressRow(AstroProgressBar::processingColumns());
+        showProgressRow(AstroProgressBar::processingRow());
         AstroData data{};
         const AstroParseStatus status =
             parseAstroData(responseBuffer_, request_.result.length, data);
@@ -559,7 +561,7 @@ const char* fetchStatusName(St67FetchStatus status)
 void AstroDataRefreshTask::onFetchProgress(FetchStage stage, void* context)
 {
     AstroDataRefreshTask& self = *static_cast<AstroDataRefreshTask*>(context);
-    self.showProgressRow(AstroProgressBar::fetchingColumns(stage, osKernelGetTickCount()));
+    self.showProgressRow(AstroProgressBar::fetchingRow(stage));
     if (static_cast<uint8_t>(stage) != self.loggedStage_)
     {
         self.loggedStage_ = static_cast<uint8_t>(stage);
@@ -568,38 +570,31 @@ void AstroDataRefreshTask::onFetchProgress(FetchStage stage, void* context)
     }
 }
 
-void AstroDataRefreshTask::showProgressRow(uint32_t columns)
+void AstroDataRefreshTask::showProgressRow(const AstroProgressBar::Row& row)
 {
-    if (display_ == nullptr || columns == shownRow_)
+    if (display_ == nullptr || row == shownRow_)
     {
         return;
     }
-    display_->local().matrix(AstroDisplayMapper::kProgressRow).setRow(columns);
+    // The blinking is the display's own, so the row is drawn once per change.
+    display_->local().matrix(AstroDisplayMapper::kProgressRow).setRow(row.columns);
+    display_->local().attributes().setMatrixBlink(AstroDisplayMapper::kProgressRow, row.blink);
     display_->submitLocal();
-    shownRow_ = columns;
+    shownRow_ = row;
 }
 
 void AstroDataRefreshTask::startIndicator(AstroProgressBar::Indicator::Kind kind,
                                           uint8_t failedSegment)
 {
     // Success: the full bar. Failure: the bar up to and including the step that
-    // failed, blinked by stepIndicator().
+    // failed, blinking.
     showProgressRow(indicator_.start(kind, failedSegment, osKernelGetTickCount()));
-}
-
-void AstroDataRefreshTask::stepIndicator()
-{
-    uint32_t columns = 0U;
-    if (indicator_.step(columns))
-    {
-        showProgressRow(columns);
-    }
 }
 
 void AstroDataRefreshTask::clearIndicator()
 {
     indicator_.cancel();
-    showProgressRow(0U);
+    showProgressRow({0U, 0U});
 }
 
 void AstroDataRefreshTask::run()
@@ -607,8 +602,8 @@ void AstroDataRefreshTask::run()
     for (;;)
     {
         // Between refreshes the task wakes to check the schedule, and while an
-        // outcome is shown on the progress row, to blink it and to clear it when
-        // it expires. A new refresh request always takes over straight away.
+        // outcome is shown on the progress row, to clear it when it expires. A
+        // new refresh request always takes over straight away.
         uint32_t timeout = kScheduleCheckMs;
         if (indicator_.active())
         {
@@ -624,7 +619,6 @@ void AstroDataRefreshTask::run()
         const uint32_t flags = osThreadFlagsWait(kFlagRun, osFlagsWaitAny, timeout);
         if (flags == static_cast<uint32_t>(osFlagsErrorTimeout))
         {
-            stepIndicator();
             checkSchedule();
             continue;
         }

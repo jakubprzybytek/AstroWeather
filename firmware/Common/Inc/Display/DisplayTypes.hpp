@@ -118,15 +118,19 @@ private:
 // matrix blank. Shown at boot on every board until the first data arrives.
 LogicalBoardState noDataState();
 
+// Content and attributes without a board, for tests and pure code.
 class DisplayBoardState {
 public:
     NumericDisplay numeric(uint8_t index) { return NumericDisplay(state_.numeric[index]); }
     MatrixRow matrix(uint8_t row) { return MatrixRow(state_.matrix[row]); }
     const LogicalBoardState& state() const { return state_; }
     LogicalBoardState& state() { return state_; }
+    BoardAttributes& attributes() { return attributes_; }
+    const BoardAttributes& attributes() const { return attributes_; }
 
 private:
     LogicalBoardState state_{};
+    BoardAttributes attributes_{};
 };
 
 } // namespace Display

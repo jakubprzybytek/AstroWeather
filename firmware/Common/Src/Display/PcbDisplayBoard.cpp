@@ -85,7 +85,8 @@ bool PcbDisplayBoard::setPassPercent(const std::array<uint8_t, kPassCount>& perc
 
 bool PcbDisplayBoard::refreshStats(RefreshStats& stats) const
 {
-    stats = {sequencer_.frames(), lateShifts_, maxInterruptMicros_};
+    stats = {sequencer_.frames(), lateShifts_, lateInterrupts_, maxInterruptMicros_,
+             sequencer_.passPercent()};
     return true;
 }
 
@@ -128,8 +129,16 @@ void PcbDisplayBoard::onPass()
     }
 
     // 2. This pass's length. Preload is off, so it applies to the period
-    //    that has just started.
+    //    that has just started. If this interrupt came later than the pass
+    //    is long (a long critical section elsewhere), the counter is already
+    //    past the new reload and would run on to the timer's full range
+    //    before the next update, 71 minutes on the 32-bit TIM2. Restart the
+    //    pass instead: it shows for its length plus the delay.
     __HAL_TIM_SET_AUTORELOAD(&timer_, now.micros - 1U);
+    if (__HAL_TIM_GET_COUNTER(&timer_) >= now.micros - 1U) {
+        __HAL_TIM_SET_COUNTER(&timer_, 0U);
+        lateInterrupts_ = lateInterrupts_ + 1U;
+    }
 
     // 3. Shift the next pass's data in the background. A new submission is
     //    taken over only at a frame boundary, so every frame comes from one.

@@ -12,7 +12,7 @@ the stale-data timeout are unit tested.
 ## Boot
 
 `main()` runs the CubeMX sequence: `HAL_Init()`, `SystemClock_Config()` (HSI,
-16 MHz), `MX_GPIO_Init()`, `MX_SPI1_Init()`, `MX_I2C1_Init()`,
+16 MHz), `MX_GPIO_Init()`, `MX_DMA_Init()`, `MX_SPI1_Init()`, `MX_I2C1_Init()`,
 `MX_TIM6_Init()`, `osKernelInitialize()`, `defaultTask`, then
 `DisplayController_Init()` from the `RTOS_THREADS` user section, then
 `osKernelStart()`.
@@ -22,10 +22,12 @@ scheduler starts:
 
 1. Starts the `Led1` heartbeat.
 2. Loads the all-segments self-test into the board and starts the refresh
-   (`PcbDisplayBoard::start()`: enables the SCT outputs, starts the
-   `DisplayRefresh` task and TIM6). The self-test is prepared first, so the
-   first frames latched are the self-test, not whatever the drivers held at
-   reset.
+   (`PcbDisplayBoard::start()`: enables the SCT outputs and starts TIM6, whose
+   interrupt then multiplexes the board with SPI1 DMA transfers, no task
+   involved; see the host's
+   [Display.md](../../HostControllerA/docs/Display.md#refresh-operation)).
+   The self-test is prepared first, so the first frames latched are the
+   self-test, not whatever the drivers held at reset.
 3. Starts the `DisplayApp` task and routes the switches to it
    (`Utils::SwitchInput`).
 4. Reads the address straps (`Display::detectBoardAddress()`), stores the
@@ -45,14 +47,13 @@ for 2 s, and then the host's data, or "no data" if none has arrived yet.
 
 | Task | Owner | Priority | Stack (bytes) | Does |
 | --- | --- | --- | ---: | --- |
-| `DisplayRefresh` | `Display::PcbDisplayBoard` (Common) | Realtime7 (55) | 1024 | Multiplexes the board, one slot per TIM6 tick (250 Hz) |
-| `DisplayApp` | `User/Src/DisplayApp.cpp` | Normal (24) | 1024 | Chooses what is shown: boot screens, data, "no data", test screens |
+| `DisplayApp` | `User/Src/DisplayApp.cpp` | Normal (24) | 1024 | Chooses what is shown: boot screens, data with its attributes, "no data", test screens |
 | `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | Idles |
 | `Led1` | `Debug::BlinkingLed` (Common) | Low (8) | 768 | Heartbeat on `LED_1`, 20 ms every 2 s |
 
-`DisplayRefresh`, `DisplayApp` and `Led1` are `Task<N>` objects with static
-stacks, and `Utils::Mutex` uses static storage, so the 3072-byte FreeRTOS heap
-holds only `defaultTask`. `configCHECK_FOR_STACK_OVERFLOW` is 2; see
+`DisplayApp` and `Led1` are `Task<N>` objects with static stacks, and
+`Utils::Mutex` uses static storage, so the 3072-byte FreeRTOS heap holds only
+`defaultTask`. The display refresh runs from TIM6's interrupt, not a task. `configCHECK_FOR_STACK_OVERFLOW` is 2; see
 [Diagnostics](#diagnostics).
 
 `DisplayApp` waits on three thread flags, with a 1 s timeout for its periodic
@@ -60,7 +61,7 @@ checks:
 
 | Flag | Set by | Meaning |
 | --- | --- | --- |
-| `kFlagFrame` | `I2cTarget`, from the I2C interrupt | A complete 36-byte message is waiting |
+| `kFlagFrame` | `I2cTarget`, from the I2C interrupt | One or more complete 36-byte messages are waiting |
 | `kFlagSwitch1` | `SwitchInput`, from the EXTI interrupt | Switch 1 pressed |
 | `kFlagSwitch2` | `SwitchInput` | Switch 2 pressed |
 
@@ -78,9 +79,10 @@ stopped.
 | All segments | Every digit segment with its dot, L1-L3, every matrix dot | 1 s at boot; switch 1 |
 | Address | `Ad12` (for 0x12) on every numeric display, matrix blank; `Ad--` if the straps gave no address | 2 s at boot; 3 s on switch 2 |
 | Identify | Numeric display *n* (0-3) shows *n* + 1 on all four digits (`1111` to `4444`); matrix row *r* lights its first *r* + 1 columns, so the top row has one dot | Switch 1, after all segments |
-| Data | The last message from the host | After a frame arrives, until it goes stale |
+| Data | The last content from the host, with the blink and level attributes it sent | After a frame arrives, until it goes stale |
 | No data | Segment G on the last digit of every numeric display (`   -`), everything else off, matrix blank | Before the first frame, and after 7 h without one |
 
+The test screens and "no data" are plain: full brightness, nothing blinking.
 Switch 1 steps through all segments, identify, and back to the data; each test
 screen closes by itself after 60 s. A frame that arrives while a test or
 address screen is up is kept and shown when it closes. `LED_2` flashes for
@@ -101,16 +103,26 @@ HAL's interrupt-driven sequential listen API:
 - `HAL_I2C_AddrCallback()`: the host addressed this board. For a write, a
   36-byte receive is started (`I2C_FIRST_AND_LAST_FRAME`). For a read, which
   the protocol does not use, one byte (0) is sent so the bus is not held.
-- `HAL_I2C_SlaveRxCpltCallback()`: all 36 bytes arrived. They are copied to a
-  second buffer and `kFlagFrame` is set; only the newest message is kept.
+- `HAL_I2C_SlaveRxCpltCallback()`: all 36 bytes arrived. They are queued
+  (four deep, the oldest dropped and counted when full: the host sends a
+  board's three attribute planes and its content a few milliseconds apart)
+  and `kFlagFrame` is set.
 - `HAL_I2C_ListenCpltCallback()` and `HAL_I2C_ErrorCallback()`: the transfer
   ended. A write that ended before 36 bytes is counted as a probe (no data
   bytes, as the host's `status` sends) or a short write, and listening is
   restarted.
 
-The task decodes the message with `Display::deserializeI2c()`: command `0x01`
-and exactly 36 bytes, or it is rejected and the previous frame stays. Nothing
-is decoded in the interrupt.
+The task takes every queued message and feeds it to `FrameAssembler`
+(`User/Src/FrameAssembler.cpp`), which decodes it with
+`Display::deserializePlaneI2c()`: a known command and exactly 36 bytes, or it
+is rejected and nothing changes. The attribute commands `0x02`-`0x04` (blink,
+level bit 0, level bit 1) are staged; the content command `0x01` takes effect
+together with whatever is staged by then, so content and attributes always
+change as one. Staged attributes persist until the host replaces them, so a
+host that sends only content keeps the last attributes, and one that never
+sends any gets full brightness and no blinking. Nothing is decoded in the
+interrupt. The message format is in the host's
+[Display.md](../../HostControllerA/docs/Display.md#i2c-transport).
 
 The HAL NACKs the byte after the 36th; a host that sends more gets an error on
 its side. Listening is restarted after every error, and the task checks every
@@ -122,13 +134,13 @@ board's address.
 ## Diagnostics
 
 Until the board has a console, its counters are read over SWD. They are in
-`g_displayStats` (`User/Inc/Stats.hpp`), a C-linkage struct of nine 32-bit
+`g_displayStats` (`User/Inc/Stats.hpp`), a C-linkage struct of fifteen 32-bit
 fields:
 
 | Field | Counts |
 | --- | --- |
 | `address` | The 7-bit address from the straps, 0 if none |
-| `framesAccepted` | Messages shown |
+| `framesAccepted` | Content messages (`0x01`) shown |
 | `framesRejected` | 36-byte messages with an unknown command |
 | `shortWrites` | Writes that ended before 36 bytes |
 | `probes` | Address-only writes, such as the host's `status` probe |
@@ -136,10 +148,16 @@ fields:
 | `listenRearms` | Times the periodic check had to restart listening |
 | `staleTimeouts` | Times the data went stale and "no data" was shown |
 | `lastFrameTick` | Kernel tick (ms since boot) of the last accepted frame |
+| `attributesAccepted` | Attribute messages (`0x02`-`0x04`) staged |
+| `queueOverruns` | Messages dropped because the four-deep queue was full |
+| `refreshFrames` | Display frames shown, copied from the refresh once a second; grows by 50 a second |
+| `lateShifts` | Refresh interrupts that found the previous pass's shift still running |
+| `lateInterrupts` | Refresh interrupts later than the pass they start, which was restarted |
+| `maxInterruptMicros` | Longest refresh interrupt, in microseconds |
 
 ```bash
 arm-none-eabi-nm build/Debug/DisplayController.elf | grep g_displayStats
-STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x24
+STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x3C
 ```
 
 `mode=HOTPLUG` attaches without resetting the board.
@@ -147,7 +165,7 @@ STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x24
 A stack overflow halts the board in `vApplicationStackOverflowHook()`
 (`Core/Src/main.c`), with interrupts disabled and the task's name in
 `g_stackOverflowTaskName`, as on the host. The display then freezes on its
-current slot.
+current pass.
 
 ## Code Layout
 
@@ -155,15 +173,17 @@ current slot.
 | --- | --- |
 | `User/Src/DisplayController.cpp` | The static objects and `DisplayController_Init()` |
 | `User/Src/DisplayApp.cpp` | The `DisplayApp` task |
-| `User/Src/I2cTarget.cpp` | The I2C target and the HAL I2C callbacks |
+| `User/Src/I2cTarget.cpp` | The I2C target, its message queue and the HAL I2C callbacks |
+| `User/Src/FrameAssembler.cpp` | Staging of the attribute messages and their application with the content |
 | `User/Src/Screens.cpp` | Self-test, identify and address screens |
 | `User/Inc/NoDataTimer.hpp` | Stale-data timeout on the wrapping tick |
 | `User/Inc/Stats.hpp` | `g_displayStats` |
-| `tests/ScreensTests.cpp`, `tests/NoDataTimerTests.cpp` | Native tests |
-| `../Common` | Display types and encoding, `PcbDisplayBoard`, `SCT2xxx`, the I2C message, the address straps, tasks and mutexes |
+| `tests/ScreensTests.cpp`, `tests/NoDataTimerTests.cpp`, `tests/FrameAssemblerTests.cpp` | Native tests |
+| `../Common` | Display types, attributes and encoding, the pass sequencing, `PcbDisplayBoard`, `SCT2xxx`, the I2C messages, the address straps, tasks and mutexes |
 
 ## Open Items
 
-- Run it on a display board: the refresh on SPI1/TIM6, the I2C target against
-  the host, and the boot and test screens.
+- Run it on a display board: the interrupt-driven refresh on SPI1/TIM6 with
+  DMA, the I2C target against the host including the attribute messages, and
+  the boot and test screens.
 - Console over USART2 (PA2/PA3); see the README.

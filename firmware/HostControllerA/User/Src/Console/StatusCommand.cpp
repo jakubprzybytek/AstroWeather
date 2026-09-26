@@ -245,8 +245,9 @@ void reportLocalRefresh(Display::Display* display)
     if (!display->local().refreshStats(stats)) {
         return;
     }
-    line("display    %lu frames, %lu late shifts, refresh interrupt up to %lu us",
+    line("display    %lu frames, %lu late shifts, %lu late interrupts, refresh interrupt up to %lu us",
          static_cast<unsigned long>(stats.frames), static_cast<unsigned long>(stats.lateShifts),
+         static_cast<unsigned long>(stats.lateInterrupts),
          static_cast<unsigned long>(stats.maxInterruptMicros));
 }
 

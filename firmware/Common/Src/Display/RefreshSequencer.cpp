@@ -25,6 +25,7 @@ bool RefreshSequencer::setPassPercent(const std::array<uint8_t, kPassCount>& per
     if (total != 100U) {
         return false;
     }
+    passPercent_ = percent;
     for (uint8_t pass = 0; pass < kPassCount; ++pass) {
         passMicros_[pass] = kSlotMicros * percent[pass] / 100U;
     }

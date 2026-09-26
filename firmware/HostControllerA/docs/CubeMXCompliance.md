@@ -256,6 +256,17 @@ Definitions on the top-level CMake target do **not** reach the driver: it is com
 
 At their default priorities the two driver tasks pre-empted the display multiplexing task, holding a slot for up to 14 ms instead of 4 ms during WiFi activity, which was visible as the whole display flashing during a refresh. Measured by timing slot switches in the display task: the longest gap fell from 14 ms with four late switches to 8 ms with one per refresh, with WiFi fetches still succeeding. The remaining short stall happens during connect and was not traced.
 
-That stall was LwIP's `netif` task, which the driver creates at `NETIF_TASK_PRIORITY` 50, above the display's 48. The value is a plain `#define` in the generated `LWIP/App/lwip_netif.h`, outside any USER CODE block and without an `#ifndef` guard, so it cannot be overridden in a way that survives regeneration. `DisplayRefresh` was raised to `osPriorityRealtime7` (55) instead, above every driver task. Measured with the display's gray-level test on 2026-09-26: the display task's longest wait during an astro refresh fell from 4.5-5.4 ms, every one caught with `netif` running, to under 1 ms.
+That stall was LwIP's `netif` task, which the driver creates at `NETIF_TASK_PRIORITY` 50, above the display's 48. The value is a plain `#define` in the generated `LWIP/App/lwip_netif.h`, outside any USER CODE block and without an `#ifndef` guard, so it cannot be overridden in a way that survives regeneration. `DisplayRefresh` was raised to `osPriorityRealtime7` (55) instead, above every driver task. Measured with the display's gray-level test on 2026-09-26: the display task's longest wait during an astro refresh fell from 4.5-5.4 ms, every one caught with `netif` running, to under 1 ms. The refresh has since moved into the TIM2 interrupt altogether, so no task priority is involved any more; see [Display.md](Display.md#refresh-operation).
+
+## Display refresh timer and DMA
+
+Set in CubeMX on 2026-09-27 for the interrupt-driven refresh with brightness levels ([Display.md](Display.md#refresh-operation)):
+
+| Setting | Host (`HostControllerA.ioc`) | DisplayController (`DisplayController.ioc`) |
+| --- | --- | --- |
+| Refresh timer | TIM2: prescaler 15 (1 MHz count), period 3999 (placeholder), preload off, update interrupt at priority 3 | TIM6: the same |
+| Display SPI DMA | `SPI3_TX` on DMA1 channel 4, memory to peripheral, byte/byte, memory increment, normal mode, priority high; its interrupt (`DMA1_Ch4_7_DMA2_Ch1_5_DMAMUX1_OVR`) at priority 3 | `SPI1_TX` on DMA1 channel 1, the same settings and `DMA1_Channel1` interrupt |
+
+The DMA interrupt must stay enabled: `HAL_SPI_Transmit_DMA()` finishes its state machine in the transfer-complete interrupt, and the next transfer is refused as busy without it. The timer's period is rewritten by the refresh interrupt every pass, so the CubeMX value only sets the first pass; the prescaler and the disabled preload are what matter.
 
 Verify any change here with a preprocessor dump of a driver unit, for example `spi_iface.c` from `compile_commands.json` with `-E -dM`, since a misplaced override fails silently.

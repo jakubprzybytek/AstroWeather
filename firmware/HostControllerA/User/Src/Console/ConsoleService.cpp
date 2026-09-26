@@ -261,7 +261,7 @@ void ConsoleService::execute(const char* line)
 
     const Console::CommandResult displayResult = Console::handleDisplayCommand(line, display_);
     if (displayResult == Console::CommandResult::Ok) {
-        reply("OK display");
+        return;  // replied itself
     } else if (displayResult == Console::CommandResult::Unavailable) {
         reply("ERR display-unavailable");
     } else if (displayResult == Console::CommandResult::InvalidArgument) {

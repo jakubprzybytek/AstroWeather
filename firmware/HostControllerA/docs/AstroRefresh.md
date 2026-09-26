@@ -29,8 +29,8 @@ implementation phases, is in
 | File | Responsibility |
 | --- | --- |
 | `User/Inc/Astro/AstroDataRefreshTask.hpp`, `User/Src/Astro/AstroDataRefreshTask.cpp` | The refresh task: triggers, pipeline, schedule driver, status summaries; draws the display mapping and the progress bar. |
-| `User/Inc/Astro/AstroDisplayMapper.hpp`, `User/Src/Astro/AstroDisplayMapper.cpp` | Pure display mapping: `AstroData` to the six boards' numerics and matrix rows. Tested by `tests/AstroDisplayMapperTests.cpp`. |
-| `User/Inc/Astro/AstroProgressBar.hpp`, `User/Src/Astro/AstroProgressBar.cpp` | Pure progress bar: row pattern per step, blink phase, and the outcome indicator's timing. Tested by `tests/AstroProgressBarTests.cpp`. |
+| `User/Inc/Astro/AstroDisplayMapper.hpp`, `User/Src/Astro/AstroDisplayMapper.cpp` | Pure display mapping: `AstroData` to the six boards' numerics and matrix rows, with the rows' levels and blinking. Tested by `tests/AstroDisplayMapperTests.cpp`. |
+| `User/Inc/Astro/AstroProgressBar.hpp`, `User/Src/Astro/AstroProgressBar.cpp` | Pure progress bar: the row's columns and blink mask per step, and the outcome indicator's timing. Tested by `tests/AstroProgressBarTests.cpp`. |
 | `../Common/Inc/Utils/Crc32.hpp` | The CRC-32 of the recheck. Tested by `../Common/tests/Crc32Tests.cpp`. |
 | `User/Inc/Astro/AstroData.hpp` | The parsed model: six boards, the server `time` and `lastWeatherFetchTime`. |
 | `User/Inc/Astro/AstroDataParser.hpp`, `User/Src/Astro/AstroDataParser.cpp` | Pure parser, no HAL or RTOS. Tested by `tests/AstroDataParserTests.cpp`. |
@@ -144,7 +144,7 @@ whole payload has validated.
 
 ### Header
 
-1. The first record must be `protocol`, and its value exactly `1`.
+1. The first record must be `protocol`, and its value exactly `2`. Version 1, which had on/off matrix cells, is rejected.
 2. The second must be `configurationId`, with a value of at most 20
    characters. The value is not compared with the configuration requested.
 3. Before `display=0`, `time` and `lastWeatherFetchTime` are recognised in
@@ -168,7 +168,7 @@ Within each block the records must come in this order:
 | 2 | `nightId` | Not validated; kept (up to 15 characters) for the log. |
 | 3 | `numeric_0` | Sunset, `HH:MM` or `?`. |
 | 4 | `numeric_1` | Sunrise, `HH:MM` or `?`. |
-| 5–8 | `matrix_0` … `matrix_3` | 21 characters from `*`, `.` and `?`, or the single `?`. |
+| 5–8 | `matrix_0` … `matrix_3` | 21 characters from `0`–`3`, `*` and `?`, or the single `?`. |
 | 9 | `numeric_2` | Maximum temperature, or `?`. |
 | 10 | `numeric_3` | Minimum temperature, or `?`. |
 
@@ -179,7 +179,11 @@ Within each block the records must come in this order:
   the numeric display decides what it can show.
 - A temperature is an optional `+` or `-`, one or more digits, a point and
   exactly one digit: `18.5`, `-2.0`. `18` and `18.50` are rejected.
-- In a matrix row, `*` is on; `.` and `?` are off. A whole-row `?` is all off.
+- In a matrix row, each character is one column: `0` off, `1`–`3` lit at that
+  brightness level, `*` lit at level 3 and blinking, `?` off. A whole-row `?`
+  is all off. The row is kept as four bit-planes, column *i* in bit *i*:
+  `lit`, the level's two bits `level0` and `level1`, and `blink`
+  (`AstroMatrixRow`). Version 1's `.` is rejected.
 - `?` for a numeric is valid unavailable data, not a parse failure.
 
 ### Parse results
@@ -189,7 +193,7 @@ Within each block the records must come in this order:
 | `Success` | `success` | Six complete blocks. |
 | `InvalidArgument` | `invalid-argument` | Empty body. |
 | `Malformed` | `malformed` | A line with no `=`. |
-| `UnsupportedProtocol` | `unsupported-protocol` | `protocol` is not `1`. |
+| `UnsupportedProtocol` | `unsupported-protocol` | `protocol` is not `2`. |
 | `UnsupportedBoard` | `unsupported-board` | `board` is not `num4x4_matrix5x21`. |
 | `MissingRecord` | `missing-record` | `protocol` or `configurationId` not first, `configurationId` over 20 characters, or a block record missing or out of order. |
 | `InvalidDisplay` | `invalid-display` | The first block is not `display=0`, or a block index is not the next one. |
@@ -241,8 +245,13 @@ On each board:
 | `numeric_1` | Numeric 1 | `setTime(hour, minute)` |
 | `numeric_2` | Numeric 2 | `setValue(value, 1)`: one decimal, for example `18.5`, `-2.0`. |
 | `numeric_3` | Numeric 3 | `setValue(value, 1)` |
-| `matrix_0` … `matrix_3` | Matrix rows 0–3 | `setRow()`, character *i* to column *i*. |
-| — | Matrix row 4 | Cleared on the remote boards. Left alone on the local board, where it carries the progress bar. |
+| `matrix_0` … `matrix_3` | Matrix rows 0–3 | `setRow()` with the lit columns, character *i* to column *i*; the level planes and the blink mask into the board's attributes. Unlit columns are left at full level, so a later `display row` lighting one shows it. |
+| — | Matrix row 4 | Cleared on the remote boards, attributes included. Left alone on the local board, where it carries the progress bar. |
+
+The numerics carry no attributes in the payload, so the mapper resets theirs
+to plain (full level, no blink) on every board it draws; the clock re-applies
+its blinking colon on its next redraw. What the levels and `*` look like is
+described in [Display.md](Display.md#blink-and-brightness-levels).
 
 A numeric `?` is drawn as the decimal point on all four digits and nothing in
 the indicator slot. That is distinct from the numeric display's own error
@@ -289,17 +298,20 @@ progress. The row is split into six segments, one per step:
 | 5 | 14–16 | Disconnecting |
 | 6 | 17–20 | CRC check, parse and publish |
 
-- Finished steps are solid; the current one blinks every 250 ms.
-- **Success**: the full row for 1.5 s, then clear.
-- **Failure**: the bar up to and including the failed step blinks every 500 ms
-  for 60 s, then clears. A fetch failure shows at the step the WiFi task
-  stopped at; a CRC, parse or publish failure at segment 6.
+- Finished steps are solid; the current one blinks.
+- **Success**: the full row, solid, for 1.5 s, then clear.
+- **Failure**: the bar up to and including the failed step, all of it
+  blinking, for 60 s, then clear. A fetch failure shows at the step the WiFi
+  task stopped at; a CRC, parse or publish failure at segment 6.
 - A new refresh clears the indicator at once.
 
-The patterns and timing are `AstroProgressBar`'s; the refresh task keeps its
-`Indicator` state and draws the bar itself, from the WiFi task's progress callback
-and its own wake-ups, using `Display::submitLocal()`, so it never costs I2C
-traffic and the WiFi task never touches the display. A scheduled refresh shows
+The blinking is the display's own blink attribute (1 Hz, see
+[Display.md](Display.md#blink-and-brightness-levels)), so the row is drawn once
+per change, as a `Row` of lit columns and a blink mask. The patterns and timing
+are `AstroProgressBar`'s; the refresh task keeps its `Indicator` state and
+draws the bar itself, from the WiFi task's progress callback and its own
+wake-ups, using `Display::submitLocal()`, so it never costs I2C traffic and
+the WiFi task never touches the display. A scheduled refresh shows
 the same bar as a manual one; there are no quiet hours. Typical step times and
 an SWD check of the row are in [Display.md](Display.md#refresh-progress).
 
@@ -391,20 +403,23 @@ The exact text of each is in [Console.md](Console.md).
 Native tests, run with the other suites; see [Development.md](Development.md).
 
 - `tests/AstroDataParserTests.cpp`: a valid six-block payload, time and matrix
-  unavailable values, one malformed temperature, an unknown header key, and
-  the `time` and `lastWeatherFetchTime` records in all their accepted and
+  unavailable values, every matrix cell kind and its planes, the rejected
+  version 1 rows, one malformed temperature, an unknown header key, and the
+  `time` and `lastWeatherFetchTime` records in all their accepted and
   malformed forms.
 - `tests/RefreshScheduleTests.cpp`: slot boundaries, retry delays, the first
   refresh being due at once, a success covering its slot, a manual refresh
   counting, missed slots caught up once, backoff and its reset at the next
   slot, tick wrap, no retry without credentials, an unset clock, and clock
   steps both ways.
-- `tests/AstroDisplayMapperTests.cpp`: each numeric kind and `?`, matrix rows,
-  row 4 kept on the local board and cleared on the remotes, each block on its
-  board, and a parsed payload's `*`, `.` and `?` through to the board bits.
+- `tests/AstroDisplayMapperTests.cpp`: each numeric kind and `?`, matrix rows
+  with their levels and blinking, the numerics' attributes reset, row 4 kept
+  on the local board and cleared on the remotes, each block on its board, and
+  a parsed payload's `0`–`3`, `?` cells through to the board bits and levels.
 - `tests/AstroProgressBarTests.cpp`: segment layout, the segment per stage, the
-  250 ms blink phases, the failed segment per outcome, the success hold, the
-  failure bar per failed step, its 500 ms toggles and 60 s end, and tick wrap.
+  fetching rows with the current step's blink mask, the failed segment per
+  outcome, the success hold, the blinking failure bar per failed step and its
+  60 s end, and tick wrap.
 - `../Common/tests/Crc32Tests.cpp`: the check value, known vectors, empty input and
   piecewise updates.
 

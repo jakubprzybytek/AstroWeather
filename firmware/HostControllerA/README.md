@@ -89,12 +89,14 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | Low-brightness step (`LOW_POWER_ENABLE`) | ✅ Done | `display low on\|off` or switch 2, both saved, for all boards; it still follows the light sensor. Cuts LED current by about half (measured 59–65 → 28 mA with all LEDs lit). Remote boards need the DisplayController firmware from 2026-09-24, which releases their `PB8` (M-4) | [Display.md](docs/Display.md#low-brightness) |
 | "No data" state at boot: segment G on the last digit of each numeric display, matrix blank, until the first refresh | ✅ Done | Shared with the display boards, which also return to it after 7 h without a frame | [Display.md](docs/Display.md#no-data) |
 | Numeric formatting (fixed point, time, `?`) | ✅ Done | -0.5 °C shows as `-0.5`; values that do not fit 4 digits show the error pattern | [Display.md](docs/Display.md#fixed-point-values) |
+| Display effects: blinking, 4 brightness levels | ✅ Done | Per segment and pixel, made in time by the refresh; the forecast's matrix rows carry levels and blink (API protocol 2), the clock's colon and the refresh progress bar blink. `display test` shows it all. Levels tuned by eye at normal brightness; not yet run on a display board | [Display.md](docs/Display.md#blink-and-brightness-levels) |
 | **Time** | | | |
 | RTC clock on numeric display 3, `time` commands | ✅ Done | Lost on power loss (no LSE crystal or backup battery) | [RTC.md](docs/RTC.md) |
 | Clock sync from the server | ✅ Done | | [RTC.md](docs/RTC.md#sync-from-the-api) |
 | Clock trim | 🟡 Partial | Set by hand with `time trim`; automatic trim is planned | [RTC.md](docs/RTC.md) |
 | **Power and sensing** | | | |
 | Current, temperature and VDDA monitor | ✅ Done (reworked board) | Works on the prototype with `VREF+` rewired to VDD; the schematic and PCB still tie it to GND (C-1). Current sense also relies on the PC6→PB2 connection (H-1) | [CurrentSense.md](docs/CurrentSense.md) |
+| ADC should be off when Current Sens is not being displayed nor logged | Not implemented | | [CurrentSense.md](docs/CurrentSense.md) 
 | VBUS voltage sense | ⚠️ Blocked by HW | PC7 is not an ADC pin and has no divider (H-1, H-2) | [Hardware review](../../KiCad/Hardware_Review.md) |
 | USB-PD negotiation for more than 5 V | 🔴 Not implemented | Feasibility study only; the hardware needs changes | [USB_PD_Feasibility.md](docs/USB_PD_Feasibility.md) |
 | Reading the USB-C current limit (CC pins) | 🔴 Not implemented | Worst-case load exceeds the USB default (H-5) | [Hardware review](../../KiCad/Hardware_Review.md) |

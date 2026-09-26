@@ -28,23 +28,22 @@ Client code accesses all boards through the same Display Board interface without
 The PCB-backed implementation:
 
 - Owns the SCT2xxx SPI interface, latch and enable signals, and the five multiplexing GPIOs.
-- Stores logical display values.
-- Converts logical values into PCB-specific segment and matrix bit mappings.
-- Maintains the prepared SPI refresh data.
-- Runs the local multiplexing mechanism.
+- Stores logical display values and their attributes (blink, level).
+- Converts them into PCB-specific segment and matrix bit mappings, one prepared frame per blink phase and pass.
+- Runs the local multiplexing from the refresh timer's interrupt, with the SPI transfers done by DMA; no task is involved. See [Refresh Operation](#refresh-operation).
 
-The HostController `AstroWeather.cpp` creates this object and starts it. `start()` starts the `DisplayRefresh` task (`Task<1024>`, `osPriorityRealtime7`, the highest task priority) and then calls `HAL_TIM_Base_Start_IT(&htim2)`. The DisplayController creates one too, on SPI1 and TIM6.
+The HostController `AstroWeather.cpp` creates this object and starts it. `start()` primes TIM2 and calls `HAL_TIM_Base_Start_IT(&htim2)`. The DisplayController creates one too, on SPI1 and TIM6.
 
 ### Buffer-backed Display Board
 
-The buffer-backed implementation exists only on the Host Controller. It stores logical board values in the I2C payload format and does not apply PCB wiring mappings. Its data is sent to a Display Controller, where the PCB-backed implementation performs the mapping.
+The buffer-backed implementation exists only on the Host Controller. It stores logical board values and attributes and does not apply PCB wiring mappings. `submit()` sends them to a Display Controller as four I2C messages, the attributes first and then the content, where the PCB-backed implementation performs the mapping; see [I2C Transport](#i2c-transport).
 
 ### Code Ownership
 
 The display code is split between the shared `../Common` tree, compiled into both the host and the DisplayController, and this project's `User`:
 
 - `../Common/Src/Device` holds the SCT2xxx driver.
-- `../Common/Src/Display` holds the logical content types, the PCB encoding, the multiplexing refresh (`PcbDisplayBoard`), the I2C message format and the address straps.
+- `../Common/Src/Display` holds the logical content types and attributes, the PCB encoding of content and passes, the pass sequencing (`RefreshSequencer`), the multiplexing refresh (`PcbDisplayBoard`), the I2C message format and the address straps.
 - `User/Src/Display` holds the host-only parts: the aggregate `Display`, the buffer-backed remote boards (`BufferedDisplayBoard`) and `LowBrightness`. `User/Src/Device` holds `I2cBus` and the EEPROM driver.
 
 ## Public Interface
@@ -66,6 +65,14 @@ numeric[i].setSegments(NumericSegments{...});
 
 matrix[row].setRow(uint32_t columns);
 
+// Attributes, kept next to the content and shown with it; see below.
+attributes().setNumericBlink(i, NumericSegments{...});
+attributes().setMatrixBlink(row, uint32_t columns);
+attributes().setNumericLevel(i, level);                      // whole display
+attributes().setNumericLevel(i, NumericSegments{...}, level);  // some segments
+attributes().setMatrixLevel(row, uint32_t columns, level);
+attributes().clearBlink();  attributes().clearLevels();
+
 display.submit();       // local board, then every remote board over I2C
 display.submitLocal();  // local board only, no I2C traffic
 ```
@@ -75,6 +82,22 @@ display.submitLocal();  // local board only, no I2C traffic
 Only the lowest 21 bits passed to `setRow()` are used. Bit 0 drives matrix column 1 and bit 20 drives matrix column 21.
 
 Additional integer overloads may be provided. All setters convert their input to the canonical logical representation before it is stored.
+
+### Blink and brightness levels
+
+Every lit segment and pixel has two attributes, stored in `Display::BoardAttributes` next to the content in the same layout, as three bit-planes: `blink`, and `level0`/`level1`, the two bits of a brightness level 0 to 3. The default is nothing blinking and everything at level 3, full. An attribute on an unlit element has no effect, and attributes persist across content updates, so the clock sets its colon to blink once and keeps calling `setTime()`. Like the content, they are last-writer-wins: an astro refresh resets the numerics' attributes of every board it draws (the clock re-applies its colon on every redraw) and sets the matrix rows' from the payload.
+
+- **Blink** is on/off: a blinking element is shown in the on half-period and dark in the off one, 0.5 s each at the 50 Hz frame rate (`RefreshSequencer::kBlinkHalfPeriodFrames`). The phase is the board's own and free-running; boards drift apart within a minute, which does not matter as long as no blinking element spans boards.
+- **Levels** are made in time. Each multiplexing slot is shown as four passes of 12, 39, 19 and 30 % of its 4 ms, and a level lights the passes in `Display::kLevelPasses`: level 1 the first, level 2 the second, level 3 all four. A numeric segment at levels 1, 2 and 3 is therefore lit for 12, 39 and 100 % of the slot, percentages chosen by eye for even-looking steps (brightness perception is roughly logarithmic, so equal steps of light would look uneven). The matrix LEDs are visibly brighter than the numeric ones, so the matrix sits out the last pass (`Display::kMatrixPasses`) and its levels get 12, 39 and 70 %.
+
+| Level | Numeric segment | Matrix pixel |
+| --- | ---: | ---: |
+| 0 | off | off |
+| 1 | 12 % | 12 % |
+| 2 | 39 % | 39 % |
+| 3 (default) | 100 % | 70 % |
+
+The pass lengths are the one tunable: `display passes <a> <b> <c> <d>` changes them at run time, to judge a curve by eye; the encoder's level-to-pass table is fixed. The levels multiply with the analog brightness (the light sensor and `display low`), so level 1 in low brightness in a dark room may be near invisible; the table above was tuned at normal brightness. See [Refresh Operation](#refresh-operation) for how the passes are shown.
 
 `setSegments(const NumericSegments&)` accepts five normalized A-G/DP masks: the
 first four control visible digits and the fifth controls special indicators.
@@ -191,7 +214,7 @@ If a setter receives an invalid value, it stores the error pattern: segment D en
 
 ## Logical Board Buffer
 
-A board's transport-level logical buffer contains 35 bytes:
+A board's transport-level logical buffer contains 35 bytes. The three attribute planes use the same layout, one message each:
 
 | Offset | Size | Content |
 |---:|---:|---|
@@ -205,7 +228,7 @@ This buffer contains normalized logical segments, not SPI-ready PCB data. Matrix
 
 ## PCB Encoding
 
-The PCB encoder converts the logical board state into a prepared frame containing five multiplexing slots of seven SPI bytes, for a total of 35 bytes.
+The PCB encoder converts a logical board state into a prepared frame containing five multiplexing slots of seven SPI bytes, for a total of 35 bytes. `encodePasses()` runs it eight times, once per blink phase and pass, on the elements that phase and pass show (`passElements()`: the content masked by the level planes, the blink plane and the matrix's pass mask), giving the 280-byte `PassFrames` the refresh reads.
 
 For each slot, the seven bytes are defined in physical order from the first to the last device in the daisy chain:
 
@@ -260,38 +283,32 @@ The encoder reads normalized A-G and DP segment values, then applies the wiring 
 
 ## Refresh Operation
 
-A complete multiplexing frame consists of five slots. The complete frame rate must be at least 50 Hz, giving a maximum nominal slot period of 4 ms.
+A complete multiplexing frame is five slots of 4 ms, a 50 Hz frame. Each slot is shown as four passes (`RefreshSequencer`), longest first, so the slot switch and its settle time come out of the longest pass rather than the shortest: with the default table the order is 39, 30, 19 and 12 % of the slot, 1560, 1200, 760 and 480 us.
 
-Each slot is processed in this order:
+The whole refresh runs from the timer's update interrupt, once per pass, with no task:
 
-1. Shift all seven bytes for the next slot while the current slot stays lit. The SCT drivers keep their outputs while LA/ is low (SCT2024 truth table), so the display is not disturbed.
-2. Blank all driver outputs with OE/ (`SCT_ENABLE` high).
-3. Drive the previously active `DISPLAY_x_EN` output high to disable it.
-4. Pulse the SCT latch, moving the shifted data to the outputs.
-5. Drive the next `DISPLAY_x_EN` output low to enable it.
-6. Wait `kSlotSettleMicros` (10 us), then re-enable the outputs with OE/.
-7. Keep the slot active until the next 4 ms deadline.
+1. **Latch** the data the DMA shifted in during the pass that has just ended. At the first pass of a slot this is the slot switch: blank the drivers' outputs with OE/ (`SCT_ENABLE` high), drive the previous `DISPLAY_x_EN` high, pulse the latch, drive the new `DISPLAY_x_EN` low, wait `kSlotSettleMicros` (10 us, timed from SysTick) and re-enable the outputs. Within a slot it is just the latch pulse: the SCT drivers keep their outputs while LA/ is low (SCT2024 truth table), so the display is not disturbed by the shift. If the previous shift is somehow still running, the interrupt was later than a whole pass; the old data stays on and `lateShifts` counts it.
+2. **Set the length** of the pass that starts now, by writing ARR (auto-reload preload is off, so the write applies to the running period). If the interrupt came later than the pass is long, the counter is already past the new reload and would run on to the timer's full range before the next update, 71 minutes on the 32-bit TIM2, so the counter is restarted instead and `lateInterrupts` counts it; that pass shows for its length plus the delay. This happened once, at boot, in the thick of the WiFi module start-up.
+3. **Start the DMA** that shifts the next pass's seven bytes (56 us at 1 MHz) while this pass is lit. At a frame boundary a pending submission is swapped in first, so a frame never mixes two submissions.
 
-The display is therefore dark only for the swap, steps 2-6, about 12 us per slot, rather than for the whole transfer. Brightness no longer depends on SPI speed. The settle time lets the old slot's switch finish turning off before the outputs return: the Si2333DDS high-side P-MOSFET is switched on hard through a BC847 but turned off only by its gate pull-up resistor, and returning the outputs too early would show a faint copy of the new slot's pattern on the old one (ghosting). If ghosting is visible, raise `kSlotSettleMicros` in `PcbDisplayBoard.cpp`. The delay is timed from SysTick, so it does not depend on compiler optimisation.
+The display is therefore dark only for the slot swap, about 12 us per slot, and the pass timing depends on interrupt latency alone: 13 us typically, up to about 260 us measured under WiFi load, against the 480 us shortest pass. The settle time lets the old slot's switch finish turning off before the outputs return: the Si2333DDS high-side P-MOSFET is switched on hard through a BC847 but turned off only by its gate pull-up resistor, and returning the outputs too early would show a faint copy of the new slot's pattern on the old one (ghosting). If ghosting is visible, raise `kSlotSettleMicros` in `PcbDisplayBoard.cpp`.
 
-SPI3 runs at 1 MHz (prescaler 16), so a slot's 56 bits take about 56 us. The SCT2024 accepts up to 25 MHz; above about 4 MHz the SCK/MOSI pins (PB3/PB5) would also need a faster GPIO speed than the current `GPIO_SPEED_FREQ_LOW`. If a transfer fails, the current slot stays lit and the next tick tries again.
+`submit()` encodes the content and attributes into the back frame set (`encodePasses()`, about 1.5 ms at `-O0`, from the caller's task and outside any lock the interrupt needs) and asks for a swap; the interrupt swaps the sets before it shifts the first pass of the next frame. A submission still waiting to be shown is overwritten by a newer one. Setters remain unsynchronized: the most recent update to a field wins, and a submission may combine fields from different clients; `Display::submit()` serializes the transfers.
 
-TIM2 provides the 250 Hz slot cadence and the `DisplayRefresh` task (`osPriorityRealtime7`) performs the short seven-byte SPI transaction. The timer interrupt only signals the task and never calls blocking SPI functions. SPI DMA could replace the blocking task-level transfer if measured jitter or CPU use ever required it.
+The interrupt takes up to about 170 us at `-O0` (a slot switch plus the HAL DMA start), 1000 times a second: about 2-3 % of the CPU, and that long a hold-off for every other interrupt of the same NVIC priority. `status` reports `frames` (should grow by 50 a second), `late shifts`, `late interrupts` and the longest interrupt; the DisplayController copies the same counters into `g_displayStats`.
+
+SPI3 runs at 1 MHz (prescaler 16) with `SPI3_TX` on DMA1 channel 4; the DMA interrupt is needed by the HAL to finish a transfer's bookkeeping. The SCT2024 accepts up to 25 MHz; above about 4 MHz the SCK/MOSI pins (PB3/PB5) would also need a faster GPIO speed than the current `GPIO_SPEED_FREQ_LOW`.
 
 TIM2 configuration, from the 16 MHz HSI timer clock:
 
-- Prescaler: `15999`, giving a 1 kHz counter clock.
-- Auto-reload period: `3`, giving an update event every 4 counter ticks, or 250 Hz.
-- Counter mode: up-counting, clock division 1, auto-reload preload disabled.
-- TIM2 update interrupt and its NVIC entry enabled in CubeMX.
+- Prescaler: `15`, a 1 MHz counter clock, so a pass length is written in microseconds.
+- Auto-reload period: `3999` in CubeMX, a placeholder; the interrupt rewrites it every pass.
+- Counter mode: up-counting, clock division 1, auto-reload preload disabled (it must stay off).
+- TIM2 update interrupt and its NVIC entry enabled in CubeMX, priority 3 like the other peripherals.
 
-`HAL_TIM_PeriodElapsedCallback()` in `main.c` forwards every timer to `Display_PcbTimerElapsed()` from its user-code section, which signals the refresh task for TIM2. TIM1 provides the HAL time base and stays separate.
+`HAL_TIM_PeriodElapsedCallback()` in `main.c` forwards every timer to `Display_PcbTimerElapsed()` from its user-code section, which runs the refresh for TIM2. TIM1 provides the HAL time base and stays separate. TIM2 is primed and started by `PcbDisplayBoard::start()`. The DisplayController does the same with TIM6 and SPI1 on DMA1 channel 1.
 
-TIM2 is started by `PcbDisplayBoard::start()`, after its task. The task runs above every ST67 WiFi driver and LwIP task, so WiFi activity cannot hold up the multiplexing; see [CubeMXCompliance.md](CubeMXCompliance.md#st67-driver-task-settings).
-
-Logical-to-segment conversion is performed when display state changes, not in the periodic refresh loop. The refresh mechanism reads only prepared slot bytes.
-
-The initial implementation may update prepared data without double buffering. A concurrent update may produce one mixed frame, which is accepted for the first version because the following frame corrects it. Likewise, clients may update pending logical state concurrently without setter synchronization: the most recent update to a field wins, and a submission may combine fields from different clients. `Display::submit()` serializes the resulting SPI/I2C transfer sequence. Double buffering or transaction-level state locking can be added later only if a product requirement needs a coherent all-or-nothing frame.
+Before this design the refresh was a task woken by the timer, which took the mutex `submit()` held while encoding and then spent about 210 us in the blocking SPI HAL before a slot could change; any task-level stall moved the slot boundary with it, and the lwIP `netif` task, created by the ST67 driver above the refresh task's priority, held slots for up to 5 ms during a WiFi refresh. Both were found with the pass timing, which made them visible as flicker on the dim levels, and fixed before the interrupt-driven refresh replaced the task.
 
 ## I2C Transport
 
@@ -301,16 +318,23 @@ The bus needs external 2.2k pull-up resistors to 3V3 on SCL and SDA. They are si
 
 I2C1 is shared with the settings EEPROM described in [Settings.md](Settings.md), which is driven from a different task. All traffic therefore goes through `Device::I2cBus`, which owns the handle and the mutex serializing one transfer at a time. `Display::submit()`'s own mutex serializes display refreshes against each other but does not cover other clients of the bus, so any new I2C device must be given the same `I2cBus` rather than the raw `I2C_HandleTypeDef`.
 
-Each message contains 36 bytes. The payload has one explicit byte order used by both I2C sender and receiver:
+Each message contains 36 bytes: one command byte and one 35-byte plane in the logical board layout:
 
 | Offset | Size | Content |
 |---:|---:|---|
 | 0 | 1 | Command |
-| 1 | 35 | Logical board buffer |
+| 1 | 35 | Logical board buffer, or one attribute plane in the same layout |
+
+| Command | Plane | Receiver |
+|---:|---|---|
+| `0x01` | Content | Replaces the content, applies the staged attributes, shows the board |
+| `0x02` | `BoardAttributes::blink` | Staged |
+| `0x03` | `BoardAttributes::level0` | Staged |
+| `0x04` | `BoardAttributes::level1` | Staged |
 
 The 35-byte logical payload is serialized in this order: numeric display 1, numeric display 2, matrix rows 0 through 4, numeric display 3, and numeric display 4. Each numeric display occupies five bytes, one normalized segment byte for each multiplexing slot. Each matrix row occupies three bytes in little-endian order, with bit 0 in the first byte's least-significant bit. The unused bits 21 through 23 are zero. The same serialization is used when packing on the Host Controller and unpacking on the Display Controller.
 
-Command `0x01` means "set display board values" using the logical buffer format defined above. The Display Controller checks this first command/format byte and processes the message only when it is a known value. `0x01` is currently the only known command. Unknown commands are ignored. For command `0x01`, the Display Controller replaces its local logical values and performs its own PCB-specific encoding. There is no application-level response or success message in the initial protocol; normal I2C ACK/NACK behavior still applies.
+The host sends a board its attributes first, `0x02`, `0x03`, `0x04`, then its content, `0x01`, about 3.6 ms per message at 100 kHz. The Display Controller stages the attribute planes and applies them together with the next content, so content and attributes always change as one; staged attributes persist until the host replaces them, so a host that sends only content keeps the last attributes, and one that never sends any (or a Display Controller firmware from before the attributes, which drops the unknown commands) shows full brightness and no blinking. The Display Controller performs its own PCB-specific encoding. Unknown commands are counted and ignored. There is no application-level response or success message; normal I2C ACK/NACK behavior still applies.
 
 Each Display Controller has three address-programming pins, `ADDR_0` (PB10), `ADDR_1` (PB11) and `ADDR_2` (PB14), as named in `Core/Inc/main.h`. Each pin can be tied to ground, tied to VCC, or left floating, providing 27 possible ternary board IDs. The Display Controller derives its 7-bit I2C target address as `0x10 + board_id`, giving addresses `0x10` through `0x2A`.
 
@@ -323,15 +347,14 @@ Address detection (`Display::detectBoardId()` in `DisplayAddress.cpp`) uses two 
 
 The pins are then left in analog mode, so a strap tied to VCC draws no pull current and an open one leaves no floating digital input, and `board_id = ADDR_0 + 3 × ADDR_1 + 9 × ADDR_2`.
 
-On receipt, `deserializeI2c()` in `DisplayI2cProtocol.cpp` accepts only a 36-byte message whose first byte is `0x01`, and decodes it into a temporary state before replacing the destination, so a rejected message leaves the previous state untouched.
-
-`DisplayAddress.cpp` and `deserializeI2c()` are written for the Display Controller but are not called anywhere yet; only `serializeI2c()` is used, by `BufferedDisplayBoard`. All three have native tests; see [Tests](#tests).
+On receipt, `deserializePlaneI2c()` in `DisplayI2cProtocol.cpp` accepts only a 36-byte message with a known command, reports which and decodes its plane; the Display Controller's `FrameAssembler` then stages or applies it. `deserializeI2c()` is the content-only form. A rejected message changes nothing. All of this has native tests; see [Tests](#tests).
 
 ## Refresh Progress
 
 While an astro refresh runs, the bottom row (row 4) of the Host Controller's
-own matrix shows its progress in six segments. Remote boards are not affected;
-their row 4 is always blank. The behaviour, segment boundaries and success and
+own matrix shows its progress in six segments, the current one blinking with
+the display's own blink attribute. Remote boards are not affected; their row 4
+is always blank. The behaviour, segment boundaries and success and
 failure indications are described in
 [AstroRefresh.md](AstroRefresh.md#progress-bar). Typical step times:
 
@@ -377,19 +400,19 @@ The net is bussed to every board, so the Display Controller's CubeMX configurati
 
 `AstroWeather.cpp` creates:
 
-- The local PCB-backed Display Board, started with its `DisplayRefresh` task and TIM2.
+- The local PCB-backed Display Board, refreshed from TIM2's interrupt with SPI3 DMA.
 - Five buffer-backed boards at I2C addresses `0x10` through `0x14`, on the shared `Device::I2cBus`.
 - The top-level `Display` containing the local board and the five remote boards.
 
-Clients call `Display::submit()` after they have finished updating the boards. Setters are intentionally unsynchronized, so independent clients may overwrite pending fields; the last update to each field wins. `submit()` serializes the hardware transfer sequence, submits the local logical buffer to the PCB-backed board for encoding and periodic SPI refresh, then sends each remote logical buffer to its configured I2C address.
+Clients call `Display::submit()` after they have finished updating the boards. Setters are intentionally unsynchronized, so independent clients may overwrite pending fields; the last update to each field wins. `submit()` serializes the hardware transfer sequence, submits the local content and attributes to the PCB-backed board for encoding, then sends each remote board its three attribute planes and its content at its configured I2C address.
 
-Each remote transfer is bounded by a 50 ms timeout rather than `HAL_MAX_DELAY`, so an unreachable board cannot block the calling task. A board's reachability is logged on transition, and an unreachable board is restated every 30 seconds while it keeps being refreshed; logging every failure could flood the console, while logging only the transition would lose the message entirely for a board missing from boot, which fails before USB CDC has enumerated. A failed transfer is not retried; the board gets the data at the next `submit()`.
+Each remote transfer is bounded by a 50 ms timeout rather than `HAL_MAX_DELAY`, so an unreachable board cannot block the calling task; a board's four messages stop at the first failure. A board's reachability is logged on transition, and an unreachable board is restated every 30 seconds while it keeps being refreshed; logging every failure could flood the console, while logging only the transition would lose the message entirely for a board missing from boot, which fails before USB CDC has enumerated. A failed transfer is not retried; the board gets the data at the next `submit()`.
 
 Remote boards are refreshed by `Display::submit()` only, which only astro refreshes and `display` commands call. Updates that touch just the local board, namely the current-sense readout, the clock and the refresh progress bar, use `Display::submitLocal()` and send nothing over I2C, so an unreachable board is reported when a refresh actually tries to reach it, not continuously.
 
 ### Display Controller
 
-The separate [DisplayController](../../DisplayController/README.md) project creates one PCB-backed board on SPI1 and TIM6, reads its address from the straps, and listens on I2C1 at that address. Each 36-byte message is received in interrupts and decoded by its `DisplayApp` task with `deserializeI2c()`; a valid command `0x01` replaces the board's logical state and is shown, anything else is counted and dropped. It also shows boot screens (all segments, then its address), the "no data" state, and test screens on its switches. Built and unit tested, not yet run on a display board; see its [Architecture.md](../../DisplayController/docs/Architecture.md).
+The separate [DisplayController](../../DisplayController/README.md) project creates one PCB-backed board on SPI1 and TIM6, reads its address from the straps, and listens on I2C1 at that address. Each 36-byte message is received in interrupts and queued (four deep); its `DisplayApp` task feeds them to `FrameAssembler`, which stages the attribute planes and applies them with the content, and shows the result. Anything else is counted and dropped. It also shows boot screens (all segments, then its address), the "no data" state, and test screens on its switches, all plain: full brightness, no blinking. Built and unit tested; the attribute messages and the interrupt-driven refresh have not yet been run on a display board. See its [Architecture.md](../../DisplayController/docs/Architecture.md).
 
 ## Tests
 
@@ -397,10 +420,14 @@ The separate [DisplayController](../../DisplayController/README.md) project crea
 - `../Common/tests/DisplayCodecTests.cpp`: golden vectors from the tables above: every segment of every digit of every numeric display on its documented bit, byte and slot, the indicators, the 21 matrix columns and bits 21-23, and the order of the five matrix rows in the prepared frame.
 - `../Common/tests/DisplayI2cProtocolTests.cpp`: the 36-byte layout, the round trip, masking of bits 21-23, and rejection of short, long and null messages and unknown commands, leaving the destination untouched.
 - `../Common/tests/DisplayAddressTests.cpp`: all 27 strap combinations through the stub GPIO, the pins left analog without pull, `boardAddress()` limits and `detectBoardAddress()` on `ADDR_0`-`ADDR_2`.
+- `../Common/tests/DisplayAttributesTests.cpp`: the attribute defaults, the blink and level setters with their masks, clamping and out-of-range indices, and the plane operations (`&`, `|`, `~` keeping bits 21-23 zero).
+- `../Common/tests/DisplayPassesTests.cpp`: the pass table's invariants (sums to 100, the level percentages, the matrix's 70 %), which elements each pass and blink phase show, and that `encodePasses()` is `encodePcb()` of exactly those, with spot checks against the wiring.
+- `../Common/tests/RefreshSequencerTests.cpp`: the pass lengths from the table and their validation, the longest-first order and slot and frame boundaries over a frame, `peek()` not advancing, and the blink phase per frame.
+- `../../DisplayController/tests/FrameAssemblerTests.cpp`: the staging rules on the receiving side.
 
-Not covered: the refresh timing and transfer failures.
+Not covered: the refresh interrupt itself and transfer failures.
 
 ## Remaining Implementation Work
 
-1. Display Controller: create the PCB-backed board, detect the address with `detectBoardAddress()`, configure I2C1 as a target at that address with receive callbacks, and apply complete 36-byte messages through `deserializeI2c()`. The Host Controller `.ioc` configures I2C1 as a controller; the Display Controller must reconfigure it at run time.
+1. Run the attribute messages and the interrupt-driven refresh on a display board.
 2. Decide whether a failed remote transfer should be retried before the next `submit()`.

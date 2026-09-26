@@ -12,8 +12,9 @@
 // Block 0 goes to the local board, blocks 1-5 to remote slots 0-4. Each numeric
 // is drawn as its payload value says: a time as HH:MM (the payload's numerics
 // 0-1), a value with one decimal (numerics 2-3), and a `?` as the "unavailable"
-// pattern, the decimal point on all four digits. Matrix rows
-// 0-3 come from the payload; row 4 is cleared on the remote boards and left
+// pattern, the decimal point on all four digits; the numerics' attributes are
+// reset to plain (full, no blink). Matrix rows 0-3 come from the payload with
+// their levels and blinking; row 4 is cleared on the remote boards and left
 // alone on the local board, where it carries the refresh progress bar.
 namespace AstroDisplayMapper {
 
@@ -26,23 +27,33 @@ Display::NumericSegments unavailableSegments();
 
 void mapNumeric(Display::NumericDisplay display, const HostController::AstroNumericValue& value);
 
-// Board: anything with numeric(index) and matrix(row) returning a
-// Display::NumericDisplay and a Display::MatrixRow, such as
-// Display::DisplayBoard or Display::DisplayBoardState.
+// Writes a parsed row's columns, levels and blinking. Unlit columns are left
+// at full level, so a later 'display' command lighting one shows it.
+void mapMatrixRow(const HostController::AstroMatrixRow& row, uint8_t index,
+                  Display::MatrixRow target, Display::BoardAttributes& attributes);
+
+// Board: anything with numeric(index), matrix(row) and attributes() returning
+// a Display::NumericDisplay, a Display::MatrixRow and Display::BoardAttributes,
+// such as Display::DisplayBoard or Display::DisplayBoardState.
 template <typename Board>
 void mapBoard(const HostController::AstroBoardData& data, bool localBoard, Board& board)
 {
+    Display::BoardAttributes& attributes = board.attributes();
     for (uint8_t numericIndex = 0U; numericIndex < data.numeric.size(); ++numericIndex)
     {
         mapNumeric(board.numeric(numericIndex), data.numeric[numericIndex]);
+        attributes.setNumericBlink(numericIndex, Display::NumericSegments{});
+        attributes.setNumericLevel(numericIndex, Display::kLevelFull);
     }
     for (uint8_t matrixIndex = 0U; matrixIndex < kPayloadMatrixRows; ++matrixIndex)
     {
-        board.matrix(matrixIndex).setRow(data.matrix[matrixIndex]);
+        mapMatrixRow(data.matrix[matrixIndex], matrixIndex, board.matrix(matrixIndex), attributes);
     }
     if (!localBoard)
     {
         board.matrix(kProgressRow).setRow(0U);
+        attributes.setMatrixBlink(kProgressRow, 0U);
+        attributes.setMatrixLevel(kProgressRow, Display::kMatrixMask, Display::kLevelFull);
     }
 }
 

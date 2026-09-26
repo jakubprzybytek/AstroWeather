@@ -85,8 +85,9 @@ See [CubeMXCompliance.md](CubeMXCompliance.md#st67-driver-task-settings).
 
 The generated `netif` task runs at 50, a value that cannot be overridden (see
 CubeMXCompliance.md). At 50 it held the display off for up to 5.4 ms during a
-refresh, so `DisplayRefresh` now runs at `osPriorityRealtime7` (55), above all
-of these tasks.
+refresh, so `DisplayRefresh` was raised to `osPriorityRealtime7` (55), above
+all of these tasks; the display refresh has since moved into the TIM2
+interrupt and competes with no task at all.
 
 The driver and LwIP tasks are created from the 40 000-byte FreeRTOS heap when
 the module is first started. See [Firmware-RAM-Usage.md](Firmware-RAM-Usage.md).

@@ -283,7 +283,7 @@ under the 16-line log queue.
 
 ### status
 
-A one-screen summary, 14 lines on the HostController:
+A one-screen summary, 15 lines on the HostController:
 
 ```text
 OK status
@@ -299,6 +299,7 @@ weather    last fetched by the server 2026-09-23 09:05:12 +02:00, 1 h 07 min ago
 schedule   every 6 h from 00:10; next 12:10; last ok 2026-09-23 10:10
 api        http://api.example.com/astro/wroclaw (built-in)
 brightness normal
+display    3078 frames, 0 late shifts, 0 late interrupts, refresh interrupt up to 170 us
 remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 ```
 
@@ -316,6 +317,7 @@ remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 | `schedule` **HC** | The next slot and the last success. `next` reads `once the clock is set` before the time is known; after failures it reads `retry <n> in <s> s`, `retry <n> now` or `no WiFi credentials, then <HH:MM>`. `last ok` reads `none since power-up` until a refresh succeeds. See [AstroRefresh.md](AstroRefresh.md). |
 | `api` **HC** | The URL the next fetch uses, `(saved)` if `api host` or `api path` is saved, else `(built-in)`. See [api](#api). |
 | `brightness` **HC** | `normal` or `low`: the state in use. It normally matches `low brightness` in the `settings` line, since both controls save; see [display low](#display). |
+| `display` | The local board's refresh, since boot: frames shown (50 a second), refresh interrupts that came later than a whole pass (`late shifts`) or than the pass they start (`late interrupts`), and the longest refresh interrupt. See [Display.md](Display.md#refresh-operation). |
 | `remote` | Each remote display board, probed now on I2C: `yes` if it answered. `no display boards in this variant` without a display. |
 
 WiFi has no link state of its own, so the `astro` line is the evidence that the
@@ -493,21 +495,26 @@ display board that is present; see [Settings.md](Settings.md#storage-medium).
 
 ### display
 
-`set`, `time`, `blank` and `matrix` drive the local board only. Remote boards
-are updated by `astro refresh`. Details in [Display.md](Display.md).
+All but `display low` drive the local board only, through
+`Display::submitLocal()`; `astro refresh` redraws every board. The content,
+blink and level model is in [Display.md](Display.md#public-interface).
 
 | Command | Effect |
 | --- | --- |
-| `display set <n> <value> <precision>` | Fixed-point number on numeric display `n` (0–3). `value` is −999 to 9999 and `precision` (0–3) the digits after the point. `display set 0 1234 2` shows `12.34`. |
-| `display time <n> <HH:MM>` | A time on display `n`. `HH` and `MM` accept 00–99 and are not checked as a clock. |
-| `display blank <n>` | Switches display `n` off. |
-| `display matrix <row> <bits>` | One row (0–4, 0 at the top) of the 5×21 matrix. `bits` is a string of `0` and `1`, character N lighting column N; missing columns are off and extra ones ignored. |
+| `display show <n> <value>` | Numeric display `n` (0–3) shows `value`: a number with up to three decimals (`12.34`, `-45`, `0.5`; the decimals set the precision, −999.9 to 9999), a time `HH:MM` (00–99 each, not checked as a clock), `?` for the unavailable pattern (the decimal point on all four digits) or `blank`. |
+| `display row <r> <cells>` | Matrix row `r` (0–4, 0 at the top), one character per column as the forecast payload sends them: `0`–`3` the level, `*` full and blinking, `.` or `?` off. Missing columns are off; more than 21 is an error. `display row 0 0123*0123*0123*0123*0` shows every kind. |
+| `display blink <n> off\|colon\|all` | Nothing, the colon (L1 and L2), or every segment of display `n` blinks. |
+| `display level <n> <0-3>` | Brightness level of display `n`, all segments; 3 is full. |
+| `display test` | Every element lit: the levels run 0 to 3 along the matrix columns and along the sixteen digits, the colons blink, and columns 5, 11 and 17 of rows 1 and 3 blink. To judge the levels and blinking by eye. |
+| `display clear` | Everything on the local board off, nothing blinking, every level full. |
+| `display passes [<a> <b> <c> <d>]` | Shows the pass lengths behind the levels, as `OK display passes=12/39/19/30`, or sets them: percent of a slot, summing to 100. Takes effect at once; not saved. For tuning by eye; see [Display.md](Display.md#blink-and-brightness-levels). |
 | `display low on\|off` **HC** | Low brightness on every board: drives `LOW_POWER_ENABLE`. Saved, and applied at boot. Replies `OK display-low=on` or `OK display-low=off`. |
 | `display low` **HC** | `OK display-low=<in use> saved=<saved>`, e.g. `OK display-low=on saved=on`. Switch 2 also saves, so the two differ only if a save failed, which logs `Settings save failed`. |
 
-The other commands reply `OK display`. Out-of-range values or an unknown `display`
-subcommand get `ERR invalid-argument`. Display 3 is also driven by the clock,
-and the matrix by refresh progress, so a manual setting there may soon be
+The other commands reply `OK display`. Out-of-range values, a bad cell or an
+unknown `display` subcommand get `ERR invalid-argument`. Display 2 is also
+driven by the current readout and display 3 by the clock, and the bottom
+matrix row by refresh progress, so a manual setting there may soon be
 overwritten.
 
 ## Security

@@ -28,9 +28,7 @@ public:
     void start();
     void submit() override;
 
-    // Pass lengths for tuning the levels by eye; see RefreshSequencer.
-    bool setPassPercent(const std::array<uint8_t, kPassCount>& percent);
-
+    bool setPassPercent(const std::array<uint8_t, kPassCount>& percent) override;
     bool refreshStats(RefreshStats& stats) const override;
 
     static void onTimerElapsed(TIM_HandleTypeDef* timer);
@@ -58,6 +56,7 @@ private:
 
     uint8_t activeSlot_ = 0U;
     volatile uint32_t lateShifts_ = 0U;
+    volatile uint32_t lateInterrupts_ = 0U;
     volatile uint32_t maxInterruptMicros_ = 0U;
 };
 

@@ -15,15 +15,15 @@ std::string block(unsigned int index)
     return "display=" + std::to_string(index) +
            "\nboard=num4x4_matrix5x21\nnightId=ignored\n"
            "numeric_0=20:30\nnumeric_1=?\n"
-           "matrix_0=*....................\n"
-           "matrix_1=?\nmatrix_2=.....................\n"
+           "matrix_0=100000000000000000000\n"
+           "matrix_1=?\nmatrix_2=000000000000000000000\n"
            "matrix_3=?????????????????????\n"
            "numeric_2=18.5\nnumeric_3=-2.0\n\n";
 }
 
 std::string validPayload()
 {
-    std::string payload = "protocol=1\nconfigurationId=krakow\n\n";
+    std::string payload = "protocol=2\nconfigurationId=krakow\n\n";
     for (unsigned int index = 0U; index < 6U; ++index) {
         payload += block(index);
     }
@@ -50,8 +50,10 @@ void testValidPayload()
     expect(data.boards[0].numeric[0].time, "time type");
     expect(data.boards[0].numeric[0].hour == 20U, "time hour");
     expect(!data.boards[0].numeric[1].available, "missing time");
-    expect(data.boards[0].matrix[0] == 1U, "matrix first pixel");
-    expect(data.boards[0].matrix[1] == 0U, "missing matrix blank");
+    expect(data.boards[0].matrix[0].lit == 1U, "matrix first pixel");
+    expect(data.boards[0].matrix[0].level0 == 1U && data.boards[0].matrix[0].level1 == 0U,
+           "matrix first pixel at level 1");
+    expect(data.boards[0].matrix[1].lit == 0U, "missing matrix blank");
     expect(data.boards[0].numeric[2].value > 18.4F &&
                data.boards[0].numeric[2].value < 18.6F,
            "maximum temperature");
@@ -289,7 +291,7 @@ void testCrlfLineEndings()
     HostController::AstroData data{};
     expectEqual(parse(crlf, data), AstroParseStatus::Success, "CRLF payload");
     expectEqual(data.boards[0].numeric[0].hour, 20U, "CRLF time hour");
-    expectEqual(data.boards[5].matrix[0], 1U, "CRLF matrix row");
+    expectEqual(data.boards[5].matrix[0].lit, 1U, "CRLF matrix row");
     expect(data.boards[0].numeric[3].available && data.boards[0].numeric[3].value < -1.9F &&
                data.boards[0].numeric[3].value > -2.1F,
            "CRLF temperature");
@@ -356,9 +358,9 @@ void testTruncatedPayload()
     }
     expectEqual(parse(noFinalNewline), AstroParseStatus::Success, "no final newline");
 
-    expectEqual(parse("protocol=1\nconfigurationId=krakow\n"), AstroParseStatus::Truncated,
+    expectEqual(parse("protocol=2\nconfigurationId=krakow\n"), AstroParseStatus::Truncated,
                 "header only");
-    expectEqual(parse("protocol=1\n"), AstroParseStatus::Truncated, "protocol only");
+    expectEqual(parse("protocol=2\n"), AstroParseStatus::Truncated, "protocol only");
 
     HostController::AstroData data{};
     expectEqual(HostController::parseAstroData(nullptr, 10U, data),
@@ -383,11 +385,13 @@ void testConfigurationIdLength()
 
 void testProtocol()
 {
-    expectEqual(parse(replaced(validPayload(), "protocol=1", "protocol=2")),
-                AstroParseStatus::UnsupportedProtocol, "protocol 2");
-    expectEqual(parse(replaced(validPayload(), "protocol=1\n", "")),
+    expectEqual(parse(replaced(validPayload(), "protocol=2", "protocol=1")),
+                AstroParseStatus::UnsupportedProtocol, "protocol 1");
+    expectEqual(parse(replaced(validPayload(), "protocol=2", "protocol=3")),
+                AstroParseStatus::UnsupportedProtocol, "protocol 3");
+    expectEqual(parse(replaced(validPayload(), "protocol=2\n", "")),
                 AstroParseStatus::MissingRecord, "protocol missing");
-    expectEqual(parse(replaced(validPayload(), "protocol=1", "protocol 1")),
+    expectEqual(parse(replaced(validPayload(), "protocol=2", "protocol 2")),
                 AstroParseStatus::Malformed, "record without '='");
     expectEqual(parse(replaced(validPayload(), "board=num4x4_matrix5x21",
                                "board=num4x4_matrix5x20")),
@@ -400,17 +404,37 @@ void testUnavailableValues()
 
     // block() has matrix_1=? and an all-'?' matrix_3; both are blank rows.
     expectEqual(parse(validPayload(), data), AstroParseStatus::Success, "? rows");
-    expectEqual(data.boards[2].matrix[1], 0U, "single ? row blank");
-    expectEqual(data.boards[2].matrix[3], 0U, "all-? row blank");
+    expectEqual(data.boards[2].matrix[1].lit, 0U, "single ? row blank");
+    expectEqual(data.boards[2].matrix[3].lit, 0U, "all-? row blank");
 
     // A '?' inside a row is an unlit column.
-    std::string payload = replaced(validPayload(), "matrix_2=.....................",
-                                   "matrix_2=*?*.................*");
+    std::string payload = replaced(validPayload(), "matrix_2=000000000000000000000",
+                                   "matrix_2=3?1000000000000000002");
     expectEqual(parse(payload, data), AstroParseStatus::Success, "mixed ? row");
-    expectEqual(data.boards[0].matrix[2], 0x100005U, "mixed ? row value");
+    expectEqual(data.boards[0].matrix[2].lit, 0x100005U, "mixed ? row lit");
+    expectEqual(data.boards[0].matrix[2].level0, 0x000005U, "mixed ? row level bit 0");
+    expectEqual(data.boards[0].matrix[2].level1, 0x100001U, "mixed ? row level bit 1");
+    expectEqual(data.boards[0].matrix[2].blink, 0U, "mixed ? row nothing blinks");
 
-    expectEqual(parse(replaced(validPayload(), "matrix_2=.....................", "matrix_2=??")),
+    expectEqual(parse(replaced(validPayload(), "matrix_2=000000000000000000000", "matrix_2=??")),
                 AstroParseStatus::InvalidMatrix, "short ? row");
+
+    // Every cell of the alphabet, 0123*? repeated, with its planes.
+    payload = replaced(validPayload(), "matrix_2=000000000000000000000",
+                       "matrix_2=0123*?0123*?0123*?012");
+    expectEqual(parse(payload, data), AstroParseStatus::Success, "every cell kind");
+    expectEqual(data.boards[0].matrix[2].lit, 0x19E79EU, "levels 1-3 and * are lit");
+    expectEqual(data.boards[0].matrix[2].level0, 0x09A69AU, "level bit 0 of 1, 3 and *");
+    expectEqual(data.boards[0].matrix[2].level1, 0x11C71CU, "level bit 1 of 2, 3 and *");
+    expectEqual(data.boards[0].matrix[2].blink, 0x010410U, "* blinks");
+
+    // The version 1 alphabet and anything else is rejected.
+    for (const char* row : {"*....................", ".....................",
+                            "444444444444444444444", "0123x0123x0123x0123x0"}) {
+        expectEqual(parse(replaced(validPayload(), "matrix_2=000000000000000000000",
+                                   std::string("matrix_2=") + row)),
+                    AstroParseStatus::InvalidMatrix, "rejected row");
+    }
 
     payload = replaced(validPayload(), "numeric_2=18.5", "numeric_2=?");
     payload = replaced(payload, "numeric_0=20:30", "numeric_0=?");

@@ -7,7 +7,7 @@
 // demangling:
 //
 //   arm-none-eabi-nm build/Debug/DisplayController.elf | grep g_displayStats
-//   STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x38
+//   STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x3C
 //
 // Each field has a single writer (the I2C interrupt or the DisplayApp task), so
 // no locking is needed.
@@ -27,6 +27,7 @@ struct DisplayControllerStats {
     uint32_t queueOverruns;       // messages dropped because the queue was full
     uint32_t refreshFrames;       // display frames shown, copied once a second
     uint32_t lateShifts;          // refresh interrupts later than a whole pass
+    uint32_t lateInterrupts;      // refresh interrupts later than the pass they start
     uint32_t maxInterruptMicros;  // longest refresh interrupt
 };
 

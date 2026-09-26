@@ -33,6 +33,7 @@ public:
     // Pass lengths as percentages of a slot, in pass index order, summing to
     // 100. False, and unchanged, otherwise.
     bool setPassPercent(const std::array<uint8_t, kPassCount>& percent);
+    const std::array<uint8_t, kPassCount>& passPercent() const { return passPercent_; }
     const std::array<uint32_t, kPassCount>& passMicros() const { return passMicros_; }
 
     // Advances: the step that starts now. The first call is slot 0's first
@@ -56,6 +57,7 @@ private:
     Step stepFor(const State& state) const;
     void sortOrder();
 
+    std::array<uint8_t, kPassCount> passPercent_{};
     std::array<uint32_t, kPassCount> passMicros_{};
     std::array<uint8_t, kPassCount> order_{};  // sequence position -> pass index
     State state_{};
