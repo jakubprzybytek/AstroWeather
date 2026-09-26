@@ -54,8 +54,13 @@ void PcbDisplayBoard::start()
 
 void PcbDisplayBoard::submit()
 {
+    // Encode unlocked: the refresh task needs the lock for every slot, and
+    // encoding takes ~0.5 ms at 16 MHz, long enough to delay a slot. Only the
+    // copy of the finished frame is locked.
+    PreparedFrame next;
+    encodePcb(state_, next);
     MutexGuard guard(frameMutex_);
-    encodePcb(state_, frame_);
+    frame_ = next;
 }
 
 void PcbDisplayBoard::onTimerElapsed(TIM_HandleTypeDef* timer)
