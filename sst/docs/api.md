@@ -20,8 +20,8 @@ For a valid `configurationId`, the main endpoint returns:
 - six observing nights, starting with the current night in the configuration's
   local timezone;
 - local sunset and next-day sunrise times for each night;
-- fixed-size hourly sun, moon, cloud, and thunderstorm state matrices for each
-   night;
+- fixed-size hourly sun, moon, cloud, and precipitation matrices for each
+  night, graded in four levels, with thunderstorms blinking;
 - the supported display board identifier for each night;
 - available maximum and minimum temperature for each night;
 
@@ -47,20 +47,20 @@ The endpoint is consumed by an STM32-based device without a JSON parser. A
 successful request returns `text/plain; charset=utf-8` using the versioned ASCII
 `key=value` protocol defined in [api-payload.md](api-payload.md).
 
-The response contains the `protocol=1`, `configurationId`, `time`, and
+The response contains the `protocol=2`, `configurationId`, `time`, and
 `lastWeatherFetchTime` header records, followed by six fixed-order display
 blocks. `time` is the configuration's local wall-clock time with its UTC
 offset as `YYYY-MM-DDTHH:MM:SS.mmm+HH:MM`; `lastWeatherFetchTime` is the local
 `YYYY-MM-DDTHH:MM:SS+HH:MM` of the last successful weather fetch, or `?`. Each block contains, in order,
 `display`, `board`, `nightId`, `numeric_0`, `numeric_1`, `matrix_0` through
 `matrix_3`, `numeric_2`, and `numeric_3`. `numeric_0` and `numeric_1`
-are sunset and sunrise; `matrix_0` through `matrix_3` are sun, moon, cloud,
-and thunderstorm state; and `numeric_2` and `numeric_3` are maximum and
-minimum temperature. `board` is `num4x4_matrix5x21` in version 1.
+are sunset and sunrise; `matrix_0` through `matrix_3` are sun, moon, cloud
+and precipitation; and `numeric_2` and `numeric_3` are maximum and minimum
+temperature. `board` is `num4x4_matrix5x21` in version 2.
 
 Records remain present when a source is missing or fails and use the payload
 sentinel `?` for all unavailable times, weather values, and matrix slots. There is no
-`displayCount`, `matrix_4`, or end marker in version 1. The wire
+`displayCount`, `matrix_4`, or end marker in version 2. The wire
 format has one empty row between display blocks and no comments.
 
 Error responses use the same line protocol and stable machine-readable error
@@ -106,17 +106,22 @@ belongs to the following local date. Moonrise and moonset times are not
 emitted; the moon is represented only by its hourly above-horizon matrix.
 
 Sunset and sunrise are serialized as local `HH:MM` values. An event that does
-not occur is represented by `?`. Sun and moon state are sampled for the
-21 local-hour slots: 14:00 through 10:00 on the following date. The
-11:00-12:00 interval is not displayed. Sun and moon state is sampled at each
-slot midpoint. The server emits the same 21 wall-clock slots across DST
-transitions and maps each local-hour midpoint to the appropriate instant.
+not occur is represented by `?`. Sun and moon are graded for the 21
+local-hour slots, 14:00 through 10:00 on the following date, by the minutes
+of each hour the body is above the horizon: `0` for none, `1` for under half
+an hour, `2` for half an hour or more, `3` for the whole hour. The altitude
+is sampled at the middle of every minute. The 11:00-12:00 interval is not
+displayed. The server emits the same 21 wall-clock slots across DST
+transitions and maps each local hour to the appropriate instant.
 
-`matrix_2` is on when total cloud coverage is at least 10 percent, and
-`matrix_3` is on when a thunderstorm is predicted. An available matrix contains
-exactly 21 characters, each `*`, `.`, or `?`; a matrix row with no available
-source data is represented by the single `?` character. Within an available
-row, `?` represents an unavailable individual slot.
+`matrix_2` grades total cloud coverage in quarters (`0` for 0-24 % up to `3`
+for 75-100 %), and `matrix_3` grades the precipitation probability the same
+way, with `*` for a slot where a thunderstorm is predicted. An available
+matrix contains exactly 21 characters, each `0`-`3`, `*` or `?`; a matrix row
+with no available source data is represented by the single `?` character.
+Within an available row, `?` represents an unavailable individual slot. The
+device shows `*` as its brightest level blinking; see
+[api-payload.md](api-payload.md#matrix-encoding).
 
 ### Weather
 
@@ -172,7 +177,7 @@ client. Operational details belong in structured Lambda logs.
 ## Acceptance Criteria
 
 1. A request for a known configuration returns `200`, content type `text/plain`,
-   protocol version 1, and exactly six display blocks in ascending order.
+   protocol version 2, and exactly six display blocks in ascending order.
 2. The first night is selected using the location's timezone and local-noon
    boundary; the next five night identifiers are consecutive local dates.
 3. Every display block contains the complete, fixed-order record set defined in

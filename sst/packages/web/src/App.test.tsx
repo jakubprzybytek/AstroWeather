@@ -25,7 +25,7 @@ describe("AstroWeather app", () => {
   test("submits the selected location and renders results", async () => {
     fetchMock
       .mockResolvedValueOnce(configurationsResponse())
-      .mockResolvedValueOnce(new Response("protocol=1\nconfigurationId=krakow\n", {
+      .mockResolvedValueOnce(new Response("protocol=2\nconfigurationId=krakow\n", {
         status: 200,
         headers: { "content-type": "text/plain; charset=utf-8" }
       }));
@@ -40,7 +40,7 @@ describe("AstroWeather app", () => {
     ));
     const responseTitle = await screen.findByText("API response");
     expect(responseTitle.parentElement?.querySelector("pre")?.textContent)
-      .toBe("protocol=1\nconfigurationId=krakow\n");
+      .toBe("protocol=2\nconfigurationId=krakow\n");
     expect(screen.getByText(/HTTP 200/)).toBeInTheDocument();
   });
 
@@ -67,7 +67,7 @@ describe("AstroWeather app", () => {
   test("renders API errors", async () => {
     fetchMock
       .mockResolvedValueOnce(configurationsResponse())
-      .mockResolvedValueOnce(new Response("protocol=1\nerror=configuration_not_found\n", {
+      .mockResolvedValueOnce(new Response("protocol=2\nerror=configuration_not_found\n", {
         status: 404,
         headers: { "content-type": "text/plain; charset=utf-8" }
       }));
@@ -79,7 +79,7 @@ describe("AstroWeather app", () => {
 
     const responseTitle = await screen.findByText("API response");
     expect(responseTitle.parentElement?.querySelector("pre")?.textContent)
-      .toBe("protocol=1\nerror=configuration_not_found\n");
+      .toBe("protocol=2\nerror=configuration_not_found\n");
   });
 
   test("opens Clearoutside and renders hourly risk indicators", async () => {

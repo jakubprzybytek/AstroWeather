@@ -9,7 +9,7 @@ function emptyDisplay(display: number, nightId: string): ForecastDisplay {
   return {
     display, board: BOARD, nightId,
     sunset: "?", sunrise: "?", sun: "?", moon: "?", cloud: "?",
-    thunderstorm: "?", maximumTemperature: "?", minimumTemperature: "?"
+    precipitation: "?", maximumTemperature: "?", minimumTemperature: "?"
   };
 }
 

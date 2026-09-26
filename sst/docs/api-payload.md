@@ -18,7 +18,7 @@ Wire example
 ------------
 
 ```
-protocol=1
+protocol=2
 configurationId=krakow
 time=2026-09-22T23:22:45.678+02:00
 lastWeatherFetchTime=2026-09-22T18:00:04+02:00
@@ -28,10 +28,10 @@ board=num4x4_matrix5x21
 nightId=2026-09-17
 numeric_0=20:30
 numeric_1=05:59
-matrix_0=******........*******
-matrix_1=****.......**********
-matrix_2=.....**********......
-matrix_3=......*..............
+matrix_0=333320000000000002333
+matrix_1=000023333333333333200
+matrix_2=110011122233333221100
+matrix_3=0000000111223**211110
 numeric_2=18.5
 numeric_3=9.2
 
@@ -40,10 +40,10 @@ board=num4x4_matrix5x21
 nightId=2026-09-18
 numeric_0=20:28
 numeric_1=06:01
-matrix_0=******........*******
-matrix_1=???????********......
-matrix_2=...****************..
-matrix_3=..............*......
+matrix_0=333320000000000002333
+matrix_1=???????33333333333100
+matrix_2=000333333333333333300
+matrix_3=000000000000003000000
 numeric_2=17.8
 numeric_3=8.9
 
@@ -64,10 +64,10 @@ board=num4x4_matrix5x21
 nightId=2026-09-20
 numeric_0=20:23
 numeric_1=06:04
-matrix_0=******........*******
-matrix_1=.....................
-matrix_2=.....................
-matrix_3=.....................
+matrix_0=333320000000000002333
+matrix_1=000000000000000000000
+matrix_2=000000000000000000000
+matrix_3=000000000000000000000
 numeric_2=16.4
 numeric_3=7.5
 
@@ -76,10 +76,10 @@ board=num4x4_matrix5x21
 nightId=2026-09-21
 numeric_0=20:21
 numeric_1=06:06
-matrix_0=******........*******
-matrix_1=.....................
-matrix_2=.....................
-matrix_3=.....................
+matrix_0=333320000000000002333
+matrix_1=000000000000000000000
+matrix_2=000000000000000000000
+matrix_3=000000000000000000000
 numeric_2=15.9
 numeric_3=6.8
 
@@ -88,10 +88,10 @@ board=num4x4_matrix5x21
 nightId=2026-09-22
 numeric_0=20:18
 numeric_1=06:07
-matrix_0=******........*******
-matrix_1=.....................
-matrix_2=.....................
-matrix_3=.....................
+matrix_0=333320000000000002333
+matrix_1=000000000000000000000
+matrix_2=000000000000000000000
+matrix_3=000000000000000000000
 numeric_2=15.2
 numeric_3=6.1
 ```
@@ -117,7 +117,7 @@ Framing and parsing rules
   character when the entire matrix row is unavailable. Within a 21-character
   row, `?` marks an unavailable individual slot.
 - A successful response always has six display blocks, with display indexes 0
-  to 5. There is no displayCount or end marker in version 1.
+  to 5. There is no displayCount or end marker in version 2.
 - The device must reject the update if the protocol version is unsupported, a
   required record is malformed or absent, the board is unsupported, display
   indexes are not consecutive, or the HTTP body ends before all required
@@ -129,10 +129,12 @@ Field definitions
 -----------------
 
 protocol
-  Decimal protocol version. The initial version is 1.
+  Decimal protocol version. The current version is 2, which changed the
+  matrix cells from on/off (`*`, `.`) to brightness levels with blinking;
+  see Matrix encoding. Version 1 was retired with it.
 
 board
-  Display format identifier. Version 1 supports only
+  Display format identifier. Version 2 supports only
   `num4x4_matrix5x21`. The board record is repeated in every display block so
   a device can validate each block independently.
 
@@ -180,20 +182,20 @@ numeric_1
   the morning after nightId.
 
 matrix_0
-  Sun state by local-hour slot.
+  Sun by local-hour slot: how much of the hour the sun is above the horizon.
 
 matrix_1
-  Moon state by local-hour slot.
+  Moon by local-hour slot: how much of the hour the moon is above the horizon.
 
 matrix_2
-  Total cloud coverage by local-hour slot. A slot is on when total cloud
-  coverage is greater than or equal to 10 percent.
+  Total cloud coverage by local-hour slot, in quarters.
 
 matrix_3
-  Thunderstorm prediction by local-hour slot.
+  Precipitation probability by local-hour slot, in quarters, with `*` where a
+  thunderstorm is predicted.
 
 matrix_4
-  Unused in version 1 and omitted from the response. It is reserved for a
+  Unused in version 2 and omitted from the response. It is reserved for a
   future matrix channel.
 
 numeric_2
@@ -240,23 +242,33 @@ interval is not displayed.
 In physical LED numbering, LED 1 maps to character index 0 and LED 21 maps to
 character index 20.
 
-Characters have these meanings:
+Each character is one LED's brightness level, and optionally blinking:
 
-* * means the condition is on for the slot.
-* . means the condition is off for the slot.
-* ? means source data is unavailable for the slot.
+* `0` means the LED is off.
+* `1`, `2` and `3` are increasing brightness levels; `3` is full.
+* `*` means full brightness, blinking.
+* `?` means source data is unavailable for the slot; the device shows it off.
 
-For sun and moon matrices, state is sampled at the midpoint of each slot. This
-makes rise/set transitions deterministic when an event occurs partway through
-an hour. All time calculations use the configuration's timezone, including DST
+The device maps the levels to its own brightness steps; the payload only
+ranks them. What a level means depends on the row:
+
+| Row | `0` | `1` | `2` | `3` | `*` |
+|---|---|---|---|---|---|
+| `matrix_0` sun and `matrix_1` moon: minutes of the hour above the horizon | 0 | 1-29 | 30-59 | 60 | - |
+| `matrix_2` total cloud coverage | 0-24 % | 25-49 % | 50-74 % | 75-100 % | - |
+| `matrix_3` precipitation probability | 0-24 % | 25-49 % | 50-74 % | 75-100 % | thunderstorm predicted, whatever the probability |
+
+For the sun and moon rows, the body's altitude is sampled at the middle of
+every minute of the slot, from the slot's start, and the minutes above the
+horizon are counted, so a rise or set partway through an hour grades that
+hour. All time calculations use the configuration's timezone, including DST
 transitions. The protocol still emits 21 wall-clock slots on a DST transition;
-the server maps each labeled local-hour midpoint to the appropriate instant.
+the server maps each labeled local hour to the appropriate instant.
 
-For weather matrices, each slot uses the weather record for its corresponding
-hour. In `matrix_2`, `*` means total cloud coverage is at least 10 percent and
-`.` means it is below 10 percent. In `matrix_3`, `*` means a thunderstorm is
-predicted and `.` means none is predicted. In either matrix, `?` means the
-weather record or that hourly value is unavailable.
+For the weather rows, each slot uses the weather record for its corresponding
+hour. `?` means the weather record or that hourly value is unavailable; in
+`matrix_3` a predicted thunderstorm gives `*` even when the probability is
+unavailable.
 
 Missing data
 ------------
@@ -281,7 +293,7 @@ Errors
 
 Errors also use text/plain and a small parseable body:
 
-protocol=1
+protocol=2
 error=configuration_not_found
 
 HTTP status remains authoritative: 404 for an unknown configuration and 500

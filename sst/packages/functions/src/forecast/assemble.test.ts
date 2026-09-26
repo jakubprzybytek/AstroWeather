@@ -24,7 +24,7 @@ describe("assembleForecast", () => {
       nightId: "2026-09-17", service: "skyConditions" as const,
       coordinates: { latitude: 50, longitude: 20 }, fetchedAt: "2026-09-17T00:00:00Z",
       expireAt: 2_000_000_000,
-      hours: [{ hour: 14, timestampUtc: "2026-09-17T12:00:00.000Z", temperatureC: 18.5, cloudCoverTotalPct: 20, precipitationProbabilityPct: 0, thunderstormRisk: false }]
+      hours: [{ hour: 14, timestampUtc: "2026-09-17T12:00:00.000Z", temperatureC: 18.5, cloudCoverTotalPct: 60, precipitationProbabilityPct: 30, thunderstormRisk: true }]
     };
     const result = await assembleForecast("krakow", { lat: Number.NaN, lon: 20, tz: "Europe/Warsaw" }, {
       now: () => new Date("2026-09-17T10:00:00Z"),
@@ -34,7 +34,21 @@ describe("assembleForecast", () => {
 
     expect(result.displays[0].sun).toBe("?");
     expect(result.displays[0].maximumTemperature).toBe("18.5");
-    expect(result.displays[0].cloud[0]).toBe("*");
+    expect(result.displays[0].cloud).toBe("2????????????????????");
+    expect(result.displays[0].precipitation).toBe("*????????????????????");
+  });
+
+  test("grades the sun by minutes above the horizon in each hour", async () => {
+    const result = await assembleForecast("krakow", { lat: 50.06, lon: 19.94, tz: "Europe/Warsaw" }, {
+      now: () => new Date("2026-09-17T10:00:00Z"),
+      readWeather: async () => new Map(),
+      log: vi.fn()
+    });
+    // 2026-09-17 in Krakow: sunset about 18:50, sunrise about 06:21. Slots 0-3
+    // (14:00-17:00) are whole hours up, slot 4 (18:00) has 50 minutes, slots
+    // 5-15 (19:00-05:00) are night, slot 16 (06:00) has 39 minutes, 17-20 whole.
+    expect(result.displays[0].sun).toMatch(/^3333[12]0{11}[12]3333$/);
+    expect(result.displays[0].moon).toMatch(/^[0-3]{21}$/);
   });
 
   test("reports the newest weather fetch among the nights used", async () => {

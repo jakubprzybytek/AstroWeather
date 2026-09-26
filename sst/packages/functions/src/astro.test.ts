@@ -16,7 +16,7 @@ describe("astro handler", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["content-type"]).toBe("text/plain; charset=utf-8");
     expect(response.body.split("\n").slice(0, 5)).toEqual([
-      "protocol=1", "configurationId=krakow", "time=2026-09-22T23:22:45.678+02:00",
+      "protocol=2", "configurationId=krakow", "time=2026-09-22T23:22:45.678+02:00",
       "lastWeatherFetchTime=?", ""
     ]);
   });
@@ -71,6 +71,6 @@ describe("astro handler", () => {
     const response = await handlerAt("2026-09-22T21:22:45Z")({ pathParameters: { configurationId: "unknown" } });
 
     expect(response.statusCode).toBe(404);
-    expect(response.body).toBe("protocol=1\nerror=configuration_not_found\n");
+    expect(response.body).toBe("protocol=2\nerror=configuration_not_found\n");
   });
 });

@@ -1,25 +1,32 @@
 import SunCalc from "suncalc";
+import { encodeMatrix, minutesLevel, type MatrixCell } from "./matrix";
 import { instantAtLocal, localTime, observingSlots, type ObservingSlot } from "./nights";
 import type { ForecastDisplay } from "./types";
 
 type Location = { lat: number; lon: number; tz: string };
 
-function matrix(states: Array<boolean | null>): string {
-  const available = states.some((state) => state !== null);
-  return available ? states.map((state) => state === null ? "?" : state ? "*" : ".").join("") : "?";
-}
-
 function eventTime(date: Date | undefined, timezone: string): string {
   return date && !Number.isNaN(date.getTime()) ? localTime(date, timezone) : "?";
 }
 
+// Minutes of the slot's hour during which the body is above the horizon,
+// sampled at the middle of every minute from the slot's start. A rise or set
+// partway through the hour thus counts the minutes on each side.
+export function minutesAboveHorizon(slot: ObservingSlot, altitude: (instant: Date) => number): number {
+  let minutes = 0;
+  for (let minute = 0; minute < 60; minute += 1) {
+    if (altitude(new Date(slot.start.getTime() + minute * 60_000 + 30_000)) > 0) minutes += 1;
+  }
+  return minutes;
+}
+
 function sample(
   slots: ObservingSlot[],
-  callback: (slot: ObservingSlot) => boolean
-): Array<boolean | null> {
+  altitude: (instant: Date) => number
+): Array<MatrixCell | null> {
   return slots.map((slot) => {
     try {
-      return callback(slot);
+      return minutesLevel(minutesAboveHorizon(slot, altitude));
     } catch {
       return null;
     }
@@ -41,7 +48,7 @@ export function calculateAstronomy(nightId: string, location: Location): Pick<Fo
   return {
     sunset: eventTime(times.sunset, location.tz),
     sunrise: eventTime(nextTimes.sunrise, location.tz),
-    sun: matrix(sample(slots, (slot) => SunCalc.getPosition(slot.midpoint, location.lat, location.lon).altitude > 0)),
-    moon: matrix(sample(slots, (slot) => SunCalc.getMoonPosition(slot.midpoint, location.lat, location.lon).altitude > 0))
+    sun: encodeMatrix(sample(slots, (instant) => SunCalc.getPosition(instant, location.lat, location.lon).altitude)),
+    moon: encodeMatrix(sample(slots, (instant) => SunCalc.getMoonPosition(instant, location.lat, location.lon).altitude))
   };
 }

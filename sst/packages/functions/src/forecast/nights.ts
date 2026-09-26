@@ -87,6 +87,7 @@ export type ObservingSlot = {
   index: number;
   date: string;
   hour: number;
+  start: Date;
   midpoint: Date;
 };
 
@@ -99,6 +100,7 @@ export function observingSlots(nightId: string, timezone: string): ObservingSlot
       index,
       date,
       hour: hour % 24,
+      start: instantAtLocal(date, hour % 24, 0, timezone),
       midpoint: instantAtLocal(date, hour % 24, 30, timezone)
     };
   });

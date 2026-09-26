@@ -2,6 +2,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { Resource } from "sst";
 import type { ClearOutsideItem } from "../weather/clearoutside-storage";
+import { encodeMatrix, quartileLevel, type MatrixCell } from "./matrix";
 import { instantAtLocal, observingSlots } from "./nights";
 
 type WeatherReader = {
@@ -17,14 +18,21 @@ function isWeatherItem(value: unknown): value is ClearOutsideItem {
     && typeof item.expireAt === "number";
 }
 
-export function projectWeather(item: ClearOutsideItem, timezone: string): Pick<ReturnType<typeof weatherFields>, "cloud" | "thunderstorm" | "maximumTemperature" | "minimumTemperature"> {
+export function projectWeather(item: ClearOutsideItem, timezone: string): Pick<ReturnType<typeof weatherFields>, "cloud" | "precipitation" | "maximumTemperature" | "minimumTemperature"> {
   return weatherFields(item, timezone);
+}
+
+// Cloud cover and precipitation probability in quarters; a thunderstorm risk
+// shows as `*`, the brightest level blinking, whatever the probability.
+export function precipitationCell(probabilityPercent: number | null | undefined, thunderstormRisk: boolean | null | undefined): MatrixCell | null {
+  if (thunderstormRisk) return "*";
+  return probabilityPercent == null ? null : quartileLevel(probabilityPercent);
 }
 
 function weatherFields(item: ClearOutsideItem, timezone: string) {
   const slots = observingSlots(item.nightId, timezone);
-  const cloudValues: Array<boolean | null> = [];
-  const thunderstormValues: Array<boolean | null> = [];
+  const cloudValues: Array<MatrixCell | null> = [];
+  const precipitationValues: Array<MatrixCell | null> = [];
   const temperatures: number[] = [];
 
   for (const slot of slots) {
@@ -32,8 +40,8 @@ function weatherFields(item: ClearOutsideItem, timezone: string) {
       const expected = instantAtLocal(slot.date, slot.hour, 0, timezone).getTime();
       return Date.parse(candidate.timestampUtc) === expected;
     });
-    cloudValues.push(hour?.cloudCoverTotalPct == null ? null : hour.cloudCoverTotalPct >= 10);
-    thunderstormValues.push(hour?.thunderstormRisk ?? null);
+    cloudValues.push(hour?.cloudCoverTotalPct == null ? null : quartileLevel(hour.cloudCoverTotalPct));
+    precipitationValues.push(precipitationCell(hour?.precipitationProbabilityPct, hour?.thunderstormRisk));
   }
 
   const start = instantAtLocal(item.nightId, 12, 0, timezone).getTime();
@@ -45,11 +53,9 @@ function weatherFields(item: ClearOutsideItem, timezone: string) {
     if (timestamp >= start && timestamp < endInstant && hour.temperatureC != null) temperatures.push(hour.temperatureC);
   }
 
-  const encode = (values: Array<boolean | null>) => values.some((value) => value !== null)
-    ? values.map((value) => value === null ? "?" : value ? "*" : ".").join("") : "?";
   return {
-    cloud: encode(cloudValues),
-    thunderstorm: encode(thunderstormValues),
+    cloud: encodeMatrix(cloudValues),
+    precipitation: encodeMatrix(precipitationValues),
     maximumTemperature: temperatures.length ? Math.max(...temperatures).toFixed(1) : "?",
     minimumTemperature: temperatures.length ? Math.min(...temperatures).toFixed(1) : "?"
   };

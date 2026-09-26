@@ -11,7 +11,7 @@ export type ForecastDisplay = {
   sun: MatrixValue;
   moon: MatrixValue;
   cloud: MatrixValue;
-  thunderstorm: MatrixValue;
+  precipitation: MatrixValue;  // probability, `*` for a thunderstorm risk
   maximumTemperature: string;
   minimumTemperature: string;
 };
