@@ -17,6 +17,11 @@ public:
     // low, so the latches keep the previous data (SCT2024 truth table). Follow
     // with latch() to show it.
     HAL_StatusTypeDef shift(const uint8_t* data, uint16_t size);
+    // Starts the same shift by DMA and returns at once; `data` must stay
+    // valid until busy() clears. Usable from an interrupt.
+    HAL_StatusTypeDef shiftDma(const uint8_t* data, uint16_t size);
+    // A shift is still in progress, or its completion handling has not run.
+    bool busy() const;
     // Pulses LA/, moving the shifted data to the outputs.
     void latch();
 

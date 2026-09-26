@@ -16,6 +16,16 @@ HAL_StatusTypeDef SCT2xxx::shift(const uint8_t* data, uint16_t size)
     return HAL_SPI_Transmit(spi_, const_cast<uint8_t*>(data), size, HAL_MAX_DELAY);
 }
 
+HAL_StatusTypeDef SCT2xxx::shiftDma(const uint8_t* data, uint16_t size)
+{
+    return HAL_SPI_Transmit_DMA(spi_, const_cast<uint8_t*>(data), size);
+}
+
+bool SCT2xxx::busy() const
+{
+    return HAL_SPI_GetState(spi_) != HAL_SPI_STATE_READY;
+}
+
 void SCT2xxx::latch()
 {
     HAL_GPIO_WritePin(latchPort_, latchPin_, GPIO_PIN_SET);

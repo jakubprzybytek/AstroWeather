@@ -1,5 +1,7 @@
 #include <Display/PcbDisplayBoard.hpp>
-#include <Display/DisplayCodec.hpp>
+
+#include "FreeRTOS.h"
+#include "task.h"
 
 namespace Display {
 namespace {
@@ -11,22 +13,27 @@ namespace {
 // of the new slot's pattern (ghosting). Raise this if ghosting is visible.
 constexpr uint32_t kSlotSettleMicros = 10U;
 
-// Busy-waits using SysTick, which the kernel keeps running at the core clock,
-// so the delay does not depend on compiler optimisation. Short waits only.
+// SysTick runs at the core clock and counts down; the kernel keeps it going.
+uint32_t sysTickElapsed(uint32_t from, uint32_t to)
+{
+    const uint32_t reload = SysTick->LOAD + 1U;
+    return (from >= to) ? (from - to) : (from + reload - to);
+}
+
+// Busy-waits on SysTick, so the delay does not depend on compiler
+// optimisation. Short waits only; safe in an interrupt.
 void delayMicros(uint32_t micros)
 {
-    // Never spin on a stopped counter: that would hang the display task.
+    // Never spin on a stopped counter.
     if ((SysTick->CTRL & SysTick_CTRL_ENABLE_Msk) == 0U) {
         return;
     }
-    const uint32_t reload = SysTick->LOAD + 1U;
     const uint32_t target = micros * (SystemCoreClock / 1000000U);
     uint32_t elapsed = 0U;
     uint32_t last = SysTick->VAL;
     while (elapsed < target) {
         const uint32_t now = SysTick->VAL;
-        // SysTick counts down and reloads.
-        elapsed += (last >= now) ? (last - now) : (last + reload - now);
+        elapsed += sysTickElapsed(last, now);
         last = now;
     }
 }
@@ -39,11 +46,8 @@ PcbDisplayBoard::PcbDisplayBoard(
     SCT2xxx& driver, TIM_HandleTypeDef& timer,
     const std::array<GPIO_TypeDef*, kSlotCount>& enablePorts,
     const std::array<uint16_t, kSlotCount>& enablePins)
-    // The highest task priority: a slot or pass is only as punctual as this
-    // task. lwIP's netif task, created by the ST67 driver at 50, otherwise
-    // pre-empts it for up to ~5 ms during a WiFi refresh.
-    : Task<1024>("DisplayRefresh", osPriorityRealtime7),
-      driver_(driver), timer_(timer), enablePorts_(enablePorts), enablePins_(enablePins)
+    : driver_(driver), timer_(timer), enablePorts_(enablePorts), enablePins_(enablePins),
+      front_(&frameSets_[0]), back_(&frameSets_[1])
 {
     activeBoard_ = this;
 }
@@ -51,59 +55,100 @@ PcbDisplayBoard::PcbDisplayBoard(
 void PcbDisplayBoard::start()
 {
     driver_.enable();
-    Task<1024>::start();
+    // The first interrupt starts slot 0; until then the drivers hold what
+    // they had, with every slot switch off.
+    __HAL_TIM_SET_AUTORELOAD(&timer_, sequencer_.peek().micros - 1U);
+    __HAL_TIM_SET_COUNTER(&timer_, 0U);
     HAL_TIM_Base_Start_IT(&timer_);
 }
 
 void PcbDisplayBoard::submit()
 {
-    // Encode unlocked: the refresh task needs the lock for every slot, and
-    // encoding takes ~0.5 ms at 16 MHz, long enough to delay a slot. Only the
-    // copy of the finished frame is locked.
-    PreparedFrame next;
-    encodePcb(state_, next);
-    MutexGuard guard(frameMutex_);
-    frame_ = next;
+    MutexGuard guard(submitMutex_);
+    // While pendingSwap_ is clear the interrupt leaves back_ alone, so the
+    // encode cannot be swapped in half-done. A submission still waiting to
+    // be shown is simply overwritten by this newer one.
+    pendingSwap_ = false;
+    PassFrames* const target = back_;
+    encodePasses(state_, attributes_, *target);
+    pendingSwap_ = true;
+}
+
+bool PcbDisplayBoard::setPassPercent(const std::array<uint8_t, kPassCount>& percent)
+{
+    // The interrupt reads the table; change it in one go.
+    taskENTER_CRITICAL();
+    const bool accepted = sequencer_.setPassPercent(percent);
+    taskEXIT_CRITICAL();
+    return accepted;
+}
+
+bool PcbDisplayBoard::refreshStats(RefreshStats& stats) const
+{
+    stats = {sequencer_.frames(), lateShifts_, maxInterruptMicros_};
+    return true;
 }
 
 void PcbDisplayBoard::onTimerElapsed(TIM_HandleTypeDef* timer)
 {
     if (activeBoard_ != nullptr && timer == &activeBoard_->timer_) {
-        osThreadFlagsSet(activeBoard_->getHandle(), kRefreshFlag);
+        activeBoard_->onPass();
     }
 }
 
-void PcbDisplayBoard::run()
+void PcbDisplayBoard::switchSlot(uint8_t slot)
 {
-    for (;;) {
-        const uint32_t flags = osThreadFlagsWait(kRefreshFlag, osFlagsWaitAny, osWaitForever);
-        if ((flags & osFlagsError) != 0U) {
-            continue;
-        }
-        const uint8_t nextSlot = static_cast<uint8_t>((activeSlot_ + 1U) % kSlotCount);
+    // Swap slots with the outputs blanked, so neither slot shows the
+    // other's data while the switches change over.
+    driver_.disable();
+    HAL_GPIO_WritePin(enablePorts_[activeSlot_], enablePins_[activeSlot_], GPIO_PIN_SET);
+    driver_.latch();
+    HAL_GPIO_WritePin(enablePorts_[slot], enablePins_[slot], GPIO_PIN_RESET);
+    delayMicros(kSlotSettleMicros);
+    driver_.enable();
+    activeSlot_ = slot;
+}
 
-        // Shift the next slot's data in while the current slot stays lit: with
-        // LA/ low the drivers' outputs keep the current data, so the display
-        // is dark only for the swap below, not for the whole transfer.
-        HAL_StatusTypeDef status;
-        {
-            MutexGuard guard(frameMutex_);
-            status = driver_.shift(&frame_[nextSlot * kBytesPerSlot], kBytesPerSlot);
-        }
-        if (status != HAL_OK) {
-            // Keep showing the current slot and try again on the next tick.
-            continue;
-        }
+// The refresh timer's update: one pass ends, the next begins.
+void PcbDisplayBoard::onPass()
+{
+    const uint32_t entered = SysTick->VAL;
+    const RefreshSequencer::Step now = sequencer_.next();
 
-        // Swap slots with the outputs blanked, so neither slot shows the
-        // other's data while the switches change over.
-        driver_.disable();
-        HAL_GPIO_WritePin(enablePorts_[activeSlot_], enablePins_[activeSlot_], GPIO_PIN_SET);
+    // 1. Show the pass that starts now: its data was shifted in during the
+    //    pass that just ended. If that shift is somehow still running, the
+    //    interrupt is more than a pass late; keep the old data rather than
+    //    latch half of the new.
+    if (driver_.busy()) {
+        lateShifts_ = lateShifts_ + 1U;
+    } else if (now.firstInSlot) {
+        switchSlot(now.slot);
+    } else {
         driver_.latch();
-        HAL_GPIO_WritePin(enablePorts_[nextSlot], enablePins_[nextSlot], GPIO_PIN_RESET);
-        delayMicros(kSlotSettleMicros);
-        driver_.enable();
-        activeSlot_ = nextSlot;
+    }
+
+    // 2. This pass's length. Preload is off, so it applies to the period
+    //    that has just started.
+    __HAL_TIM_SET_AUTORELOAD(&timer_, now.micros - 1U);
+
+    // 3. Shift the next pass's data in the background. A new submission is
+    //    taken over only at a frame boundary, so every frame comes from one.
+    const RefreshSequencer::Step following = sequencer_.peek();
+    if (following.firstInFrame && pendingSwap_) {
+        PassFrames* const shown = front_;
+        front_ = back_;
+        back_ = shown;
+        pendingSwap_ = false;
+    }
+    if (!driver_.busy()) {
+        const PassFrames& frames = *front_;
+        driver_.shiftDma(&frames[following.blinkPhase][following.pass][following.slot * kBytesPerSlot],
+                         kBytesPerSlot);
+    }
+
+    const uint32_t micros = sysTickElapsed(entered, SysTick->VAL) / (SystemCoreClock / 1000000U);
+    if (micros > maxInterruptMicros_) {
+        maxInterruptMicros_ = micros;
     }
 }
 

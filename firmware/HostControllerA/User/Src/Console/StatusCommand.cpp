@@ -233,6 +233,23 @@ void reportRemoteBoards(Display::Display* display)
 
 } // namespace
 
+// The local board's own refresh: a late shift is a refresh interrupt that
+// came later than a whole pass, which shows as one pass kept on; the
+// interrupt time is what every other interrupt has to wait for.
+void reportLocalRefresh(Display::Display* display)
+{
+    if (display == nullptr) {
+        return;
+    }
+    Display::DisplayBoard::RefreshStats stats{};
+    if (!display->local().refreshStats(stats)) {
+        return;
+    }
+    line("display    %lu frames, %lu late shifts, refresh interrupt up to %lu us",
+         static_cast<unsigned long>(stats.frames), static_cast<unsigned long>(stats.lateShifts),
+         static_cast<unsigned long>(stats.maxInterruptMicros));
+}
+
 CommandResult handleStatusCommand(const char* command, Display::Display* display,
                                   Device::Eeprom24AA04* eeprom, Settings::Store* settings)
 {
@@ -260,6 +277,7 @@ CommandResult handleStatusCommand(const char* command, Display::Display* display
              (target.hostSaved || target.pathSaved) ? "saved" : "built-in");
     }
     line("brightness %s", LowBrightness::isEnabled() ? "low" : "normal");
+    reportLocalRefresh(display);
     reportRemoteBoards(display);
     return CommandResult::Ok;
 }

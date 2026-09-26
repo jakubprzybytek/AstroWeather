@@ -26,6 +26,10 @@ add_native_test(display_passes_tests
     SOURCES DisplayPassesTests.cpp
     SUT Src/Display/DisplayCodec.cpp Src/Display/DisplayTypes.cpp
 )
+add_native_test(refresh_sequencer_tests
+    SOURCES RefreshSequencerTests.cpp
+    SUT Src/Display/RefreshSequencer.cpp
+)
 add_native_test(display_i2c_protocol_tests
     SOURCES DisplayI2cProtocolTests.cpp
     SUT Src/Display/DisplayI2cProtocol.cpp Src/Display/DisplayTypes.cpp
