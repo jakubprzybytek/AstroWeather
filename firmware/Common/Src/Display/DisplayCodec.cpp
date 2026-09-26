@@ -42,4 +42,42 @@ void encodePcb(const LogicalBoardState& state, PreparedFrame& frame)
     }
 }
 
+namespace {
+
+// The elements whose level is exactly `level`.
+LogicalBoardState atLevel(const BoardAttributes& attributes, uint8_t level)
+{
+    const LogicalBoardState bit0 = (level & 1U) != 0U ? attributes.level0 : ~attributes.level0;
+    const LogicalBoardState bit1 = (level & 2U) != 0U ? attributes.level1 : ~attributes.level1;
+    return bit0 & bit1;
+}
+
+} // namespace
+
+LogicalBoardState passElements(const LogicalBoardState& lit, const BoardAttributes& attributes,
+                               uint8_t pass, uint8_t phase)
+{
+    const LogicalBoardState visible = phase == kBlinkOff ? (lit & ~attributes.blink) : lit;
+    LogicalBoardState elements{};
+    for (uint8_t level = 0; level < kLevelCount; ++level) {
+        if (((kLevelPasses[level] >> pass) & 1U) != 0U) {
+            elements = elements | (visible & atLevel(attributes, level));
+        }
+    }
+    if (((kMatrixPasses >> pass) & 1U) == 0U) {
+        elements.matrix.fill(0U);
+    }
+    return elements;
+}
+
+void encodePasses(const LogicalBoardState& lit, const BoardAttributes& attributes,
+                  PassFrames& frames)
+{
+    for (uint8_t phase = 0; phase < kBlinkPhaseCount; ++phase) {
+        for (uint8_t pass = 0; pass < kPassCount; ++pass) {
+            encodePcb(passElements(lit, attributes, pass, phase), frames[phase][pass]);
+        }
+    }
+}
+
 } // namespace Display

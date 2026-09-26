@@ -30,6 +30,60 @@ struct LogicalBoardState {
 using I2cMessage = std::array<uint8_t, kI2cMessageSize>;
 using PreparedFrame = std::array<uint8_t, kSlotCount * kBytesPerSlot>;
 
+// Brightness levels. Every lit segment and pixel has a level 0 to 3; 3 is
+// full and the default. The refresh shows a level as some of the passes a
+// slot is split into; see kLevelPasses in DisplayCodec.hpp.
+constexpr uint8_t kLevelBits = 2;
+constexpr uint8_t kLevelCount = 1U << kLevelBits;
+constexpr uint8_t kLevelFull = kLevelCount - 1U;
+
+// A LogicalBoardState doubles as a bit-plane: one bit per segment and per
+// pixel. These act elementwise; ~ keeps the unused matrix bits 21-23 zero.
+LogicalBoardState operator&(const LogicalBoardState& a, const LogicalBoardState& b);
+LogicalBoardState operator|(const LogicalBoardState& a, const LogicalBoardState& b);
+LogicalBoardState operator~(const LogicalBoardState& a);
+bool operator==(const LogicalBoardState& a, const LogicalBoardState& b);
+bool operator!=(const LogicalBoardState& a, const LogicalBoardState& b);
+
+// Every segment and pixel bit set.
+constexpr LogicalBoardState allElements()
+{
+    LogicalBoardState state{};
+    for (NumericSegments& numeric : state.numeric) {
+        for (uint8_t& slot : numeric.slots) {
+            slot = 0xFFU;
+        }
+    }
+    for (uint32_t& row : state.matrix) {
+        row = kMatrixMask;
+    }
+    return state;
+}
+
+// Per-element display effects, one bit-plane each, in the same layout as the
+// content so the same encoder and I2C serialiser handle them. Attributes
+// persist across content updates: set the clock's colon to blink once, then
+// keep calling setTime(). An attribute on an unlit element has no effect.
+struct BoardAttributes {
+    LogicalBoardState blink{};                 // set: shown in the blink-on phase only
+    LogicalBoardState level0 = allElements();  // bit 0 of the element's level
+    LogicalBoardState level1 = allElements();  // bit 1; both set is full, the default
+
+    // Masks use the normalized segment layout of NumericSegments and the
+    // column bits of setRow(). An index or row out of range is ignored; a
+    // level above kLevelFull is treated as full.
+    void setNumericBlink(uint8_t index, const NumericSegments& mask);
+    void setMatrixBlink(uint8_t row, uint32_t columns);
+    void clearBlink();
+    void setNumericLevel(uint8_t index, uint8_t level);  // all five slots
+    void setNumericLevel(uint8_t index, const NumericSegments& mask, uint8_t level);
+    void setMatrixLevel(uint8_t row, uint32_t columns, uint8_t level);
+    void clearLevels();  // everything back to full
+
+    uint8_t numericLevel(uint8_t index, uint8_t slot, uint8_t segment) const;
+    uint8_t matrixLevel(uint8_t row, uint8_t column) const;
+};
+
 class NumericDisplay {
 public:
     explicit NumericDisplay(NumericSegments& data) : data_(data) {}

@@ -144,4 +144,153 @@ LogicalBoardState noDataState()
     return state;
 }
 
+LogicalBoardState operator&(const LogicalBoardState& a, const LogicalBoardState& b)
+{
+    LogicalBoardState result{};
+    for (uint8_t display = 0; display < kNumericDisplayCount; ++display) {
+        for (uint8_t slot = 0; slot < kSlotCount; ++slot) {
+            result.numeric[display].slots[slot] =
+                a.numeric[display].slots[slot] & b.numeric[display].slots[slot];
+        }
+    }
+    for (uint8_t row = 0; row < kMatrixRowCount; ++row) {
+        result.matrix[row] = a.matrix[row] & b.matrix[row];
+    }
+    return result;
+}
+
+LogicalBoardState operator|(const LogicalBoardState& a, const LogicalBoardState& b)
+{
+    LogicalBoardState result{};
+    for (uint8_t display = 0; display < kNumericDisplayCount; ++display) {
+        for (uint8_t slot = 0; slot < kSlotCount; ++slot) {
+            result.numeric[display].slots[slot] =
+                a.numeric[display].slots[slot] | b.numeric[display].slots[slot];
+        }
+    }
+    for (uint8_t row = 0; row < kMatrixRowCount; ++row) {
+        result.matrix[row] = a.matrix[row] | b.matrix[row];
+    }
+    return result;
+}
+
+LogicalBoardState operator~(const LogicalBoardState& a)
+{
+    LogicalBoardState result{};
+    for (uint8_t display = 0; display < kNumericDisplayCount; ++display) {
+        for (uint8_t slot = 0; slot < kSlotCount; ++slot) {
+            result.numeric[display].slots[slot] =
+                static_cast<uint8_t>(~a.numeric[display].slots[slot]);
+        }
+    }
+    for (uint8_t row = 0; row < kMatrixRowCount; ++row) {
+        result.matrix[row] = ~a.matrix[row] & kMatrixMask;
+    }
+    return result;
+}
+
+bool operator==(const LogicalBoardState& a, const LogicalBoardState& b)
+{
+    for (uint8_t display = 0; display < kNumericDisplayCount; ++display) {
+        if (a.numeric[display].slots != b.numeric[display].slots) {
+            return false;
+        }
+    }
+    return a.matrix == b.matrix;
+}
+
+bool operator!=(const LogicalBoardState& a, const LogicalBoardState& b)
+{
+    return !(a == b);
+}
+
+namespace {
+
+// Sets the level of the elements in `mask`: bit 0 into plane0, bit 1 into
+// plane1, leaving the other elements alone.
+template <typename Bits>
+void writeLevel(Bits& plane0, Bits& plane1, Bits mask, uint8_t level)
+{
+    plane0 = static_cast<Bits>((level & 1U) != 0U ? (plane0 | mask) : (plane0 & ~mask));
+    plane1 = static_cast<Bits>((level & 2U) != 0U ? (plane1 | mask) : (plane1 & ~mask));
+}
+
+uint8_t clampLevel(uint8_t level)
+{
+    return level > kLevelFull ? kLevelFull : level;
+}
+
+} // namespace
+
+void BoardAttributes::setNumericBlink(uint8_t index, const NumericSegments& mask)
+{
+    if (index < kNumericDisplayCount) {
+        blink.numeric[index] = mask;
+    }
+}
+
+void BoardAttributes::setMatrixBlink(uint8_t row, uint32_t columns)
+{
+    if (row < kMatrixRowCount) {
+        blink.matrix[row] = columns & kMatrixMask;
+    }
+}
+
+void BoardAttributes::clearBlink()
+{
+    blink = LogicalBoardState{};
+}
+
+void BoardAttributes::setNumericLevel(uint8_t index, uint8_t level)
+{
+    NumericSegments all{};
+    all.slots.fill(0xFFU);
+    setNumericLevel(index, all, level);
+}
+
+void BoardAttributes::setNumericLevel(uint8_t index, const NumericSegments& mask, uint8_t level)
+{
+    if (index >= kNumericDisplayCount) {
+        return;
+    }
+    for (uint8_t slot = 0; slot < kSlotCount; ++slot) {
+        writeLevel(level0.numeric[index].slots[slot], level1.numeric[index].slots[slot],
+                   mask.slots[slot], clampLevel(level));
+    }
+}
+
+void BoardAttributes::setMatrixLevel(uint8_t row, uint32_t columns, uint8_t level)
+{
+    if (row < kMatrixRowCount) {
+        writeLevel(level0.matrix[row], level1.matrix[row], columns & kMatrixMask,
+                   clampLevel(level));
+    }
+}
+
+void BoardAttributes::clearLevels()
+{
+    level0 = allElements();
+    level1 = allElements();
+}
+
+uint8_t BoardAttributes::numericLevel(uint8_t index, uint8_t slot, uint8_t segment) const
+{
+    if (index >= kNumericDisplayCount || slot >= kSlotCount || segment >= 8U) {
+        return 0U;
+    }
+    const uint8_t bit = static_cast<uint8_t>(1U << segment);
+    return static_cast<uint8_t>(((level0.numeric[index].slots[slot] & bit) != 0U ? 1U : 0U) |
+                                ((level1.numeric[index].slots[slot] & bit) != 0U ? 2U : 0U));
+}
+
+uint8_t BoardAttributes::matrixLevel(uint8_t row, uint8_t column) const
+{
+    if (row >= kMatrixRowCount || column >= kMatrixColumnCount) {
+        return 0U;
+    }
+    const uint32_t bit = 1UL << column;
+    return static_cast<uint8_t>(((level0.matrix[row] & bit) != 0U ? 1U : 0U) |
+                                ((level1.matrix[row] & bit) != 0U ? 2U : 0U));
+}
+
 } // namespace Display

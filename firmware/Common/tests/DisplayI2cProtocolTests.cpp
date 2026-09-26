@@ -121,10 +121,83 @@ void testRejectedMessages()
     longer[0] = Display::kSetDisplayCommand;
     expectRejected(longer, sizeof(longer), "long message");
 
-    for (const uint8_t command : {0x00U, 0x02U, 0xFFU}) {
+    // The content decoder takes only the content command, attributes included.
+    for (const uint8_t command : {0x00U, 0x02U, 0x03U, 0x04U, 0xFFU}) {
         message[0] = command;
-        expectRejected(message.data(), message.size(), "unknown command");
+        expectRejected(message.data(), message.size(), "not the content command");
     }
+}
+
+// The attribute messages carry the planes in the content layout, in the
+// order blink, level 0, level 1, with their own command bytes.
+void testAttributeMessages()
+{
+    expectEqual(Display::kSetBlinkCommand, 0x02U, "blink command");
+    expectEqual(Display::kSetLevel0Command, 0x03U, "level 0 command");
+    expectEqual(Display::kSetLevel1Command, 0x04U, "level 1 command");
+
+    Display::BoardAttributes attributes{};
+    attributes.blink = variedState();
+    attributes.level0 = ~variedState();
+    Display::AttributeMessages messages{};
+    Display::serializeAttributesI2c(attributes, messages);
+
+    Display::I2cMessage expected{};
+    Display::serializeI2c(attributes.blink, expected);
+    expected[0] = Display::kSetBlinkCommand;
+    expect(messages[0] == expected, "blink message is the content layout with command 0x02");
+    Display::serializeI2c(attributes.level0, expected);
+    expected[0] = Display::kSetLevel0Command;
+    expect(messages[1] == expected, "level 0 message with command 0x03");
+    Display::serializeI2c(attributes.level1, expected);
+    expected[0] = Display::kSetLevel1Command;
+    expect(messages[2] == expected, "level 1 message with command 0x04");
+}
+
+void testDeserializePlane()
+{
+    const Display::LogicalBoardState plane = variedState();
+    for (const uint8_t command : {0x01U, 0x02U, 0x03U, 0x04U}) {
+        Display::I2cMessage message{};
+        Display::serializePlaneI2c(command, plane, message);
+        uint8_t decodedCommand = 0U;
+        Display::LogicalBoardState decoded{};
+        expect(Display::deserializePlaneI2c(message.data(), message.size(), decodedCommand, decoded),
+               "known command accepted");
+        expectEqual(decodedCommand, command, "command reported");
+        expect(sameState(decoded, plane), "plane restored");
+    }
+
+    Display::I2cMessage message{};
+    Display::serializePlaneI2c(Display::kSetBlinkCommand, plane, message);
+    uint8_t decodedCommand = 0x55U;
+    Display::LogicalBoardState decoded = Display::LogicalBoardState{};
+    for (const uint8_t command : {0x00U, 0x05U, 0xFFU}) {
+        message[0] = command;
+        expect(!Display::deserializePlaneI2c(message.data(), message.size(), decodedCommand, decoded),
+               "unknown command rejected");
+    }
+    message[0] = Display::kSetBlinkCommand;
+    expect(!Display::deserializePlaneI2c(message.data(), message.size() - 1U, decodedCommand, decoded),
+           "short attribute message rejected");
+    expect(!Display::deserializePlaneI2c(nullptr, message.size(), decodedCommand, decoded),
+           "null data rejected");
+    expectEqual(decodedCommand, 0x55U, "rejected message leaves the command untouched");
+    expect(sameState(decoded, Display::LogicalBoardState{}), "rejected message leaves the plane");
+}
+
+void testAttributePlane()
+{
+    Display::BoardAttributes attributes{};
+    expect(Display::attributePlane(attributes, Display::kSetBlinkCommand) == &attributes.blink,
+           "0x02 is the blink plane");
+    expect(Display::attributePlane(attributes, Display::kSetLevel0Command) == &attributes.level0,
+           "0x03 is level bit 0");
+    expect(Display::attributePlane(attributes, Display::kSetLevel1Command) == &attributes.level1,
+           "0x04 is level bit 1");
+    expect(Display::attributePlane(attributes, Display::kSetDisplayCommand) == nullptr,
+           "content is not an attribute");
+    expect(Display::attributePlane(attributes, 0x05U) == nullptr, "unknown is not an attribute");
 }
 
 } // namespace
@@ -137,5 +210,8 @@ int main()
     testRoundTrip();
     testDeserializeMasksUnusedMatrixBits();
     testRejectedMessages();
+    testAttributeMessages();
+    testDeserializePlane();
+    testAttributePlane();
     return Test::finish("DisplayI2cProtocol");
 }

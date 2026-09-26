@@ -19,23 +19,64 @@ NumericSegments readNumeric(const uint8_t* input)
     return value;
 }
 
+// The 35-byte plane after the command byte: numeric 1, numeric 2, matrix
+// rows 0-4 (three bytes each, little-endian), numeric 3, numeric 4.
+void writePayload(const LogicalBoardState& state, uint8_t* payload)
+{
+    writeNumeric(state.numeric[0], &payload[0]);
+    writeNumeric(state.numeric[1], &payload[5]);
+    for (uint8_t row = 0; row < kMatrixRowCount; ++row) {
+        const uint32_t value = state.matrix[row] & kMatrixMask;
+        const uint8_t offset = static_cast<uint8_t>(10U + row * 3U);
+        payload[offset] = static_cast<uint8_t>(value);
+        payload[offset + 1U] = static_cast<uint8_t>(value >> 8U);
+        payload[offset + 2U] = static_cast<uint8_t>(value >> 16U);
+    }
+    writeNumeric(state.numeric[2], &payload[25]);
+    writeNumeric(state.numeric[3], &payload[30]);
+}
+
+LogicalBoardState readPayload(const uint8_t* payload)
+{
+    LogicalBoardState decoded{};
+    decoded.numeric[0] = readNumeric(&payload[0]);
+    decoded.numeric[1] = readNumeric(&payload[5]);
+    for (uint8_t row = 0; row < kMatrixRowCount; ++row) {
+        const uint8_t offset = static_cast<uint8_t>(10U + row * 3U);
+        decoded.matrix[row] = (static_cast<uint32_t>(payload[offset]) |
+                               (static_cast<uint32_t>(payload[offset + 1U]) << 8U) |
+                               (static_cast<uint32_t>(payload[offset + 2U]) << 16U)) & kMatrixMask;
+    }
+    decoded.numeric[2] = readNumeric(&payload[25]);
+    decoded.numeric[3] = readNumeric(&payload[30]);
+    return decoded;
+}
+
+bool knownCommand(uint8_t command)
+{
+    return command == kSetDisplayCommand || command == kSetBlinkCommand ||
+           command == kSetLevel0Command || command == kSetLevel1Command;
+}
+
 } // namespace
 
 void serializeI2c(const LogicalBoardState& state, I2cMessage& message)
 {
+    serializePlaneI2c(kSetDisplayCommand, state, message);
+}
+
+void serializePlaneI2c(uint8_t command, const LogicalBoardState& plane, I2cMessage& message)
+{
     message.fill(0U);
-    message[0] = kSetDisplayCommand;
-    writeNumeric(state.numeric[0], &message[1]);
-    writeNumeric(state.numeric[1], &message[6]);
-    for (uint8_t row = 0; row < kMatrixRowCount; ++row) {
-        const uint32_t value = state.matrix[row] & kMatrixMask;
-        const uint8_t offset = static_cast<uint8_t>(11U + row * 3U);
-        message[offset] = static_cast<uint8_t>(value);
-        message[offset + 1U] = static_cast<uint8_t>(value >> 8U);
-        message[offset + 2U] = static_cast<uint8_t>(value >> 16U);
-    }
-    writeNumeric(state.numeric[2], &message[26]);
-    writeNumeric(state.numeric[3], &message[31]);
+    message[0] = command;
+    writePayload(plane, &message[1]);
+}
+
+void serializeAttributesI2c(const BoardAttributes& attributes, AttributeMessages& messages)
+{
+    serializePlaneI2c(kSetBlinkCommand, attributes.blink, messages[0]);
+    serializePlaneI2c(kSetLevel0Command, attributes.level0, messages[1]);
+    serializePlaneI2c(kSetLevel1Command, attributes.level1, messages[2]);
 }
 
 bool deserializeI2c(const uint8_t* data, std::size_t size, LogicalBoardState& destination)
@@ -43,19 +84,33 @@ bool deserializeI2c(const uint8_t* data, std::size_t size, LogicalBoardState& de
     if (data == nullptr || size != kI2cMessageSize || data[0] != kSetDisplayCommand) {
         return false;
     }
-    LogicalBoardState decoded{};
-    decoded.numeric[0] = readNumeric(&data[1]);
-    decoded.numeric[1] = readNumeric(&data[6]);
-    for (uint8_t row = 0; row < kMatrixRowCount; ++row) {
-        const uint8_t offset = static_cast<uint8_t>(11U + row * 3U);
-        decoded.matrix[row] = (static_cast<uint32_t>(data[offset]) |
-                               (static_cast<uint32_t>(data[offset + 1U]) << 8U) |
-                               (static_cast<uint32_t>(data[offset + 2U]) << 16U)) & kMatrixMask;
-    }
-    decoded.numeric[2] = readNumeric(&data[26]);
-    decoded.numeric[3] = readNumeric(&data[31]);
-    destination = decoded;
+    destination = readPayload(&data[1]);
     return true;
+}
+
+bool deserializePlaneI2c(const uint8_t* data, std::size_t size, uint8_t& command,
+                         LogicalBoardState& plane)
+{
+    if (data == nullptr || size != kI2cMessageSize || !knownCommand(data[0])) {
+        return false;
+    }
+    command = data[0];
+    plane = readPayload(&data[1]);
+    return true;
+}
+
+LogicalBoardState* attributePlane(BoardAttributes& attributes, uint8_t command)
+{
+    switch (command) {
+    case kSetBlinkCommand:
+        return &attributes.blink;
+    case kSetLevel0Command:
+        return &attributes.level0;
+    case kSetLevel1Command:
+        return &attributes.level1;
+    default:
+        return nullptr;
+    }
 }
 
 } // namespace Display
