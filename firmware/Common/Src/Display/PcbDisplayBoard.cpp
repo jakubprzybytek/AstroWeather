@@ -39,7 +39,10 @@ PcbDisplayBoard::PcbDisplayBoard(
     SCT2xxx& driver, TIM_HandleTypeDef& timer,
     const std::array<GPIO_TypeDef*, kSlotCount>& enablePorts,
     const std::array<uint16_t, kSlotCount>& enablePins)
-    : Task<1024>("DisplayRefresh", osPriorityRealtime),
+    // The highest task priority: a slot or pass is only as punctual as this
+    // task. lwIP's netif task, created by the ST67 driver at 50, otherwise
+    // pre-empts it for up to ~5 ms during a WiFi refresh.
+    : Task<1024>("DisplayRefresh", osPriorityRealtime7),
       driver_(driver), timer_(timer), enablePorts_(enablePorts), enablePins_(enablePins)
 {
     activeBoard_ = this;

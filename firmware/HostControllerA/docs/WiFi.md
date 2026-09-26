@@ -76,15 +76,17 @@ switches (`../Common/Src/Utils/SwitchInput.cpp`).
 | `spi_xfer_engine` | 46 | 1536 B | `w61_driver_config.h` |
 
 The driver's two tasks default to 53 and 54, above the display multiplexing
-task `DisplayRefresh` (`osPriorityRealtime`, 48). There they held a display
+task `DisplayRefresh`, then at `osPriorityRealtime` (48). There they held a display
 slot for up to 14 ms during WiFi activity, which flashed the whole display, so
 they are overridden to 46 and 47. The overrides must live in the `USER CODE
 BEGIN EC` block of `w61_driver_config.h`: definitions on the CMake target never
 reach the driver, which is compiled in the generated `STM32_Drivers` library.
 See [CubeMXCompliance.md](CubeMXCompliance.md#st67-driver-task-settings).
 
-The generated `netif` task runs at 50, above `DisplayRefresh`. It has not been
-measured against the display.
+The generated `netif` task runs at 50, a value that cannot be overridden (see
+CubeMXCompliance.md). At 50 it held the display off for up to 5.4 ms during a
+refresh, so `DisplayRefresh` now runs at `osPriorityRealtime7` (55), above all
+of these tasks.
 
 The driver and LwIP tasks are created from the 40 000-byte FreeRTOS heap when
 the module is first started. See [Firmware-RAM-Usage.md](Firmware-RAM-Usage.md).

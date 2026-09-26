@@ -33,7 +33,7 @@ The PCB-backed implementation:
 - Maintains the prepared SPI refresh data.
 - Runs the local multiplexing mechanism.
 
-The HostController `AstroWeather.cpp` creates this object and starts it. `start()` starts the `DisplayRefresh` task (`Task<1024>`, `osPriorityRealtime`) and then calls `HAL_TIM_Base_Start_IT(&htim2)`. The DisplayController creates one too, on SPI1 and TIM6.
+The HostController `AstroWeather.cpp` creates this object and starts it. `start()` starts the `DisplayRefresh` task (`Task<1024>`, `osPriorityRealtime7`, the highest task priority) and then calls `HAL_TIM_Base_Start_IT(&htim2)`. The DisplayController creates one too, on SPI1 and TIM6.
 
 ### Buffer-backed Display Board
 
@@ -276,7 +276,7 @@ The display is therefore dark only for the swap, steps 2-6, about 12 us per slot
 
 SPI3 runs at 1 MHz (prescaler 16), so a slot's 56 bits take about 56 us. The SCT2024 accepts up to 25 MHz; above about 4 MHz the SCK/MOSI pins (PB3/PB5) would also need a faster GPIO speed than the current `GPIO_SPEED_FREQ_LOW`. If a transfer fails, the current slot stays lit and the next tick tries again.
 
-TIM2 provides the 250 Hz slot cadence and the `DisplayRefresh` task (`osPriorityRealtime`) performs the short seven-byte SPI transaction. The timer interrupt only signals the task and never calls blocking SPI functions. SPI DMA could replace the blocking task-level transfer if measured jitter or CPU use ever required it.
+TIM2 provides the 250 Hz slot cadence and the `DisplayRefresh` task (`osPriorityRealtime7`) performs the short seven-byte SPI transaction. The timer interrupt only signals the task and never calls blocking SPI functions. SPI DMA could replace the blocking task-level transfer if measured jitter or CPU use ever required it.
 
 TIM2 configuration, from the 16 MHz HSI timer clock:
 
@@ -287,7 +287,7 @@ TIM2 configuration, from the 16 MHz HSI timer clock:
 
 `HAL_TIM_PeriodElapsedCallback()` in `main.c` forwards every timer to `Display_PcbTimerElapsed()` from its user-code section, which signals the refresh task for TIM2. TIM1 provides the HAL time base and stays separate.
 
-TIM2 is started by `PcbDisplayBoard::start()`, after its task. The ST67 WiFi driver's own tasks are configured just below it, so WiFi activity cannot hold up the multiplexing; see [CubeMXCompliance.md](CubeMXCompliance.md#st67-driver-task-settings).
+TIM2 is started by `PcbDisplayBoard::start()`, after its task. The task runs above every ST67 WiFi driver and LwIP task, so WiFi activity cannot hold up the multiplexing; see [CubeMXCompliance.md](CubeMXCompliance.md#st67-driver-task-settings).
 
 Logical-to-segment conversion is performed when display state changes, not in the periodic refresh loop. The refresh mechanism reads only prepared slot bytes.
 

@@ -45,7 +45,7 @@ for 2 s, and then the host's data, or "no data" if none has arrived yet.
 
 | Task | Owner | Priority | Stack (bytes) | Does |
 | --- | --- | --- | ---: | --- |
-| `DisplayRefresh` | `Display::PcbDisplayBoard` (Common) | Realtime (48) | 1024 | Multiplexes the board, one slot per TIM6 tick (250 Hz) |
+| `DisplayRefresh` | `Display::PcbDisplayBoard` (Common) | Realtime7 (55) | 1024 | Multiplexes the board, one slot per TIM6 tick (250 Hz) |
 | `DisplayApp` | `User/Src/DisplayApp.cpp` | Normal (24) | 1024 | Chooses what is shown: boot screens, data, "no data", test screens |
 | `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | Idles |
 | `Led1` | `Debug::BlinkingLed` (Common) | Low (8) | 768 | Heartbeat on `LED_1`, 20 ms every 2 s |

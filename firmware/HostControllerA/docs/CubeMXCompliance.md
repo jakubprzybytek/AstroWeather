@@ -251,9 +251,11 @@ Definitions on the top-level CMake target do **not** reach the driver: it is com
 | Setting | Default | Project value | Why |
 | --- | --- | --- | --- |
 | `SPI_THREAD_STACK_SIZE` | 768 | 1536 | Larger ST67 stack requirement, as above. |
-| `SPI_THREAD_PRIO` | 53 | 46 | Below `DisplayRefresh` (48). |
+| `SPI_THREAD_PRIO` | 53 | 46 | Below `DisplayRefresh`, then at 48. |
 | `W61_MDM_RX_TASK_PRIO` | 54 | 47 | Below `DisplayRefresh`; kept one above the SPI engine as in the defaults. |
 
 At their default priorities the two driver tasks pre-empted the display multiplexing task, holding a slot for up to 14 ms instead of 4 ms during WiFi activity, which was visible as the whole display flashing during a refresh. Measured by timing slot switches in the display task: the longest gap fell from 14 ms with four late switches to 8 ms with one per refresh, with WiFi fetches still succeeding. The remaining short stall happens during connect and was not traced.
+
+That stall was LwIP's `netif` task, which the driver creates at `NETIF_TASK_PRIORITY` 50, above the display's 48. The value is a plain `#define` in the generated `LWIP/App/lwip_netif.h`, outside any USER CODE block and without an `#ifndef` guard, so it cannot be overridden in a way that survives regeneration. `DisplayRefresh` was raised to `osPriorityRealtime7` (55) instead, above every driver task. Measured with the display's gray-level test on 2026-09-26: the display task's longest wait during an astro refresh fell from 4.5-5.4 ms, every one caught with `netif` running, to under 1 ms.
 
 Verify any change here with a preprocessor dump of a driver unit, for example `spi_iface.c` from `compile_commands.json` with `-E -dM`, since a misplaced override fails silently.

@@ -129,11 +129,11 @@ Middleware tasks come from the FreeRTOS heap and are not in that registry.
 
 CMSIS-RTOS2 priorities are FreeRTOS priorities (`configMAX_PRIORITIES` is 56):
 `osPriorityLow` = 8, `BelowNormal` = 16, `Normal` = 24, `Normal4` = 28,
-`Realtime` = 48.
+`Realtime` = 48, `Realtime7` = 55.
 
 | Task name | Owner | Priority | Stack (bytes) | Allocation | Does |
 | --- | --- | --- | ---: | --- | --- |
-| `DisplayRefresh` | `Display::PcbDisplayBoard` | Realtime (48) | 1024 | static | Multiplexes the local board, one slot per TIM2 tick |
+| `DisplayRefresh` | `Display::PcbDisplayBoard` | Realtime7 (55) | 1024 | static | Multiplexes the local board, one slot per TIM2 tick |
 | `netif` | `LWIP/App/lwip_netif.c` | 50 | 2048 | heap | Passes received frames from the ST67 driver to LwIP |
 | `Modem_Process` | ST67 driver `w61_at_common.c` | 47 | 2048 | heap | AT response and event handling |
 | `spi_xfer_engine` | ST67 driver `spi_iface.c` | 46 | 1536 | heap | SPI1 transfers to the module |
