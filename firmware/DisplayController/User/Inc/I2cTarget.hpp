@@ -5,6 +5,7 @@
 #include "cmsis_os2.h"
 #include "main.h"
 
+#include <array>
 #include <cstdint>
 
 // The board's side of the I2C link to the host: listens on its own address,
@@ -30,8 +31,11 @@ public:
     // after a bus error. Cheap; the owning task calls it periodically.
     void ensureListening();
 
-    // Copies the latest complete message; false if none arrived since the
-    // last call. Only the newest message is kept.
+    // Copies the oldest complete message not yet taken; false if none. The
+    // host sends a board's attributes and content as four messages a few
+    // milliseconds apart, so several can be waiting; when the queue is full
+    // the oldest is dropped and counted.
+    static constexpr uint8_t kQueueDepth = 4U;
     bool takeMessage(Display::I2cMessage& message);
 
     uint16_t address() const { return address_; }
@@ -53,8 +57,10 @@ private:
     uint32_t flag_ = 0U;
 
     Display::I2cMessage receiveBuffer_{};
-    Display::I2cMessage pending_{};
-    volatile bool pendingReady_ = false;
+    // Ring of complete messages: head_ is the oldest, count_ how many.
+    std::array<Display::I2cMessage, kQueueDepth> pending_{};
+    volatile uint8_t head_ = 0U;
+    volatile uint8_t count_ = 0U;
     volatile bool receiving_ = false;
     // Answer to a read from the host, which the protocol does not use; kept
     // so a read does not hang the bus.

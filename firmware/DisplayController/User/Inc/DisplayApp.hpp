@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Display/DisplayBoard.hpp>
+#include <FrameAssembler.hpp>
 #include <I2cTarget.hpp>
 #include <NoDataTimer.hpp>
 #include <Utils/Led.hpp>
@@ -8,9 +9,10 @@
 
 #include <cstdint>
 
-// Decides what the board shows: the boot screens, the host's data, "no data"
-// before the first frame and after the data goes stale, and the switch-driven
-// test screens. Owns no hardware; the refresh itself is PcbDisplayBoard's task.
+// Decides what the board shows: the boot screens, the host's data with its
+// blink and level attributes, "no data" before the first frame and after the
+// data goes stale, and the switch-driven test screens. Owns no hardware; the
+// refresh itself runs from PcbDisplayBoard's timer interrupt.
 class DisplayApp : public Task<1024> {
 public:
     static constexpr uint32_t kFlagFrame = 1U << 0;
@@ -41,12 +43,13 @@ private:
     void setScreen(Screen screen, uint32_t now);
     bool screenTimedOut(uint32_t now) const;
     void show();
+    void publishRefreshStats();
 
     Display::DisplayBoard& board_;
     I2cTarget& link_;
     Led& activityLed_;
     DisplayController::NoDataTimer noData_{kNoDataTimeoutMs};
-    Display::LogicalBoardState data_{};
+    DisplayController::FrameAssembler frames_;
     Screen screen_ = Screen::Data;
     uint32_t screenSince_ = 0U;
 };

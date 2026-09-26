@@ -51,10 +51,11 @@ void I2cTarget::ensureListening()
 bool I2cTarget::takeMessage(Display::I2cMessage& message)
 {
     taskENTER_CRITICAL();
-    const bool ready = pendingReady_;
+    const bool ready = count_ != 0U;
     if (ready) {
-        message = pending_;
-        pendingReady_ = false;
+        message = pending_[head_];
+        head_ = static_cast<uint8_t>((head_ + 1U) % kQueueDepth);
+        count_ = static_cast<uint8_t>(count_ - 1U);
     }
     taskEXIT_CRITICAL();
     return ready;
@@ -77,8 +78,16 @@ void I2cTarget::onAddress(uint8_t direction)
 void I2cTarget::onReceiveComplete()
 {
     receiving_ = false;
-    pending_ = receiveBuffer_;
-    pendingReady_ = true;
+    // Interrupt context: the task's takeMessage() runs under a critical
+    // section, so head_ and count_ are consistent here.
+    if (count_ == kQueueDepth) {
+        // Full: drop the oldest, so the newest is never the one lost.
+        head_ = static_cast<uint8_t>((head_ + 1U) % kQueueDepth);
+        count_ = static_cast<uint8_t>(count_ - 1U);
+        ++g_displayStats.queueOverruns;
+    }
+    pending_[(head_ + count_) % kQueueDepth] = receiveBuffer_;
+    count_ = static_cast<uint8_t>(count_ + 1U);
     if (recipient_ != nullptr) {
         osThreadFlagsSet(recipient_, flag_);
     }

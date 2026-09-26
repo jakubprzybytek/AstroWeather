@@ -16,3 +16,9 @@ add_native_test(screens_tests
 add_native_test(no_data_timer_tests
     SOURCES NoDataTimerTests.cpp
 )
+add_native_test(frame_assembler_tests
+    SOURCES FrameAssemblerTests.cpp
+    SUT User/Src/FrameAssembler.cpp
+        ../Common/Src/Display/DisplayI2cProtocol.cpp
+        ../Common/Src/Display/DisplayTypes.cpp
+)

@@ -1,6 +1,5 @@
 #include <DisplayApp.hpp>
 
-#include <Display/DisplayI2cProtocol.hpp>
 #include <Screens.hpp>
 #include <Stats.hpp>
 
@@ -55,6 +54,7 @@ void DisplayApp::run()
             changed = true;
         }
         link_.ensureListening();
+        publishRefreshStats();
 
         if (changed) {
             show();
@@ -62,25 +62,42 @@ void DisplayApp::run()
     }
 }
 
-// Takes the newest message from the link. A frame received while a test
-// screen is up is kept and shown when the screen closes.
+// Takes every message waiting on the link. Attributes are staged, content
+// applies them; a frame received while a test screen is up is kept and
+// shown when the screen closes.
 bool DisplayApp::receiveFrames(uint32_t now)
 {
+    bool newContent = false;
     Display::I2cMessage message{};
-    if (!link_.takeMessage(message)) {
-        return false;
+    while (link_.takeMessage(message)) {
+        switch (frames_.accept(message.data(), message.size())) {
+        case DisplayController::FrameAssembler::Result::Content:
+            newContent = true;
+            noData_.onFrame(now);
+            ++g_displayStats.framesAccepted;
+            g_displayStats.lastFrameTick = now;
+            activityLed_.blink(kActivityBlinkMs);
+            break;
+        case DisplayController::FrameAssembler::Result::Staged:
+            ++g_displayStats.attributesAccepted;
+            break;
+        case DisplayController::FrameAssembler::Result::Rejected:
+        default:
+            ++g_displayStats.framesRejected;
+            break;
+        }
     }
-    Display::LogicalBoardState decoded{};
-    if (!Display::deserializeI2c(message.data(), message.size(), decoded)) {
-        ++g_displayStats.framesRejected;
-        return false;
+    return newContent && screen_ == Screen::Data;
+}
+
+void DisplayApp::publishRefreshStats()
+{
+    Display::DisplayBoard::RefreshStats stats{};
+    if (board_.refreshStats(stats)) {
+        g_displayStats.refreshFrames = stats.frames;
+        g_displayStats.lateShifts = stats.lateShifts;
+        g_displayStats.maxInterruptMicros = stats.maxInterruptMicros;
     }
-    data_ = decoded;
-    noData_.onFrame(now);
-    ++g_displayStats.framesAccepted;
-    g_displayStats.lastFrameTick = now;
-    activityLed_.blink(kActivityBlinkMs);
-    return screen_ == Screen::Data;
 }
 
 void DisplayApp::setScreen(Screen screen, uint32_t now)
@@ -106,6 +123,8 @@ bool DisplayApp::screenTimedOut(uint32_t now) const
 
 void DisplayApp::show()
 {
+    // The test screens and "no data" are plain: full brightness, no blink.
+    Display::BoardAttributes attributes{};
     switch (screen_) {
     case Screen::AllSegments:
         board_.setState(DisplayController::allSegmentsState());
@@ -118,8 +137,14 @@ void DisplayApp::show()
         break;
     case Screen::Data:
     default:
-        board_.setState(noData_.hasData() ? data_ : Display::noDataState());
+        if (noData_.hasData()) {
+            board_.setState(frames_.content());
+            attributes = frames_.attributes();
+        } else {
+            board_.setState(Display::noDataState());
+        }
         break;
     }
+    board_.setAttributes(attributes);
     board_.submit();
 }

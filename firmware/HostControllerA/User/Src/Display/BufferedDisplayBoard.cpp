@@ -9,13 +9,27 @@ namespace Display {
 
 void BufferedDisplayBoard::submit()
 {
-    I2cMessage message{};
-    serializeI2c(state_, message);
     if (address_ < 0x10U || address_ > 0x2AU) {
         report(HAL_ERROR);
         return;
     }
-    report(bus_.transmit(address_, message.data(), static_cast<uint16_t>(message.size()),
+    // The attributes first, which the board only stages, then the content,
+    // which applies them; a board that misses the attributes shows the
+    // content at full brightness. Stop at the first failure: the rest would
+    // fail the same way, and the next submit() sends everything again.
+    AttributeMessages attributes{};
+    serializeAttributesI2c(attributes_, attributes);
+    for (const I2cMessage& message : attributes) {
+        const HAL_StatusTypeDef status = bus_.transmit(
+            address_, message.data(), static_cast<uint16_t>(message.size()), kTransferTimeoutMs);
+        if (status != HAL_OK) {
+            report(status);
+            return;
+        }
+    }
+    I2cMessage content{};
+    serializeI2c(state_, content);
+    report(bus_.transmit(address_, content.data(), static_cast<uint16_t>(content.size()),
                          kTransferTimeoutMs));
 }
 
