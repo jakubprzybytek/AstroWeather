@@ -85,10 +85,42 @@ void testRepeatsCollapse()
     expectEqual(log.entry(2).count, 3U, "first of the set counted");
     expectEqual(log.entry(3).count, 3U, "second of the set counted");
 
+    // An older entry repeats: counted, and moved to the end as the latest.
     log.record(Level::Error, "fetch failed", up(400U));
     expectEqual(log.count(), 4U, "an older entry collapses too");
-    expectEqual(log.entry(0).count, 4U, "and keeps its place");
-    expectEqual(ErrorLog::textHash("fetch failed"), log.entry(0).hash, "hash stored");
+    expectEqual(std::string(log.entry(3).text), std::string("fetch failed"), "and moves to the end");
+    expectEqual(log.entry(3).level, static_cast<uint8_t>(Level::Error), "the error one");
+    expectEqual(log.entry(3).count, 4U, "counted");
+    expectEqual(log.entry(0).level, static_cast<uint8_t>(Level::Warning),
+                "the warning of the same text is now the one quiet longest");
+    expect(log.newest() == &log.entry(3), "newest is the latest problem");
+    expectEqual(ErrorLog::textHash("fetch failed"), log.entry(3).hash, "hash stored");
+    expectEqual(line(log, log.entry(3)),
+                std::string("E up 0d 00:01:00 x4, last up 0d 00:06:40: fetch failed"),
+                "first time kept after the move");
+}
+
+// The entry quiet longest is the one dropped, so an ongoing problem stays.
+void testOngoingProblemKept()
+{
+    ErrorLog::Storage storage{};
+    ErrorLog::Log log(storage);
+    log.begin();
+    log.record(Level::Error, "ongoing", up(0U));
+    for (uint32_t i = 0U; i < 40U; ++i) {
+        log.record(Level::Warning, ("one-off " + std::to_string(i)).c_str(), up(i + 1U));
+        if (i % 10U == 0U) {
+            log.record(Level::Error, "ongoing", up(i + 1U));
+        }
+    }
+    bool found = false;
+    for (uint8_t i = 0U; i < log.count(); ++i) {
+        found = found || std::string(log.entry(i).text) == "ongoing";
+    }
+    expect(found, "a problem that keeps recurring is not pushed out");
+    expectEqual(log.count(), ErrorLog::kCapacity, "full");
+    expectEqual(std::string(log.newest()->text), std::string("one-off 39"), "newest is the last logged");
+    expectEqual(log.dropped(), 25U, "41 distinct entries, 16 kept");
 }
 
 void testCapAndDropped()
@@ -165,6 +197,12 @@ void testCorruptionDetected()
     expectEqual(badCheck.count(), 0U, "bad check word starts afresh");
 
     copy = storage;
+    copy.order[0] = 3U;
+    ErrorLog::Log badOrder(copy);
+    badOrder.begin();
+    expectEqual(badOrder.count(), 0U, "an order naming an unused slot starts afresh");
+
+    copy = storage;
     copy.count = ErrorLog::kCapacity + 1U;
     ErrorLog::Log badCount(copy);
     badCount.begin();
@@ -200,6 +238,7 @@ int main()
     testRecordAndFormat();
     testRepeatsCollapse();
     testCapAndDropped();
+    testOngoingProblemKept();
     testLongTextTruncated();
     testSurvivesReboot();
     testCorruptionDetected();

@@ -10,11 +10,13 @@
 // a reset, a crash and reflashing, but not a power loss. See
 // docs/Console.md#error-log.
 //
-// A message identical to an entry of the current boot, at the same level,
-// only bumps that entry's count and last time; the entry keeps its place and
-// first time. So an error repeated every retry or every sample, or a set of
-// them repeated every refresh, takes one entry each. When all kCapacity
-// entries are used the oldest is overwritten and counted as dropped.
+// Entries are ordered by their latest occurrence, oldest first. A message
+// identical to an entry of the current boot, at the same level, bumps that
+// entry's count and last time and moves it to the end; its first time stays.
+// So an error repeated every retry or every sample, or a set of them repeated
+// every refresh, takes one entry each, and the newest entry is always the
+// latest problem. When all kCapacity entries are used, the one quiet longest
+// is overwritten and counted as dropped, so an ongoing problem is kept.
 namespace ErrorLog {
 
 constexpr uint8_t kCapacity = 16U;
@@ -54,14 +56,16 @@ struct Storage
     uint32_t check;    // ~magic ^ kVersion ^ sizeof(Storage)
     uint32_t boot;     // boots seen, counting this one
     uint32_t dropped;  // entries overwritten since the log was last cleared
-    uint8_t head;      // index of the oldest entry
-    uint8_t count;     // entries in use
-    uint8_t reserved[2];
+    uint8_t count;     // entries in use: always slots 0 .. count - 1
+    uint8_t reserved[3];
+    // order[0 .. count - 1]: the slots by latest occurrence, oldest first.
+    // Reordering this, not the entries, keeps a move to the end cheap.
+    std::array<uint8_t, kCapacity> order;
     std::array<Entry, kCapacity> entries;
 };
 
 constexpr uint32_t kMagic = 0x4552524CU;  // "ERRL"
-constexpr uint32_t kVersion = 2U;
+constexpr uint32_t kVersion = 3U;
 
 // A 16-bit hash of the text as it would be stored (truncated to
 // kTextSize - 1). Cheap to compare; the text is compared only on a match.
@@ -89,7 +93,8 @@ public:
     uint8_t count() const { return storage_.count; }
     uint32_t dropped() const { return storage_.dropped; }
     uint32_t boot() const { return storage_.boot; }
-    // index 0 is the oldest.
+    // By latest occurrence: index 0 is the one quiet longest, count() - 1
+    // the latest.
     const Entry& entry(uint8_t index) const;
     const Entry* newest() const;
 
@@ -101,6 +106,7 @@ public:
 private:
     bool consistent() const;
     void reset(uint32_t boot);
+    void moveToEnd(uint8_t index);
 
     Storage& storage_;
 };

@@ -49,8 +49,17 @@ void formatStamp(bool wall, uint32_t seconds, char* out, std::size_t size)
 bool Log::consistent() const
 {
     if (storage_.magic != kMagic || storage_.check != expectedCheck() ||
-        storage_.head >= kCapacity || storage_.count > kCapacity) {
+        storage_.count > kCapacity) {
         return false;
+    }
+    // order must list each used slot, 0 .. count - 1, exactly once.
+    uint32_t seen = 0U;
+    for (uint8_t i = 0U; i < storage_.count; ++i) {
+        const uint8_t slot = storage_.order[i];
+        if (slot >= storage_.count || (seen & (1UL << slot)) != 0U) {
+            return false;
+        }
+        seen |= 1UL << slot;
     }
     for (uint8_t i = 0U; i < storage_.count; ++i) {
         const Entry& e = entry(i);
@@ -86,7 +95,7 @@ void Log::clear()
 
 const Entry& Log::entry(uint8_t index) const
 {
-    return storage_.entries[(storage_.head + index) % kCapacity];
+    return storage_.entries[storage_.order[index]];
 }
 
 const Entry* Log::newest() const
@@ -98,9 +107,9 @@ const Entry* Log::newest() const
 void Log::record(Level level, const char* text, uint16_t hash, Stamp stamp)
 {
     const uint8_t levelValue = static_cast<uint8_t>(level);
-    // Newest first: a repeat is most likely recent.
+    // Latest first: a repeat is most likely recent.
     for (uint8_t i = storage_.count; i > 0U; --i) {
-        Entry& seen = storage_.entries[(storage_.head + i - 1U) % kCapacity];
+        Entry& seen = storage_.entries[storage_.order[i - 1U]];
         if (seen.hash != hash || seen.level != levelValue || seen.boot != storage_.boot ||
             std::strncmp(seen.text, text, kTextSize - 1U) != 0) {
             continue;
@@ -111,16 +120,19 @@ void Log::record(Level level, const char* text, uint16_t hash, Stamp stamp)
         seen.last = stamp.seconds;
         seen.flags =
             static_cast<uint8_t>((seen.flags & ~kLastWall) | (stamp.wall ? kLastWall : 0U));
+        moveToEnd(static_cast<uint8_t>(i - 1U));
         return;
     }
 
     uint8_t slot;
     if (storage_.count < kCapacity) {
-        slot = static_cast<uint8_t>((storage_.head + storage_.count) % kCapacity);
+        slot = storage_.count;
+        storage_.order[storage_.count] = slot;
         ++storage_.count;
     } else {
-        slot = storage_.head;
-        storage_.head = static_cast<uint8_t>((storage_.head + 1U) % kCapacity);
+        // Reuse the slot of the entry quiet longest, moved to the end.
+        slot = storage_.order[0];
+        moveToEnd(0U);
         if (storage_.dropped != UINT32_MAX) {
             ++storage_.dropped;
         }
@@ -135,6 +147,15 @@ void Log::record(Level level, const char* text, uint16_t hash, Stamp stamp)
     e.flags = stamp.wall ? static_cast<uint8_t>(kFirstWall | kLastWall) : 0U;
     std::strncpy(e.text, text, kTextSize - 1U);
     e.text[kTextSize - 1U] = '\0';
+}
+
+void Log::moveToEnd(uint8_t index)
+{
+    const uint8_t slot = storage_.order[index];
+    for (uint8_t i = index; i + 1U < storage_.count; ++i) {
+        storage_.order[i] = storage_.order[i + 1U];
+    }
+    storage_.order[storage_.count - 1U] = slot;
 }
 
 int Log::format(const Entry& e, char* out, std::size_t size) const

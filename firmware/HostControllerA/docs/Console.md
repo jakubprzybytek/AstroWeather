@@ -214,15 +214,22 @@ includes the ST67 WiFi driver's own errors, which arrive through
 [welcome message](#welcome-message), so a problem that happened while no
 terminal was open, or before USB enumerated at boot, is still visible.
 
-- **16 entries.** When all are used, the oldest is overwritten and counted as
-  dropped.
+- **16 entries, ordered by latest occurrence.** The list runs from the entry
+  quiet longest to the latest problem, which is also the "newest" the welcome
+  message shows. When all 16 are used, the entry quiet longest is overwritten
+  and counted as dropped, so a problem that keeps recurring is not pushed out
+  by one-off ones.
 - **Repeats are one entry.** A message identical to one already kept from the
-  current boot, at the same level, only bumps that entry's count and last
-  time; the entry keeps its place and first time. So an error repeated every
+  current boot, at the same level, bumps that entry's count and last time and
+  moves it to the end; its first time stays. So an error repeated every
   retry, or the five `DisplayBoard 0x1x unreachable` warnings of every
   refresh, take one entry each. Each entry stores a 16-bit hash of its text,
   so a new message is compared in full only against entries with the same
   hash.
+- **Order without copying.** The 120-byte entries stay in their slots; a
+  16-byte `order` list gives the slots by latest occurrence, so moving an
+  entry to the end shifts at most 15 bytes with interrupts masked, not up to
+  1.8 KB of entries.
 - **Timestamps.** The local date and time when the clock is set, read from
   the RTC registers directly (`ClockTask::wallSecondsNow()`), without the RTC
   mutex, so a task that logs while holding it cannot deadlock. Until the clock
@@ -382,7 +389,7 @@ resets.
 
 | Command | Reply |
 | --- | --- |
-| `errors` | `OK errors <n> of 16 kept, <d> older dropped, boot <b>`, then one line per entry, oldest first. |
+| `errors` | `OK errors <n> of 16 kept, <d> older dropped, boot <b>`, then one line per entry, ordered by latest occurrence: the one quiet longest first, the latest problem last. |
 | `errors clear` | `OK errors cleared`. Empties the log and the dropped count; the boot count stays. |
 | `errors <anything else>` | `ERR invalid-argument` |
 
@@ -395,7 +402,10 @@ E 2026-09-27 12:20:31 x4, last 2026-09-27 13:30:02: AstroDataRefresh fetch statu
 
 Each line is the level (`E` error, `W` warning), when it was first logged, and
 for a repeat `x<count>, last <time>`, then the message as it was logged,
-without the log line's own `[uptime] [LEVEL]` prefix. The list is sent in
+without the log line's own `[uptime] [LEVEL]` prefix. A repeat moves its entry
+to the end, so the list reads in order of each entry's latest occurrence: the
+last line is always the latest problem, and in the example the `fetch` error
+last happened after the other two although it first happened between them. The list is sent in
 bursts of 8 lines with a 30 ms pause, so up to 17 lines fit through the
 16-line log queue.
 
