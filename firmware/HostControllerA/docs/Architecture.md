@@ -147,7 +147,7 @@ DMA, so its timing depends on interrupt latency only; see
 | `ConsoleService` | `Console/ConsoleService.cpp` | Normal (24) | 2048 | static | Assembles and runs console commands |
 | `AstroDataRefresh` | `Astro/AstroDataRefreshTask.cpp` | Normal (24) | 3072 | static | Refresh pipeline, 6-hourly schedule, progress bar |
 | `MainLoopTask` | `MainLoopTask.cpp` | Normal (24) | 1536 | static | Switch presses: switch 1 requests a refresh, switch 2 toggles low brightness and saves it |
-| `CurrentSense` | `Sensors/CurrentSenseTask.cpp` | BelowNormal (16) | 2048 | static | ADC every 100 ms |
+| `CurrentSense` | `Sensors/CurrentSenseTask.cpp` | BelowNormal (16) | 2048 | static | ADC every 100 ms, idle while `adc display` and `adc log` are both off |
 | `Clock` | `Clock/ClockTask.cpp` | BelowNormal (16) | 1024 | static | RTC, `HH:MM` on display 3 |
 | `St67HttpFetch` | `WiFi/St67HttpFetchTask.cpp` | BelowNormal (16) | 2560 | static | Owns the ST67 session and the HTTP fetch |
 | `Led1` | `Debug/BlinkingLed.cpp` | Low (8) | 768 | static | Heartbeat on `LED_1` |
@@ -173,6 +173,7 @@ queues and five mutexes.
 | --- | --- | --- |
 | `MainLoopTask` | `HAL_GPIO_EXTI_Falling_Callback()` via `SwitchInput` | `kEventSwitch1`, `kEventSwitch2` |
 | `CurrentSense` | ADC DMA complete / error callbacks | Conversion done or failed |
+| `CurrentSense` | `setDisplayEnabled()`, `setLoggingEnabled()` | Re-check whether to sample |
 | `ConsoleService` | USB CDC RX and line-state callbacks | Command queued, host connected |
 | `LogService` | `log()` from any task; `setStatsEnabled()` | Log queued, stats changed |
 | `Clock` | display and time setters | Redraw |

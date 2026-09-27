@@ -96,7 +96,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | Clock trim | 🟡 Partial | Set by hand with `time trim`; automatic trim is planned | [RTC.md](docs/RTC.md) |
 | **Power and sensing** | | | |
 | Current, temperature and VDDA monitor | ✅ Done (reworked board) | Works on the prototype with `VREF+` rewired to VDD; the schematic and PCB still tie it to GND (C-1). Current sense also relies on the PC6→PB2 connection (H-1) | [CurrentSense.md](docs/CurrentSense.md) |
-| ADC should be off when Current Sens is not being displayed nor logged | Not implemented | | [CurrentSense.md](docs/CurrentSense.md) 
+| ADC idle when the current is neither displayed nor logged | ✅ Done | With `adc display off` and `adc log off` the task stops sampling until either is switched on | [CurrentSense.md](docs/CurrentSense.md#sampling) |
 | VBUS voltage sense | ⚠️ Blocked by HW | PC7 is not an ADC pin and has no divider (H-1, H-2) | [Hardware review](../../KiCad/Hardware_Review.md) |
 | USB-PD negotiation for more than 5 V | 🔴 Not implemented | Feasibility study only; the hardware needs changes | [USB_PD_Feasibility.md](docs/USB_PD_Feasibility.md) |
 | Reading the USB-C current limit (CC pins) | 🔴 Not implemented | Worst-case load exceeds the USB default (H-5) | [Hardware review](../../KiCad/Hardware_Review.md) |

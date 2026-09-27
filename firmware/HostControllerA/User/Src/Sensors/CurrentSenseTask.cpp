@@ -45,11 +45,22 @@ void CurrentSenseTask::setDisplay(Display::Display* display)
 void CurrentSenseTask::setLoggingEnabled(bool enabled)
 {
     loggingEnabled_ = enabled;
+    wake();
 }
 
 void CurrentSenseTask::setDisplayEnabled(bool enabled)
 {
     displayEnabled_ = enabled;
+    wake();
+}
+
+void CurrentSenseTask::wake()
+{
+    // Before start() there is no thread; run() reads the flags on its first pass.
+    if (getHandle() != nullptr)
+    {
+        osThreadFlagsSet(getHandle(), kWakeFlag);
+    }
 }
 
 void CurrentSenseTask::notifyAdcComplete()
@@ -111,6 +122,14 @@ void CurrentSenseTask::run()
 
     for (;;)
     {
+        if (!displayEnabled_ && !loggingEnabled_)
+        {
+            // Nobody uses a reading: leave the ADC idle until 'adc display'
+            // or 'adc log' is switched on, then sample at once.
+            (void)osThreadFlagsWait(kWakeFlag, osFlagsWaitAny, osWaitForever);
+            nextWake = osKernelGetTickCount();
+            continue;
+        }
         nextWake += kSamplePeriodMs;
 
         const Sample sample = readSample();

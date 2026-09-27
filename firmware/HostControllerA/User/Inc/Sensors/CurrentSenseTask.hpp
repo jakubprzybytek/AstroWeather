@@ -40,6 +40,10 @@ private:
 
     static constexpr uint32_t kAdcCompleteFlag = 1U << 0U;
     static constexpr uint32_t kAdcErrorFlag = 1U << 1U;
+    // Display or logging switched: re-check whether to sample at all.
+    static constexpr uint32_t kWakeFlag = 1U << 2U;
+
+    void wake();
 
     alignas(uint32_t) uint16_t adcValues_[3] = {0U, 0U, 0U};
     Display::Display* display_ = nullptr;

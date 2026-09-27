@@ -8,7 +8,8 @@ display boards, through a shunt and an INA180A2 current-sense amplifier read by
 ADC1. `CurrentSenseTask` samples it ten times a
 second, together with the MCU's internal temperature sensor and `VREFINT`, and
 by default shows the current in mA on numeric display 2 of the local board.
-`adc log on` also logs every sample.
+`adc log on` also logs every sample. With both `adc display` and `adc log`
+off, nothing uses a reading, so the task stops sampling and the ADC stays idle.
 
 Only the HostController firmware has the task; the DisplayController project
 has no ADC configured.
@@ -101,6 +102,12 @@ Changes belong in the `.ioc`, followed by regeneration; see
    - stops with `HAL_ADC_Stop_DMA()`.
 3. A start failure, timeout or ADC error logs
    `CurrentSense ADC conversion failed` for that sample.
+4. While `adc display` and `adc log` are both off, the task skips all of this
+   and blocks on a thread flag instead, so there are no conversions, no DMA
+   interrupts and no wake-ups. Switching either on (`setDisplayEnabled()`,
+   `setLoggingEnabled()`, from the console or at boot) sets the flag, and the
+   task takes a reading at once and resumes the 100 ms cadence from there.
+   Switching the display off leaves the last value on numeric 2.
 
 ### Conversion
 
