@@ -250,7 +250,17 @@ and the frequency is what that makes the LSI:
 | 2026-09-22 22:51:31 → ?, offset +0.043 s | +18 400 | ended by an unplugged board, not read before; the clock was later set by hand, 2.1 s ahead |
 | 2026-09-22 23:49:52 → 2026-09-23 09:09, 9.3 h overnight, board up since 23:11 | +18 400 | **+798 ± 3 ppm**, 32 614.8 Hz, 69 s/day: the fastest by far |
 | 2026-09-22 23:49:52 → 2026-09-23 09:32, 9.7 h | +18 400 | +806 ± 3 ppm, 32 614.9 Hz; ended by the first API sync, which stepped the RTC back 28.6 s |
-| from 2026-09-23 09:40:14, offset +0.010 s | +18 400 | running; after the step, the RTC was within 10 ms of the PC |
+| from 2026-09-23 09:40:14, offset +0.010 s | +18 400 | ended by later API syncs; the SWD run could not be kept going through the testing of the following days |
+| 2026-09-23 10:16 → 12:53, 2.6 h, from the API syncs | +18 400 | about +324 ppm (stepped back 2.89 s) |
+| 2026-09-27 18:10 → 19:31, 81 min, from the API syncs | +18 400 | about **+1300 ppm** (stepped back 6.35 s) |
+| 2026-09-27 20:10 → 20:17, 7 min, from the API syncs | +18 400 | about +950 ppm (stepped back 0.40 s; rough, a sync leaves up to 250 ms) |
+| from 2026-09-27 20:21 | +19 300 | `time trim 19300` set, centring the +300 … +1300 ppm range seen with +18 400; the day/night swing of about ±500 ppm remains |
+
+From 2026-09-23 the API syncs are the reference: each `Clock sync` line gives
+the RTC's error against the server, to about ±150 ms. The SWD tool compares
+against the PC's clock instead, which was found 0.7 s behind the server on
+2026-09-27 with Windows time not synchronized; resync it
+(`w32tm /resync`, as administrator) before trusting an SWD baseline.
 
 ## Limits
 
