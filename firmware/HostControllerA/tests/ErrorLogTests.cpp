@@ -70,8 +70,8 @@ void testRepeatsCollapse()
     expectEqual(log.count(), 1U, "repeats take one entry");
     expectEqual(log.entry(0).count, 3U, "counted");
     expectEqual(line(log, log.entry(0)),
-                std::string("E up 0d 00:01:00 x3, last 2026-09-27 03:10:00: fetch failed"),
-                "first time kept, last time updated, clock set between");
+                std::string("E 2026-09-27 03:10:00 3x, first up 0d 00:01:00: fetch failed"),
+                "latest time leads, first time kept, clock set between");
 
     log.record(Level::Warning, "fetch failed", up(200U));
     expectEqual(log.count(), 2U, "same text at another level is a new entry");
@@ -96,7 +96,7 @@ void testRepeatsCollapse()
     expect(log.newest() == &log.entry(3), "newest is the latest problem");
     expectEqual(ErrorLog::textHash("fetch failed"), log.entry(3).hash, "hash stored");
     expectEqual(line(log, log.entry(3)),
-                std::string("E up 0d 00:01:00 x4, last up 0d 00:06:40: fetch failed"),
+                std::string("E up 0d 00:06:40 4x, first up 0d 00:01:00: fetch failed"),
                 "first time kept after the move");
 }
 
@@ -176,10 +176,20 @@ void testSurvivesReboot()
     afterReset.record(Level::Error, "stamped", wall(2026, 9, 27, 1, 5, 0));
     expectEqual(afterReset.count(), 3U, "a repeat from another boot is a new entry");
 
+    // A repeat in an earlier boot, with uptime stamps: both are marked.
+    afterReset.record(Level::Warning, "twice", up(50U));
+    afterReset.record(Level::Warning, "twice", up(70U));
+    ErrorLog::Log nextBoot(storage);
+    nextBoot.begin();
+    expectEqual(line(nextBoot, *nextBoot.newest()),
+                std::string("W up 0d 00:01:10 (previous boot) 2x, first up 0d 00:00:50 "
+                            "(previous boot): twice"),
+                "both uptime stamps of an earlier boot marked");
+
     ErrorLog::Log later(storage);
     later.begin();
     later.begin();
-    expectEqual(line(later, later.entry(0)), std::string("E up 0d 00:00:30 (3 boots ago): before reset"),
+    expectEqual(line(later, later.entry(0)), std::string("E up 0d 00:00:30 (4 boots ago): before reset"),
                 "older boots counted");
 }
 

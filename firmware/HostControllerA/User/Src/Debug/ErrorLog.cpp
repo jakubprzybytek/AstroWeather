@@ -158,32 +158,39 @@ void Log::moveToEnd(uint8_t index)
     storage_.order[storage_.count - 1U] = slot;
 }
 
+void Log::formatStampOf(const Entry& e, bool wall, uint32_t seconds, char* out,
+                        std::size_t size) const
+{
+    char stamp[24];
+    formatStamp(wall, seconds, stamp, sizeof(stamp));
+    // Uptime means nothing across a reset without saying which boot.
+    const uint32_t ago = storage_.boot - e.boot;
+    if (wall || ago == 0U) {
+        std::snprintf(out, size, "%s", stamp);
+    } else if (ago == 1U) {
+        std::snprintf(out, size, "%s (previous boot)", stamp);
+    } else {
+        std::snprintf(out, size, "%s (%lu boots ago)", stamp, static_cast<unsigned long>(ago));
+    }
+}
+
 int Log::format(const Entry& e, char* out, std::size_t size) const
 {
-    char first[24];
-    formatStamp((e.flags & kFirstWall) != 0U, e.first, first, sizeof(first));
+    // Led by the latest occurrence, the order the list is in; a repeat adds
+    // its count and when it first happened.
+    char latest[48];
+    formatStampOf(e, (e.flags & kLastWall) != 0U, e.last, latest, sizeof(latest));
 
-    // Uptime means nothing across a reset without saying which boot.
-    char boot[24] = "";
-    if ((e.flags & kFirstWall) == 0U && e.boot != storage_.boot) {
-        const uint32_t ago = storage_.boot - e.boot;
-        if (ago == 1U) {
-            std::snprintf(boot, sizeof(boot), " (previous boot)");
-        } else {
-            std::snprintf(boot, sizeof(boot), " (%lu boots ago)", static_cast<unsigned long>(ago));
-        }
-    }
-
-    char repeat[48] = "";
+    char repeat[64] = "";
     if (e.count > 1U) {
-        char last[24];
-        formatStamp((e.flags & kLastWall) != 0U, e.last, last, sizeof(last));
-        std::snprintf(repeat, sizeof(repeat), " x%lu, last %s", static_cast<unsigned long>(e.count),
-                      last);
+        char first[48];
+        formatStampOf(e, (e.flags & kFirstWall) != 0U, e.first, first, sizeof(first));
+        std::snprintf(repeat, sizeof(repeat), " %lux, first %s", static_cast<unsigned long>(e.count),
+                      first);
     }
 
     const char levelLetter = e.level == static_cast<uint8_t>(Level::Error) ? 'E' : 'W';
-    return std::snprintf(out, size, "%c %s%s%s: %s", levelLetter, first, boot, repeat, e.text);
+    return std::snprintf(out, size, "%c %s%s: %s", levelLetter, latest, repeat, e.text);
 }
 
 } // namespace ErrorLog

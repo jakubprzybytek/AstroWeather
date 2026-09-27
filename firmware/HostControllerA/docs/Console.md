@@ -397,12 +397,13 @@ resets.
 OK errors 3 of 16 kept, 0 older dropped, boot 6
 E up 0d 00:00:42 (previous boot): CurrentSense ADC conversion failed
 W 2026-09-27 12:19:50: DisplayBoard 0x10 unreachable status=1
-E 2026-09-27 12:20:31 x4, last 2026-09-27 13:30:02: AstroDataRefresh fetch status=...
+E 2026-09-27 13:30:02 4x, first 2026-09-27 12:20:31: AstroDataRefresh fetch status=...
 ```
 
-Each line is the level (`E` error, `W` warning), when it was first logged, and
-for a repeat `x<count>, last <time>`, then the message as it was logged,
-without the log line's own `[uptime] [LEVEL]` prefix. A repeat moves its entry
+Each line is the level (`E` error, `W` warning), when it was last logged, and
+for a repeat `<count>x, first <time>`, then the message as it was logged,
+without the log line's own `[uptime] [LEVEL]` prefix. An uptime stamp from an
+earlier boot is marked `(previous boot)` or `(<n> boots ago)`. A repeat moves its entry
 to the end, so the list reads in order of each entry's latest occurrence: the
 last line is always the latest problem, and in the example the `fetch` error
 last happened after the other two although it first happened between them. The list is sent in

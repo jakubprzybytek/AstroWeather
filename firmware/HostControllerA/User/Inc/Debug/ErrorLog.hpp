@@ -98,15 +98,19 @@ public:
     const Entry& entry(uint8_t index) const;
     const Entry* newest() const;
 
-    // One entry as a line: "E 2026-09-27 00:26:54 <text>", with the repeat
-    // count and last time when it repeated, and uptime stamps from an earlier
-    // boot marked as such. Returns the length written, like snprintf.
+    // One entry as a line, stamped with its latest occurrence:
+    // "E 2026-09-27 00:26:54: <text>", or for a repeat
+    // "E 2026-09-27 18:10:31 2x, first 2026-09-27 12:42:42: <text>". Uptime
+    // stamps from an earlier boot are marked as such. Returns the length
+    // written, like snprintf.
     int format(const Entry& entry, char* out, std::size_t size) const;
 
 private:
     bool consistent() const;
     void reset(uint32_t boot);
     void moveToEnd(uint8_t index);
+    void formatStampOf(const Entry& e, bool wall, uint32_t seconds, char* out,
+                       std::size_t size) const;
 
     Storage& storage_;
 };
