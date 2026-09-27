@@ -1,5 +1,7 @@
  #include <Debug/LogService.hpp>
 
+#include <Clock/ClockTask.hpp>
+
 #include <task.h>
 #include "usbd_cdc_if.h"
 #include "main.h"
@@ -7,6 +9,24 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+
+namespace {
+
+// The error log's storage, in the retained RAM region (.noinit, see
+// STM32G0B1xx_FLASH.ld): not cleared at startup and at the same address in
+// every build, so it survives a reset and reflashing.
+__attribute__((section(".noinit"))) ErrorLog::Storage errorLogStorage;
+
+ErrorLog::Stamp stampNow()
+{
+    uint32_t seconds = 0U;
+    if (ClockTask::instance().wallSecondsNow(seconds)) {
+        return {true, seconds};
+    }
+    return {false, HAL_GetTick() / 1000U};
+}
+
+} // namespace
 
 LogService& LogService::instance()
 {
@@ -17,12 +37,15 @@ LogService& LogService::instance()
 LogService::LogService()
     : Task<1536>("LogService", osPriorityNormal),
       logQueueHandle_(nullptr), logQueueCb_{}, logQueueStorage_{}, txBuffer_{},
-      sentCount_(0), droppedCount_(0), busyDropCount_(0), statsEnabled_(false)
+      sentCount_(0), droppedCount_(0), busyDropCount_(0), statsEnabled_(false),
+      errorLog_(errorLogStorage)
 {
 }
 
 void LogService::init()
 {
+    errorLog_.begin();
+    errorLogStarted_ = true;
     osMessageQueueAttr_t attr = {};
     attr.name = "DebugLogQ";
     attr.cb_mem = &logQueueCb_;
@@ -53,8 +76,39 @@ const char* LogService::levelColor(Level level)
     }
 }
 
+void LogService::keepProblem(Level level, const char* message)
+{
+    // Before init() the storage is unchecked power-up RAM.
+    if ((level != Level::Warn && level != Level::Error) || !errorLogStarted_) {
+        return;
+    }
+    const ErrorLog::Stamp stamp = stampNow();
+    const uint16_t hash = ErrorLog::textHash(message);
+    // Masked rather than a scheduler critical section, so this is also safe
+    // from an interrupt. It copies about a hundred bytes.
+    const UBaseType_t mask = taskENTER_CRITICAL_FROM_ISR();
+    errorLog_.record(level == Level::Error ? ErrorLog::Level::Error : ErrorLog::Level::Warning,
+                     message, hash, stamp);
+    taskEXIT_CRITICAL_FROM_ISR(mask);
+}
+
+void LogService::errorLogSnapshot(ErrorLog::Storage& copy) const
+{
+    const UBaseType_t mask = taskENTER_CRITICAL_FROM_ISR();
+    copy = errorLogStorage;
+    taskEXIT_CRITICAL_FROM_ISR(mask);
+}
+
+void LogService::clearErrorLog()
+{
+    const UBaseType_t mask = taskENTER_CRITICAL_FROM_ISR();
+    errorLog_.clear();
+    taskEXIT_CRITICAL_FROM_ISR(mask);
+}
+
 bool LogService::log(Level level, const char* message)
 {
+    keepProblem(level, message);
     LogEvent event;
     event.level = level;
     char uptime[24];
@@ -76,6 +130,7 @@ bool LogService::logf(Level level, const char* format, ...)
         va_start(args, format);
         std::vsnprintf(event.text + prefixLen, sizeof(event.text) - static_cast<size_t>(prefixLen), format, args);
         va_end(args);
+        keepProblem(level, event.text + prefixLen);
     }
     return enqueueLogEvent(event);
 }

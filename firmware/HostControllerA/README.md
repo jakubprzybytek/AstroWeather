@@ -90,6 +90,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | "No data" state at boot: segment G on the last digit of each numeric display, matrix blank, until the first refresh | ✅ Done | Shared with the display boards, which also return to it after 7 h without a frame | [Display.md](docs/Display.md#no-data) |
 | Numeric formatting (fixed point, time, `?`) | ✅ Done | -0.5 °C shows as `-0.5`; values that do not fit 4 digits show the error pattern | [Display.md](docs/Display.md#fixed-point-values) |
 | Display effects: blinking, 4 brightness levels | ✅ Done | Per segment and pixel, made in time by the refresh; the forecast's matrix rows carry levels and blink (API protocol 2), the clock's colon and the refresh progress bar blink. `display test` shows it all. Levels tuned by eye at normal brightness; not yet run on a display board | [Display.md](docs/Display.md#blink-and-brightness-levels) |
+| Error log: the last 16 warnings and errors, with date and time or uptime, kept over resets and reflashing | ✅ Done | `errors [clear]`; the welcome message shows the count and the newest. Lost on power loss | [Console.md](docs/Console.md#error-log) |
 | **Time** | | | |
 | RTC clock on numeric display 3, `time` commands | ✅ Done | Lost on power loss (no LSE crystal or backup battery) | [RTC.md](docs/RTC.md) |
 | Clock sync from the server | ✅ Done | | [RTC.md](docs/RTC.md#sync-from-the-api) |

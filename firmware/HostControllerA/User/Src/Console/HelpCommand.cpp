@@ -27,6 +27,7 @@ const char* const kIndex[] = {
     "Commands. Type 'help <group>' for details and examples.",
     "  status            firmware, uptime, memory, EEPROM, WiFi, astro, boards",
     "  stats on|off      memory, stack and log statistics every 5 s (off at boot)",
+    "  errors [clear]    the last 16 warnings and errors, kept over resets",
     "  display ...       numbers, times and matrix rows on this board",
     "  astro refresh     fetch the sky forecast and publish it to all boards",
     "  api ...           show or set the server host and path (saved)",

@@ -24,6 +24,12 @@ add_native_test(test_support_tests
     FAKE_LOG
 )
 
+# Log
+add_native_test(error_log_tests
+    SOURCES ErrorLogTests.cpp
+    SUT User/Src/Debug/ErrorLog.cpp
+)
+
 # Sensors
 add_native_test(current_sense_conversion_tests
     SOURCES CurrentSenseConversionTests.cpp

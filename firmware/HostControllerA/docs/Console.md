@@ -41,8 +41,11 @@ with statistics off:
 ```text
 [0:00:05:12] [INFO] OK connected to AstroWeather HostController, built 2026-09-23 10:12:40
 [0:00:05:12] [INFO] Settings loaded from EEPROM: ok
+[0:00:05:12] [INFO] 5 warnings/errors kept ('errors' lists them); newest: W 2026-09-27 12:19:50: DisplayBoard 0x14 unreachable status=1
 [0:00:05:12] [INFO] Type 'help' for commands. Periodic stats are off; 'stats on' to switch.
 ```
+
+The third line appears only while the [error log](#error-log) holds entries.
 
 The build time comes from `cmake/BuildInfo.cmake`, which regenerates it on
 every build, so it identifies the flashed image. The settings line gives
@@ -202,6 +205,45 @@ There is one `[STACK]` line for each task created through `Task<>`. The counters
 are cumulative since boot. See [Firmware-RAM-Usage.md](Firmware-RAM-Usage.md)
 for what the stack figures mean for sizing.
 
+## Error Log
+
+`LogService` keeps every message logged at `Warn` or `Error` in
+`ErrorLog` (`User/Src/Debug/ErrorLog.cpp`), on top of printing it. That
+includes the ST67 WiFi driver's own errors, which arrive through
+`vLoggingPrintf()`. It is read with [`errors`](#errors) and summed up in the
+[welcome message](#welcome-message), so a problem that happened while no
+terminal was open, or before USB enumerated at boot, is still visible.
+
+- **16 entries.** When all are used, the oldest is overwritten and counted as
+  dropped.
+- **Repeats are one entry.** A message identical to one already kept from the
+  current boot, at the same level, only bumps that entry's count and last
+  time; the entry keeps its place and first time. So an error repeated every
+  retry, or the five `DisplayBoard 0x1x unreachable` warnings of every
+  refresh, take one entry each. Each entry stores a 16-bit hash of its text,
+  so a new message is compared in full only against entries with the same
+  hash.
+- **Timestamps.** The local date and time when the clock is set, read from
+  the RTC registers directly (`ClockTask::wallSecondsNow()`), without the RTC
+  mutex, so a task that logs while holding it cannot deadlock. Until the clock
+  is set, which after a power-up is the first astro refresh, entries carry
+  uptime instead, marked `(previous boot)` or `(<n> boots ago)` when listed
+  after a reset.
+- **Text.** Up to 101 characters of the message; longer ones are cut.
+- **Kept over a reset, a crash and reflashing, not a power loss.** The log
+  lives in a 2 KB RAM region that the startup code neither initialises nor
+  clears (`.noinit`, the last 2 KB of RAM, set up in `STM32G0B1xx_FLASH.ld`),
+  at the same address in every build. At boot, `ErrorLog::Log::begin()` keeps
+  it if its magic word and check word match and every entry is consistent,
+  otherwise starts empty, and counts the boot. After a power loss the region
+  is random and fails the check. A change to the entry layout must bump
+  `ErrorLog::kVersion`, so an older layout is discarded rather than misread.
+- **Cost.** Recording masks interrupts for the copy of about a hundred bytes
+  (the hash is computed before), so it is safe from any task or interrupt.
+  Messages logged before `LogService::init()` are not recorded.
+
+Only the HostController has the log.
+
 ## Console Service
 
 `ConsoleService` (`User/Src/Console/ConsoleService.cpp`) is a `Task<2048>` at
@@ -231,17 +273,18 @@ Input is not echoed. The only output for a command is its reply.
 Each handler is tried in turn; the first that recognises the line owns it:
 
 1. `help` (`HelpCommand.cpp`)
-2. `status` (`StatusCommand.cpp`)
-3. `stats on`, `stats off` (in `ConsoleService.cpp`)
-4. `astro ...` (`AstroCommand.cpp`), HostController only
-5. `time ...` (`TimeCommand.cpp`), HostController only
-6. `api ...` (`ApiCommand.cpp`), HostController only
-7. `display low [on|off]` (`LowBrightnessCommand.cpp`), HostController only;
+2. `errors [clear]` (`ErrorsCommand.cpp`), HostController only
+3. `status` (`StatusCommand.cpp`)
+4. `stats on`, `stats off` (in `ConsoleService.cpp`)
+5. `astro ...` (`AstroCommand.cpp`), HostController only
+6. `time ...` (`TimeCommand.cpp`), HostController only
+7. `api ...` (`ApiCommand.cpp`), HostController only
+8. `display low [on|off]` (`LowBrightnessCommand.cpp`), HostController only;
    ahead of `display`, which would take it as a bad argument
-8. `adc ...` (`AdcCommand.cpp`)
-9. `settings ...` and `wifi ...` (`SettingsCommand.cpp`)
-10. `eeprom ...` (`EepromCommand.cpp`)
-11. `display ...` (`DisplayCommand.cpp`)
+9. `adc ...` (`AdcCommand.cpp`)
+10. `settings ...` and `wifi ...` (`SettingsCommand.cpp`)
+11. `eeprom ...` (`EepromCommand.cpp`)
+12. `display ...` (`DisplayCommand.cpp`)
 
 A line no handler recognises gets `ERR invalid-command`. Commands are
 case-sensitive. Fixed commands such as `stats on` or `settings show` must match
@@ -331,6 +374,30 @@ network path works.
 | `stats off` | `OK stats=off` |
 
 See [Statistics](#statistics) for the report format.
+
+### errors
+
+**HC.** The [error log](#error-log): the last warnings and errors, kept over
+resets.
+
+| Command | Reply |
+| --- | --- |
+| `errors` | `OK errors <n> of 16 kept, <d> older dropped, boot <b>`, then one line per entry, oldest first. |
+| `errors clear` | `OK errors cleared`. Empties the log and the dropped count; the boot count stays. |
+| `errors <anything else>` | `ERR invalid-argument` |
+
+```text
+OK errors 3 of 16 kept, 0 older dropped, boot 6
+E up 0d 00:00:42 (previous boot): CurrentSense ADC conversion failed
+W 2026-09-27 12:19:50: DisplayBoard 0x10 unreachable status=1
+E 2026-09-27 12:20:31 x4, last 2026-09-27 13:30:02: AstroDataRefresh fetch status=...
+```
+
+Each line is the level (`E` error, `W` warning), when it was first logged, and
+for a repeat `x<count>, last <time>`, then the message as it was logged,
+without the log line's own `[uptime] [LEVEL]` prefix. The list is sent in
+bursts of 8 lines with a 30 ms pause, so up to 17 lines fit through the
+16-line log queue.
 
 ### astro
 

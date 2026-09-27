@@ -42,6 +42,12 @@ public:
         uint16_t millisecond;
     };
     bool readDateTime(DateTime& dateTime);
+    // Local time now in seconds since 2000 (Calendar::secondsSince2000()),
+    // to the second; false while the clock is unset. Reads the RTC registers
+    // directly with interrupts masked for a few cycles, without the RTC
+    // mutex, so any task or interrupt may call it, including one that is
+    // logging while it holds the mutex. For log timestamps.
+    bool wallSecondsNow(uint32_t& seconds) const;
 
     // Corrects the RTC for an LSI running `ppm` away from 32 kHz; see RtcTrim.
     // Safe before the scheduler starts. Returns false for an out-of-range value

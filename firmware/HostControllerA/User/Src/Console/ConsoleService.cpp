@@ -5,6 +5,7 @@
 #include <Console/AstroCommand.hpp>
 #include <Console/DisplayCommand.hpp>
 #include <Console/EepromCommand.hpp>
+#include <Console/ErrorsCommand.hpp>
 #include <Console/HelpCommand.hpp>
 #include <Console/SettingsCommand.hpp>
 #include <Console/StatusCommand.hpp>
@@ -83,6 +84,7 @@ void ConsoleService::sendWelcome()
         reply("Settings loaded from EEPROM: %s",
               Settings::Store::describe(settings_->lastDecode()));
     }
+    Console::sendErrorLogSummary();
     reply("Type 'help' for commands. Periodic stats are %s; 'stats %s' to switch.",
           LogService::instance().statsEnabled() ? "on" : "off",
           LogService::instance().statsEnabled() ? "off" : "on");
@@ -161,6 +163,14 @@ void ConsoleService::reply(const char* format, ...)
 void ConsoleService::execute(const char* line)
 {
     if (Console::handleHelpCommand(line) == Console::CommandResult::Ok) {
+        return;
+    }
+    const Console::CommandResult errorsResult = Console::handleErrorsCommand(line);
+    if (errorsResult == Console::CommandResult::Ok) {
+        return;
+    }
+    if (errorsResult == Console::CommandResult::InvalidArgument) {
+        reply("ERR invalid-argument");
         return;
     }
     if (Console::handleStatusCommand(line, display_, eeprom_, settings_) ==

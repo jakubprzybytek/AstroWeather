@@ -9,13 +9,18 @@ from GNU Tools for STM32 14.3.1:
 
 | Item | Bytes |
 | --- | ---: |
-| RAM capacity, STM32G0B1CETx | 147456 (144 KiB) |
+| RAM capacity, STM32G0B1CETx | 147456 (144 KiB): 142 KiB `RAM` region plus the 2 KiB `NOINIT` region of the error log |
 | `.data` | 616 |
 | `.bss` | 132792 |
 | `._user_heap_stack`: C heap `0x200` + main stack `0x400` | 1536 |
 | **Total statically reserved** | **134944** |
 | **Remaining** | **12512** |
 | Static RAM usage | about **91.5%** |
+
+Since 2026-09-27 the last 2 KiB of RAM are a separate `NOINIT` region for the
+error log (`ErrorLog::Storage`, 2004 bytes), not cleared at startup so the log
+survives a reset; see [Console.md](Console.md#error-log). The link-time report
+then shows `RAM` out of 142 KiB and `NOINIT` separately.
 
 The previous measurement, on 2026-08-30 from `build/Debug/`,
 was 131564 bytes of `.data + .bss` and 14352 bytes remaining. On 2026-09-23

@@ -7,6 +7,7 @@
 #ifndef INC_DEBUG_LOGSERVICE_HPP_
 #define INC_DEBUG_LOGSERVICE_HPP_
 
+#include <Debug/ErrorLog.hpp>
 #include <Utils/Task.hpp>
 #include "FreeRTOS.h"
 #include "queue.h"
@@ -20,7 +21,15 @@ public:
     enum class Level : uint8_t { Info, Warn, Error, Debug };
 
     static LogService& instance();
+    // Also starts the error log for this boot; call once, early.
     void init();
+
+    // Every Warn and Error logged is also kept here; see ErrorLog.hpp. The
+    // entries are written under a critical section in log()/logf(); readers
+    // (the console) take a consistent copy with errorLogSnapshot().
+    const ErrorLog::Log& errorLog() const { return errorLog_; }
+    void errorLogSnapshot(ErrorLog::Storage& copy) const;
+    void clearErrorLog();
     bool log(Level level, const char* message);
     bool logf(Level level, const char* format, ...);
     bool sendLine(const char* message);
@@ -47,6 +56,7 @@ private:
     struct LogEvent { Level level; char text[kMaxLogMessageLen]; };
 
     bool enqueueLogEvent(const LogEvent& event);
+    void keepProblem(Level level, const char* message);
     void drainLogQueue();
     void emitStats();
     void formatUptime(char* out, size_t outSize) const;
@@ -64,6 +74,8 @@ private:
     uint32_t droppedCount_;
     uint32_t busyDropCount_;
     volatile bool statsEnabled_;
+    ErrorLog::Log errorLog_;
+    volatile bool errorLogStarted_ = false;
 };
 
 #endif /* INC_DEBUG_LOGSERVICE_HPP_ */

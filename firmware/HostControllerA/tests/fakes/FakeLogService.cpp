@@ -54,6 +54,12 @@ std::string dump()
 
 } // namespace FakeLog
 
+namespace {
+
+ErrorLog::Storage fakeErrorLogStorage{};
+
+} // namespace
+
 LogService& LogService::instance()
 {
     static LogService service;
@@ -63,7 +69,8 @@ LogService& LogService::instance()
 LogService::LogService()
     : Task<1536>("LogService", osPriorityNormal),
       logQueueHandle_(nullptr), logQueueCb_{}, logQueueStorage_{}, txBuffer_{},
-      sentCount_(0), droppedCount_(0), busyDropCount_(0), statsEnabled_(false)
+      sentCount_(0), droppedCount_(0), busyDropCount_(0), statsEnabled_(false),
+      errorLog_(fakeErrorLogStorage)
 {
 }
 

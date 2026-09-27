@@ -258,6 +258,15 @@ At their default priorities the two driver tasks pre-empted the display multiple
 
 That stall was LwIP's `netif` task, which the driver creates at `NETIF_TASK_PRIORITY` 50, above the display's 48. The value is a plain `#define` in the generated `LWIP/App/lwip_netif.h`, outside any USER CODE block and without an `#ifndef` guard, so it cannot be overridden in a way that survives regeneration. `DisplayRefresh` was raised to `osPriorityRealtime7` (55) instead, above every driver task. Measured with the display's gray-level test on 2026-09-26: the display task's longest wait during an astro refresh fell from 4.5-5.4 ms, every one caught with `netif` running, to under 1 ms. The refresh has since moved into the TIM2 interrupt altogether, so no task priority is involved any more; see [Display.md](Display.md#refresh-operation).
 
+## Linker script: retained RAM
+
+`STM32G0B1xx_FLASH.ld` has a user change: the `RAM` region is 142 KiB, and the
+last 2 KiB are a `NOINIT` region holding the `.noinit` section, for the error
+log that survives a reset ([Console.md](Console.md#error-log)). Both changes are
+marked `USER`. CubeMX regenerates the linker script only when asked to; if it
+ever does, re-apply them, or the log silently stops surviving resets (the
+build still links, with `.noinit` placed in `RAM` and cleared at startup).
+
 ## Display refresh timer and DMA
 
 Set in CubeMX on 2026-09-27 for the interrupt-driven refresh with brightness levels ([Display.md](Display.md#refresh-operation)):

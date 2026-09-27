@@ -162,6 +162,38 @@ bool ClockTask::writeDateTime(const Calendar::DateTime& dateTime)
     return ok;
 }
 
+bool ClockTask::wallSecondsNow(uint32_t& seconds) const
+{
+    if (!timeSet_)
+    {
+        return false;
+    }
+    // Reading TR freezes DR's shadow until DR is read, so the pair is one
+    // instant. Masked, so no other reader can come between the two.
+    const uint32_t mask = __get_PRIMASK();
+    __disable_irq();
+    const uint32_t tr = hrtc.Instance->TR;
+    const uint32_t dr = hrtc.Instance->DR;
+    __set_PRIMASK(mask);
+
+    const auto bcd = [](uint32_t value, uint32_t shift, uint32_t tensMask) {
+        return static_cast<uint8_t>(((value >> (shift + 4U)) & tensMask) * 10U +
+                                    ((value >> shift) & 0xFU));
+    };
+    const uint16_t year = static_cast<uint16_t>(Calendar::kMinYear + bcd(dr, 16U, 0xFU));
+    const uint8_t month = bcd(dr, 8U, 0x1U);
+    const uint8_t day = bcd(dr, 0U, 0x3U);
+    const uint8_t hour = bcd(tr, 16U, 0x3U);
+    const uint8_t minute = bcd(tr, 8U, 0x7U);
+    const uint8_t second = bcd(tr, 0U, 0x7U);
+    if (!Calendar::isValidDate(year, month, day) || hour > 23U || minute > 59U || second > 59U)
+    {
+        return false;
+    }
+    seconds = Calendar::secondsSince2000(year, month, day, hour, minute, second);
+    return true;
+}
+
 bool ClockTask::readDateTime(DateTime& dateTime)
 {
     RTC_TimeTypeDef rtcTime = {};
