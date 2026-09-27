@@ -110,10 +110,17 @@ void Log::record(Level level, const char* text, uint16_t hash, Stamp stamp)
     // Latest first: a repeat is most likely recent.
     for (uint8_t i = storage_.count; i > 0U; --i) {
         Entry& seen = storage_.entries[storage_.order[i - 1U]];
-        if (seen.hash != hash || seen.level != levelValue || seen.boot != storage_.boot ||
+        // Uptime restarts at every boot, so an entry with an uptime stamp only
+        // takes repeats from its own boot. One dated throughout, and a dated
+        // repeat, merge across boots: a date means the same after a reset.
+        const bool datedThroughout =
+            stamp.wall && (seen.flags & (kFirstWall | kLastWall)) == (kFirstWall | kLastWall);
+        if (seen.hash != hash || seen.level != levelValue ||
+            (seen.boot != storage_.boot && !datedThroughout) ||
             std::strncmp(seen.text, text, kTextSize - 1U) != 0) {
             continue;
         }
+        seen.boot = storage_.boot;
         if (seen.count != UINT32_MAX) {
             ++seen.count;
         }

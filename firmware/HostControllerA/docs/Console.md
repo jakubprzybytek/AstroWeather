@@ -219,13 +219,18 @@ terminal was open, or before USB enumerated at boot, is still visible.
   message shows. When all 16 are used, the entry quiet longest is overwritten
   and counted as dropped, so a problem that keeps recurring is not pushed out
   by one-off ones.
-- **Repeats are one entry.** A message identical to one already kept from the
-  current boot, at the same level, bumps that entry's count and last time and
-  moves it to the end; its first time stays. So an error repeated every
-  retry, or the five `DisplayBoard 0x1x unreachable` warnings of every
-  refresh, take one entry each. Each entry stores a 16-bit hash of its text,
-  so a new message is compared in full only against entries with the same
-  hash.
+- **Repeats are one entry.** A message identical to one already kept, at the
+  same level, bumps that entry's count and last time and moves it to the end;
+  its first time stays. So an error repeated every retry, or the five
+  `DisplayBoard 0x1x unreachable` warnings of every refresh, take one entry
+  each. Each entry stores a 16-bit hash of its text, so a new message is
+  compared in full only against entries with the same hash.
+- **Across resets.** An entry dated throughout and a dated repeat merge even
+  across a reset, since a date means the same before and after it. Uptime
+  restarts at every boot, so an entry with an uptime stamp, or a repeat
+  logged before the clock is set, only merges within its own boot; each entry
+  records the boot of its latest occurrence for that. The log therefore does
+  not show that a merged problem spanned a reset.
 - **Order without copying.** The 120-byte entries stay in their slots; a
   16-byte `order` list gives the slots by latest occurrence, so moving an
   entry to the end shifts at most 15 bytes with interrupts masked, not up to

@@ -11,11 +11,13 @@
 // docs/Console.md#error-log.
 //
 // Entries are ordered by their latest occurrence, oldest first. A message
-// identical to an entry of the current boot, at the same level, bumps that
-// entry's count and last time and moves it to the end; its first time stays.
-// So an error repeated every retry or every sample, or a set of them repeated
-// every refresh, takes one entry each, and the newest entry is always the
-// latest problem. When all kCapacity entries are used, the one quiet longest
+// identical to a kept entry, at the same level, bumps that entry's count and
+// last time and moves it to the end; its first time stays. So an error
+// repeated every retry or every sample, or a set of them repeated every
+// refresh, takes one entry each, and the newest entry is always the latest
+// problem. Uptime restarts at every boot, so an entry with an uptime stamp
+// only takes repeats from its own boot; a dated entry and a dated repeat
+// merge across resets. When all kCapacity entries are used, the one quiet longest
 // is overwritten and counted as dropped, so an ongoing problem is kept.
 namespace ErrorLog {
 
@@ -37,7 +39,7 @@ struct Entry
     uint32_t first;  // Stamp::seconds of the first occurrence
     uint32_t last;   // and of the latest
     uint32_t count;  // occurrences, 1 or more
-    uint32_t boot;   // Storage::boot when it was logged
+    uint32_t boot;   // Storage::boot of the latest occurrence
     uint16_t hash;   // textHash() of text, to find repeats quickly
     uint8_t level;   // Level
     uint8_t flags;   // kFirstWall, kLastWall

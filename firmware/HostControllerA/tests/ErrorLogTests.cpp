@@ -173,8 +173,23 @@ void testSurvivesReboot()
     expectEqual(line(afterReset, afterReset.entry(1)), std::string("E 2026-09-27 01:02:03: stamped"),
                 "wall-clock stamp needs no mark");
 
+    // Dated in both boots: the same problem, merged across the reset.
     afterReset.record(Level::Error, "stamped", wall(2026, 9, 27, 1, 5, 0));
-    expectEqual(afterReset.count(), 3U, "a repeat from another boot is a new entry");
+    expectEqual(afterReset.count(), 2U, "a dated repeat from another boot merges");
+    expectEqual(line(afterReset, *afterReset.newest()),
+                std::string("E 2026-09-27 01:05:00 2x, first 2026-09-27 01:02:03: stamped"),
+                "latest from this boot, first from the previous one");
+
+    // An uptime stamp cannot be merged across boots: a new entry.
+    afterReset.record(Level::Error, "before reset", wall(2026, 9, 27, 1, 6, 0));
+    expectEqual(afterReset.count(), 3U, "a repeat of an uptime entry from another boot is new");
+    // The merged entry now belongs to this boot, so an undated repeat in this
+    // boot joins it, as within any boot.
+    afterReset.record(Level::Error, "stamped", up(90U));
+    expectEqual(afterReset.count(), 3U, "an undated repeat in the entry's own boot merges");
+    expectEqual(line(afterReset, afterReset.entry(2)),
+                std::string("E up 0d 00:01:30 3x, first 2026-09-27 01:02:03: stamped"),
+                "latest uptime of this boot, unmarked");
 
     // A repeat in an earlier boot, with uptime stamps: both are marked.
     afterReset.record(Level::Warning, "twice", up(50U));
