@@ -29,6 +29,12 @@ export function precipitationCell(probabilityPercent: number | null | undefined,
   return probabilityPercent == null ? null : quartileLevel(probabilityPercent);
 }
 
+// Clear Outside gives whole degrees, so a temperature is sent without a
+// decimal point; String() turns a rounded -0 into "0".
+export function wholeDegrees(celsius: number): string {
+  return String(Math.round(celsius));
+}
+
 function weatherFields(item: ClearOutsideItem, timezone: string) {
   const slots = observingSlots(item.nightId, timezone);
   const cloudValues: Array<MatrixCell | null> = [];
@@ -56,8 +62,8 @@ function weatherFields(item: ClearOutsideItem, timezone: string) {
   return {
     cloud: encodeMatrix(cloudValues),
     precipitation: encodeMatrix(precipitationValues),
-    maximumTemperature: temperatures.length ? Math.max(...temperatures).toFixed(1) : "?",
-    minimumTemperature: temperatures.length ? Math.min(...temperatures).toFixed(1) : "?"
+    maximumTemperature: temperatures.length ? wholeDegrees(Math.max(...temperatures)) : "?",
+    minimumTemperature: temperatures.length ? wholeDegrees(Math.min(...temperatures)) : "?"
   };
 }
 

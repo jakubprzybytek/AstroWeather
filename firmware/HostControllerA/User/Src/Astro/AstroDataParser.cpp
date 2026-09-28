@@ -212,11 +212,19 @@ bool parseTemperature(const char* text, float& result)
         value = value * 10.0F + static_cast<float>(*text - '0');
         ++text;
     }
-    if (*text != '.' || text[1] < '0' || text[1] > '9' || text[2] != '\0')
+    // Whole degrees; an older server's one decimal is still accepted.
+    if (*text == '.')
+    {
+        if (text[1] < '0' || text[1] > '9' || text[2] != '\0')
+        {
+            return false;
+        }
+        value += static_cast<float>(text[1] - '0') * 0.1F;
+    }
+    else if (*text != '\0')
     {
         return false;
     }
-    value += static_cast<float>(text[1] - '0') * 0.1F;
     result = negative ? -value : value;
     return std::isfinite(result);
 }

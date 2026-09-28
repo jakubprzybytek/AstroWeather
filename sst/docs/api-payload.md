@@ -32,8 +32,8 @@ matrix_0=333320000000000002333
 matrix_1=000023333333333333200
 matrix_2=110011122233333221100
 matrix_3=0000000111223**211110
-numeric_2=18.5
-numeric_3=9.2
+numeric_2=18
+numeric_3=9
 
 display=1
 board=num4x4_matrix5x21
@@ -44,8 +44,8 @@ matrix_0=333320000000000002333
 matrix_1=???????33333333333100
 matrix_2=000333333333333333300
 matrix_3=000000000000003000000
-numeric_2=17.8
-numeric_3=8.9
+numeric_2=18
+numeric_3=9
 
 display=2
 board=num4x4_matrix5x21
@@ -68,8 +68,8 @@ matrix_0=333320000000000002333
 matrix_1=000000000000000000000
 matrix_2=000000000000000000000
 matrix_3=000000000000000000000
-numeric_2=16.4
-numeric_3=7.5
+numeric_2=16
+numeric_3=8
 
 display=4
 board=num4x4_matrix5x21
@@ -80,8 +80,8 @@ matrix_0=333320000000000002333
 matrix_1=000000000000000000000
 matrix_2=000000000000000000000
 matrix_3=000000000000000000000
-numeric_2=15.9
-numeric_3=6.8
+numeric_2=16
+numeric_3=7
 
 display=5
 board=num4x4_matrix5x21
@@ -92,8 +92,8 @@ matrix_0=333320000000000002333
 matrix_1=000000000000000000000
 matrix_2=000000000000000000000
 matrix_3=000000000000000000000
-numeric_2=15.2
-numeric_3=6.1
+numeric_2=15
+numeric_3=6
 ```
 
 This example illustrates the syntax only. Its values are not a coherent
@@ -200,12 +200,12 @@ matrix_4
   future matrix channel.
 
 numeric_2
-  Maximum temperature during the observing night, in degrees Celsius, with one
-  decimal place. A question mark means weather is unavailable.
+  Maximum temperature during the observing night, in whole degrees Celsius,
+  with no decimal point. A question mark means weather is unavailable.
 
 numeric_3
-  Minimum temperature during the observing night, in degrees Celsius, with one
-  decimal place. A question mark means weather is unavailable.
+  Minimum temperature during the observing night, in whole degrees Celsius,
+  with no decimal point. A question mark means weather is unavailable.
 
 Numeric display formats
 -------------------------
@@ -224,7 +224,8 @@ within these supported ranges and formats.
 For this protocol:
 
 - `numeric_0` and `numeric_1` contain local sunset and sunrise times;
-- `numeric_2` and `numeric_3` contain temperatures with one decimal place.
+- `numeric_2` and `numeric_3` contain temperatures in whole degrees, such as
+  `18` or `-3`.
 - `numeric_0` and `numeric_1` use the missing-value sentinel `?` when
   the corresponding astronomical event is unavailable.
 - `numeric_2` and `numeric_3` use the missing-value sentinel `?` when

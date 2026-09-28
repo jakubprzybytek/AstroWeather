@@ -141,7 +141,8 @@ DynamoDB TTL removal is asynchronous. The reader must exclude an item when
 `expireAt` is at or before the request time, even if DynamoDB has not deleted it
 yet. Temperature extrema are calculated only from hourly values within the
 requested observing night. The maximum is serialized in `numeric_2` and the
-minimum in `numeric_3`, each with one decimal place.
+minimum in `numeric_3`, each rounded to whole degrees and written without a
+decimal point (Clear Outside reports whole degrees).
 
 ### Graceful degradation
 

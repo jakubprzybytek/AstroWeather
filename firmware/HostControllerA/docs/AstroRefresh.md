@@ -177,8 +177,9 @@ Within each block the records must come in this order:
   before the current block is complete, or after `display=5`.
 - A time is two digits, a colon, two digits. The digits are not range-checked;
   the numeric display decides what it can show.
-- A temperature is an optional `+` or `-`, one or more digits, a point and
-  exactly one digit: `18.5`, `-2.0`. `18` and `18.50` are rejected.
+- A temperature is an optional `+` or `-` and one or more digits: `18`, `-2`,
+  as the server sends it. A point and exactly one digit may follow (`18.5`),
+  the form an older server sent. `18.` and `18.50` are rejected.
 - In a matrix row, each character is one column: `0` off, `1`–`3` lit at that
   brightness level, `*` lit at level 3 and blinking, `?` off. A whole-row `?`
   is all off. The row is kept as four bit-planes, column *i* in bit *i*:
@@ -198,7 +199,7 @@ Within each block the records must come in this order:
 | `MissingRecord` | `missing-record` | `protocol` or `configurationId` not first, `configurationId` over 20 characters, or a block record missing or out of order. |
 | `InvalidDisplay` | `invalid-display` | The first block is not `display=0`, or a block index is not the next one. |
 | `InvalidTime` | `invalid-time` | `numeric_0` or `numeric_1` is neither `?` nor `HH:MM`. |
-| `InvalidTemperature` | `invalid-temperature` | `numeric_2` or `numeric_3` is neither `?` nor a one-decimal number. |
+| `InvalidTemperature` | `invalid-temperature` | `numeric_2` or `numeric_3` is neither `?` nor a whole or one-decimal number. |
 | `InvalidMatrix` | `invalid-matrix` | A matrix row of the wrong length or with another character. |
 | `Truncated` | `truncated` | The body ended, or a line was too long, before six complete blocks. |
 
@@ -243,8 +244,8 @@ On each board:
 | --- | --- | --- |
 | `numeric_0` | Numeric 0 | `setTime(hour, minute)`: hour without a leading zero, colon lit. |
 | `numeric_1` | Numeric 1 | `setTime(hour, minute)` |
-| `numeric_2` | Numeric 2 | `setValue(value, 1)`: one decimal, for example `18.5`, `-2.0`. |
-| `numeric_3` | Numeric 3 | `setValue(value, 1)` |
+| `numeric_2` | Numeric 2 | `setValue(value, 0)`: whole degrees, no decimal point, for example `18`, `-2`. A one-decimal value is rounded: `18.5` shows as `19`. |
+| `numeric_3` | Numeric 3 | `setValue(value, 0)` |
 | `matrix_0` … `matrix_3` | Matrix rows 0–3 | `setRow()` with the lit columns, character *i* to column *i*; the level planes and the blink mask into the board's attributes. Unlit columns are left at full level, so a later `display row` lighting one shows it. |
 | — | Matrix row 4 | Cleared on the remote boards, attributes included. Left alone on the local board, where it carries the progress bar. |
 
@@ -256,12 +257,8 @@ described in [Display.md](Display.md#blink-and-brightness-levels).
 A numeric `?` is drawn as the decimal point on all four digits and nothing in
 the indicator slot. That is distinct from the numeric display's own error
 pattern, segment D (an underscore) on all four digits, which a value the
-display cannot show gets instead: a temperature outside -99.9 … 999.9, or an
+display cannot show gets instead: a temperature outside -999 … 9999, or an
 hour above 99. See [Display.md](Display.md#numeric-representation).
-
-Temperatures between -1 and 1 keep the zero before the decimal point: -0.5
-shows as `-0.5` and 0.5 as `0.5`. See
-[Display.md](Display.md#fixed-point-values).
 
 Only a fully parsed payload is published. After a fetch, CRC or parse failure
 the display keeps whatever it showed.

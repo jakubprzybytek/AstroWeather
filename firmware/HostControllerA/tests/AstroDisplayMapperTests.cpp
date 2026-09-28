@@ -44,7 +44,7 @@ NumericSegments expectedTime(uint8_t hour, uint8_t minute)
 NumericSegments expectedValue(float value)
 {
     NumericSegments segments{};
-    Display::NumericDisplay(segments).setValue(value, 1U);
+    Display::NumericDisplay(segments).setValue(value, 0U);
     return segments;
 }
 
@@ -101,14 +101,17 @@ void testNumericKinds()
     AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), timeValue(0U, 0U));
     expect(sameSegments(segments, expectedTime(0U, 0U)), "midnight drawn with setTime");
 
+    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), plainValue(18.0F));
+    expect(sameSegments(segments, expectedValue(18.0F)), "value drawn in whole units");
+
     AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), plainValue(18.5F));
-    expect(sameSegments(segments, expectedValue(18.5F)), "value drawn with one decimal");
+    expect(sameSegments(segments, expectedValue(19.0F)), "a decimal value is rounded");
 
     AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), plainValue(-12.3F));
-    expect(sameSegments(segments, expectedValue(-12.3F)), "negative value with one decimal");
+    expect(sameSegments(segments, expectedValue(-12.0F)), "negative value in whole units");
 
-    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), plainValue(1234.5F));
-    expect(sameSegments(segments, expectedValue(1234.5F)),
+    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), plainValue(12345.0F));
+    expect(sameSegments(segments, expectedValue(12345.0F)),
            "value too large takes the display's own error pattern");
 }
 
@@ -279,7 +282,7 @@ void testParsedPayload()
         expect(sameSegments(state.numeric[0], expectedTime(20U, 30U)), "parsed time");
         expect(sameSegments(state.numeric[1], AstroDisplayMapper::unavailableSegments()),
                "parsed ? time");
-        expect(sameSegments(state.numeric[2], expectedValue(18.5F)), "parsed value");
+        expect(sameSegments(state.numeric[2], expectedValue(19.0F)), "parsed value");
         expect(sameSegments(state.numeric[3], AstroDisplayMapper::unavailableSegments()),
                "parsed ? value");
     }

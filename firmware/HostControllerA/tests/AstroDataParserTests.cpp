@@ -18,7 +18,7 @@ std::string block(unsigned int index)
            "matrix_0=100000000000000000000\n"
            "matrix_1=?\nmatrix_2=000000000000000000000\n"
            "matrix_3=?????????????????????\n"
-           "numeric_2=18.5\nnumeric_3=-2.0\n\n";
+           "numeric_2=18.5\nnumeric_3=-2\n\n";
 }
 
 std::string validPayload()
@@ -348,7 +348,7 @@ void testTruncatedPayload()
     expectEqual(parse(payload.substr(0U, matrix2 + 15U)), AstroParseStatus::InvalidMatrix,
                 "cut inside a matrix row");
     const std::size_t temperature = payload.find("numeric_2=18.5", block3);
-    expectEqual(parse(payload.substr(0U, temperature + 12U)), AstroParseStatus::InvalidTemperature,
+    expectEqual(parse(payload.substr(0U, temperature + 13U)), AstroParseStatus::InvalidTemperature,
                 "cut inside a temperature");
 
     // A payload that ends with the last record but no newline is complete.
@@ -445,6 +445,15 @@ void testUnavailableValues()
 
     expectEqual(parse(replaced(validPayload(), "numeric_2=18.5", "numeric_2=??")),
                 AstroParseStatus::InvalidTemperature, "?? temperature");
+    // Whole degrees, as the server sends them; one decimal from an older server.
+    expectEqual(parse(replaced(validPayload(), "numeric_2=18.5", "numeric_2=18"), data),
+                AstroParseStatus::Success, "whole-degree temperature");
+    expect(data.boards[0].numeric[2].value > 17.9F && data.boards[0].numeric[2].value < 18.1F,
+           "whole-degree value");
+    for (const char* bad : {"numeric_2=18.", "numeric_2=18.50", "numeric_2=-", "numeric_2=1 8"}) {
+        expectEqual(parse(replaced(validPayload(), "numeric_2=18.5", bad)),
+                    AstroParseStatus::InvalidTemperature, "rejected temperature");
+    }
     expectEqual(parse(replaced(validPayload(), "numeric_0=20:30", "numeric_0=20:3")),
                 AstroParseStatus::InvalidTime, "short time");
 }

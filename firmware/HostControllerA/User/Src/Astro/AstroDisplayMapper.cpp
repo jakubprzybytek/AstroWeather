@@ -36,7 +36,7 @@ void mapNumeric(Display::NumericDisplay display, const HostController::AstroNume
     }
     else
     {
-        display.setValue(value.value, 1U);
+        display.setValue(value.value, 0U);
     }
 }
 

@@ -11,7 +11,7 @@
 //
 // Block 0 goes to the local board, blocks 1-5 to remote slots 0-4. Each numeric
 // is drawn as its payload value says: a time as HH:MM (the payload's numerics
-// 0-1), a value with one decimal (numerics 2-3), and a `?` as the "unavailable"
+// 0-1), a value in whole units (numerics 2-3), and a `?` as the "unavailable"
 // pattern, the decimal point on all four digits; the numerics' attributes are
 // reset to plain (full, no blink). Matrix rows 0-3 come from the payload with
 // their levels and blinking; row 4 is cleared on the remote boards and left

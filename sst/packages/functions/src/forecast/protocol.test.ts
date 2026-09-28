@@ -9,7 +9,7 @@ function display(index: number): ForecastDisplay {
     nightId: `2026-09-${String(17 + index).padStart(2, "0")}`,
     sunset: "20:30", sunrise: "05:59",
     sun: "333320000000000002333", moon: "?", cloud: "000000000000000000000",
-    precipitation: "?", maximumTemperature: "18.5", minimumTemperature: "9.2"
+    precipitation: "?", maximumTemperature: "18", minimumTemperature: "9"
   };
 }
 
@@ -25,11 +25,11 @@ describe("forecast protocol", () => {
       "lastWeatherFetchTime=2026-09-17T18:00:04+02:00", "", "display=0", "board=num4x4_matrix5x21",
       "nightId=2026-09-17", "numeric_0=20:30", "numeric_1=05:59",
       "matrix_0=333320000000000002333", "matrix_1=?", "matrix_2=000000000000000000000",
-      "matrix_3=?", "numeric_2=18.5", "numeric_3=9.2", "", "display=1"
+      "matrix_3=?", "numeric_2=18", "numeric_3=9", "", "display=1"
     ]);
     expect(body).not.toContain("displayCount");
     expect(body).toContain("lastWeatherFetchTime=2026-09-17T18:00:04+02:00\n\ndisplay=0");
-    expect(body).toContain("numeric_3=9.2\n\ndisplay=1");
+    expect(body).toContain("numeric_3=9\n\ndisplay=1");
   });
 
   test("accepts every matrix cell of version 2", () => {

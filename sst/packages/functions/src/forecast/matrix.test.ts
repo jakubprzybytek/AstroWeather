@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { minutesAboveHorizon } from "./astronomy";
 import { cloudLevel, encodeMatrix, minutesLevel, quartileLevel } from "./matrix";
 import { observingSlots } from "./nights";
-import { precipitationCell } from "./weather-reader";
+import { precipitationCell, wholeDegrees } from "./weather-reader";
 
 describe("matrix cells", () => {
   test.each([
@@ -21,6 +21,12 @@ describe("matrix cells", () => {
     [0, 0], [1, 1], [33, 1], [33.4, 2], [34, 2], [66, 2], [66.7, 3], [67, 3], [100, 3]
   ])("%d percent cloud coverage is level %i", (percent, level) => {
     expect(cloudLevel(percent)).toBe(level);
+  });
+
+  test.each([
+    [18, "18"], [18.4, "18"], [18.5, "19"], [-3, "-3"], [-0.4, "0"], [0, "0"]
+  ])("%d degrees is sent as %s", (celsius, text) => {
+    expect(wholeDegrees(celsius)).toBe(text);
   });
 
   test("encodes a row, with ? for an unavailable slot and for an empty row", () => {
