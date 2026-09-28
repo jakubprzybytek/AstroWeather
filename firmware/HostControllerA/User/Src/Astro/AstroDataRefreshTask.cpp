@@ -577,8 +577,13 @@ void AstroDataRefreshTask::showProgressRow(const AstroProgressBar::Row& row)
         return;
     }
     // The blinking is the display's own, so the row is drawn once per change.
+    // The level is reset too: mapBoard leaves the local progress row alone, so
+    // levels a console 'display' command set there would otherwise stay.
+    Display::BoardAttributes& attributes = display_->local().attributes();
     display_->local().matrix(AstroDisplayMapper::kProgressRow).setRow(row.columns);
-    display_->local().attributes().setMatrixBlink(AstroDisplayMapper::kProgressRow, row.blink);
+    attributes.setMatrixBlink(AstroDisplayMapper::kProgressRow, row.blink);
+    attributes.setMatrixLevel(AstroDisplayMapper::kProgressRow, Display::kMatrixMask,
+                              Display::kLevelFull);
     display_->submitLocal();
     shownRow_ = row;
 }
