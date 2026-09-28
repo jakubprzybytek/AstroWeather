@@ -7,7 +7,7 @@ MCU,J102,1,Conn_01x10,1x10 female socket 2.54mm right-angle,PinSocket_1x10 horiz
 MCU,J104,1,Conn_01x10,1x10 male header 2.54mm right-angle,PinHeader_1x10 horizontal,daisy chain: I2C / VBUS / GND
 Power,U601,1,TPS54202,TPS54202DDCR (TME),SOT-23-6,TPS54302 unavailable - TPS54202 is pin-compatible (2A); buck VBUS -> VDD (~3.7V)
 Power,U602,1,MCP1825S,MCP1825S-3302E/DB (TME),SOT-223-3,3.3V LDO
-Power,L601,1,33u,Bourns SRR6838A-330M (Farnell 4655301),L_Bourns_SRP7028A_7.3x6.6mm,schematic footprint is SRP7028A - check pads fit SRR6838A
+Power,L601,1,33u,Ferrocore DE0704-33 (TME),L_Bourns_SRP7028A_7.3x6.6mm,7.3x7.3x4.5 fits the SRP7028A pads (0.27 mm to C602); fallback Bourns SRR6838A-330M (Farnell 4655301)
 Power,C601,1,100n,MLCC X7R 50V,0805,bootstrap
 Power,C602,1,10u/35V,MLCC X5R/X7R 35V+,0805,VBUS input
 Power,C603,1,100n/35V,MLCC X7R 50V,0603,VBUS input

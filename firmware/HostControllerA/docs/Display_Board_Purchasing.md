@@ -4,7 +4,7 @@
 
 Buy parts for display boards: the `AstroWeather` PCB populated only with the MCU, power supply and displays. These boards receive data over I2C from the host controller through `J102`/`J104`. They do not need USB-C, current sensing, the ST67 Wi-Fi module or the light sensor.
 
-Prices and stock were first checked on 2026-09-22 and last on 2026-09-24. Recheck them before ordering.
+Prices and stock were first checked on 2026-09-22 and last on 2026-09-24; `L601` on 2026-09-28. Recheck them before ordering.
 
 ## Sources and caveats
 
@@ -32,7 +32,7 @@ The `MCP6006` + `BC847` stages (`U503`/`U507`/`U511`/`U515`, `Q506`-`Q509`) are 
 
 | Item | Decision |
 |---|---|
-| `L601` | Bourns `SRR6838A-330M` (33 µH, Isat 1.02 A). A tight fit on the SRP7028A footprint, but proven on the prototype. Kept at 33 µH for its lower ripple (≈ 60 mA p-p at 5 V → 3.7 V). Considered and rejected: `SRR6838A-100M` (10 µH, Isat 1.72 A, DCR 35 mΩ, Farnell 4655293), the TPS54202 datasheet value, with more saturation margin but ≈ 190 mA p-p ripple |
+| `L601` | Ferrocore `DE0704-33` from TME (33 µH, IDC 0.96 A max, DCR 0.170 Ω max, shielded, 7.3×7.3×4.5 mm), chosen 2026-09-28. Same inductance and about the same current as the Bourns `SRR6838A-330M` (Isat 1.02 A) proven on the prototype, and it removes the Farnell order. See [L601: DE0704-33](#l601-de0704-33) |
 | `D501` | Not fitted, pads shorted |
 | `U601` | `TPS54202DDCR` replaces `TPS54302` (out of stock at TME and withdrawn at Farnell). Pin-compatible, and `EN` floats to enable: confirmed in `Hardware_Review.md` M-2. Rechecked 2026-09-24: TPS54302DDCR still 0 at TME; at Farnell the DDCR is not listed and the DDCT is withdrawn |
 | `Q501`-`Q505` | `SI2333CDS-T1-E3` replaces `Si2333DDS` (TME has 1, Farnell lead time 56 weeks) |
@@ -73,6 +73,28 @@ chosen on 2026-09-24. The STM32G0B1CET6 ships from 2027-01-18 at Farnell, has a
     Mouser sells it as `STM32G070CBT6TR` cut tape (25,651 in stock, 10+ 6.91),
     but its delivery charge rules it out for this order.
 
+## L601: DE0704-33
+
+- **Footprint:** the DE0704 recommended pattern is two 2.2 × 1.6 mm pads with a
+  4.8 mm gap, so its terminals sit 2.4–4.0 mm from the centre. The
+  `L_Bourns_SRP7028A_7.3x6.6mm` pads (2.95 × 3.5 mm at ±2.725 mm) cover
+  1.25–4.2 mm along the axis and ±1.75 mm across it, so the terminals land fully
+  on them.
+- **Clearance:** the 7.3 mm square body is 0.5 mm wider than the SRR6838A. The
+  nearest part is `C602`, whose pad edge is about 3.93 mm from the `L601` centre,
+  against a body half-width of 3.65 mm: 0.27 mm nominal, about 0.07 mm at the
+  +0.2 mm body tolerance. `C604`/`C605` and `TP601` have more room.
+- **Current:** the datasheet gives only IDC (max), with no definition (ΔL or ΔT).
+  0.96 A is close to the SRR6838A's 1.02 A Isat, so it does not address
+  `Hardware_Review.md` M-1 (Isat ≥ 2.5 A); nothing in stock at TME in this size
+  does.
+- **DCR:** 0.170 Ω costs 1.7 mW at 0.1 A and 109 mW (3.7% of output power) at the
+  host's 0.8 A worst case. It is inside the feedback loop, so VDD does not move.
+- **Ripple:** ≈ 60 mA p-p gives about 1 mV p-p on VDD with ≈ 20 µF effective at
+  `C604`/`C605`. The SCT2024 datasheet sets no ripple limit (line regulation
+  ±1 %/V max, load regulation ±0.5 %/V max), and each driver has a 10 Ω + 5.7 µF
+  filter, so ripple does not favour any inductance between 10 and 33 µH.
+
 ## Console over UART
 
 Without USB, the development console (`tools/astro_console.py`, the log and
@@ -102,24 +124,8 @@ as the programmer, which appears as COM3 ("STLink Virtual COM Port").
 
 ## Shopping lists
 
-Final lists, chosen on cost, from the recheck of Farnell, TME and Mouser on
-2026-09-24. Two orders: Farnell for the inductor, TME for everything else,
-including the MCU.
-
-### Farnell
-
-| Part | Farnell # | Qty | Stock | Price incl. VAT | Total |
-|---|---|---|---|---|---|
-| Bourns SRR6838A-330M | 4655301 | 5 | 1,939 | 5.45 (1+) | 27.24 |
-| | | | | Delivery (below 200 zł) | 29.99 |
-| | | | | **Total** | **57.23 zł incl. VAT** |
-
-- The SRR6838A is not stocked at TME (only the SRR6038 on 1,000-piece reels).
-- Buying the MCU here as well (STM32G070CBT6, 3365393, 32,648 in stock, 10+ 11.01
-  incl. VAT) would still leave the order below 200 zł, and costs about 14 zł more
-  than buying it at TME.
-- Farnell notice: since 2026-07-01 some EU shipping methods need a valid EU VAT
-  number on the account.
+Final list, chosen on cost, from the recheck of Farnell, TME and Mouser on
+2026-09-24 and of `L601` on 2026-09-28. One order: everything from TME.
 
 ### TME
 
@@ -142,13 +148,14 @@ including the MCU.
 | Microchip MCP6006T-E/OT (`U503`/`U507`/`U511`/`U515`) | 20 | 949 | 0.718 (1+) | 14.36 |
 | Samsung CL10B104KB8NNNC (100n 0603 50 V X7R ±10%) | 200 | 240,984 | 0.0876 (100+) | 17.52 |
 | Murata GRM31CR61E226KE15L (22u 1206 25 V X5R ±10%, `C604`/`C605`) | 10 | 58,634 | 1.330 (10+) | 13.30 |
-| | | | **Subtotal** | **449.39 zł net (≈ 552.8 zł incl. VAT)**, plus 13.90 zł net delivery |
+| Ferrocore DE0704-33 (33 µH, `L601`) | 5 | 340 | 1.087 (5+) | 5.44 |
+| | | | **Subtotal** | **454.83 zł net (≈ 559.4 zł incl. VAT)**, plus 13.90 zł net delivery |
 
 - STM32G070CBT6: 10 rather than 6, since 6 at the 1+ price (10.85) cost 65.10 zł
   and 10 at the 10+ price cost 78.00 zł. TME price breaks: 1+ 10.85, 10+ 7.80,
   25+ 6.63.
 
-**Both orders: about 627 zł incl. VAT including delivery (≈ 510 zł net).**
+**Total: about 577 zł incl. VAT including delivery (468.73 zł net).** Moving `L601` from Farnell (57.23 zł incl. VAT with delivery) saves about 50 zł.
 
 ### Why not Mouser
 
@@ -177,6 +184,7 @@ prices had no VAT added in the basket and are compared here as net.
   - MCP6006T-E/OT: 25+ 0.654 (25 pieces cost 16.35, more than 20 at the 1+ price)
   - CL10B104KB8NNNC: 10+ 0.1325, 1000+ 0.0549, 4000+ 0.0445
   - GRM31CR61E226KE15L: 1+ 2.394
+  - DE0704-33: 25+ 0.860, 100+ 0.760, 500+ 0.680. Minimum 5.
 - Lead times when stock runs out: SCT2024CSSG 9 weeks, SCT2167CSSG 14 weeks. TPS54202DDCR: 98 in stock on 2026-09-24 (147 on 2026-09-22), 6,000 expected on 2026-11-10.
 - Standard delivery costs 13.90 zł net (17.10 zł incl. VAT). DPD, GLS and InPost cost 15.90 zł net.
 - Stock changes seen on 2026-09-24: CL21A475KAQNNNE 1,614 → 333 (30 needed); MCP1825S-3302E/DB 702 → 2,305.
@@ -186,6 +194,7 @@ prices had no VAT added in the basket and are compared here as net.
 - ZL263-10SG: 1×10, 2.54 mm, 90°, THT, gold-plated contacts, 3 A, height 8.4 mm, lead length 3.2 mm.
 - ZL211-20KG-S is a 1×20 header, cut in two for two boards, so 3 are enough for 5 boards. The 5-piece minimum leaves spares.
 - `C602`: the previously used `GRM21BR6YA106KE43L` (±10%) has 0 in stock at TME. The ±20% `...ME43L` is the same part otherwise; tolerance does not matter for VBUS bulk decoupling. Alternative: TDK `C2012X5R1V106K125AC` (35 V X5R ±10%, 114 in stock, 1+ 1.578, 10+ 1.100).
+- DE0704-33: 340 in stock on 2026-09-28, 4,000 more expected on 2027-01-12.
 - The connectors and `C602` were checked on 2026-09-23, the MCP6006, CL10B104KB8NNNC and GRM31CR61E226KE15L on 2026-09-24. MCP6006T-E/OT has 15,000 more in external stock (2026-11-02).
 
 ## Not buying
@@ -198,7 +207,7 @@ None. Recheck stock and prices on both carts just before ordering.
 
 Closed:
 
-- **`L601` footprint:** the SRR6838A-330M fits the `L_Bourns_SRP7028A_7.3x6.6mm` pads, tightly, and works on the prototype. `SRP7028A-330M` (Farnell 3373372) would match the footprint exactly if ever needed.
+- **`L601` footprint:** the SRR6838A-330M fits the `L_Bourns_SRP7028A_7.3x6.6mm` pads, tightly, and works on the prototype. The DE0704-33 fits them too; see [L601: DE0704-33](#l601-de0704-33). `SRP7028A-330M` (Farnell 3373372) would match the footprint exactly if ever needed.
 - **TPS54202 swap:** confirmed pin-compatible, with `EN` floating to enable; see the `U601` decision.
 - **Faint glow on switched-off digits:** none visible on the prototype host board, whose `Q501`-`Q505` gates are driven straight from 3.3 V GPIOs against a 3.7 V source. The margin is still thin, so a gate driver is listed for the next PCB revision in `Hardware_Review.md` H-3.
 
@@ -213,6 +222,11 @@ Closed:
 
   Pin 30 is harmless. Pin 31 would float, and `VDDIO2` supplies `VDDUSB` and some I/Os, which are cut off while it is unpowered. Which I/Os those are was not checked. Using the CET6N needs a wire from pin 31 (the MCU-side pad of `R304`) to 3.3 V on every board, with 100 nF at `C306` and a 0R at `C307`, and `R304` must never be fitted. With `VDDIO2` tied to `VDD` it behaves as the CET6, and its USB works (VDDUSB comes from VDDIO2). Kept as the option if USB on the display boards is ever needed.
 - **`STM32G0B1CET6`:** 0 in stock everywhere on 2026-09-24 (Farnell ships from 2027-01-18, Mouser 52-week factory lead time). At TME on 2026-09-22: 0 in stock, 13-week lead time (1+ 18.25 / 20.29 net, 10+ 14.24 / 15.68 net).
+- **Bourns `SRR6838A-330M`** (Farnell 4655301, 5.45 incl. VAT, 29.99 zł delivery below 200 zł): proven on the prototype, and the fallback if the DE0704-33 does not work out. Not stocked at TME. Farnell notice: since 2026-07-01 some EU shipping methods need a valid EU VAT number on the account.
+- **`SRR6838A-100M`** (10 µH, Isat 1.72 A, DCR 35 mΩ, Farnell 4655293): the TPS54202 datasheet value, with more saturation margin but ≈ 190 mA p-p ripple.
+- **Ferrocore `DE0704-22`** (22 µH, IDC 1.23 A, 0.110 Ω, 1.125 net at 5+): the better part electrically, but 0 in TME stock on 2026-09-28 (6,430 expected 2026-10-14).
+- **Ferrocore `DE0703-22`** (22 µH, IDC 1.07 A, 0.190 Ω, 3.2 mm high, 321 in stock, 1.125 net at 5+): only about 11% more current than the DE0704-33, with higher DCR.
+- **At TME on 2026-09-28, no small quantities:** Bourns `SRP7028A-100M`/`-220M`/`SRP7028AA-150M` and `SRN6045TA-100M`/`-220M`/`-330M` (1,000-piece reels or 0 stock, business customers only); Panasonic `ETQP5M330YFM` (0 stock, minimum 1,000); Ferrocore `HPI0640-100` and `MPLF0630-330` (withdrawn).
 - **SRR6038-330Y** at TME: sold only as a 1,000-piece reel, business customers only.
 - **SRP7028A-330M** at TME: discontinued.
 - Farnell does not list the FYM-7571, LFD028BUE or SCT2024 parts.
