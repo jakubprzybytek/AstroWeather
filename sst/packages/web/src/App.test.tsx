@@ -109,4 +109,72 @@ describe("AstroWeather app", () => {
     expect(await screen.findByText("2026-09-11")).toBeInTheDocument();
     expect(screen.getByText("⚡")).toBeInTheDocument();
   });
+
+  test("opens the NOAA 27-day tool with the first configuration preselected and renders a night from two consecutive UTC days", async () => {
+    fetchMock
+      .mockResolvedValueOnce(configurationsResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        configurationId: "wroclaw",
+        coordinates: { latitude: 51.1079, longitude: 17.0385 },
+        timezone: "Europe/Warsaw",
+        source: {
+          url: "https://services.swpc.noaa.gov/text/27-day-outlook.txt",
+          fetchedAt: "2026-09-28T20:00:00.000Z",
+          lastModified: null,
+          issuedAt: "2026-09-28T02:21:00.000Z"
+        },
+        nights: [{
+          nightId: "2026-10-04",
+          spans: [
+            { start: "2026-10-04T00:00:00.000Z", end: "2026-10-05T00:00:00.000Z", largestKp: 4, ap: 12, f107: 90 },
+            { start: "2026-10-05T00:00:00.000Z", end: "2026-10-06T00:00:00.000Z", largestKp: 5, ap: 15, f107: 91 }
+          ]
+        }]
+      }), { status: 200 }));
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("tab", { name: "NOAA 27-day" }));
+    await screen.findByRole("option", { name: "Wrocław" });
+    expect(screen.getByLabelText("Configuration")).toHaveValue("wroclaw");
+    fireEvent.click(screen.getByRole("button", { name: "Fetch forecast" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/tools/noaa-outlook"),
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ configurationId: "wroclaw" }) })
+    ));
+    expect(await screen.findByText("2026-10-04")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "04 Oct 02:00–05 Oct 02:00" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "05 Oct 02:00–06 Oct 02:00" })).toBeInTheDocument();
+    expect(screen.getByText("Largest Kp").parentElement?.textContent).toBe("Largest Kp45");
+  });
+
+  test("sends coordinates with a timezone to the OVATION tool", async () => {
+    fetchMock
+      .mockResolvedValueOnce(configurationsResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        coordinates: { latitude: 27.9, longitude: 34.3 },
+        timezone: "Africa/Cairo",
+        source: { url: "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json", fetchedAt: "2026-09-28T20:00:00.000Z", lastModified: null },
+        nights: [{
+          nightId: "2026-09-28",
+          spans: [{ start: "2026-09-28T20:03:00.000Z", end: "2026-09-28T21:27:00.000Z", probabilityPct: 7, cell: { latitude: 28, longitude: 34 } }]
+        }]
+      }), { status: 200 }));
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("tab", { name: "OVATION" }));
+    await screen.findByRole("option", { name: "Wrocław" });
+    fireEvent.change(screen.getByLabelText("Input"), { target: { value: "coordinates" } });
+    fireEvent.change(screen.getByLabelText("Latitude"), { target: { value: "27.9" } });
+    fireEvent.change(screen.getByLabelText("Longitude"), { target: { value: "34.3" } });
+    fireEvent.change(screen.getByLabelText("Timezone"), { target: { value: "Africa/Cairo" } });
+    fireEvent.click(screen.getByRole("button", { name: "Fetch forecast" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/tools/ovation"),
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ latitude: 27.9, longitude: 34.3, timezone: "Africa/Cairo" }) })
+    ));
+    expect(await screen.findByRole("columnheader", { name: "23:03–00:27" })).toBeInTheDocument();
+    expect(screen.getByText("7%")).toBeInTheDocument();
+  });
 });

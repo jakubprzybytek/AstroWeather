@@ -112,6 +112,10 @@ export default $config({
       link: [forecastData]
     });
     api.route("POST /tools/clearoutside", "packages/functions/src/clearoutside.handler");
+    api.route("POST /tools/gfz-hp60", "packages/functions/src/tools/gfz-hp60.handler");
+    api.route("POST /tools/noaa-kp", "packages/functions/src/tools/noaa-kp.handler");
+    api.route("POST /tools/noaa-outlook", "packages/functions/src/tools/noaa-outlook.handler");
+    api.route("POST /tools/ovation", "packages/functions/src/tools/ovation.handler");
 
     const apiCertificate = new aws.acm.Certificate("AstroApiCertificate", {
       domainName: domain.api,

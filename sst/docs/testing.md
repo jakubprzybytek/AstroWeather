@@ -48,6 +48,11 @@ Current coverage:
 | `weather/clearoutside.test.ts` | HTML parser against a saved fixture; fetch timeout and retry behavior |
 | `weather/clearoutside-storage.test.ts` | DynamoDB keys, metadata, and `expireAt` calculation |
 | `jobs/clearoutside-weather.test.ts` | Scheduled ingestion: sequential locations, failure isolation, final failure signal |
+| `aurora/spans.test.ts` | Night grouping: spans keep their boundaries and join every local night they overlap |
+| `aurora/gfz-hp60.test.ts`, `aurora/noaa-kp.test.ts`, `aurora/noaa-outlook.test.ts` | Source parsers against saved fixtures in `aurora/__fixtures__/`; fail-closed checks |
+| `aurora/ovation.test.ts` | Grid-cell lookup, including western longitudes on the 0..359 grid |
+| `aurora/fetch.test.ts` | Source fetch: last-modified header, retry on server failure only |
+| `tools/handler.test.ts` | `POST /tools/<source>` factory: configuration or coordinates plus timezone, night grouping, `502` on source failure |
 
 The forecast weather reader (`forecast/weather-reader.ts`) and astronomy
 projection (`forecast/astronomy.ts`) have no dedicated unit tests yet. Astronomy is exercised indirectly through `assemble.test.ts`.

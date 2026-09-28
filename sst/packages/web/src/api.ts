@@ -1,4 +1,4 @@
-import type { AstroResponse, ClearOutsideResponse, Configuration } from "./types";
+import type { AstroResponse, ClearOutsideResponse, Configuration, SourceResponse } from "./types";
 
 const apiUrl = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
@@ -39,4 +39,25 @@ export async function fetchClearOutside(input: ClearOutsideInput): Promise<Clear
   }
 
   return body as ClearOutsideResponse;
+}
+
+export type SourceToolInput =
+  | { configurationId: string }
+  | { latitude: number; longitude: number; timezone: string };
+
+// The aurora source tools share one request and response shape; `tool` is
+// the path segment after `/tools/`.
+export async function fetchSourceTool<T>(tool: string, input: SourceToolInput): Promise<SourceResponse<T>> {
+  const response = await fetch(`${apiUrl}/tools/${tool}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input)
+  });
+  const body = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(typeof body.message === "string" ? body.message : `Unable to load ${tool} data`);
+  }
+
+  return body as SourceResponse<T>;
 }

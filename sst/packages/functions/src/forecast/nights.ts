@@ -48,7 +48,7 @@ export function localDate(date: Date, timezone: string): string {
   return localDateTime(date, timezone).slice(0, 10);
 }
 
-function addDays(date: string, amount: number): string {
+export function addDays(date: string, amount: number): string {
   const value = new Date(`${date}T12:00:00Z`);
   value.setUTCDate(value.getUTCDate() + amount);
   return value.toISOString().slice(0, 10);

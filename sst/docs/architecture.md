@@ -19,6 +19,11 @@ to call a separate endpoint for each data source.
 - **Endpoint**: `POST /tools/clearoutside`
   - **Output**: JSON with normalized hourly Clearoutside nights, used by the web
     UI's helper tool (see [Web UI](#web-ui)).
+- **Endpoints**: `POST /tools/gfz-hp60`, `POST /tools/noaa-kp`,
+  `POST /tools/noaa-outlook`, `POST /tools/ovation`
+  - **Output**: JSON with one aurora source's values grouped into local nights,
+    at the source's own granularity, used by the web UI's helper tools (see
+    [Web UI](#web-ui)).
 - **Throttling**: burst of one request and a steady rate of one request per second.
 
 ### 2. Lambda Functions
@@ -31,6 +36,10 @@ to call a separate endpoint for each data source.
     when a source is unavailable;
   - `protocol.ts` validates the model and serializes the text payload.
 - **Configurations handler** and **Clearoutside tool handler** for the other routes.
+- **Aurora source tool handlers** (`tools/`): one `createSourceToolHandler`
+  factory resolves the location and groups spans into nights; `aurora/` holds
+  a fetcher and parser per source (`gfz-hp60.ts`, `noaa-kp.ts`,
+  `noaa-outlook.ts`, `ovation.ts`) and the shared `spans.ts` night grouping.
 - **Clearoutside ingestion job** (`jobs/clearoutside-weather.ts`), described in
   [Write path](#write-path-independent-cadence-per-source).
 
@@ -270,12 +279,26 @@ resolves the final coordinates, fetches and parses the server-rendered
 Clearoutside forecast in Lambda, and returns normalized hourly nights to the
 browser.
 
+The aurora source tools (`GFZ Hp60`, `NOAA Kp`, `NOAA 27-day`, `OVATION`) are
+backed by `POST /tools/<id>` and share one form and one table. They accept a
+`configurationId`, or coordinates plus an IANA `timezone`, because every tool
+needs the timezone to cut the source into local-noon-to-noon nights even
+though three of the four sources are global. The response keeps the source's
+own granularity as spans with their real UTC boundaries: hourly for GFZ Hp60,
+three-hour bins for the NOAA Kp forecast, UTC days for the 27-day outlook, and
+one observation-to-forecast interval for OVATION. A span belongs to every
+night it overlaps, so a night built from the 27-day outlook shows the two
+consecutive UTC days it straddles, and a three-hour bin crossing local noon
+appears in both neighbouring nights. See
+[Aurora Forecast Supplier Evaluation](aurora-forecast-supplier.md) for the
+sources.
+
 The project structure is:
 
 ```text
 sst/
 ├── packages/functions/
-│   ├── src/              # Lambda handlers, forecast/, weather/, jobs/
+│   ├── src/              # Lambda handlers, forecast/, weather/, aurora/, tools/, jobs/
 │   └── tests/integration/
 ├── packages/web/         # Vite + React UI
 ├── docs/                 # Architecture, API, development, and testing documentation
