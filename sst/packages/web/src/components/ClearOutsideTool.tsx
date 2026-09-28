@@ -7,6 +7,8 @@ import { ClearOutsideResults } from "./ClearOutsideResults";
 export function ClearOutsideTool({ configurations }: { configurations: Configuration[] }) {
   const [mode, setMode] = useState<"configuration" | "coordinates">("configuration");
   const [configurationId, setConfigurationId] = useState("");
+  // The first configuration is preselected once the list has loaded.
+  const selectedConfigurationId = configurationId || (configurations[0]?.id ?? "");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [data, setData] = useState<ClearOutsideResponse | null>(null);
@@ -15,9 +17,9 @@ export function ClearOutsideTool({ configurations }: { configurations: Configura
   const requestId = useRef(0);
 
   async function submit() {
-    if (mode === "configuration" && !configurationId) return;
+    if (mode === "configuration" && !selectedConfigurationId) return;
     const input: ClearOutsideInput = mode === "configuration"
-      ? { configurationId }
+      ? { configurationId: selectedConfigurationId }
       : { latitude: Number(latitude), longitude: Number(longitude) };
     if (mode === "coordinates") {
       const coordinates = input as Extract<ClearOutsideInput, { latitude: number }>;
@@ -59,8 +61,7 @@ export function ClearOutsideTool({ configurations }: { configurations: Configura
           {mode === "configuration" ? (
             <Form.Group controlId="clearoutside-configuration">
               <Form.Label>Configuration</Form.Label>
-              <Form.Select value={configurationId} onChange={(event) => setConfigurationId(event.target.value)}>
-                <option value="">Choose a configuration</option>
+              <Form.Select value={selectedConfigurationId} onChange={(event) => setConfigurationId(event.target.value)}>
                 {configurations.map((configuration) => <option key={configuration.id} value={configuration.id}>{configuration.label}</option>)}
               </Form.Select>
             </Form.Group>
@@ -76,7 +77,7 @@ export function ClearOutsideTool({ configurations }: { configurations: Configura
               </Form.Group>
             </div>
           )}
-          <Button className="mt-3" type="submit" disabled={loading || (mode === "configuration" && !configurationId)}>
+          <Button className="mt-3" type="submit" disabled={loading || (mode === "configuration" && !selectedConfigurationId)}>
             {loading && <Spinner animation="border" size="sm" className="me-2" />}
             {loading ? "Loading…" : "Fetch forecast"}
           </Button>
