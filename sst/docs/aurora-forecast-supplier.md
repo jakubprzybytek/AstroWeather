@@ -37,8 +37,9 @@ licensed, and to apply the location rule ourselves:
 
 The per-location step is a geomagnetic-latitude threshold (see
 [Deriving a four-level scale](#deriving-a-four-level-scale)); for Wrocław an
-aurora is only plausible at Kp ≥ 6, i.e. during G2+ storms, a few nights per
-year. Most of the time the row will be dark, which is the correct answer.
+aurora is only plausible at Kp ≥ 6 and only a real display at Kp ≥ 8, i.e.
+during G2+ and G4+ storms, a few nights per year. Most of the time the row
+will be dark, which is the correct answer.
 
 ## Candidates Rejected
 
@@ -137,37 +138,65 @@ GET https://services.swpc.noaa.gov/json/ovation_aurora_latest.json
 ## Deriving a Four-Level Scale
 
 Kp/Hp60 is global; whether the aurora reaches a place depends on that place's
-**geomagnetic latitude**. NOAA's viewing guidance gives the rule: at Kp 0 the
-equatorward edge of the auroral oval sits at ~66° geomagnetic latitude and
-moves ~2° equatorward per Kp step (Kp 9 → ~48°), and the aurora "can often be
+**magnetic latitude**. NOAA's viewing guidance gives the rule: at Kp 0 the
+equatorward edge of the auroral oval sits at ~66° magnetic latitude and moves
+~2° equatorward per Kp step (Kp 9 → ~48°), and the aurora "can often be
 observed hundreds of kilometers equatorward" of that edge, low on the poleward
-horizon.
+horizon. Magnetic longitude does not enter: two places on the same magnetic
+latitude get the same thresholds, and longitude only matters through local
+time (whether it is dark, and how close the hour is to magnetic midnight,
+where the oval reaches furthest south).
 
-Wrocław (51.11° N, 17.03° E) is at ~50° geomagnetic latitude on the dipole
-approximation (sources quoting corrected-geomagnetic coordinates give ~47°).
-Taking a horizon-visibility allowance of ~5° of latitude:
+### Which magnetic latitude
+
+Two conventions give different numbers for the same place, and the choice is
+worth about one Kp step:
+
+- **Centred-dipole latitude** treats the field as a single tilted bar magnet
+  through Earth's centre (north pole at ~80.7° N, 72.7° W) and is a pure
+  spherical rotation of the geographic coordinates. For Wrocław
+  (51.11° N, 17.03° E) it gives ~50°.
+- **Corrected geomagnetic (CGM / AACGM) latitude** traces the actual IGRF
+  field line from the location to the magnetic equator and labels the place
+  with the dipole coordinates of that crossing. Auroral particles precipitate
+  along field lines, so this is the latitude the oval actually follows, and it
+  is what NOAA, OVATION and the aurora sites use. For Wrocław it gives ~47°.
+
+They differ over Europe because the real field is offset ~500 km from
+Earth's centre toward the western Pacific and bent by the non-dipole
+Siberian anomaly, which connects European field lines to lower dipole
+latitudes than the plain rotation suggests (and North American ones to
+higher). That asymmetry is why the oval reaches further south over Canada and
+the US than over Europe at the same geographic latitude.
+
+**Use the CGM value.** Wrocław ≈ 47°, Kraków ≈ 46°; both should be stored as
+a per-configuration constant rather than computed at runtime, since an AACGM
+dependency is not worth it for two cities.
+
+### Levels
+
+Generalised for a location with CGM latitude `mlat` and a horizon-visibility
+allowance of ~5° of latitude: `kpMin = (66 − (mlat + 5)) / 2` rounded to the
+nearest whole step, then levels at `kpMin − 1`, `kpMin`, `kpMin + 1`. For
+Wrocław `kpMin = 7`:
 
 | Level | Kp / Hp60 | NOAA scale | What it means at Wrocław |
 | --- | --- | --- | --- |
-| `0` | < 5 | quiet–active | nothing to see |
-| `1` | 5 – 5.99 | G1 | camera-only glow on the northern horizon, on a good night |
-| `2` | 6 – 6.99 | G2 | faint naked-eye glow / pillars low in the north |
-| `3` | ≥ 7 | G3 – G5 | proper display, colour visible |
+| `0` | < 6 | quiet – G1 | nothing to see |
+| `1` | 6 – 6.99 | G2 | camera-only glow on the northern horizon, on a good night |
+| `2` | 7 – 7.99 | G3 | faint naked-eye glow / red pillars low in the north |
+| `3` | ≥ 8 | G4 – G5 | proper display, colour visible, possibly overhead |
 
-Generalised for any configured location with geomagnetic latitude `mlat`:
-`kpMin = (66 − (mlat + 5)) / 2` rounded to the nearest half, then levels at
-`kpMin`, `kpMin + 1`, `kpMin + 2`. For Wrocław that is `kpMin ≈ 5.5`, which the
-table above rounds down to 5 to keep the display slightly optimistic; Kraków
-(50.06° N) lands on the same thresholds. The threshold should be a
-per-location constant rather than computed at runtime, since a magnetic-model
-dependency is not worth it for two cities.
+This matches recent experience: the G3 storms of November 2023 and October
+2024 (Kp 7) gave a photographable red glow across Poland, while only the
+May 2024 G5 storm (Kp 9) put the aurora overhead.
 
 Which value to threshold: for nights 1–3 use the GFZ **`median`** for the
 level, and raise the level by one when the ensemble gives at least a 25 %
-chance of the next band (`prob 6-7 + prob 7-8 + prob >= 8` for level `2`, and
-so on), so a storm the ensemble is split about still shows as a possibility.
-For nights 4–7 threshold the 27-day `Largest Kp` directly. These weights are a
-first guess to tune by eye, like the cloud-coverage thirds were.
+chance of the next band (`prob 7-8 + prob >= 8` for level `2`, `prob >= 8`
+for level `3`), so a storm the ensemble is split about still shows as a
+possibility. For nights 4–7 threshold the 27-day `Largest Kp` directly. These
+weights are a first guess to tune by eye, like the cloud-coverage thirds were.
 
 ## Concerns And Risks
 
