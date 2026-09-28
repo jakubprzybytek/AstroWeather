@@ -114,11 +114,13 @@ is sampled at the middle of every minute. The 11:00-12:00 interval is not
 displayed. The server emits the same 21 wall-clock slots across DST
 transitions and maps each local hour to the appropriate instant.
 
-`matrix_2` grades total cloud coverage in quarters (`0` for 0-24 % up to `3`
-for 75-100 %), and `matrix_3` grades the precipitation probability the same
-way, with `*` for a slot where a thunderstorm is predicted. An available
-matrix contains exactly 21 characters, each `0`-`3`, `*` or `?`; a matrix row
-with no available source data is represented by the single `?` character.
+`matrix_2` grades total cloud coverage: `0` only for a clear sky (0 %), and
+the rest in thirds, `1` for 1-33 %, `2` for 34-66 % and `3` for 67-100 %.
+`matrix_3` grades the precipitation probability in quarters (`0` for 0-24 % up
+to `3` for 75-100 %), with `*` for a slot where a thunderstorm is predicted.
+An available matrix contains exactly 21 characters, each `0`-`3`, `*` or `?`;
+a matrix row with no available source data is represented by the single `?`
+character.
 Within an available row, `?` represents an unavailable individual slot. The
 device shows `*` as its brightest level blinking; see
 [api-payload.md](api-payload.md#matrix-encoding).

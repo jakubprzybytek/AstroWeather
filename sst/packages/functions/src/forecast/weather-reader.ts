@@ -2,7 +2,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { Resource } from "sst";
 import type { ClearOutsideItem } from "../weather/clearoutside-storage";
-import { encodeMatrix, quartileLevel, type MatrixCell } from "./matrix";
+import { cloudLevel, encodeMatrix, quartileLevel, type MatrixCell } from "./matrix";
 import { instantAtLocal, observingSlots } from "./nights";
 
 type WeatherReader = {
@@ -22,7 +22,7 @@ export function projectWeather(item: ClearOutsideItem, timezone: string): Pick<R
   return weatherFields(item, timezone);
 }
 
-// Cloud cover and precipitation probability in quarters; a thunderstorm risk
+// Precipitation probability in quarters; a thunderstorm risk
 // shows as `*`, the brightest level blinking, whatever the probability.
 export function precipitationCell(probabilityPercent: number | null | undefined, thunderstormRisk: boolean | null | undefined): MatrixCell | null {
   if (thunderstormRisk) return "*";
@@ -40,7 +40,7 @@ function weatherFields(item: ClearOutsideItem, timezone: string) {
       const expected = instantAtLocal(slot.date, slot.hour, 0, timezone).getTime();
       return Date.parse(candidate.timestampUtc) === expected;
     });
-    cloudValues.push(hour?.cloudCoverTotalPct == null ? null : quartileLevel(hour.cloudCoverTotalPct));
+    cloudValues.push(hour?.cloudCoverTotalPct == null ? null : cloudLevel(hour.cloudCoverTotalPct));
     precipitationValues.push(precipitationCell(hour?.precipitationProbabilityPct, hour?.thunderstormRisk));
   }
 

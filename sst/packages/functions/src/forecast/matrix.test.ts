@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { minutesAboveHorizon } from "./astronomy";
-import { encodeMatrix, minutesLevel, quartileLevel } from "./matrix";
+import { cloudLevel, encodeMatrix, minutesLevel, quartileLevel } from "./matrix";
 import { observingSlots } from "./nights";
 import { precipitationCell } from "./weather-reader";
 
@@ -15,6 +15,12 @@ describe("matrix cells", () => {
     [0, 0], [24, 0], [25, 1], [49, 1], [50, 2], [74, 2], [75, 3], [100, 3]
   ])("%i percent is level %i", (percent, level) => {
     expect(quartileLevel(percent)).toBe(level);
+  });
+
+  test.each([
+    [0, 0], [1, 1], [33, 1], [33.4, 2], [34, 2], [66, 2], [66.7, 3], [67, 3], [100, 3]
+  ])("%d percent cloud coverage is level %i", (percent, level) => {
+    expect(cloudLevel(percent)).toBe(level);
   });
 
   test("encodes a row, with ? for an unavailable slot and for an empty row", () => {

@@ -188,7 +188,8 @@ matrix_1
   Moon by local-hour slot: how much of the hour the moon is above the horizon.
 
 matrix_2
-  Total cloud coverage by local-hour slot, in quarters.
+  Total cloud coverage by local-hour slot: `0` for a clear sky, the rest in
+  thirds.
 
 matrix_3
   Precipitation probability by local-hour slot, in quarters, with `*` where a
@@ -255,7 +256,7 @@ ranks them. What a level means depends on the row:
 | Row | `0` | `1` | `2` | `3` | `*` |
 |---|---|---|---|---|---|
 | `matrix_0` sun and `matrix_1` moon: minutes of the hour above the horizon | 0 | 1-29 | 30-59 | 60 | - |
-| `matrix_2` total cloud coverage | 0-24 % | 25-49 % | 50-74 % | 75-100 % | - |
+| `matrix_2` total cloud coverage | 0 % | 1-33 % | 34-66 % | 67-100 % | - |
 | `matrix_3` precipitation probability | 0-24 % | 25-49 % | 50-74 % | 75-100 % | thunderstorm predicted, whatever the probability |
 
 For the sun and moon rows, the body's altitude is sampled at the middle of

@@ -21,6 +21,15 @@ export function quartileLevel(percent: number): MatrixCell {
   return 0;
 }
 
+// Cloud coverage: clear sky alone is 0, the rest in thirds: 1-33, 34-66,
+// 67-100.
+export function cloudLevel(percent: number): MatrixCell {
+  if (percent <= 0) return 0;
+  if (percent * 3 <= 100) return 1;
+  if (percent * 3 <= 200) return 2;
+  return 3;
+}
+
 // The row as sent: `?` when no slot is available, otherwise one character
 // per slot with `?` for an unavailable one.
 export function encodeMatrix(cells: Array<MatrixCell | null>): string {
