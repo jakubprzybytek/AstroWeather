@@ -36,9 +36,16 @@ export function ovationCell(latitude: number, longitude: number) {
   };
 }
 
-// The nowcast is a single interval from the observation used to the time the
-// probabilities apply to, so a location gets one span.
-export function parseOvation(json: string, latitude: number, longitude: number): OvationSpan {
+export type OvationGrid = {
+  observedAt: string;
+  validAt: string;
+  // The probability for the cell nearest to a location, or null off the grid.
+  probability(latitude: number, longitude: number): number | null;
+};
+
+// Parses the whole grid once, so one download serves every location and the
+// cells north of each.
+export function parseOvationGrid(json: string): OvationGrid {
   let document: OvationDocument;
   try {
     document = JSON.parse(json);
@@ -49,20 +56,39 @@ export function parseOvation(json: string, latitude: number, longitude: number):
     throw new Error("OVATION file is missing the coordinates grid");
   }
 
-  const cell = ovationCell(latitude, longitude);
-  const point = document.coordinates.find((entry) =>
-    Array.isArray(entry) && entry[0] === cell.longitude && entry[1] === cell.latitude
-  );
-  if (!point || typeof point[2] !== "number" || !Number.isFinite(point[2])) {
-    throw new Error(`OVATION file has no value for the cell ${cell.latitude}, ${cell.longitude}`);
+  const values = new Map<string, number>();
+  for (const entry of document.coordinates) {
+    if (Array.isArray(entry) && typeof entry[2] === "number" && Number.isFinite(entry[2])) {
+      values.set(`${entry[0]},${entry[1]}`, entry[2]);
+    }
   }
 
   return {
-    start: timestamp(document["Observation Time"], "observation time"),
-    end: timestamp(document["Forecast Time"], "forecast time"),
-    probabilityPct: point[2],
-    cell
+    observedAt: timestamp(document["Observation Time"], "observation time"),
+    validAt: timestamp(document["Forecast Time"], "forecast time"),
+    probability(latitude, longitude) {
+      const cell = ovationCell(latitude, longitude);
+      return values.get(`${cell.longitude},${cell.latitude}`) ?? null;
+    }
   };
+}
+
+// The nowcast is a single interval from the observation used to the time the
+// probabilities apply to, so a location gets one span.
+export function parseOvation(json: string, latitude: number, longitude: number): OvationSpan {
+  const grid = parseOvationGrid(json);
+  const cell = ovationCell(latitude, longitude);
+  const probabilityPct = grid.probability(latitude, longitude);
+  if (probabilityPct === null) {
+    throw new Error(`OVATION file has no value for the cell ${cell.latitude}, ${cell.longitude}`);
+  }
+
+  return { start: grid.observedAt, end: grid.validAt, probabilityPct, cell };
+}
+
+export async function loadOvationGrid() {
+  const document = await fetchSourceDocument(OVATION_URL, "OVATION");
+  return parseOvationGrid(document.body);
 }
 
 export async function loadOvation(latitude: number, longitude: number) {

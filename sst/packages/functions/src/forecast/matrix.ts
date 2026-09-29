@@ -1,8 +1,9 @@
-// Matrix cells of the num4x4_matrix5x21 board, protocol 2: each of the 21
-// hourly slots is a brightness level 0-3, `*` for the brightest level with
-// blinking, or `?` when unavailable. See docs/api-payload.md.
+// Matrix cells of the num4x4_matrix5x21 board, protocol 3: each of the 21
+// hourly slots is a brightness level 0-3, `a`/`b`/`c` for levels 1-3 blinking
+// down (alternating with off), `*` for level 3 blinking (as `c`), or `?` when
+// unavailable. See docs/api-payload.md.
 
-export type MatrixCell = 0 | 1 | 2 | 3 | "*";
+export type MatrixCell = 0 | 1 | 2 | 3 | "a" | "b" | "c" | "*";
 
 // How much of an hour a body is above the horizon: none, under half an hour,
 // half an hour or more, the whole hour.

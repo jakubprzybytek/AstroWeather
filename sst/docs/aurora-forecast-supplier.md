@@ -14,6 +14,30 @@ The product asked for:
 - an aurora probability expressible on the display's four-level scale;
 - a 7-night horizon, matching the weather rows.
 
+## Current Status
+
+The aurora row is implemented on the server as designed below, with these
+decisions:
+
+- **Thresholds**: each configuration carries `aurora.kpMain`, the naked-eye
+  Kp (Wrocław 7, Kraków 7.5); levels 1 and 3 are one Kp below and above. The
+  procedure for computing it is in `configurations.ts`.
+- **Nowcast from the first release**: raise-only with the placeholder
+  thresholds (5 / 15 / 40 %) and blinking down, rather than logging only; the
+  `aurora-calibration` log runs alongside, and the thresholds are to be tuned
+  after the first storms.
+- **Protocol 3**: blink down (`a`, `b`, `c`) is supported and used for the
+  nowcast; blink up (`A`, `B`) and the GFZ ensemble blink up are not
+  implemented. The device accepts protocol 3 only.
+- **Refresh interval**: the `refreshIntervalMinutes` header record, `60` on a
+  storm night.
+- **Progress bar**: on the local board the parsed aurora row overwrites the
+  progress bar at once, with no success hold; after a failed refresh tonight's
+  row stays blank until the next success.
+
+The HostController firmware accepts protocol 3 (parser, mapper and the
+hourly schedule) and runs against the `int` stage.
+
 ## Executive Assessment
 
 **No public source publishes a per-location, hourly, 7-night aurora
@@ -423,9 +447,12 @@ consecutive UTC days, split at local 01:00 or 02:00.
    happened rather than an old forecast. (The web tool drops those bins; the
    merge keeps them.)
 3. **Fallback is by freshness, not only presence.** GFZ outranks the NOAA
-   3-day forecast only while its file is fresh (`Last-Modified` under three
-   hours old). If the fetch failed or the file went stale, its slots fall
-   through to rank 3; the cascade is the fallback.
+   3-day forecast only while its file was fresh when fetched (`fetchedAt` at
+   most three hours after `Last-Modified`) and the fetch itself is recent (at
+   most seven hours old, which allows one missed six-hourly run). The file's
+   age cannot be judged at read time alone: with six-hourly ingestion the
+   stored copy is routinely hours old. If the fetch failed or the file went
+   stale, its slots fall through to rank 3; the cascade is the fallback.
 4. **Seams are marked, not smoothed.** The 27-day value is a *daily maximum*,
    while GFZ gives an hourly median, so crossing from rank 2 to rank 4
    typically steps up (median 2 → daily max 4). That is honest — "this day

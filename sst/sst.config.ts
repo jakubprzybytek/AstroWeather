@@ -202,6 +202,32 @@ export default $config({
       }
     });
 
+    new sst.aws.CronV2("AuroraIngestion", {
+      // With the weather, so the device's :10 refresh finds both fresh; see
+      // docs/aurora-forecast-supplier.md#fetch-cadence.
+      schedule: "cron(0 0/6 * * ? *)",
+      timezone: "Europe/Warsaw",
+      retries: 0,
+      function: {
+        handler: "packages/functions/src/jobs/aurora-forecast.handler",
+        link: [forecastData],
+        timeout: "2 minutes"
+      }
+    });
+
+    new sst.aws.CronV2("AuroraNowcast", {
+      // Every ten minutes, off the hour; does nothing unless a location's
+      // night is a flagged storm night and it is dark there.
+      schedule: "cron(3/10 * * * ? *)",
+      retries: 0,
+      function: {
+        handler: "packages/functions/src/jobs/aurora-nowcast.handler",
+        link: [forecastData],
+        timeout: "2 minutes",
+        memory: "512 MB"
+      }
+    });
+
     const web = new sst.aws.StaticSite("AstroWeb", {
       path: "packages/web",
       domain: {

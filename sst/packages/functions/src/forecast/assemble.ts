@@ -1,4 +1,6 @@
+import { auroraCell, mergeAurora } from "../aurora/merge";
 import { calculateAstronomy } from "./astronomy";
+import { encodeMatrix } from "./matrix";
 import { nextNightIds } from "./nights";
 import { projectWeather } from "./weather-reader";
 import type { AssembledForecast, ForecastDependencies, ForecastDisplay } from "./types";
@@ -9,13 +11,14 @@ function emptyDisplay(display: number, nightId: string): ForecastDisplay {
   return {
     display, board: BOARD, nightId,
     sunset: "?", sunrise: "?", sun: "?", moon: "?", cloud: "?",
-    precipitation: "?", maximumTemperature: "?", minimumTemperature: "?"
+    precipitation: "?", aurora: "?", maximumTemperature: "?", minimumTemperature: "?"
   };
 }
 
 export async function assembleForecast(
   configurationId: string,
   location: { lat: number; lon: number; tz: string },
+  aurora: { kpMain: number },
   dependencies: ForecastDependencies
 ): Promise<AssembledForecast> {
   const now = dependencies.now();
@@ -56,5 +59,24 @@ export async function assembleForecast(
     });
   }
 
-  return { displays, lastWeatherFetch };
+  // Six-hourly unless tonight is a storm night; also when the aurora is unknown.
+  let refreshIntervalMinutes: 60 | 360 = 360;
+  try {
+    const nights = await dependencies.readAurora(configurationId, nightIds, now);
+    for (const display of displays) {
+      const night = nights.get(display.nightId);
+      if (!night) continue;
+      display.aurora = encodeMatrix(mergeAurora(display.nightId, location.tz, aurora.kpMain, night, now).map(auroraCell));
+    }
+    if (nights.get(nightIds[0])?.flag) refreshIntervalMinutes = 60;
+  } catch (cause) {
+    dependencies.log?.("Forecast aurora failed", {
+      configurationId,
+      nightIds,
+      error: cause instanceof Error ? cause.message : String(cause),
+      source: "aurora"
+    });
+  }
+
+  return { displays, lastWeatherFetch, refreshIntervalMinutes };
 }

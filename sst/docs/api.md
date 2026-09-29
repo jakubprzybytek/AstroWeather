@@ -47,20 +47,21 @@ The endpoint is consumed by an STM32-based device without a JSON parser. A
 successful request returns `text/plain; charset=utf-8` using the versioned ASCII
 `key=value` protocol defined in [api-payload.md](api-payload.md).
 
-The response contains the `protocol=2`, `configurationId`, `time`, and
-`lastWeatherFetchTime` header records, followed by six fixed-order display
+The response contains the `protocol=3`, `configurationId`, `time`,
+`lastWeatherFetchTime` and `refreshIntervalMinutes` header records, followed by six fixed-order display
 blocks. `time` is the configuration's local wall-clock time with its UTC
 offset as `YYYY-MM-DDTHH:MM:SS.mmm+HH:MM`; `lastWeatherFetchTime` is the local
 `YYYY-MM-DDTHH:MM:SS+HH:MM` of the last successful weather fetch, or `?`. Each block contains, in order,
 `display`, `board`, `nightId`, `numeric_0`, `numeric_1`, `matrix_0` through
-`matrix_3`, `numeric_2`, and `numeric_3`. `numeric_0` and `numeric_1`
-are sunset and sunrise; `matrix_0` through `matrix_3` are sun, moon, cloud
-and precipitation; and `numeric_2` and `numeric_3` are maximum and minimum
-temperature. `board` is `num4x4_matrix5x21` in version 2.
+`matrix_4`, `numeric_2`, and `numeric_3`. `numeric_0` and `numeric_1`
+are sunset and sunrise; `matrix_0` through `matrix_4` are sun, moon, cloud,
+precipitation and aurora; and `numeric_2` and `numeric_3` are maximum and minimum
+temperature. `board` is `num4x4_matrix5x21` in version 3.
+`refreshIntervalMinutes` is `60` on a storm night and `360` otherwise.
 
 Records remain present when a source is missing or fails and use the payload
 sentinel `?` for all unavailable times, weather values, and matrix slots. There is no
-`displayCount`, `matrix_4`, or end marker in version 2. The wire
+`displayCount` or end marker in version 3. The wire
 format has one empty row between display blocks and no comments.
 
 Error responses use the same line protocol and stable machine-readable error
@@ -180,7 +181,7 @@ client. Operational details belong in structured Lambda logs.
 ## Acceptance Criteria
 
 1. A request for a known configuration returns `200`, content type `text/plain`,
-   protocol version 2, and exactly six display blocks in ascending order.
+   protocol version 3, and exactly six display blocks in ascending order.
 2. The first night is selected using the location's timezone and local-noon
    boundary; the next five night identifiers are consecutive local dates.
 3. Every display block contains the complete, fixed-order record set defined in
@@ -205,13 +206,30 @@ client. Operational details belong in structured Lambda logs.
    instant, including after a DST change.
 12. A successful response carries `lastWeatherFetchTime` as the local time and
    UTC offset of the newest weather `fetchedAt` used, or `?` without weather.
+13. Available `#AURORA` items supply `matrix_4`, merged as in
+   [aurora-forecast-supplier.md](aurora-forecast-supplier.md#merging-sources);
+   missing or failed aurora leaves it `?` and `refreshIntervalMinutes=360`
+   without affecting the other rows.
+
+## Data Attribution
+
+The aurora row uses:
+
+- the GFZ Hp60 and Kp forecasts, GFZ German Research Centre for Geosciences,
+  licensed CC BY 4.0: Matzka, J., Bronkalla, O., Tornow, K., Elger, K. and
+  Stolle, C. (2021), Geomagnetic Kp index, GFZ Data Services,
+  doi:10.5880/Kp.0001; Matzka, J., Stolle, C., Yamazaki, Y., Bronkalla, O. and
+  Morschhauser, A. (2021), The geomagnetic Kp index and derived indices of
+  geomagnetic activity, Space Weather, doi:10.1029/2020SW002641;
+- the 3-day Kp forecast, the 27-day outlook and the OVATION aurora nowcast of
+  the NOAA Space Weather Prediction Center (public domain).
 
 ## Non-goals
 
 - Backfilling or migrating old DynamoDB records.
 - Fetching Clear Outside during an API request.
 - Configuration CRUD or accepting arbitrary coordinates.
-- Adding aurora or additional forecast services in this story.
+- Additional forecast services beyond weather and aurora.
 - Guaranteeing that weather exists for every requested night.
 
 ## Clients

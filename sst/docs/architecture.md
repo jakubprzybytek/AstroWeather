@@ -32,16 +32,19 @@ to call a separate endpoint for each data source.
   - `nights.ts` derives the six observing nights and 21 local-hour slots;
   - `astronomy.ts` calculates sunset, sunrise, and sun/moon matrices with `suncalc`;
   - `weather-reader.ts` reads and projects the stored `#WEATHER` items;
-  - `assemble.ts` merges astronomy and weather independently, using sentinels
-    when a source is unavailable;
+  - the aurora store (`aurora/storage.ts`) reads the stored `#AURORA#…` items
+    and `aurora/merge.ts` merges them into the aurora row, slot by slot;
+  - `assemble.ts` merges astronomy, weather and aurora independently, using
+    sentinels when a source is unavailable, and sets the refresh interval;
   - `protocol.ts` validates the model and serializes the text payload.
 - **Configurations handler** and **Clearoutside tool handler** for the other routes.
 - **Aurora source tool handlers** (`tools/`): one `createSourceToolHandler`
   factory resolves the location and groups spans into nights; `aurora/` holds
   a fetcher and parser per source (`gfz-hp60.ts`, `noaa-kp.ts`,
   `noaa-outlook.ts`, `ovation.ts`) and the shared `spans.ts` night grouping.
-- **Clearoutside ingestion job** (`jobs/clearoutside-weather.ts`), described in
-  [Write path](#write-path-independent-cadence-per-source).
+- **Clearoutside ingestion job** (`jobs/clearoutside-weather.ts`) and the
+  **aurora jobs** (`jobs/aurora-forecast.ts`, `jobs/aurora-nowcast.ts`),
+  described in [Write path](#write-path-independent-cadence-per-source).
 
 ### 3. API edge (CloudFront, HTTP and HTTPS)
 
@@ -94,20 +97,26 @@ renaming the path parameter later.
 
 For now, configurations are deliberately simple and are hardcoded in
 `packages/functions/src/configurations.ts`. The object maps each identifier to
-a display label, location, and timezone:
+a display label, location, timezone and aurora threshold:
 
 ```typescript
 export const configurations = {
   "wroclaw": {
     label: "Wrocław",
-    location: { lat: 51.1079, lon: 17.0385, tz: "Europe/Warsaw" }
+    location: { lat: 51.1079, lon: 17.0385, tz: "Europe/Warsaw" },
+    aurora: { kpMain: 7 }
   },
   "krakow": {
     label: "Kraków",
-    location: { lat: 50.0647, lon: 19.945, tz: "Europe/Warsaw" }
+    location: { lat: 50.0647, lon: 19.945, tz: "Europe/Warsaw" },
+    aurora: { kpMain: 7.5 }
   }
 } as const;
 ```
+
+`aurora.kpMain` is the Kp at which an aurora becomes visible to the naked eye
+from the location; the file's comment gives the procedure for computing it
+from the location's corrected geomagnetic latitude.
 
 The configuration collection can eventually be managed with CRUD operations,
 with profiles stored independently from the nightly forecast records. That is
@@ -225,8 +234,22 @@ weather data for night X"):
 - **Weather (Meteosource, evaluated only)**: a documented API alternative; see
   [Meteosource Weather Supplier Evaluation](meteosource-weather-supplier.md) for
   live API results, plan limits, and integration guidance.
-- **Aurora forecast (future)**: separate scheduled Lambda with its own polling
-  interval; shorter TTL since forecasts go stale quickly.
+- **Aurora forecast (implemented)**: the `AuroraIngestion` `CronV2` runs on the
+  weather's schedule (00:00, 06:00, 12:00 and 18:00 Europe/Warsaw). It fetches
+  the global GFZ Hp60 ensemble, the NOAA 3-day Kp forecast (with its observed
+  bins) and the NOAA 27-day outlook once, and stores each source's spans per
+  location and displayed night as `NIGHT#…#AURORA#GFZ`, `#NOAA3` and
+  `#NOAA27`. A failed source is logged, the others are still stored, and the
+  invocation throws at the end. The same run sets the sticky
+  `NIGHT#…#AURORA#FLAG` item for a night that may reach the location's aurora
+  threshold, which switches the device to hourly refreshes.
+- **Aurora nowcast (implemented)**: the `AuroraNowcast` `CronV2` runs every
+  ten minutes (`cron(3/10 * * * ? *)`). It returns at once unless a location's
+  current night is flagged and it is dark there (sun below −6°); then it
+  refreshes GFZ and NOAA 3-day, fetches the OVATION grid once, stores the
+  location's percentage in `NIGHT#…#AURORA#OVATION` for the slot the nowcast
+  describes (latest and maximum), and logs an `aurora-calibration` sample.
+  See [Aurora Forecast Supplier Evaluation](aurora-forecast-supplier.md).
 
 Each writer is a small, independent Lambda + schedule, matching the existing
 SST/Lambda-per-concern style and keeping blast radius small if one upstream API

@@ -4,9 +4,10 @@ import { assembleForecast } from "./assemble";
 describe("assembleForecast", () => {
   test("keeps six displays and available astronomy when weather fails", async () => {
     const log = vi.fn();
-    const result = await assembleForecast("krakow", { lat: 50, lon: 20, tz: "Europe/Warsaw" }, {
+    const result = await assembleForecast("krakow", { lat: 50, lon: 20, tz: "Europe/Warsaw" }, { kpMain: 7.5 }, {
       now: () => new Date("2026-09-17T10:00:00Z"),
       readWeather: vi.fn().mockRejectedValue(new Error("Dynamo unavailable")),
+      readAurora: async () => new Map(),
       log
     });
 
@@ -26,9 +27,10 @@ describe("assembleForecast", () => {
       expireAt: 2_000_000_000,
       hours: [{ hour: 14, timestampUtc: "2026-09-17T12:00:00.000Z", temperatureC: 18.5, cloudCoverTotalPct: 60, precipitationProbabilityPct: 30, thunderstormRisk: true }]
     };
-    const result = await assembleForecast("krakow", { lat: Number.NaN, lon: 20, tz: "Europe/Warsaw" }, {
+    const result = await assembleForecast("krakow", { lat: Number.NaN, lon: 20, tz: "Europe/Warsaw" }, { kpMain: 7.5 }, {
       now: () => new Date("2026-09-17T10:00:00Z"),
       readWeather: async () => new Map([["2026-09-17", item]]),
+      readAurora: async () => new Map(),
       log: vi.fn()
     });
 
@@ -39,9 +41,10 @@ describe("assembleForecast", () => {
   });
 
   test("grades the sun by minutes above the horizon in each hour", async () => {
-    const result = await assembleForecast("krakow", { lat: 50.06, lon: 19.94, tz: "Europe/Warsaw" }, {
+    const result = await assembleForecast("krakow", { lat: 50.06, lon: 19.94, tz: "Europe/Warsaw" }, { kpMain: 7.5 }, {
       now: () => new Date("2026-09-17T10:00:00Z"),
       readWeather: async () => new Map(),
+      readAurora: async () => new Map(),
       log: vi.fn()
     });
     // 2026-09-17 in Krakow: sunset about 18:50, sunrise about 06:21. Slots 0-3
@@ -57,13 +60,14 @@ describe("assembleForecast", () => {
       nightId, service: "skyConditions" as const,
       coordinates: { latitude: 50, longitude: 20 }, fetchedAt, expireAt: 2_000_000_000, hours: []
     });
-    const result = await assembleForecast("krakow", { lat: 50, lon: 20, tz: "Europe/Warsaw" }, {
+    const result = await assembleForecast("krakow", { lat: 50, lon: 20, tz: "Europe/Warsaw" }, { kpMain: 7.5 }, {
       now: () => new Date("2026-09-17T10:00:00Z"),
       readWeather: async () => new Map([
         ["2026-09-17", item("2026-09-17", "2026-09-17T04:00:03.000Z")],
         ["2026-09-18", item("2026-09-18", "2026-09-16T22:00:05.000Z")],
         ["2026-09-19", item("2026-09-19", "not a date")]
       ]),
+      readAurora: async () => new Map(),
       log: vi.fn()
     });
 

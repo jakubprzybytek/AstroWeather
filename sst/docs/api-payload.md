@@ -18,10 +18,11 @@ Wire example
 ------------
 
 ```
-protocol=2
+protocol=3
 configurationId=krakow
 time=2026-09-22T23:22:45.678+02:00
 lastWeatherFetchTime=2026-09-22T18:00:04+02:00
+refreshIntervalMinutes=60
 
 display=0
 board=num4x4_matrix5x21
@@ -32,6 +33,7 @@ matrix_0=333320000000000002333
 matrix_1=000023333333333333200
 matrix_2=110011122233333221100
 matrix_3=0000000111223**211110
+matrix_4=000000011122bb2211111
 numeric_2=18
 numeric_3=9
 
@@ -44,6 +46,7 @@ matrix_0=333320000000000002333
 matrix_1=???????33333333333100
 matrix_2=000333333333333333300
 matrix_3=000000000000003000000
+matrix_4=000000000000011111111
 numeric_2=18
 numeric_3=9
 
@@ -56,6 +59,7 @@ matrix_0=?
 matrix_1=?
 matrix_2=?
 matrix_3=?
+matrix_4=?
 numeric_2=?
 numeric_3=?
 
@@ -68,6 +72,7 @@ matrix_0=333320000000000002333
 matrix_1=000000000000000000000
 matrix_2=000000000000000000000
 matrix_3=000000000000000000000
+matrix_4=000000000000000000000
 numeric_2=16
 numeric_3=8
 
@@ -80,6 +85,7 @@ matrix_0=333320000000000002333
 matrix_1=000000000000000000000
 matrix_2=000000000000000000000
 matrix_3=000000000000000000000
+matrix_4=000000000000000000000
 numeric_2=16
 numeric_3=7
 
@@ -92,6 +98,7 @@ matrix_0=333320000000000002333
 matrix_1=000000000000000000000
 matrix_2=000000000000000000000
 matrix_3=000000000000000000000
+matrix_4=000000000000000000000
 numeric_2=15
 numeric_3=6
 ```
@@ -110,14 +117,14 @@ Framing and parsing rules
 - Split each record at the first equals sign. Unknown keys must be ignored so
   fields can be added in a later protocol version.
 - Header records occur once and in the documented order: `protocol`,
-  `configurationId`, `time`.
+  `configurationId`, `time`, `lastWeatherFetchTime`, `refreshIntervalMinutes`.
 - A display=<index> record starts a display block. It is followed by that
   block's records in the documented order.
 - Each matrix record contains either 21 slot characters or the single `?`
   character when the entire matrix row is unavailable. Within a 21-character
   row, `?` marks an unavailable individual slot.
 - A successful response always has six display blocks, with display indexes 0
-  to 5. There is no displayCount or end marker in version 2.
+  to 5. There is no displayCount or end marker in version 3.
 - The device must reject the update if the protocol version is unsupported, a
   required record is malformed or absent, the board is unsupported, display
   indexes are not consecutive, or the HTTP body ends before all required
@@ -129,12 +136,14 @@ Field definitions
 -----------------
 
 protocol
-  Decimal protocol version. The current version is 2, which changed the
-  matrix cells from on/off (`*`, `.`) to brightness levels with blinking;
-  see Matrix encoding. Version 1 was retired with it.
+  Decimal protocol version. The current version is 3, which added the
+  blinking levels `a`, `b` and `c` to the matrix cells, the `matrix_4` aurora
+  row and the `refreshIntervalMinutes` header record; see Matrix encoding.
+  Version 2 (levels and `*` only, no aurora) was retired with it: a device
+  accepts only version 3. Version 2 had replaced version 1's on/off cells.
 
 board
-  Display format identifier. Version 2 supports only
+  Display format identifier. Version 3 supports only
   `num4x4_matrix5x21`. The board record is repeated in every display block so
   a device can validate each block independently.
 
@@ -167,6 +176,14 @@ lastWeatherFetchTime
   supplier, not the time the supplier's model ran. `?` means the response
   carries no weather. It appears only in successful responses.
 
+refreshIntervalMinutes
+  How often the device should fetch the forecast, in minutes: `360` normally
+  (every six hours, at 10 minutes past 00, 06, 12 and 18 local), `60` when
+  tonight (display 0) is a storm night with a chance of aurora, so the aurora
+  row and its nowcast stay current (every hour at 10 minutes past). The
+  server decides it; once set for a night it stays for that night. It
+  appears only in successful responses.
+
 display
   Zero-based display index. Display 0 is the current observing night in the
   configuration's timezone; displays 1 to 5 are consecutive nights.
@@ -196,8 +213,11 @@ matrix_3
   thunderstorm is predicted.
 
 matrix_4
-  Unused in version 2 and omitted from the response. It is reserved for a
-  future matrix channel.
+  Aurora by local-hour slot: the chance of seeing an aurora from the
+  configured location, merged from the geomagnetic forecasts and, on storm
+  nights, the OVATION nowcast. Blinking marks the hours the nowcast describes
+  (now and the next hour). See docs/aurora-forecast-supplier.md for the
+  sources and the merge.
 
 numeric_2
   Maximum temperature during the observing night, in whole degrees Celsius,
@@ -248,8 +268,14 @@ Each character is one LED's brightness level, and optionally blinking:
 
 * `0` means the LED is off.
 * `1`, `2` and `3` are increasing brightness levels; `3` is full.
-* `*` means full brightness, blinking.
+* `a`, `b` and `c` are levels 1, 2 and 3 blinking down: the LED alternates
+  between its level and off.
+* `*` is the same as `c`: full brightness, blinking. It is kept for the
+  precipitation row's thunderstorm.
 * `?` means source data is unavailable for the slot; the device shows it off.
+
+Any row may use any of these characters; the table below lists what each
+row uses today.
 
 The device maps the levels to its own brightness steps; the payload only
 ranks them. What a level means depends on the row:
@@ -259,6 +285,11 @@ ranks them. What a level means depends on the row:
 | `matrix_0` sun and `matrix_1` moon: minutes of the hour above the horizon | 0 | 1-29 | 30-59 | 60 | - |
 | `matrix_2` total cloud coverage | 0 % | 1-33 % | 34-66 % | 67-100 % | - |
 | `matrix_3` precipitation probability | 0-24 % | 25-49 % | 50-74 % | 75-100 % | thunderstorm predicted, whatever the probability |
+| `matrix_4` aurora (Kp relative to the location's `kpMain`) | below `kpMain` − 1 | from `kpMain` − 1: faint, camera | from `kpMain`: naked eye, low | from `kpMain` + 1: bright | - |
+
+In `matrix_4`, `a`/`b`/`c` are levels 1-3 in the hour the nowcast describes
+and the one before it: an aurora there now. Slots taken from the 27-day
+outlook are `1` ("possible") at most.
 
 For the sun and moon rows, the body's altitude is sampled at the middle of
 every minute of the slot, from the slot's start, and the minutes above the
@@ -295,7 +326,7 @@ Errors
 
 Errors also use text/plain and a small parseable body:
 
-protocol=2
+protocol=3
 error=configuration_not_found
 
 HTTP status remains authoritative: 404 for an unknown configuration and 500

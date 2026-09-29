@@ -3,6 +3,7 @@ import { assembleForecast } from "./forecast/assemble";
 import { localDateTime, localDateTimeMillis, utcOffset } from "./forecast/nights";
 import { serializeError, serializeForecast } from "./forecast/protocol";
 import { createWeatherReader } from "./forecast/weather-reader";
+import { createAuroraStore } from "./aurora/storage";
 
 type ConfigurationId = keyof typeof configurations;
 
@@ -20,6 +21,7 @@ export function createHandler(
   dependencies: {
     now?: () => Date;
     readWeather?: ReturnType<typeof createWeatherReader>["read"];
+    readAurora?: ReturnType<typeof createAuroraStore>["readNights"];
     log?: (message: string, details: Record<string, unknown>) => void;
   } = {}
 ) {
@@ -31,12 +33,13 @@ export function createHandler(
     }
 
     const now = dependencies.now ?? (() => new Date());
-    const { location } = configurations[configurationId];
+    const { location, aurora } = configurations[configurationId];
 
     try {
-      const { displays, lastWeatherFetch } = await assembleForecast(configurationId, location, {
+      const { displays, lastWeatherFetch, refreshIntervalMinutes } = await assembleForecast(configurationId, location, aurora, {
         now,
         readWeather: dependencies.readWeather ?? createWeatherReader().read,
+        readAurora: dependencies.readAurora ?? createAuroraStore().readNights,
         log: dependencies.log ?? ((message, details) => console.log(message, details))
       });
       // Read the clock after assembly so the device's RTC sync is as close to sending as possible.
@@ -45,7 +48,7 @@ export function createHandler(
       const lastWeatherFetchTime = lastWeatherFetch
         ? localDateTime(lastWeatherFetch, location.tz) + utcOffset(lastWeatherFetch, location.tz)
         : "?";
-      return textResponse(200, serializeForecast(configurationId, time, lastWeatherFetchTime, displays));
+      return textResponse(200, serializeForecast(configurationId, time, lastWeatherFetchTime, refreshIntervalMinutes, displays));
     } catch (cause) {
       dependencies.log?.("Forecast response failed", {
         configurationId,

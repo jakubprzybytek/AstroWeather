@@ -3,7 +3,7 @@ import { describe, test, expect, inject } from "vitest";
 const BASE_URL = inject("apiUrl");
 const displayKeys = [
   "display", "board", "nightId", "numeric_0", "numeric_1",
-  "matrix_0", "matrix_1", "matrix_2", "matrix_3", "numeric_2", "numeric_3"
+  "matrix_0", "matrix_1", "matrix_2", "matrix_3", "matrix_4", "numeric_2", "numeric_3"
 ];
 
 describe("GET /astro/{configurationId}", () => {
@@ -14,7 +14,7 @@ describe("GET /astro/{configurationId}", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/plain");
-    expect(lines[0]).toBe("protocol=2");
+    expect(lines[0]).toBe("protocol=3");
     expect(lines[1]).toBe("configurationId=krakow");
     // Krakow is UTC+1 or UTC+2; with the offset the value names an exact instant.
     expect(lines[2]).toMatch(/^time=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+0[12]:00$/);
@@ -22,8 +22,9 @@ describe("GET /astro/{configurationId}", () => {
     expect(Math.abs(renderedAt - Date.now())).toBeLessThan(60_000);
     // Weather is ingested every six hours, so a working deployment has a value.
     expect(lines[3]).toMatch(/^lastWeatherFetchTime=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+0[12]:00$/);
-    expect(lines[4]).toBe("");
-    expect(lines[5]).toBe("display=0");
+    expect(lines[4]).toMatch(/^refreshIntervalMinutes=(60|360)$/);
+    expect(lines[5]).toBe("");
+    expect(lines[6]).toBe("display=0");
     expect(body).toContain("\n\ndisplay=1");
 
     expect(lines.filter((line) => line.startsWith("display="))).toEqual([
@@ -33,8 +34,8 @@ describe("GET /astro/{configurationId}", () => {
       const start = lines.indexOf(`display=${display}`);
       expect(lines.slice(start, start + displayKeys.length).map((line) => line.split("=", 1)[0]))
         .toEqual(displayKeys);
-      const matrices = lines.slice(start + 5, start + 9).map((line) => line.split("=", 2)[1]);
-      expect(matrices.every((value) => value === "?" || /^[0-3*?]{21}$/.test(value))).toBe(true);
+      const matrices = lines.slice(start + 5, start + 10).map((line) => line.split("=", 2)[1]);
+      expect(matrices.every((value) => value === "?" || /^[0-3abc*?]{21}$/.test(value))).toBe(true);
     }
   });
 
@@ -43,7 +44,7 @@ describe("GET /astro/{configurationId}", () => {
 
     expect(response.status).toBe(404);
     expect(response.headers.get("content-type")).toContain("text/plain");
-    expect(await response.text()).toBe("protocol=2\nerror=configuration_not_found\n");
+    expect(await response.text()).toBe("protocol=3\nerror=configuration_not_found\n");
   });
 
   test("returns non-200 when configurationId path parameter is missing", async () => {

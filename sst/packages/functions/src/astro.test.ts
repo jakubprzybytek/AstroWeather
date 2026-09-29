@@ -5,6 +5,7 @@ function handlerAt(instant: string) {
   return createHandler({
     now: () => new Date(instant),
     readWeather: async () => new Map(),
+    readAurora: async () => new Map(),
     log: vi.fn()
   });
 }
@@ -15,9 +16,9 @@ describe("astro handler", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["content-type"]).toBe("text/plain; charset=utf-8");
-    expect(response.body.split("\n").slice(0, 5)).toEqual([
-      "protocol=2", "configurationId=krakow", "time=2026-09-22T23:22:45.678+02:00",
-      "lastWeatherFetchTime=?", ""
+    expect(response.body.split("\n").slice(0, 6)).toEqual([
+      "protocol=3", "configurationId=krakow", "time=2026-09-22T23:22:45.678+02:00",
+      "lastWeatherFetchTime=?", "refreshIntervalMinutes=360", ""
     ]);
   });
 
@@ -30,6 +31,7 @@ describe("astro handler", () => {
         coordinates: { latitude: 50, longitude: 20 }, fetchedAt: "2026-09-22T16:00:04.321Z",
         expireAt: 2_000_000_000, hours: []
       }]]),
+      readAurora: async () => new Map(),
       log: vi.fn()
     });
     const response = await handler({ pathParameters: { configurationId: "krakow" } });
@@ -58,6 +60,7 @@ describe("astro handler", () => {
         coordinates: { latitude: 50, longitude: 20 }, fetchedAt: "2026-10-25T00:30:00.000Z",
         expireAt: 2_000_000_000, hours: []
       }]]),
+      readAurora: async () => new Map(),
       log: vi.fn()
     });
     const response = await handler({ pathParameters: { configurationId: "krakow" } });
@@ -71,6 +74,6 @@ describe("astro handler", () => {
     const response = await handlerAt("2026-09-22T21:22:45Z")({ pathParameters: { configurationId: "unknown" } });
 
     expect(response.statusCode).toBe(404);
-    expect(response.body).toBe("protocol=2\nerror=configuration_not_found\n");
+    expect(response.body).toBe("protocol=3\nerror=configuration_not_found\n");
   });
 });

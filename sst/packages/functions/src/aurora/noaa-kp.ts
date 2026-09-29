@@ -7,7 +7,7 @@ const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
 
 export type NoaaKpValues = {
   kp: number;
-  status: "estimated" | "predicted";
+  status: "observed" | "estimated" | "predicted";
   noaaScale: string | null;
 };
 
@@ -21,9 +21,10 @@ type Row = {
 };
 
 // The file carries a week of observed bins before the forecast; only the
-// estimated and predicted bins are the forecast. `time_tag` is the UTC start
-// of a three-hour bin, written without a zone suffix.
-export function parseNoaaKpForecast(json: string): NoaaKpSpan[] {
+// estimated and predicted bins are the forecast, so the observed ones are kept
+// only on request (the aurora merge uses them for past hours). `time_tag` is
+// the UTC start of a three-hour bin, written without a zone suffix.
+export function parseNoaaKpForecast(json: string, options: { includeObserved?: boolean } = {}): NoaaKpSpan[] {
   let rows: unknown;
   try {
     rows = JSON.parse(json);
@@ -35,9 +36,9 @@ export function parseNoaaKpForecast(json: string): NoaaKpSpan[] {
   }
 
   const spans = rows.flatMap((row: Row, index): NoaaKpSpan[] => {
-    if (row.observed === "observed") return [];
+    if (row.observed === "observed" && !options.includeObserved) return [];
     const status = row.observed;
-    if (status !== "estimated" && status !== "predicted") {
+    if (status !== "observed" && status !== "estimated" && status !== "predicted") {
       throw new Error(`NOAA Kp forecast row ${index} has an unknown status`);
     }
 
@@ -63,10 +64,10 @@ export function parseNoaaKpForecast(json: string): NoaaKpSpan[] {
   return spans;
 }
 
-export async function loadNoaaKpForecast() {
+export async function loadNoaaKpForecast(options: { includeObserved?: boolean } = {}) {
   const document = await fetchSourceDocument(NOAA_KP_FORECAST_URL, "NOAA Kp forecast");
   return {
-    spans: parseNoaaKpForecast(document.body),
+    spans: parseNoaaKpForecast(document.body, options),
     lastModified: document.lastModified
   };
 }
