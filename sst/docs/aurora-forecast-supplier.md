@@ -33,7 +33,7 @@ licensed, and to apply the location rule ourselves:
 | 1–3 | GFZ Hp60 ensemble forecast (PAGER/SWIFT) | **hourly**, 72 h ahead, with probabilities per Kp band | hourly | JSON, CC BY 4.0 |
 | 1–3 (fallback) | NOAA SWPC 3-day Kp forecast | 3-hour bins | ~twice daily | JSON, US public domain |
 | 4–7 | NOAA SWPC 27-day outlook | **one "largest Kp" per day** | weekly (Mondays) | text, US public domain |
-| now (optional) | NOAA OVATION 30-minute nowcast | 1°×1° grid, per-location probability % | every 5 min | JSON, US public domain |
+| current hour, storm nights | NOAA OVATION 30-minute nowcast | 1°×1° grid, per-location probability % | every 5 min | JSON, US public domain |
 
 The per-location step is a geomagnetic-latitude threshold (see
 [Deriving a four-level scale](#deriving-a-four-level-scale)); for Wrocław an
@@ -122,7 +122,7 @@ GET https://services.swpc.noaa.gov/text/27-day-outlook.txt
   carries daily `ap` and `f107` but not Kp; Ap→Kp needs a lookup table, so the
   text product is simpler.
 
-### NOAA OVATION 30-minute nowcast (optional "now" refinement)
+### NOAA OVATION 30-minute nowcast (current hour, storm nights)
 
 ```text
 GET https://services.swpc.noaa.gov/json/ovation_aurora_latest.json
@@ -133,7 +133,10 @@ GET https://services.swpc.noaa.gov/json/ovation_aurora_latest.json
   triples on a 1° grid (longitude 0–359, so Wrocław is `[17, 51, …]`; it read
   `0` at 20:03 UTC on the test day).
 - This is the only feed that is per-location out of the box, but it is a
-  nowcast, not a forecast; it could refine the current hour's cell only.
+  nowcast, not a forecast: it refines one cell of the row. Note that its
+  `Forecast Time` is 30–90 minutes after `Observation Time` (the solar wind's
+  travel time from L1), so a fetch describes the *coming* hour, not the one
+  it was fetched in. See [Fetch Cadence](#fetch-cadence).
 
 ## Deriving a Four-Level Scale
 
@@ -226,11 +229,156 @@ weights are a first guess to tune by eye, like the cloud-coverage thirds were.
 - **Accuracy was not evaluated**; this test only established availability,
   shape, and terms.
 
+## Fetch Cadence
+
+The sources move at four different speeds and the device consumes at two, so
+the cadence follows whichever is slower, and the nowcast is gated on activity
+rather than scheduled.
+
+### Device cadence and the storm-night flag
+
+The HostController pulls the API every six hours (00:10, 06:10, 12:10 and
+18:10 local). A flag in the API response switches it to **hourly** pulls; the
+API sets the flag for a location's current night when there is a chance of
+aurora. The flag is:
+
+- **Eager**: set when any hour of the night has a GFZ `0.75-quantile` ≥ 5 or
+  `P(≥6)` ≥ 25 %, or the NOAA 3-day forecast has a bin ≥ 5 — one Kp step below
+  level `1`. An hourly pull is cheap, so a false alarm is cheap; a missed storm
+  is not.
+- **Sticky**: once set for a `nightId` it stays until that night ends, so the
+  device does not alternate cadences as forecast runs disagree.
+- **Late by design**: the device sees a newly set flag only at its next
+  six-hourly pull, up to six hours after the forecast turned. The eager
+  trigger, decided from a forecast that runs hourly, is what closes most of
+  that gap.
+
+### Job cadence
+
+| Situation | Job runs | Fetches |
+| --- | --- | --- |
+| Quiet (no location flagged) | with the existing weather job, every 6 h at 00/06/12/18 local | Hp60, NOAA 3-day, 27-day outlook |
+| Daily | once at ~03:00 UTC | 27-day outlook (issued Mondays ~02:20 UTC; catches a mid-week reissue) |
+| Storm night (a location flagged and dark there) | **every 10 minutes** | Hp60, NOAA 3-day, OVATION |
+
+The three forecast feeds are global: one fetch per run serves every
+configured location. Every source sends `Last-Modified`, so the runs poll
+with `If-Modified-Since` and an unchanged file costs a 304. Runs are offset
+from the hour (GFZ writes at ~:05, NOAA regenerates around :00), so the
+storm-night schedule is `:03, :13, :23 …`, which also leaves the device's :10
+pull a nowcast at most seven minutes old. NOAA's `Cache-Control: max-age=60`
+is far above any of these rates. On a storm night the job moves about 55 MB
+(OVATION is 920 KB) in ~60 invocations; on a quiet night, ~30 KB in four.
+
+### Why ten minutes and not an hour
+
+For the display alone, hourly at :03 would do: the device pulls hourly and
+Hp60 changes hourly. Ten minutes buys three things the display cadence does
+not:
+
+- **Substorm peaks.** Auroral activity is bursty on a 20–60 minute scale, so
+  one snapshot per hour can land in a lull and print 3 % for an hour that
+  peaked at 30 %. With six samples per hour the job stores the **maximum over
+  the hour** for each slot as well as the latest value, so a back-filled slot
+  says whether there was aurora that hour, not what L1 looked like at :03.
+- **Calibration data.** The OVATION % → level mapping is the least known part
+  of the design and is only ever calibrated on the few storm nights a year;
+  ~60 samples a night instead of ~10 makes those nights count.
+- **Resilience.** A failed :03 fetch leaves the device an hour-old nowcast
+  under hourly polling, and a 13-minute-old one under ten-minute polling.
+
+Thirty minutes is the worst of both: too coarse for peaks, no simpler than ten.
+
+### How the nowcast lands in the row
+
+- A fetch writes its level into the slot that OVATION's `Forecast Time` falls
+  in — usually the *next* hour — and a slot keeps the latest nowcast that
+  targeted it, plus the maximum seen. Over a storm night the row fills in
+  hour by hour: the current hour shows the nowcast fetched about an hour ago,
+  the next hour the fresh one, everything beyond stays forecast.
+- Until the mapping is calibrated, the nowcast only **raises** a slot above
+  its forecast level, never lowers it; the failure mode is then an optimistic
+  hour, not a hidden storm. Placeholder thresholds: `1` ≥ 5 %, `2` ≥ 15 %,
+  `3` ≥ 40 %, with the raw percentage logged on every storm-night fetch.
+- Daylight slots are skipped; there is nothing to see and the nowcast would
+  only add noise.
+- Nowcast-sourced slots are marked (blink or level attribute) so a live cell
+  can be told from a forecast one on the matrix.
+
+The first implementation step is the cheapest: run the storm-night nowcast
+fetch with **logging only**, so a calibration set accumulates before any
+nowcast value reaches the display.
+
+## Calibrating the Nowcast
+
+The forecast row is in Kp; the nowcast cell is in OVATION's "probability of
+visible aurora" for a 1° cell. Nothing published relates the two for a place
+at 47° CGM, and the placeholder thresholds above (`1` ≥ 5 %, `2` ≥ 15 %,
+`3` ≥ 40 %) are a guess. They can only be calibrated on real storms, which
+come a few nights a year, so the logging has to be in place **before** the
+next one, and the nowcast must not shape the display until it is done.
+
+### What to log on every storm-night run
+
+One structured log line per location per ten-minute run, with a fixed prefix
+(`aurora-calibration`) and a JSON body, so CloudWatch Logs Insights can pull a
+storm night out in one query:
+
+| Field | Source | Why |
+| --- | --- | --- |
+| `observedAt`, `validAt` | OVATION `Observation Time`, `Forecast Time` | Aligns the sample with the hour it describes. |
+| `cellPct` | OVATION, the location's cell | The value the placeholder mapping uses. |
+| `northPct[]` | OVATION, the cells 1°–8° north on the same meridian | An observer at 47° CGM sees the oval low on the northern horizon, hundreds of kilometres away; the cell overhead can read 0 % while the cells at 54°–56° N read 30 % and the glow is plainly visible. The profile shows which cell, if any, predicts what is seen. |
+| `hp60Median`, `hp60Max`, `probAtLeast6` | GFZ Hp60 for the hour of `validAt` | The forecast the nowcast is compared with. |
+| `kpEstimated` | NOAA 3-day, the `estimated` bin covering `validAt` | NOAA's running estimate of the current Kp. |
+| `level` | the row's forecast level for that slot | What the display would have shown without the nowcast. |
+| `dark` | astronomy for the location | Daylight samples are excluded from the analysis. |
+
+The definitive Kp for each three-hour bin arrives a day later as the
+`observed` rows of the same NOAA file (or from `kp.gfz.de/app/json/`); the
+analysis joins it by time rather than logging it live.
+
+### Ground truth
+
+Kp and OVATION are both proxies; the thing being calibrated is *visibility
+from the configured locations*. For each storm night, record what was
+actually seen, with times: own observations and photographs, and public
+reports from Polish observers (the sighting threads that appear on every
+G2+ night are dated to the minute and give the direction and height above the
+horizon). A night with no reports despite clear skies is data too.
+
+### Analysis
+
+After each storm night, for every dark ten-minute sample:
+
+1. Tabulate `cellPct`, `max(northPct)`, `hp60Median`, the definitive Kp and
+   the visibility record for that time.
+2. Check the forecast side first: did level `1`/`2`/`3` (Kp 6/7/8) coincide
+   with camera-only / naked-eye / overhead reports? This validates the
+   magnetic-latitude thresholds and is independent of OVATION.
+3. Then find the `cellPct` (or `northPct`) values that coincide with the same
+   three visibility classes, and set the nowcast thresholds from them. Decide
+   from the data which cell predicts better, the location's own or the
+   northern profile's maximum.
+4. Compare the ten-minute samples within an hour with the hour's maximum, to
+   see whether the max-over-hour rule is worth keeping.
+
+### Exit criterion
+
+Keep the nowcast in **raise-only** mode (it can lift a slot above its
+forecast level, never lower it) until at least three G2+ nights have been
+logged and analysed. Only then let it set the slot outright, and revisit the
+thresholds after every further G3+ night; the oval's behaviour at the
+equatorward edge is not linear in Kp, and the biggest storms are the ones the
+row exists for.
+
 ## Recommended Integration
 
-1. Extend the existing six-hourly scheduled job (or add a sibling) to fetch,
-   per run: the GFZ Hp60 JSON, the NOAA 3-day Kp JSON (used only if the GFZ
-   fetch or parse fails), and the NOAA 27-day outlook. The feeds are global,
+1. Add an aurora job on the cadence in [Fetch Cadence](#fetch-cadence): with
+   the six-hourly weather job when quiet, every ten minutes on a flagged
+   storm night, plus a daily 27-day fetch. It fetches the GFZ Hp60 JSON, the
+   NOAA 3-day Kp JSON (used only if the GFZ fetch or parse fails), the NOAA
+   27-day outlook, and on storm nights OVATION. The forecast feeds are global,
    so fetch once and derive every configured location from the same payload.
 2. Build, per location and per night, 24 hourly levels for local noon → noon:
    Hp60 (or NOAA 3-hour bins expanded to hours) for hours inside the 72 h
@@ -243,11 +391,14 @@ weights are a first guess to tune by eye, like the cloud-coverage thirds were.
    ```
 
    holding the hourly level array, the raw Kp/Hp60 median and `prob >= 6`
-   per hour, a per-hour `source` (`gfz-hp60` / `noaa-3day` / `noaa-27day`),
-   `fetchedAt` and `expireAt` — the same pattern as `#WEATHER`.
+   per hour, a per-hour `source` (`gfz-hp60` / `noaa-3day` / `noaa-27day` /
+   `ovation`), the nowcast's latest and maximum percentage per slot, the
+   storm-night flag, `fetchedAt` and `expireAt` — the same pattern as
+   `#WEATHER`.
 4. Expose an aurora row in the API payload using the existing `0`–`3` level
-   characters, and flag the nights that come from the 27-day outlook so the
-   device can render them at reduced brightness or blinking.
+   characters, the storm-night flag that switches the device to hourly pulls,
+   and marks for the slots that come from the 27-day outlook (dimmed) and
+   from the nowcast (live).
 5. Fail closed as for weather: keep the last good item and fail the invocation
    when parsing breaks; add fixture-based parser tests for both feeds so a
    column rename is caught in CI.
@@ -260,8 +411,11 @@ weights are a first guess to tune by eye, like the cloud-coverage thirds were.
   by watching the row through a real G1–G2 event.
 - Decide how nights 4–7 are shown (dimmed, hatched, or hidden) given they are a
   daily recurrence outlook, not a forecast.
-- Decide whether the OVATION nowcast is worth 920 KB per fetch for a
-  current-hour refinement, or whether Hp60's hourly value is enough.
+- Calibrate the OVATION % → level thresholds from the logged storm-night
+  samples before the nowcast reaches the display; see
+  [Calibrating the Nowcast](#calibrating-the-nowcast).
+- Confirm the storm-night flag trigger (0.75-quantile ≥ 5 / `P(≥6)` ≥ 25 %)
+  does not fire so often that the hourly progress bar becomes a nuisance.
 - Confirm the attribution wording for GFZ and NOAA in `api.md`.
 
 ## Sources Checked
