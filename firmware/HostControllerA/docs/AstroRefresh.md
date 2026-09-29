@@ -278,8 +278,11 @@ by default:
 
 So with the defaults, block 0's `numeric_2` and `numeric_3` are effectively
 hidden. They show only with `adc display off` or `time display off`: turning
-the owner off stops it writing, and the next refresh's value then stays.
-Display setters are last-writer-wins by design; there is no field ownership.
+the owner off stops it writing (the clock blanks numeric 3 once, at the switch),
+and the next refresh's value then stays. The refresh's clock sync wakes the
+clock task, but while off it no longer blanks on a wake, so the minimum
+temperature survives the refresh that drew it. Display setters are
+last-writer-wins by design; there is no field ownership.
 
 ## Progress Bar
 

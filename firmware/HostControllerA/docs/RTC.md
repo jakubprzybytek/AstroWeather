@@ -83,7 +83,10 @@ on the LSI, so it may wake a little early. It then sees the same minute and
 sleeps for the remainder. A new minute can appear up to about 2 s late.
 
 Display 3 is shared. An astro refresh writes all four numeric displays, so its
-value shows until the next minute, when the time comes back.
+value shows until the next minute, when the time comes back. With `time display
+off` the task blanks display 3 once and then leaves it alone: the wakes that
+follow, including the RTC write of every refresh's clock sync, do not blank it
+again, so the refresh's minimum temperature stays.
 
 All RTC access goes through `ClockTask`, under one mutex. Reads call
 `HAL_RTC_GetTime()` and then `HAL_RTC_GetDate()`. Reading the time freezes the
@@ -131,7 +134,7 @@ HostController only. See also `help time`.
 | `time show` | `OK time=2026-09-22 20:15:03.123 set=yes trim=+18400ppm prediv=3/8146 calm=26`: date and time to the millisecond, whether it has been set since power-up, and the trim with the registers it produced. |
 | `time set <YYYY-MM-DD> <HH:MM[:SS]>` | Set the date and time, 24-hour; seconds optional, 00 if left out. Kept over a reset; lost on power loss. |
 | `time trim <ppm>` | Apply and save the trim. `0` removes it. Valid range ±100 000. |
-| `time display on\|off` | Show or blank display 3. Saved. |
+| `time display on\|off` | Show the time on display 3, or blank it once and leave it to other writers. Saved. |
 
 `settings show` and `status` include the stored trim and display setting.
 

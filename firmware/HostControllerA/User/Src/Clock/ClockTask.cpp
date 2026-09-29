@@ -498,22 +498,28 @@ void ClockTask::wake()
 void ClockTask::run()
 {
     uint8_t shownMinute = kNothingShown;
+    // Whether the display was blanked since it was last switched off.
+    bool blanked = false;
 
     for (;;)
     {
         if (!displayEnabled_)
         {
-            // Blank, then wait to be switched back on. This runs once per wake,
-            // so also after a 'time set' while off, which blanks it again.
-            if (display_ != nullptr)
+            // Blank once when switched off, then leave the display to others
+            // and wait to be switched back on. Every RTC write wakes the task
+            // too, including the astro refresh's clock sync, and blanking
+            // again on those wakes would erase what the refresh just drew.
+            if (!blanked && display_ != nullptr)
             {
                 display_->local().numeric(kDisplayIndex).setBlank();
                 display_->submitLocal();
             }
+            blanked = true;
             shownMinute = kNothingShown;
             (void)osThreadFlagsWait(kFlagRedraw, osFlagsWaitAny, osWaitForever);
             continue;
         }
+        blanked = false;
 
         if (!timeSet_)
         {

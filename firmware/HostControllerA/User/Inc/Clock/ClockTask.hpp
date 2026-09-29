@@ -20,7 +20,8 @@ public:
     static ClockTask& instance();
 
     void setDisplay(Display::Display* display);
-    // Off blanks the display and stops redrawing it.
+    // Off blanks the display once and then leaves it alone, so an astro
+    // refresh's value stays on it.
     void setDisplayEnabled(bool enabled);
     // Sets the RTC calendar, and marks the time as set, so that it is kept
     // over a reset. Returns false for an invalid date or time, or if the RTC
