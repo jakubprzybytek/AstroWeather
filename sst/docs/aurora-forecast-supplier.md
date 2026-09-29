@@ -195,9 +195,10 @@ This matches recent experience: the G3 storms of November 2023 and October
 May 2024 G5 storm (Kp 9) put the aurora overhead.
 
 Which value to threshold: for nights 1–3 use the GFZ **`median`** for the
-level, and raise the level by one when the ensemble gives at least a 25 %
-chance of the next band (`prob 7-8 + prob >= 8` for level `2`, `prob >= 8`
-for level `3`), so a storm the ensemble is split about still shows as a
+level, and mark the slot to blink up to full (see
+[Showing the Row on the Device](#showing-the-row-on-the-device)) when the
+ensemble gives at least a 25 % chance of reaching level `3` (`prob >= 8`),
+or its 0.75-quantile does, so a storm the ensemble is split about still shows as a
 possibility. For nights 4–7 threshold the 27-day `Largest Kp` directly. These
 weights are a first guess to tune by eye, like the cloud-coverage thirds were.
 
@@ -208,8 +209,9 @@ weights are a first guess to tune by eye, like the cloud-coverage thirds were.
   cannot see a CME launched after Monday. A big storm typically appears in the
   forecast 1–3 days ahead, so the display's far-right columns will mostly say
   "quiet" even in the week of a storm. That is inherent, not a supplier defect;
-  the API should carry a `horizon`/`confidence` tag so the device can dim or
-  hatch nights 4–7.
+  the outlook's slots are capped at level `1`, "possible" (see
+  [Showing the Row on the Device](#showing-the-row-on-the-device)), since
+  brightness is already the level and cannot also carry confidence.
 - **Two providers, two shapes, two clocks.** GFZ's JSON is column-oriented with
   `dd-mm-yyyy HH:MM` strings and no `Cache-Control`; NOAA's is row-oriented ISO
   timestamps without a `Z`. Both are UTC and must be re-binned into the
@@ -302,8 +304,10 @@ Thirty minutes is the worst of both: too coarse for peaks, no simpler than ten.
   `3` ≥ 40 %, with the raw percentage logged on every storm-night fetch.
 - Daylight slots are skipped; there is nothing to see and the nowcast would
   only add noise.
-- Nowcast-sourced slots are marked (blink or level attribute) so a live cell
-  can be told from a forecast one on the matrix.
+- The current and next slot blink down at their nowcast level when the
+  nowcast puts them at level `1` or more, so a live cell can be told from a
+  forecast one; back-filled past hours stay steady. See
+  [Showing the Row on the Device](#showing-the-row-on-the-device).
 
 The first implementation step is the cheapest: run the storm-night nowcast
 fetch with **logging only**, so a calibration set accumulates before any
@@ -391,7 +395,7 @@ OVATION's odd-minute windows without special cases.
 | --- | --- | --- | --- |
 | 0 | OVATION nowcast | slots its `Forecast Time` fell in (latest and max over the hour) | % → level; **raise-only** until calibrated |
 | 1 | NOAA observed / estimated Kp | past three-hour bins | Kp |
-| 2 | GFZ Hp60 | now → +72 h, hourly | Hp60 median, with the ensemble bump |
+| 2 | GFZ Hp60 | now → +72 h, hourly | Hp60 median, blinking up when the ensemble reaches level `3` |
 | 3 | NOAA 3-day predicted | three-hour bins to the end of UTC day 3 | Kp |
 | 4 | NOAA 27-day outlook | UTC days | largest Kp of the day |
 | — | none | | `?` (unknown) |
@@ -408,8 +412,8 @@ consecutive UTC days, split at local 01:00 or 02:00.
 1. **Merge on Kp, threshold once.** Ranks 1–4 all yield a Kp-equivalent, and
    the location's magnetic-latitude thresholds (see
    [Levels](#levels)) turn the merged value into a level in one place, so
-   every source is judged on the same scale. The GFZ ensemble bump (≥ 25 %
-   for the next band) applies to GFZ slots only. The nowcast is in a
+   every source is judged on the same scale. The GFZ ensemble blink up (≥ 25 %
+   for level `3`) applies to GFZ slots only. The nowcast is in a
    different unit, so it has its own % → level mapping and merges at the
    level stage.
 2. **Past hours have a source.** GFZ starts at the current hour, so tonight's
@@ -425,9 +429,10 @@ consecutive UTC days, split at local 01:00 or 02:00.
 4. **Seams are marked, not smoothed.** The 27-day value is a *daily maximum*,
    while GFZ gives an hourly median, so crossing from rank 2 to rank 4
    typically steps up (median 2 → daily max 4). That is honest — "this day
-   may reach 4" — but reads as a spike unless it is marked. Each slot
-   carries its `source`, and the display dims outlook slots and marks
-   nowcast slots as live, so a step reads as lower confidence from there on.
+   may reach 4" — but reads as a spike. Each slot carries its `source`, and
+   the outlook's slots are capped at level `1`, "possible", so the outlook can
+   never look stronger than the forecast before the seam; see
+   [Showing the Row on the Device](#showing-the-row-on-the-device).
 5. **The nowcast is an overlay for now.** Until
    [calibration](#calibrating-the-nowcast) is done it only raises a slot above
    the cascade's result, never lowers it. After calibration it becomes rank
@@ -444,9 +449,83 @@ thresholds then needs no re-ingestion, and the per-slot `source` can be shown
 in the web tools for debugging.
 
 Per slot the merge yields the `level`, the `source` and the value it came
-from (Kp, or % for the nowcast). The payload row is the levels plus the
-dimmed and live marks; the storm-night flag is decided from the same merged
-night.
+from (Kp, or % for the nowcast), and whether the slot blinks. The payload
+row is encoded as in
+[Showing the Row on the Device](#showing-the-row-on-the-device); the
+storm-night flag is decided from the same merged night.
+
+## Showing the Row on the Device
+
+### What the device and the payload can express
+
+Every matrix pixel has a brightness **level** 0–3 (lit for 0 / 12 / 39 / 70 %
+of its slot) and an independent **blink** bit: a blinking pixel shows at its
+level for 0.5 s and is dark for 0.5 s, on a phase each board keeps itself
+(see `firmware/HostControllerA/docs/Display.md`, "Blink and brightness
+levels"). The protocol 2 payload uses only part of that: `0`–`3` are steady
+levels, `*` is level 3 blinking, and `?` is unavailable (see
+[api-payload.md](api-payload.md), "Matrix encoding").
+
+Brightness is the aurora level itself, so it cannot also carry confidence:
+there is no "level 2, but less sure" in four brightness states. Anything
+beyond the level has to be carried by blinking.
+
+### Two kinds of blink, one meaning each
+
+| Kind | Alternates | Means | Proposed characters |
+| --- | --- | --- | --- |
+| **Blink down** | the level ↔ off | **now** — happening, go and look | `a` `b` `c` for levels 1 / 2 / 3 (`*` stays an alias of `c`) |
+| **Blink up** | the level ↔ full | **could be more** — the likely level, flashing to the plausible one | `A` `B` for levels 1 / 2 |
+
+Blink up from 0 looks the same as blink down from 3, so it needs no character
+of its own, and blink up from 3 and down from 0 are meaningless. Blinks
+between intermediate levels (such as 1 ↔ 2, 12 ↔ 39 %) are left out: the
+pulse is too faint to catch the eye, it is hard to tell which level is the
+base, and "on a threshold" is noise rather than information. Keeping one
+meaning per kind on every row lets the matrix read the same everywhere, and
+keeping blinking pixels few keeps the boards' drifting phases from making the
+display look busy.
+
+### The aurora row
+
+| Slot | Shown as |
+| --- | --- |
+| Forecast (NOAA observed, GFZ, NOAA 3-day) | the merged level, steady |
+| GFZ, the ensemble reaching level `3` (0.75-quantile or `P(≥8)` ≥ 25 %) | blink up from the median's level (`A`/`B`) |
+| Current and next slot, nowcast at level `1` or more | blink down at the nowcast level (`a`/`b`/`c`) |
+| 27-day outlook | `1` ("possible") when the day's largest Kp reaches the level-1 threshold, else `0`; never higher, never blinking |
+| No source | `?` |
+
+The outlook is capped rather than dimmed or blinked because a daily maximum
+cannot carry an hour's intensity, and because low confidence should not draw
+the eye the way a blink does.
+
+The same vocabulary suits the precipitation row: today `*` replaces the
+probability when a thunderstorm is predicted; with blink up the row could
+keep the probability level and flash to full for the storm (a 75–100 % slot
+uses `c`, which in that row still means "thunderstorm").
+
+### Before adopting it
+
+- **Protocol 3.** The new characters need a new protocol version: the
+  firmware parser's alphabet (`AstroDataParser`) and the mapper's
+  character → level/blink table, and the server. The device keeps accepting
+  protocol 2. Until then the row can use protocol 2 alone: `*` for "aurora
+  now", steady levels otherwise, and no blink up.
+- **Firmware cost.** Blink down is supported already: the blink plane blanks
+  a pixel in the off half at any level. Blink up is not: in its off half the
+  pixel must go to level 3 rather than dark, which needs a second attribute
+  plane and handling in the pass encoder / `RefreshSequencer`; not yet sized.
+- **Bench check.** A blinking level 1 averages 6 % and may vanish with
+  `display low`; blink up from 2 (39 ↔ 70 %) may be too subtle to notice.
+  Try both with a `display` console command before fixing the alphabet; if
+  down from 1 is too faint, show a nowcast slot at level 2 or more while it
+  blinks.
+- **Matrix row 4.** The aurora row would be `matrix_4`, reserved today. On
+  the local board — tonight, the night that matters — row 4 carries the
+  refresh progress bar while a refresh runs and while its outcome is held,
+  and is then cleared. The mapper would have to redraw the aurora row once the
+  bar clears, every hour on a storm night.
 
 ## Recommended Integration
 
@@ -476,10 +555,9 @@ night.
 3. Merge at read time as in [Merging Sources](#merging-sources): per slot,
    the best fresh source covering it, one threshold pass, the nowcast as a
    raise-only overlay.
-4. Expose an aurora row in the API payload using the existing `0`–`3` level
-   characters, the storm-night flag that switches the device to hourly pulls,
-   and marks for the slots that come from the 27-day outlook (dimmed) and
-   from the nowcast (live).
+4. Expose the aurora row as `matrix_4` in the API payload, encoded as in
+   [Showing the Row on the Device](#showing-the-row-on-the-device), with the
+   storm-night flag that switches the device to hourly pulls.
 5. Fail closed as for weather: keep the last good item and fail the invocation
    when parsing breaks; add fixture-based parser tests for both feeds so a
    column rename is caught in CI.
@@ -488,10 +566,11 @@ night.
 
 ## Decision Checklist Before Adoption
 
-- Agree the Wrocław/Kraków thresholds and the "raise on 25 % probability" rule
+- Agree the Wrocław/Kraków thresholds and the blink-up rule for the ensemble
   by watching the row through a real G1–G2 event.
-- Decide how nights 4–7 are shown (dimmed, hatched, or hidden) given they are a
-  daily recurrence outlook, not a forecast.
+- Bench-test blink down from level 1 and blink up from level 2 for
+  visibility, and size the firmware work for blink up, before fixing the
+  protocol 3 alphabet.
 - Calibrate the OVATION % → level thresholds from the logged storm-night
   samples before the nowcast reaches the display; see
   [Calibrating the Nowcast](#calibrating-the-nowcast).
