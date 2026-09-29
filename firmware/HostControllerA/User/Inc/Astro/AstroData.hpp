@@ -20,7 +20,8 @@ struct AstroNumericValue
 // One matrix row as parsed, column i in bit i: which columns are lit, their
 // level in two bit-planes (level0 is bit 0 of the level, level1 bit 1, as
 // Display::BoardAttributes keeps them) and which blink. A payload `0` or `?`
-// is an unlit column, `1`-`3` a level, `*` level 3 blinking.
+// is an unlit column, `1`-`3` a level, `a`-`c` levels 1-3 blinking, `*` level
+// 3 blinking.
 struct AstroMatrixRow
 {
     uint32_t lit = 0U;
@@ -34,7 +35,7 @@ struct AstroBoardData
     std::array<char, 32> board{};
     std::array<char, 16> nightId{};
     std::array<AstroNumericValue, 4> numeric{};
-    std::array<AstroMatrixRow, 4> matrix{};
+    std::array<AstroMatrixRow, 5> matrix{};  // sun, moon, cloud, precipitation, aurora
 };
 
 // The UTC offset that may follow a header date and time (`Z`, `+02:00`). It
@@ -87,6 +88,9 @@ struct AstroData
 {
     AstroServerTime serverTime{};
     AstroWeatherFetchTime lastWeatherFetch{};
+    // The `refreshIntervalMinutes` header record: 60 or 360, or 0 when it is
+    // absent or has any other value (the schedule then keeps its interval).
+    uint16_t refreshIntervalMinutes = 0U;
     std::array<AstroBoardData, 6> boards{};
 };
 

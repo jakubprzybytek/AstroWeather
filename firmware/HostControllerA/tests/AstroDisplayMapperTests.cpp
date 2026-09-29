@@ -74,7 +74,7 @@ AstroBoardData blockData(uint8_t block)
     data.numeric[1] = timeValue(static_cast<uint8_t>(block), static_cast<uint8_t>(40U + block));
     data.numeric[2] = plainValue(10.5F + static_cast<float>(block));
     data.numeric[3] = plainValue(-3.0F - static_cast<float>(block));
-    for (uint8_t row = 0U; row < 4U; ++row) {
+    for (uint8_t row = 0U; row < 5U; ++row) {
         const uint32_t lit = (static_cast<uint32_t>(block) << 8U) | (1UL << row) | (1UL << 20U);
         data.matrix[row] = {lit, lit, lit, 0U};  // all at level 3
     }
@@ -182,19 +182,26 @@ void testNumericAttributesReset()
     expectEqual(board.attributes().numericLevel(1, 0, 0), 3U, "numeric level reset to full");
 }
 
-void testProgressRow()
+// Row 4 is the aurora on every board; on the local board it replaces the
+// progress bar, blinking included.
+void testAuroraRowReplacesProgressBar()
 {
     AstroBoardData data = blockData(0U);
+    data.matrix[4] = {0x000300U, 0x000100U, 0x000200U, 0x000100U};  // "...ab..."
 
     DisplayBoardState local{};
     local.state().matrix[4] = 0x00000FU;  // a progress bar being shown
+    local.attributes().setMatrixBlink(4, 0x00000FU);
     AstroDisplayMapper::mapBoard(data, true, local);
-    expectEqual(local.state().matrix[4], 0x00000FU, "local row 4 left to the progress bar");
+    expectEqual(local.state().matrix[4], 0x000300U, "local row 4 is the aurora");
+    expectEqual(local.attributes().blink.matrix[4], 0x000100U, "bar blink replaced");
+    expectEqual(local.attributes().matrixLevel(4, 8), 1U, "a is level 1");
+    expectEqual(local.attributes().matrixLevel(4, 9), 2U, "b is level 2");
 
     DisplayBoardState remote{};
     remote.state().matrix[4] = 0x1FFFFFU;
     AstroDisplayMapper::mapBoard(data, false, remote);
-    expectEqual(remote.state().matrix[4], 0U, "remote row 4 cleared");
+    expectEqual(remote.state().matrix[4], 0x000300U, "remote row 4 is the aurora");
 }
 
 void expectBoard(const DisplayBoardState& board, uint8_t block, const char* caseName)
@@ -207,7 +214,7 @@ void expectBoard(const DisplayBoardState& board, uint8_t block, const char* case
            caseName);
     expect(sameSegments(state.numeric[2], expectedValue(data.numeric[2].value)), caseName);
     expect(sameSegments(state.numeric[3], expectedValue(data.numeric[3].value)), caseName);
-    for (uint8_t row = 0U; row < 4U; ++row) {
+    for (uint8_t row = 0U; row < 5U; ++row) {
         expectEqual(state.matrix[row], data.matrix[row].lit, caseName);
     }
 }
@@ -227,20 +234,18 @@ void testAllBlocks()
     AstroDisplayMapper::mapAll(data, boards);
 
     expectBoard(boards.localBoard, 0U, "block 0 on the local board");
-    expectEqual(boards.localBoard.state().matrix[4], 0x000007U, "local progress row kept");
     const char* remoteCases[5] = {"block 1 on remote 0", "block 2 on remote 1",
                                   "block 3 on remote 2", "block 4 on remote 3",
                                   "block 5 on remote 4"};
     for (uint8_t slot = 0U; slot < 5U; ++slot) {
         expectBoard(boards.remoteBoards[slot], static_cast<uint8_t>(slot + 1U), remoteCases[slot]);
-        expectEqual(boards.remoteBoards[slot].state().matrix[4], 0U, remoteCases[slot]);
     }
 }
 
 // Parser and mapper together, from payload characters to board bits.
 void testParsedPayload()
 {
-    std::string payload = "protocol=2\nconfigurationId=test\n\n";
+    std::string payload = "protocol=3\nconfigurationId=test\n\n";
     for (unsigned int index = 0U; index < 6U; ++index) {
         // Column `index` marks the block, so a block on the wrong board shows.
         std::string marked(21U, '0');
@@ -252,6 +257,7 @@ void testParsedPayload()
                    "matrix_1=?\n"
                    "matrix_2=3?1000000000000000002\n"
                    "matrix_3=?????????????????????\n"
+                   "matrix_4=00000000000000000abc?\n"
                    "numeric_2=18.5\nnumeric_3=?\n\n";
     }
     AstroData data{};
@@ -278,7 +284,10 @@ void testParsedPayload()
         expectEqual(attributes.matrixLevel(2, 2), 1U, "parsed level 1");
         expectEqual(attributes.matrixLevel(2, 20), 2U, "parsed level 2");
         expectEqual(state.matrix[3], 0U, "parsed row of ? is all off");
-        expectEqual(state.matrix[4], board == 0U ? 0x000003U : 0U, "parsed row 4");
+        expectEqual(state.matrix[4], 0x0E0000U, "parsed aurora row, the bar replaced");
+        expectEqual(attributes.blink.matrix[4], 0x0E0000U, "parsed aurora row blinks");
+        expectEqual(attributes.matrixLevel(4, 17), 1U, "parsed a");
+        expectEqual(attributes.matrixLevel(4, 19), 3U, "parsed c");
         expect(sameSegments(state.numeric[0], expectedTime(20U, 30U)), "parsed time");
         expect(sameSegments(state.numeric[1], AstroDisplayMapper::unavailableSegments()),
                "parsed ? time");
@@ -297,7 +306,7 @@ int main()
     testUnavailableNumeric();
     testMatrixRows();
     testNumericAttributesReset();
-    testProgressRow();
+    testAuroraRowReplacesProgressBar();
     testAllBlocks();
     testParsedPayload();
     return Test::finish("AstroDisplayMapper");

@@ -153,6 +153,34 @@ void testClockSteps()
 
 } // namespace
 
+// A storm night's payload switches the slots to every hour at :10, and back.
+void testHourlyInterval()
+{
+    using RefreshSchedule::nextSlotStart;
+    using RefreshSchedule::slotStart;
+    constexpr uint32_t hour = RefreshSchedule::kHourlyIntervalSeconds;
+    expect(slotStart(at(23, 21, 9), hour) == at(23, 20, 10), "hourly slot before :10");
+    expect(slotStart(at(23, 21, 10), hour) == at(23, 21, 10), "hourly slot at :10");
+    expect(nextSlotStart(at(23, 23, 30), hour) == at(24, 0, 10), "next hourly slot crosses midnight");
+
+    RefreshSchedule::Scheduler scheduler;
+    expect(scheduler.intervalSeconds() == RefreshSchedule::kSlotIntervalSeconds, "six-hourly by default");
+    scheduler.setIntervalMinutes(60U);
+    scheduler.recordOutcome(clock(at(23, 18, 11), 0U), true, true);
+    expect(!scheduler.due(clock(at(23, 19, 9), 0U)), "hourly: not before 19:10");
+    expect(scheduler.due(clock(at(23, 19, 10), 0U)), "hourly: due at 19:10");
+
+    scheduler.setIntervalMinutes(0U);
+    expect(scheduler.intervalSeconds() == RefreshSchedule::kHourlyIntervalSeconds, "0 keeps the interval");
+    scheduler.setIntervalMinutes(30U);
+    expect(scheduler.intervalSeconds() == RefreshSchedule::kHourlyIntervalSeconds, "30 keeps the interval");
+
+    scheduler.setIntervalMinutes(360U);
+    scheduler.recordOutcome(clock(at(23, 19, 11), 0U), true, true);
+    expect(!scheduler.due(clock(at(23, 20, 10), 0U)), "back to six-hourly: 20:10 not due");
+    expect(scheduler.due(clock(at(24, 0, 10), 0U)), "back to six-hourly: due at 00:10");
+}
+
 int main()
 {
     testSlots();
@@ -167,6 +195,7 @@ int main()
     testNoCredentialsWaitsForTheNextSlot();
     testUnsetClock();
     testClockSteps();
+    testHourlyInterval();
 
     return Test::finish("RefreshSchedule");
 }

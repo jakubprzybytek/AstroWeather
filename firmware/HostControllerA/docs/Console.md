@@ -585,7 +585,7 @@ blink and level model is in [Display.md](Display.md#public-interface).
 | Command | Effect |
 | --- | --- |
 | `display show <n> <value>` | Numeric display `n` (0–3) shows `value`: a number with up to three decimals (`12.34`, `-45`, `0.5`; the decimals set the precision, −999.9 to 9999), a time `HH:MM` (00–99 each, not checked as a clock), `?` for the unavailable pattern (the decimal point on all four digits) or `blank`. |
-| `display row <r> <cells>` | Matrix row `r` (0–4, 0 at the top), one character per column as the forecast payload sends them: `0`–`3` the level, `*` full and blinking, `.` or `?` off. Missing columns are off; more than 21 is an error. `display row 0 0123*0123*0123*0123*0` shows every kind. |
+| `display row <r> <cells>` | Matrix row `r` (0–4, 0 at the top), one character per column as the forecast payload sends them: `0`–`3` the level, `a`–`c` levels 1–3 blinking, `*` full and blinking, `.` or `?` off. Missing columns are off; more than 21 is an error. `display row 0 0123abc*0123abc*012300` shows every kind. |
 | `display blink <n> off\|colon\|all` | Nothing, the colon (L1 and L2), or every segment of display `n` blinks. |
 | `display level <n> <0-3>` | Brightness level of display `n`, all segments; 3 is full. |
 | `display test` | Every element lit: the levels run 0 to 3 along the matrix columns and along the sixteen digits, the colons blink, and columns 5, 11 and 17 of rows 1 and 3 blink. To judge the levels and blinking by eye. |

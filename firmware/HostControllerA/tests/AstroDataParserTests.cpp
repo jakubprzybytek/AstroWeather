@@ -18,12 +18,13 @@ std::string block(unsigned int index)
            "matrix_0=100000000000000000000\n"
            "matrix_1=?\nmatrix_2=000000000000000000000\n"
            "matrix_3=?????????????????????\n"
+           "matrix_4=0000000000000abc12300\n"
            "numeric_2=18.5\nnumeric_3=-2\n\n";
 }
 
 std::string validPayload()
 {
-    std::string payload = "protocol=2\nconfigurationId=krakow\n\n";
+    std::string payload = "protocol=3\nconfigurationId=krakow\n\n";
     for (unsigned int index = 0U; index < 6U; ++index) {
         payload += block(index);
     }
@@ -358,9 +359,9 @@ void testTruncatedPayload()
     }
     expectEqual(parse(noFinalNewline), AstroParseStatus::Success, "no final newline");
 
-    expectEqual(parse("protocol=2\nconfigurationId=krakow\n"), AstroParseStatus::Truncated,
+    expectEqual(parse("protocol=3\nconfigurationId=krakow\n"), AstroParseStatus::Truncated,
                 "header only");
-    expectEqual(parse("protocol=2\n"), AstroParseStatus::Truncated, "protocol only");
+    expectEqual(parse("protocol=3\n"), AstroParseStatus::Truncated, "protocol only");
 
     HostController::AstroData data{};
     expectEqual(HostController::parseAstroData(nullptr, 10U, data),
@@ -368,6 +369,41 @@ void testTruncatedPayload()
     expectEqual(HostController::parseAstroData(reinterpret_cast<const uint8_t*>(payload.data()),
                                                0U, data),
                 AstroParseStatus::InvalidArgument, "empty payload");
+}
+
+// matrix_4 is the aurora row, between matrix_3 and numeric_2; it is required.
+void testAuroraRow()
+{
+    HostController::AstroData data{};
+    expectEqual(parse(validPayload(), data), AstroParseStatus::Success, "payload with matrix_4");
+    // "0000000000000abc12300": a, b, c blink at levels 1-3; 1, 2, 3 steady.
+    expectEqual(data.boards[3].matrix[4].lit, 0x07E000U, "aurora row lit");
+    expectEqual(data.boards[3].matrix[4].blink, 0x00E000U, "aurora row blinking");
+    expectEqual(data.boards[3].matrix[4].level0, 0x05A000U, "aurora level bit 0");
+    expectEqual(data.boards[3].matrix[4].level1, 0x06C000U, "aurora level bit 1");
+    expect(data.boards[3].numeric[2].available, "temperature after matrix_4");
+
+    expectEqual(parse(replaced(validPayload(), "matrix_4=0000000000000abc12300\n", "")),
+                AstroParseStatus::MissingRecord, "matrix_4 missing");
+}
+
+void testRefreshInterval()
+{
+    const auto withInterval = [](const std::string& value) {
+        return replaced(validPayload(), "configurationId=krakow\n",
+                        "configurationId=krakow\nrefreshIntervalMinutes=" + value + "\n");
+    };
+    HostController::AstroData data{};
+    expectEqual(parse(validPayload(), data), AstroParseStatus::Success, "no interval");
+    expectEqual(data.refreshIntervalMinutes, 0U, "absent interval is 0");
+    expectEqual(parse(withInterval("60"), data), AstroParseStatus::Success, "hourly");
+    expectEqual(data.refreshIntervalMinutes, 60U, "hourly interval");
+    expectEqual(parse(withInterval("360"), data), AstroParseStatus::Success, "six-hourly");
+    expectEqual(data.refreshIntervalMinutes, 360U, "six-hourly interval");
+    for (const char* bad : {"30", "0", "x", "", "3600"}) {
+        expectEqual(parse(withInterval(bad), data), AstroParseStatus::Success, "bad interval kept the forecast");
+        expectEqual(data.refreshIntervalMinutes, 0U, "bad interval ignored");
+    }
 }
 
 void testConfigurationIdLength()
@@ -385,13 +421,15 @@ void testConfigurationIdLength()
 
 void testProtocol()
 {
-    expectEqual(parse(replaced(validPayload(), "protocol=2", "protocol=1")),
+    expectEqual(parse(replaced(validPayload(), "protocol=3", "protocol=1")),
                 AstroParseStatus::UnsupportedProtocol, "protocol 1");
-    expectEqual(parse(replaced(validPayload(), "protocol=2", "protocol=3")),
-                AstroParseStatus::UnsupportedProtocol, "protocol 3");
-    expectEqual(parse(replaced(validPayload(), "protocol=2\n", "")),
+    expectEqual(parse(replaced(validPayload(), "protocol=3", "protocol=2")),
+                AstroParseStatus::UnsupportedProtocol, "protocol 2");
+    expectEqual(parse(replaced(validPayload(), "protocol=3", "protocol=4")),
+                AstroParseStatus::UnsupportedProtocol, "protocol 4");
+    expectEqual(parse(replaced(validPayload(), "protocol=3\n", "")),
                 AstroParseStatus::MissingRecord, "protocol missing");
-    expectEqual(parse(replaced(validPayload(), "protocol=2", "protocol 2")),
+    expectEqual(parse(replaced(validPayload(), "protocol=3", "protocol 3")),
                 AstroParseStatus::Malformed, "record without '='");
     expectEqual(parse(replaced(validPayload(), "board=num4x4_matrix5x21",
                                "board=num4x4_matrix5x20")),
@@ -428,9 +466,19 @@ void testUnavailableValues()
     expectEqual(data.boards[0].matrix[2].level1, 0x11C71CU, "level bit 1 of 2, 3 and *");
     expectEqual(data.boards[0].matrix[2].blink, 0x010410U, "* blinks");
 
+    // Blinking levels: a, b and c are levels 1, 2 and 3, blinking.
+    payload = replaced(validPayload(), "matrix_2=000000000000000000000",
+                       "matrix_2=abc0000000000000000c*");
+    expectEqual(parse(payload, data), AstroParseStatus::Success, "blinking levels");
+    expectEqual(data.boards[0].matrix[2].lit, 0x180007U, "a, b, c and * lit");
+    expectEqual(data.boards[0].matrix[2].blink, 0x180007U, "a, b, c and * blink");
+    expectEqual(data.boards[0].matrix[2].level0, 0x180005U, "level bit 0 of a, c and *");
+    expectEqual(data.boards[0].matrix[2].level1, 0x180006U, "level bit 1 of b, c and *");
+
     // The version 1 alphabet and anything else is rejected.
     for (const char* row : {"*....................", ".....................",
-                            "444444444444444444444", "0123x0123x0123x0123x0"}) {
+                            "444444444444444444444", "0123x0123x0123x0123x0",
+                            "0123d0123d0123d0123d0", "0123A0123A0123A0123A0"}) {
         expectEqual(parse(replaced(validPayload(), "matrix_2=000000000000000000000",
                                    std::string("matrix_2=") + row)),
                     AstroParseStatus::InvalidMatrix, "rejected row");
@@ -475,6 +523,8 @@ int main()
     testTruncatedPayload();
     testConfigurationIdLength();
     testProtocol();
+    testAuroraRow();
+    testRefreshInterval();
     testUnavailableValues();
     return Test::finish("AstroDataParser");
 }

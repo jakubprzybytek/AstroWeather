@@ -303,9 +303,12 @@ bool AstroDataRefreshTask::publishDisplay(const AstroData& data)
     {
         return false;
     }
-    // Leaves the local bottom row to the progress bar; see AstroProgressBar.
+    // Row 4 is the aurora on every board, so on the local board it replaces
+    // the progress bar at once; there is no success hold.
+    indicator_.cancel();
     AstroDisplayMapper::mapAll(data, *display_);
     display_->submit();
+    shownRow_ = kNoRowShown;
     return true;
 }
 
@@ -400,6 +403,9 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
             taskEXIT_CRITICAL();
             logParsedData(data);
             syncClock(data.serverTime, request_.result.responseTick);
+            taskENTER_CRITICAL();
+            scheduler_.setIntervalMinutes(data.refreshIntervalMinutes);
+            taskEXIT_CRITICAL();
             if (!publishDisplay(data))
             {
                 outcome = RefreshOutcome::PublishFailed;
@@ -425,10 +431,9 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
     active_ = false;
     taskEXIT_CRITICAL();
     // A fetch failure is shown at the step the WiFi task stopped at; anything
-    // after the download (CRC, parse, publish) at the last segment.
-    if (outcome == RefreshOutcome::Ok) {
-        startIndicator(AstroProgressBar::Indicator::Kind::Success, 0U);
-    } else {
+    // after the download (CRC, parse, publish) at the last segment. A success
+    // shows nothing more: the published aurora row already replaced the bar.
+    if (outcome != RefreshOutcome::Ok) {
         startIndicator(AstroProgressBar::Indicator::Kind::Failure,
                        AstroProgressBar::failedSegment(
                            outcome == RefreshOutcome::FetchFailed, request_.stage));
@@ -484,8 +489,8 @@ void AstroDataRefreshTask::recordScheduleOutcome(RefreshOutcome outcome,
     {
         return;
     }
-    const Calendar::DateTime next =
-        Calendar::fromSecondsSince2000(RefreshSchedule::nextSlotStart(clock.now));
+    const Calendar::DateTime next = Calendar::fromSecondsSince2000(
+        RefreshSchedule::nextSlotStart(clock.now, scheduler_.intervalSeconds()));
     if (success)
     {
         LogService::instance().logf(LogService::Level::Info,
@@ -518,7 +523,9 @@ ScheduleSummary AstroDataRefreshTask::schedule() const
     taskEXIT_CRITICAL();
     ScheduleSummary summary{};
     summary.timeSet = clock.timeSet;
-    summary.nextSlot = clock.timeSet ? RefreshSchedule::nextSlotStart(clock.now) : 0U;
+    summary.nextSlot =
+        clock.timeSet ? RefreshSchedule::nextSlotStart(clock.now, scheduler.intervalSeconds()) : 0U;
+    summary.intervalMinutes = scheduler.intervalSeconds() / 60U;
     summary.hasSuccess = scheduler.hasSuccess();
     summary.lastSuccess = scheduler.lastSuccess();
     summary.failures = scheduler.failures();

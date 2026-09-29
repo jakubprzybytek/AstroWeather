@@ -13,13 +13,14 @@
 // is drawn as its payload value says: a time as HH:MM (the payload's numerics
 // 0-1), a value in whole units (numerics 2-3), and a `?` as the "unavailable"
 // pattern, the decimal point on all four digits; the numerics' attributes are
-// reset to plain (full, no blink). Matrix rows 0-3 come from the payload with
-// their levels and blinking; row 4 is cleared on the remote boards and left
-// alone on the local board, where it carries the refresh progress bar.
+// reset to plain (full, no blink). All five matrix rows come from the payload
+// with their levels and blinking. Row 4, the aurora, is also where the local
+// board shows the refresh progress bar; a published refresh overwrites the bar.
 namespace AstroDisplayMapper {
 
-constexpr uint8_t kPayloadMatrixRows = 4U;
-// The local board's bottom row, owned by the progress bar.
+constexpr uint8_t kPayloadMatrixRows = 5U;
+// The local board's bottom row: the aurora row, and the progress bar while a
+// refresh runs or its failure is shown.
 constexpr uint8_t kProgressRow = 4U;
 
 // The decimal point on the four digits, nothing in the indicator slot.
@@ -45,15 +46,10 @@ void mapBoard(const HostController::AstroBoardData& data, bool localBoard, Board
         attributes.setNumericBlink(numericIndex, Display::NumericSegments{});
         attributes.setNumericLevel(numericIndex, Display::kLevelFull);
     }
+    (void)localBoard;
     for (uint8_t matrixIndex = 0U; matrixIndex < kPayloadMatrixRows; ++matrixIndex)
     {
         mapMatrixRow(data.matrix[matrixIndex], matrixIndex, board.matrix(matrixIndex), attributes);
-    }
-    if (!localBoard)
-    {
-        board.matrix(kProgressRow).setRow(0U);
-        attributes.setMatrixBlink(kProgressRow, 0U);
-        attributes.setMatrixLevel(kProgressRow, Display::kMatrixMask, Display::kLevelFull);
     }
 }
 

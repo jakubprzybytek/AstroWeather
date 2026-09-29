@@ -10,7 +10,7 @@ namespace HostController {
 namespace {
 
 constexpr uint32_t kLineCapacity = 96U;
-constexpr uint32_t kBlockFieldCount = 10U;
+constexpr uint32_t kBlockFieldCount = 11U;
 
 bool readLine(const uint8_t* data, uint32_t length, uint32_t& offset,
               char* line, uint32_t capacity, bool& complete)
@@ -229,8 +229,8 @@ bool parseTemperature(const char* text, float& result)
     return std::isfinite(result);
 }
 
-// Protocol 2 cells: `0`-`3` a level, `*` level 3 blinking, `?` unavailable
-// (off). A whole-row `?` is all off.
+// Protocol 3 cells: `0`-`3` a level, `a`-`c` levels 1-3 blinking (down, to
+// off), `*` level 3 blinking, `?` unavailable (off). A whole-row `?` is all off.
 bool parseMatrixCells(const char* text, AstroMatrixRow& result)
 {
     result = {};
@@ -250,6 +250,11 @@ bool parseMatrixCells(const char* text, AstroMatrixRow& result)
         if (cell >= '0' && cell <= '3')
         {
             level = static_cast<uint8_t>(cell - '0');
+        }
+        else if (cell >= 'a' && cell <= 'c')
+        {
+            level = static_cast<uint8_t>(cell - 'a' + 1);
+            result.blink |= bit;
         }
         else if (cell == '*')
         {
@@ -351,7 +356,7 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
             {
                 return AstroParseStatus::MissingRecord;
             }
-            if (!valueEquals(value, "2"))
+            if (!valueEquals(value, "3"))
             {
                 return AstroParseStatus::UnsupportedProtocol;
             }
@@ -399,6 +404,18 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
                 }
                 continue;
             }
+            if (std::strcmp(key, "refreshIntervalMinutes") == 0 &&
+                parsed.refreshIntervalMinutes == 0U)
+            {
+                // Only the two cadences the schedule knows; anything else
+                // leaves it as it is.
+                uint32_t minutes = 0U;
+                if (parseUnsigned(value, minutes) && (minutes == 60U || minutes == 360U))
+                {
+                    parsed.refreshIntervalMinutes = static_cast<uint16_t>(minutes);
+                }
+                continue;
+            }
             if (std::strcmp(key, "display") != 0)
             {
                 continue;
@@ -416,7 +433,7 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
 
         static constexpr const char* fields[kBlockFieldCount] = {
             "board", "nightId", "numeric_0", "numeric_1", "matrix_0",
-            "matrix_1", "matrix_2", "matrix_3", "numeric_2", "numeric_3"};
+            "matrix_1", "matrix_2", "matrix_3", "matrix_4", "numeric_2", "numeric_3"};
 
         if (std::strcmp(key, "display") == 0)
         {
@@ -473,7 +490,7 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
                 return status;
             }
         }
-        else if (field >= 5U && field <= 8U)
+        else if (field >= 5U && field <= 9U)
         {
             if (!parseMatrixRow(value, board.matrix[field - 5U]))
             {
@@ -483,7 +500,7 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
         else
         {
             const AstroParseStatus status = parseNumeric(
-                value, board.numeric[field - 7U], static_cast<uint8_t>(field - 7U));
+                value, board.numeric[field - 8U], static_cast<uint8_t>(field - 8U));
             if (status != AstroParseStatus::Success)
             {
                 return status;

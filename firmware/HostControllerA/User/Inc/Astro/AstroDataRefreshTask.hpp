@@ -67,6 +67,7 @@ struct ScheduleSummary
     uint32_t failures = 0U;       // consecutive, since the last success
     uint32_t retryInMs = 0U;      // with failures: until the next attempt
     bool waitingForNextSlot = false;  // failed for want of WiFi credentials
+    uint32_t intervalMinutes = 360U;  // 60 on a storm night
 };
 
 // 3 KB: the parsed forecast (~700 B), the clock sync and their formatted log
@@ -118,7 +119,10 @@ private:
     // Written by this task only; read by others through schedule().
     RefreshSchedule::Scheduler scheduler_{};
     AstroProgressBar::Indicator indicator_{};
-    AstroProgressBar::Row shownRow_{0xFFFFFFFFU, 0xFFFFFFFFU};  // last submitted; none yet
+    // What showProgressRow() last drew, or none: before the first draw, and
+    // after a publish drew the aurora row over it.
+    static constexpr AstroProgressBar::Row kNoRowShown{0xFFFFFFFFU, 0xFFFFFFFFU};
+    AstroProgressBar::Row shownRow_ = kNoRowShown;
     uint8_t loggedStage_ = 0xFFU;
 };
 

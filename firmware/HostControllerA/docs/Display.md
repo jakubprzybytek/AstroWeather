@@ -117,7 +117,7 @@ board, other clients share some of them:
 | --- | --- | --- |
 | Numeric 2 | Current sense, in mA, ten times a second; see [CurrentSense.md](CurrentSense.md) | on (`adc display`) |
 | Numeric 3 | Clock, `HH:MM`, redrawn each minute; see [RTC.md](RTC.md) | on (`time display`) |
-| Matrix row 4 | Astro refresh progress bar | always |
+| Matrix row 4 | Astro refresh progress bar, while a refresh runs or its failure shows; otherwise the aurora row from the payload | always |
 
 With the defaults, the forecast's maximum and minimum temperatures for night 0
 are therefore overwritten on the local board: numeric 2 within 100 ms, numeric
@@ -354,7 +354,8 @@ On receipt, `deserializePlaneI2c()` in `DisplayI2cProtocol.cpp` accepts only a 3
 While an astro refresh runs, the bottom row (row 4) of the Host Controller's
 own matrix shows its progress in six segments, the current one blinking with
 the display's own blink attribute. Remote boards are not affected; their row 4
-is always blank. The behaviour, segment boundaries and success and
+is the aurora row. On the local board a successful refresh replaces the bar
+with the aurora row at once. The behaviour, segment boundaries and success and
 failure indications are described in
 [AstroRefresh.md](AstroRefresh.md#progress-bar). Typical step times:
 

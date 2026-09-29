@@ -10,8 +10,10 @@ fetches, parses or maps astro data.
 
 A refresh starts from switch 1, the `astro refresh` console command, `wifi set`
 and `wifi test`, or the built-in schedule, which runs at 00:10, 06:10, 12:10
-and 18:10 local time and retries failures with a growing delay. While it runs,
-the bottom matrix row of the local board shows a progress bar.
+and 18:10 local time (every hour at :10 on a storm night, when the payload asks
+for it) and retries failures with a growing delay. While it runs, the bottom
+matrix row of the local board shows a progress bar; a successful refresh
+replaces it with the aurora row.
 
 Only the HostController firmware has this feature.
 
@@ -110,8 +112,9 @@ for the refresh to finish; the outcome follows in the log. See
    slot or retry is logged.
 10. **Summary.** `lastRefresh()` gets the outcome, trigger, fetch status, HTTP
     status and finish tick, and `active_` is cleared.
-11. **Progress indicator**: full bar for success, blinking partial bar for
-    failure; see [Progress Bar](#progress-bar).
+11. **Progress indicator**: nothing more for success, as publishing already
+    drew the aurora row over the bar; a blinking partial bar for failure. See
+    [Progress Bar](#progress-bar).
 12. `AstroDataRefresh complete source=<name> outcome=<outcome>`. This line is
     printed whatever the outcome, so it is not evidence of success on its own.
 13. **WiFi test verdict**, for a `WifiTest` trigger only: one line saying
@@ -144,7 +147,7 @@ whole payload has validated.
 
 ### Header
 
-1. The first record must be `protocol`, and its value exactly `2`. Version 1, which had on/off matrix cells, is rejected.
+1. The first record must be `protocol`, and its value exactly `3`. Versions 1 (on/off cells) and 2 (no blinking levels, no aurora row) are rejected.
 2. The second must be `configurationId`, with a value of at most 20
    characters. The value is not compared with the configuration requested.
 3. Before `display=0`, `time` and `lastWeatherFetchTime` are recognised in
@@ -168,9 +171,9 @@ Within each block the records must come in this order:
 | 2 | `nightId` | Not validated; kept (up to 15 characters) for the log. |
 | 3 | `numeric_0` | Sunset, `HH:MM` or `?`. |
 | 4 | `numeric_1` | Sunrise, `HH:MM` or `?`. |
-| 5–8 | `matrix_0` … `matrix_3` | 21 characters from `0`–`3`, `*` and `?`, or the single `?`. |
-| 9 | `numeric_2` | Maximum temperature, or `?`. |
-| 10 | `numeric_3` | Minimum temperature, or `?`. |
+| 5–9 | `matrix_0` … `matrix_4` | 21 characters from `0`–`3`, `a`–`c`, `*` and `?`, or the single `?`. `matrix_4` is the aurora. |
+| 10 | `numeric_2` | Maximum temperature, or `?`. |
+| 11 | `numeric_3` | Minimum temperature, or `?`. |
 
 - An unknown key anywhere in a block, or after the last block, is ignored.
 - A known block key out of place is `missing-record`, as is a `display` record
@@ -181,10 +184,11 @@ Within each block the records must come in this order:
   as the server sends it. A point and exactly one digit may follow (`18.5`),
   the form an older server sent. `18.` and `18.50` are rejected.
 - In a matrix row, each character is one column: `0` off, `1`–`3` lit at that
-  brightness level, `*` lit at level 3 and blinking, `?` off. A whole-row `?`
-  is all off. The row is kept as four bit-planes, column *i* in bit *i*:
-  `lit`, the level's two bits `level0` and `level1`, and `blink`
-  (`AstroMatrixRow`). Version 1's `.` is rejected.
+  brightness level, `a`–`c` lit at level 1–3 and blinking (alternating with
+  off), `*` the same as `c`, `?` off. A whole-row `?` is all off. The row is
+  kept as four bit-planes, column *i* in bit *i*: `lit`, the level's two bits
+  `level0` and `level1`, and `blink` (`AstroMatrixRow`). Version 1's `.` is
+  rejected.
 - `?` for a numeric is valid unavailable data, not a parse failure.
 
 ### Parse results
@@ -246,8 +250,7 @@ On each board:
 | `numeric_1` | Numeric 1 | `setTime(hour, minute)` |
 | `numeric_2` | Numeric 2 | `setValue(value, 0)`: whole degrees, no decimal point, for example `18`, `-2`. A one-decimal value is rounded: `18.5` shows as `19`. |
 | `numeric_3` | Numeric 3 | `setValue(value, 0)` |
-| `matrix_0` … `matrix_3` | Matrix rows 0–3 | `setRow()` with the lit columns, character *i* to column *i*; the level planes and the blink mask into the board's attributes. Unlit columns are left at full level, so a later `display row` lighting one shows it. |
-| — | Matrix row 4 | Cleared on the remote boards, attributes included. Left alone on the local board, where it carries the progress bar. |
+| `matrix_0` … `matrix_4` | Matrix rows 0–4 | `setRow()` with the lit columns, character *i* to column *i*; the level planes and the blink mask into the board's attributes. Unlit columns are left at full level, so a later `display row` lighting one shows it. On the local board row 4 replaces the progress bar. |
 
 The numerics carry no attributes in the payload, so the mapper resets theirs
 to plain (full level, no blink) on every board it draws; the clock re-applies
@@ -299,11 +302,16 @@ progress. The row is split into six segments, one per step:
 | 6 | 17–20 | CRC check, parse and publish |
 
 - Finished steps are solid; the current one blinks.
-- **Success**: the full row, solid, for 1.5 s, then clear.
+- **Success**: nothing is held. Publishing the forecast draws the aurora row
+  (`matrix_4`) over the bar at once, so the bar disappears when the new
+  forecast appears; the refresh task forgets the bar it drew, so the next
+  refresh redraws it from scratch.
 - **Failure**: the bar up to and including the failed step, all of it
   blinking, for 60 s, then clear. A fetch failure shows at the step the WiFi
   task stopped at; a CRC, parse or publish failure at segment 6.
 - A new refresh clears the indicator at once.
+- After a failure the row is clear, so tonight's aurora row stays blank until
+  the next successful refresh, at most a retry delay away.
 
 The blinking is the display's own blink attribute (1 Hz, see
 [Display.md](Display.md#blink-and-brightness-levels)), so the row is drawn once
@@ -329,6 +337,14 @@ Europe/Warsaw, so each refresh picks up weather at most 10 minutes old. The
 12:10 slot also picks up the noon rollover, after which block 0 is the next
 observing night. The RTC holds local time with DST applied, so the slots and
 the server follow DST together.
+
+The payload's `refreshIntervalMinutes` header record sets the slot interval:
+`360` for the slots above, `60` on a storm night for every hour at :10, so the
+aurora row and its nowcast stay current. The interval changes after the
+refresh that carried it, and a value other than 60 or 360 (or none) keeps the
+current one. It is not kept over a reset: the scheduler starts six-hourly and
+switches at the next refresh, which on a storm night may be up to six hours
+away.
 
 ### When a refresh is due
 
@@ -394,7 +410,8 @@ The `status` lines are:
 - `weather`: when the server last fetched the weather, from the last response
   that parsed, and how long ago.
 - `schedule`: the next slot or retry and the last success, for example
-  `schedule   every 6 h from 00:10; next 18:10; last ok 2026-09-23 12:11`.
+  `schedule   every 6 h from 00:10; next 18:10; last ok 2026-09-23 12:11`, or
+  `every hour (storm night)` on a storm night.
 
 The exact text of each is in [Console.md](Console.md).
 
@@ -410,12 +427,13 @@ Native tests, run with the other suites; see [Development.md](Development.md).
 - `tests/RefreshScheduleTests.cpp`: slot boundaries, retry delays, the first
   refresh being due at once, a success covering its slot, a manual refresh
   counting, missed slots caught up once, backoff and its reset at the next
-  slot, tick wrap, no retry without credentials, an unset clock, and clock
-  steps both ways.
+  slot, tick wrap, no retry without credentials, an unset clock, clock
+  steps both ways, and switching to hourly slots and back.
 - `tests/AstroDisplayMapperTests.cpp`: each numeric kind and `?`, matrix rows
-  with their levels and blinking, the numerics' attributes reset, row 4 kept
-  on the local board and cleared on the remotes, each block on its board, and
-  a parsed payload's `0`–`3`, `?` cells through to the board bits and levels.
+  with their levels and blinking, the numerics' attributes reset, the aurora
+  row replacing the progress bar on the local board and drawn on the remotes,
+  each block on its board, and a parsed payload's `0`–`3`, `a`–`c`, `?` cells
+  through to the board bits and levels.
 - `tests/AstroProgressBarTests.cpp`: segment layout, the segment per stage, the
   fetching rows with the current step's blink mask, the failed segment per
   outcome, the success hold, the blinking failure bar per failed step and its

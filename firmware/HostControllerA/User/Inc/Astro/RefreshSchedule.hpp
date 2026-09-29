@@ -9,7 +9,9 @@
 // Refreshes run in fixed local-time slots, 10 minutes after the server's
 // Clear Outside ingestion (sst.config.ts, 00:00/06:00/12:00/18:00
 // Europe/Warsaw). The 12:10 slot also picks up the noon rollover to the next
-// observing night.
+// observing night. On a storm night the payload's `refreshIntervalMinutes`
+// switches the slots to every hour at :10, and back; after a reset the
+// interval is six hours until the next refresh sets it.
 //
 // A slot is done when a refresh from any source succeeded at or after its
 // start. So only the time of the last success is kept, a slot missed while the
@@ -22,7 +24,8 @@
 // osKernelGetTickCount().
 namespace RefreshSchedule {
 
-constexpr uint32_t kSlotIntervalSeconds = 6U * 3600U;
+constexpr uint32_t kSlotIntervalSeconds = 6U * 3600U;  // the default
+constexpr uint32_t kHourlyIntervalSeconds = 3600U;     // on a storm night
 constexpr uint32_t kSlotOffsetSeconds = 10U * 60U;  // slots at 00:10, 06:10, 12:10, 18:10
 
 // Delay before each retry after consecutive failures; the last repeats.
@@ -39,19 +42,19 @@ constexpr uint32_t retryDelayMs(uint32_t failures)
 }
 
 // Start of the latest slot at or before `now`. Before the first slot of
-// 2000-01-01 there is none; 0 stands in for it.
-constexpr uint32_t slotStart(uint32_t now)
+// 2000-01-01 there is none; 0 stands in for it. `interval` divides a day.
+constexpr uint32_t slotStart(uint32_t now, uint32_t interval = kSlotIntervalSeconds)
 {
     if (now < kSlotOffsetSeconds) {
         return 0U;
     }
-    return now - ((now - kSlotOffsetSeconds) % kSlotIntervalSeconds);
+    return now - ((now - kSlotOffsetSeconds) % interval);
 }
 
-constexpr uint32_t nextSlotStart(uint32_t now)
+constexpr uint32_t nextSlotStart(uint32_t now, uint32_t interval = kSlotIntervalSeconds)
 {
     return (now < kSlotOffsetSeconds) ? kSlotOffsetSeconds
-                                      : slotStart(now) + kSlotIntervalSeconds;
+                                      : slotStart(now, interval) + interval;
 }
 
 // What the scheduler knows about the clock when it is asked.
@@ -94,13 +97,13 @@ public:
         }
         retryAtTick_ = clock.tick + retryDelayMs(failures_);
         failedTimeSet_ = clock.timeSet;
-        failedSlot_ = clock.timeSet ? slotStart(clock.now) : 0U;
+        failedSlot_ = clock.timeSet ? slotStart(clock.now, interval_) : 0U;
         giveUpUntilNextSlot_ = !worthRetrying;
     }
 
     bool due(const Clock& clock) const
     {
-        if (clock.timeSet && hasSuccess_ && lastSuccess_ >= slotStart(clock.now)) {
+        if (clock.timeSet && hasSuccess_ && lastSuccess_ >= slotStart(clock.now, interval_)) {
             // Also covers a clock stepped back to before the last success.
             return false;
         }
@@ -108,7 +111,7 @@ public:
             return true;
         }
         // The failures were for an earlier slot: this one starts afresh.
-        if (clock.timeSet && failedTimeSet_ && slotStart(clock.now) != failedSlot_) {
+        if (clock.timeSet && failedTimeSet_ && slotStart(clock.now, interval_) != failedSlot_) {
             return true;
         }
         if (giveUpUntilNextSlot_) {
@@ -116,6 +119,18 @@ public:
         }
         return static_cast<int32_t>(clock.tick - retryAtTick_) >= 0;
     }
+
+    // The payload's `refreshIntervalMinutes`: 60 for hourly slots, 360 for
+    // six-hourly ones; 0 or anything else keeps the current interval.
+    void setIntervalMinutes(uint32_t minutes)
+    {
+        if (minutes == 60U) {
+            interval_ = kHourlyIntervalSeconds;
+        } else if (minutes == 360U) {
+            interval_ = kSlotIntervalSeconds;
+        }
+    }
+    uint32_t intervalSeconds() const { return interval_; }
 
     bool hasSuccess() const { return hasSuccess_; }
     uint32_t lastSuccess() const { return lastSuccess_; }
@@ -125,6 +140,7 @@ public:
     bool waitingForNextSlot() const { return failures_ != 0U && giveUpUntilNextSlot_; }
 
 private:
+    uint32_t interval_ = kSlotIntervalSeconds;
     bool hasSuccess_ = false;
     uint32_t lastSuccess_ = 0U;
     uint32_t failures_ = 0U;

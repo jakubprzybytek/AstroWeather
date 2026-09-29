@@ -124,7 +124,8 @@ void reportSchedule()
         std::snprintf(next + used, sizeof(next) - used, "%s%02u:%02u", used != 0U ? ", then " : "",
                       static_cast<unsigned>(at.hour), static_cast<unsigned>(at.minute));
     }
-    line("schedule   every 6 h from 00:10; next %s; last ok %s", next, last);
+    line("schedule   every %s from 00:10; next %s; last ok %s",
+         schedule.intervalMinutes == 60U ? "hour (storm night)" : "6 h", next, last);
 }
 
 // The server's last weather fetch, as the last parsed response reported it.
