@@ -84,9 +84,11 @@ sleeps for the remainder. A new minute can appear up to about 2 s late.
 
 Display 3 is shared. An astro refresh writes all four numeric displays, so its
 value shows until the next minute, when the time comes back. With `time display
-off` the task blanks display 3 once and then leaves it alone: the wakes that
-follow, including the RTC write of every refresh's clock sync, do not blank it
-again, so the refresh's minimum temperature stays.
+off` the task blanks display 3 once, at the switch, and then leaves it alone:
+the wakes that follow, including the RTC write of every refresh's clock sync,
+do not blank it again, so the refresh's minimum temperature stays. Booting
+with the setting off blanks nothing; display 3 keeps the board's no-data
+pattern like the other displays.
 
 All RTC access goes through `ClockTask`, under one mutex. Reads call
 `HAL_RTC_GetTime()` and then `HAL_RTC_GetDate()`. Reading the time freezes the

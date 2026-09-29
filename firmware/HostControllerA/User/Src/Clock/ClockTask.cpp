@@ -498,8 +498,10 @@ void ClockTask::wake()
 void ClockTask::run()
 {
     uint8_t shownMinute = kNothingShown;
-    // Whether the display was blanked since it was last switched off.
-    bool blanked = false;
+    // Whether the display was blanked since it was last switched off. A boot
+    // with the display off blanks nothing: the board's no-data pattern stays,
+    // as on the current sense's numeric 2, until something else writes it.
+    bool blanked = !displayEnabled_;
 
     for (;;)
     {
