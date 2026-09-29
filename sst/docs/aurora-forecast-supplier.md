@@ -372,6 +372,82 @@ thresholds after every further G3+ night; the oval's behaviour at the
 equatorward edge is not linear in Kp, and the biggest storms are the ones the
 row exists for.
 
+## Merging Sources
+
+Each slot of a night takes its value from the best source that covers it, so
+the cut-over from a better source to a worse one falls exactly where the
+better one runs out of data.
+
+### The rule
+
+For each of the night's 21 hourly observing slots (14:00 → 10:00 local), **the
+highest-ranked source whose span contains the slot's midpoint wins**.
+`observingSlots()` in `forecast/nights.ts` already gives each slot its
+`midpoint`. With whole-hour zone offsets every span boundary falls on a slot
+boundary, so the test is exact; the midpoint also handles half-hour zones and
+OVATION's odd-minute windows without special cases.
+
+| Rank | Source | Covers | Unit |
+| --- | --- | --- | --- |
+| 0 | OVATION nowcast | slots its `Forecast Time` fell in (latest and max over the hour) | % → level; **raise-only** until calibrated |
+| 1 | NOAA observed / estimated Kp | past three-hour bins | Kp |
+| 2 | GFZ Hp60 | now → +72 h, hourly | Hp60 median, with the ensemble bump |
+| 3 | NOAA 3-day predicted | three-hour bins to the end of UTC day 3 | Kp |
+| 4 | NOAA 27-day outlook | UTC days | largest Kp of the day |
+| — | none | | `?` (unknown) |
+
+For example (the exact hours move with each fetch): on a night in CEST where
+GFZ ends at 18:00 UTC, GFZ covers 14:00–19:59 local, the NOAA 3-day bins may
+carry on for a few more hours, and the 27-day outlook takes the rest: its
+first UTC day until 01:59 local and the next UTC day from 02:00. A night
+covered only by the outlook is the same case — two spans from two
+consecutive UTC days, split at local 01:00 or 02:00.
+
+### Details that make it work
+
+1. **Merge on Kp, threshold once.** Ranks 1–4 all yield a Kp-equivalent, and
+   the location's magnetic-latitude thresholds (see
+   [Levels](#levels)) turn the merged value into a level in one place, so
+   every source is judged on the same scale. The GFZ ensemble bump (≥ 25 %
+   for the next band) applies to GFZ slots only. The nowcast is in a
+   different unit, so it has its own % → level mapping and merges at the
+   level stage.
+2. **Past hours have a source.** GFZ starts at the current hour, so tonight's
+   earlier slots would otherwise fall through to the outlook or to `?`.
+   NOAA's `observed` and `estimated` bins cover them, and on a storm night the
+   nowcast's max over the hour raises them further, so past hours show what
+   happened rather than an old forecast. (The web tool drops those bins; the
+   merge keeps them.)
+3. **Fallback is by freshness, not only presence.** GFZ outranks the NOAA
+   3-day forecast only while its file is fresh (`Last-Modified` under three
+   hours old). If the fetch failed or the file went stale, its slots fall
+   through to rank 3; the cascade is the fallback.
+4. **Seams are marked, not smoothed.** The 27-day value is a *daily maximum*,
+   while GFZ gives an hourly median, so crossing from rank 2 to rank 4
+   typically steps up (median 2 → daily max 4). That is honest — "this day
+   may reach 4" — but reads as a spike unless it is marked. Each slot
+   carries its `source`, and the display dims outlook slots and marks
+   nowcast slots as live, so a step reads as lower confidence from there on.
+5. **The nowcast is an overlay for now.** Until
+   [calibration](#calibrating-the-nowcast) is done it only raises a slot above
+   the cascade's result, never lowers it. After calibration it becomes rank
+   0 outright.
+
+### Where the merge runs
+
+At **read time, in the API**, not at ingestion. Ingestion stores each
+source's spans raw per night; a pure `mergeAurora(slots, sources, now,
+thresholds)` function applies the cascade when the payload is assembled, as
+`weather-reader.ts` and `assemble.ts` do for weather, and is unit-tested with
+the saved fixtures. Changing the ranking, the freshness limit or the
+thresholds then needs no re-ingestion, and the per-slot `source` can be shown
+in the web tools for debugging.
+
+Per slot the merge yields the `level`, the `source` and the value it came
+from (Kp, or % for the nowcast). The payload row is the levels plus the
+dimmed and live marks; the storm-night flag is decided from the same merged
+night.
+
 ## Recommended Integration
 
 1. Add an aurora job on the cadence in [Fetch Cadence](#fetch-cadence): with
@@ -380,21 +456,26 @@ row exists for.
    NOAA 3-day Kp JSON (used only if the GFZ fetch or parse fails), the NOAA
    27-day outlook, and on storm nights OVATION. The forecast feeds are global,
    so fetch once and derive every configured location from the same payload.
-2. Build, per location and per night, 24 hourly levels for local noon → noon:
-   Hp60 (or NOAA 3-hour bins expanded to hours) for hours inside the 72 h
-   window; the 27-day daily max beyond it; `null` where neither covers.
-3. Store as the already-reserved item:
+2. Store each source's spans raw, per location and per night, as one item
+   per source under the reserved `#AURORA` suffix:
 
    ```text
    PK = LOC#wroclaw
-   SK = NIGHT#2026-09-28#AURORA
+   SK = NIGHT#2026-09-28#AURORA#GFZ
+   SK = NIGHT#2026-09-28#AURORA#NOAA3
+   SK = NIGHT#2026-09-28#AURORA#NOAA27
+   SK = NIGHT#2026-09-28#AURORA#OVATION
    ```
 
-   holding the hourly level array, the raw Kp/Hp60 median and `prob >= 6`
-   per hour, a per-hour `source` (`gfz-hp60` / `noaa-3day` / `noaa-27day` /
-   `ovation`), the nowcast's latest and maximum percentage per slot, the
-   storm-night flag, `fetchedAt` and `expireAt` — the same pattern as
-   `#WEATHER`.
+   Each holds the spans at the source's own granularity (the NOAA 3-day item
+   including its `observed` and `estimated` bins; the OVATION item the latest
+   and maximum percentage per slot, with the raw samples), the source's
+   `Last-Modified`, `fetchedAt` and `expireAt` — the same pattern as
+   `#WEATHER`. `begins_with "NIGHT#<id>#AURORA"` still returns them all in
+   one query.
+3. Merge at read time as in [Merging Sources](#merging-sources): per slot,
+   the best fresh source covering it, one threshold pass, the nowcast as a
+   raise-only overlay.
 4. Expose an aurora row in the API payload using the existing `0`–`3` level
    characters, the storm-night flag that switches the device to hourly pulls,
    and marks for the slots that come from the 27-day outlook (dimmed) and

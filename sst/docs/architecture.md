@@ -175,7 +175,7 @@ writes independently without clobbering the others:
 | PK | SK | attributes |
 |---|---|---|
 | `LOC#krakow` | `NIGHT#2026-09-10#WEATHER` | hourly forecast, `fetchedAt`, `expireAt` |
-| `LOC#krakow` | `NIGHT#2026-09-10#AURORA` | kp-index/forecast, `fetchedAt`, `expireAt` (future) |
+| `LOC#krakow` | `NIGHT#2026-09-10#AURORA#GFZ` (one item per aurora source) | raw source spans, `Last-Modified`, `fetchedAt`, `expireAt` (future; merged at read time, see [aurora-forecast-supplier.md](aurora-forecast-supplier.md#merging-sources)) |
 | `LOC#krakow` | `NIGHT#2026-09-11#WEATHER` | … |
 
 Only `#WEATHER` items exist today. Astronomy is calculated on demand and is not
