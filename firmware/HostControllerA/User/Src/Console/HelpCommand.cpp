@@ -60,7 +60,7 @@ const char* const kDisplay[] = {
     "display blink <n> off|colon|all    blink nothing, the colon, or all of display n",
     "display level <n> <0-3>            brightness of display n; 3 is full",
     "display test                       everything lit: levels 0-3 across the matrix",
-    "    and the digits, colons and some columns blinking",
+    "    and the digits, each level also blinking",
     "display clear                      everything off, no blink, full level",
     "display passes [<a> <b> <c> <d>]   show or set the pass lengths behind the levels,",
     "    percent of a slot summing to 100; default 12 39 19 30",

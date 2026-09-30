@@ -157,33 +157,40 @@ CommandResult level(Display::DisplayBoard& board, const char* index, const char*
 }
 
 // Every element lit, the levels running 0 to 3 along the matrix and along the
-// sixteen digits, colons and a few matrix columns blinking: the levels and
-// blinking of everything at once, to judge by eye.
+// sixteen digits, and blinking at every level next to the same level steady:
+// the levels and blinking of everything at once, to judge by eye.
+//
+// Numerics: each digit's decimal point blinks at the digit's level, the rest of
+// the digit is steady, and the colons blink at full level. Matrix: rows 0, 2
+// and 4 are steady, row 1 blinks throughout, and row 3 blinks every other
+// column.
 void testPattern(Display::DisplayBoard& board)
 {
     Display::BoardAttributes& attributes = board.attributes();
     for (uint8_t n = 0U; n < Display::kNumericDisplayCount; ++n) {
         board.numeric(n).setSegments(kAllSegments);
+        Display::NumericSegments blinking = kColon;
         for (uint8_t digit = 0U; digit < 4U; ++digit) {
             const uint8_t position = static_cast<uint8_t>(n * 4U + digit);
             Display::NumericSegments mask{};
             mask.slots[digit] = 0xFFU;
             attributes.setNumericLevel(n, mask,
                                        static_cast<uint8_t>((position * 3U + 7U) / 15U));
+            blinking.slots[digit] = Display::kSegmentDp;
         }
         Display::NumericSegments indicators{};
         indicators.slots[4] = 0x07U;
         attributes.setNumericLevel(n, indicators, Display::kLevelFull);
-        attributes.setNumericBlink(n, kColon);
+        attributes.setNumericBlink(n, blinking);
     }
     for (uint8_t r = 0U; r < Display::kMatrixRowCount; ++r) {
         HostController::AstroMatrixRow parsed{};
         char cells[Display::kMatrixColumnCount + 1U] = {};
         for (uint8_t c = 0U; c < Display::kMatrixColumnCount; ++c) {
-            cells[c] = static_cast<char>('0' + (c * 3U + 10U) / 20U);
-        }
-        if (r == 1U || r == 3U) {
-            cells[4] = cells[10] = cells[16] = '*';
+            const uint8_t level = static_cast<uint8_t>((c * 3U + 10U) / 20U);
+            const bool blinks = r == 1U || (r == 3U && (c % 2U) == 0U);
+            // The payload's alphabet: 'a'-'c' are levels 1-3 blinking.
+            cells[c] = static_cast<char>(blinks && level != 0U ? 'a' + level - 1U : '0' + level);
         }
         HostController::parseMatrixRow(cells, parsed);
         AstroDisplayMapper::mapMatrixRow(parsed, r, board.matrix(r), attributes);
