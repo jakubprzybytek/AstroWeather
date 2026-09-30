@@ -30,6 +30,7 @@ const char* const kIndex[] = {
     "  errors [clear]    the last 16 warnings and errors, kept over resets",
     "  display ...       numbers, times and matrix rows on this board",
     "  astro refresh     fetch the sky forecast and publish it to all boards",
+    "  astro test        fetch the server's demo forecast once, every variant",
     "  api ...           show or set the server host and path (saved)",
     "  time ...          show, set and trim the clock; show it on display 3",
     "  adc ...           current-sense logging and readout (saved)",
@@ -89,8 +90,12 @@ const char* const kAstro[] = {
     "    WiFi session is up, up to a couple of minutes on the first run after boot.",
     "    'ERR astro-refresh-busy'         a refresh is already running",
     "    'ERR astro-refresh-unavailable'  the WiFi task is not ready",
-    "Progress fills a bar on this board's bottom matrix row step by step; the",
-    "full bar shows success, and a failure blinks where it stopped for a minute.",
+    "Progress fills this board's bottom matrix row; the forecast replaces it,",
+    "and a failure blinks where it stopped for a minute.",
+    "astro test",
+    "    Like 'astro refresh', but fetches the demo forecast (/astro/test) once:",
+    "    every display variant. The path, schedule and weather status stay;",
+    "    the next refresh brings the real forecast back.",
 };
 
 const char* const kTime[] = {

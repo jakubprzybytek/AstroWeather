@@ -59,6 +59,9 @@ struct St67FetchRequest {
   volatile bool completed = false;
   volatile FetchStage stage = FetchStage::Queued;
   osThreadId_t waiter = nullptr;  // thread to signal; set by FetchSt67Data
+  // For this fetch only, a path to use instead of the saved or built-in one
+  // ('astro test'); the host stays. Null for the usual path.
+  const char* pathOverride = nullptr;
   St67FetchResult result{};
 };
 

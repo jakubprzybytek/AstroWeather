@@ -198,6 +198,7 @@ const char* refreshTriggerName(RefreshTrigger trigger)
     case RefreshTrigger::Console: return "console";
     case RefreshTrigger::Scheduled: return "scheduled";
     case RefreshTrigger::WifiTest: return "wifi-test";
+    case RefreshTrigger::Test: return "test";
     }
     return "unknown";
 }
@@ -272,6 +273,7 @@ bool AstroDataRefreshTask::fetchPayload()
     request_ = {};
     request_.buffer = responseBuffer_;
     request_.capacity = sizeof(responseBuffer_);
+    request_.pathOverride = (trigger_ == RefreshTrigger::Test) ? kTestPath : nullptr;
     const bool succeeded = FetchSt67Data(&request_, &AstroDataRefreshTask::onFetchProgress, this);
     const St67FetchResult& result = request_.result;
     LogService::instance().logf(
@@ -397,15 +399,18 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
         }
         else
         {
-            taskENTER_CRITICAL();
-            last_.weatherFetchKnown = true;
-            last_.lastWeatherFetch = data.lastWeatherFetch;
-            taskEXIT_CRITICAL();
+            // The demo forecast carries the real time, so the clock follows
+            // it, but it says nothing about the weather or the schedule.
+            if (trigger != RefreshTrigger::Test)
+            {
+                taskENTER_CRITICAL();
+                last_.weatherFetchKnown = true;
+                last_.lastWeatherFetch = data.lastWeatherFetch;
+                scheduler_.setIntervalMinutes(data.refreshIntervalMinutes);
+                taskEXIT_CRITICAL();
+            }
             logParsedData(data);
             syncClock(data.serverTime, request_.result.responseTick);
-            taskENTER_CRITICAL();
-            scheduler_.setIntervalMinutes(data.refreshIntervalMinutes);
-            taskEXIT_CRITICAL();
             if (!publishDisplay(data))
             {
                 outcome = RefreshOutcome::PublishFailed;
@@ -421,7 +426,12 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
             }
         }
     }
-    recordScheduleOutcome(outcome, request_.result.status);
+    // A demo fetch neither covers a slot nor starts a retry: the next slot, or
+    // 'astro refresh', brings the real forecast back.
+    if (trigger != RefreshTrigger::Test)
+    {
+        recordScheduleOutcome(outcome, request_.result.status);
+    }
     taskENTER_CRITICAL();
     last_.outcome = outcome;
     last_.trigger = trigger;

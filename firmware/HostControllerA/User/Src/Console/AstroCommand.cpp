@@ -12,14 +12,23 @@ CommandResult handleAstroCommand(const char* line)
     {
         return CommandResult::NotHandled;
     }
-    if (std::strcmp(line, "astro refresh") != 0)
+    HostController::RefreshTrigger trigger;
+    if (std::strcmp(line, "astro refresh") == 0)
+    {
+        trigger = HostController::RefreshTrigger::Console;
+    }
+    else if (std::strcmp(line, "astro test") == 0)
+    {
+        // One fetch of the demo forecast; the saved path is untouched.
+        trigger = HostController::RefreshTrigger::Test;
+    }
+    else
     {
         return CommandResult::InvalidArgument;
     }
 
     const HostController::RefreshRequestResult result =
-        HostController::AstroDataRefreshTask::instance().requestRefresh(
-            HostController::RefreshTrigger::Console);
+        HostController::AstroDataRefreshTask::instance().requestRefresh(trigger);
     if (result == HostController::RefreshRequestResult::Busy)
     {
         return CommandResult::Busy;

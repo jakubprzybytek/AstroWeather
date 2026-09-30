@@ -1,5 +1,7 @@
 #include <WiFi/St67HttpFetcher.hpp>
 
+#include <cstdio>
+
 #include <Debug/LogService.hpp>
 #include <WiFi/HttpClient.hpp>
 #include <WiFi/HttpResponseParser.hpp>
@@ -123,9 +125,13 @@ St67HttpFetcher::St67HttpFetcher(St67Runtime& runtime) : runtime_(runtime) {}
 bool St67HttpFetcher::fetch(St67FetchRequest* request) {
   setFetchStage(runtime_, FetchStage::Downloading);
   target_ = resolveApiTarget(St67CredentialSource());
+  if (request->pathOverride != nullptr) {
+    std::snprintf(target_.path, sizeof(target_.path), "%s", request->pathOverride);
+  }
   LogService::instance().logf(LogService::Level::Debug, "ST67 fetch http://%s%s (%s)",
                               target_.host, target_.path,
-                              (target_.hostSaved || target_.pathSaved) ? "saved" : "built-in");
+                              request->pathOverride != nullptr ? "one-off path"
+                              : (target_.hostSaved || target_.pathSaved) ? "saved" : "built-in");
   if (!St67HttpRules::isValidTarget(target_.host, target_.path, HTTP_SNI_MAX_SIZE)) {
     LogService::instance().log(LogService::Level::Error,
                                  "ST67 fetch-config invalid");

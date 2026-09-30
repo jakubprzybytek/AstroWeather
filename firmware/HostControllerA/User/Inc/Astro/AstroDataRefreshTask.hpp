@@ -22,7 +22,11 @@ enum class RefreshTrigger : uint8_t
     Console,
     Scheduled,
     WifiTest,  // 'wifi set' / 'wifi test': a refresh used to exercise the credentials
+    Test,      // 'astro test': one fetch of the server's demo forecast, kTestPath
 };
+
+// The server's demo forecast: every display variant, with the real time.
+constexpr const char* kTestPath = "/astro/test";
 
 enum class RefreshRequestResult : uint8_t
 {

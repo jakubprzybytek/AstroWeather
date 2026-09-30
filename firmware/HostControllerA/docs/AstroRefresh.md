@@ -60,6 +60,7 @@ Every trigger goes through the same call,
 | `Console` | `console` | `astro refresh`. |
 | `Scheduled` | `scheduled` | The task itself, when the schedule says a refresh is due. |
 | `WifiTest` | `wifi-test` | `wifi set` and `wifi test`: a refresh used to exercise the credentials, which ends with a verdict line. |
+| `Test` | `test` | `astro test`: one fetch of the server's demo forecast, `/astro/test` on the usual host (`kTestPath`, passed to the fetch as `pathOverride`). The clock still syncs to its `time`, but the refresh is not recorded in the schedule, does not change the refresh interval, and does not update the weather fetch time `status` reports; the next `astro refresh` or scheduled slot brings the real forecast back. |
 
 Only one refresh can be pending or running. A test-and-set of `active_` inside
 a short critical section makes this race-free between `MainLoopTask`,
@@ -399,6 +400,7 @@ Nothing is logged about the schedule while the clock is unset.
 | Command | Effect |
 | --- | --- |
 | `astro refresh` | Request a refresh now. |
+| `astro test` | Request a refresh of the demo forecast (`/astro/test`) once; the saved path is unchanged. |
 | `wifi set <ssid> [password]` | Store credentials, then run a `WifiTest` refresh. |
 | `wifi test` | Run a `WifiTest` refresh with the stored credentials. |
 | `status` | Includes three lines on the refresh. |

@@ -422,6 +422,7 @@ bursts of 8 lines with a 30 ms pause, so up to 17 lines fit through the
 | Command | Reply |
 | --- | --- |
 | `astro refresh` | `OK astro-refresh=started`. The fetch runs in the background; progress and the result follow in the log. |
+| `astro test` | `OK astro-refresh=started`. As `astro refresh`, but fetches the server's demo forecast (`/astro/test`) once, which shows every display variant; the saved path, the schedule and the weather status are unchanged. |
 
 `ERR astro-refresh-busy` means a refresh is already running, and
 `ERR astro-refresh-unavailable` that the refresh task is not ready. Any other
