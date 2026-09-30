@@ -12,12 +12,12 @@ void encodePcb(const LogicalBoardState& state, PreparedFrame& frame);
 // is shown as kPassCount passes of different lengths, and a lit element at
 // level L is on only during the passes in kLevelPasses[L]. Its light is
 // then the sum of those passes' shares of the slot. Levels 1, 2 and 3 of a
-// numeric display get 12 %, 35 % and 100 % of the slot, percentages chosen
+// numeric display get 12 %, 31 % and 100 % of the slot, percentages chosen
 // by eye for even-looking steps. The matrix LEDs are brighter than the
 // numeric ones, so the matrix sits out the last pass and its levels get
-// 12 %, 35 % and 70 %.
+// 12 %, 31 % and 70 %.
 constexpr uint8_t kPassCount = 4;
-constexpr uint8_t kPassPercent[kPassCount] = {12, 35, 23, 30};
+constexpr uint8_t kPassPercent[kPassCount] = {12, 31, 27, 30};
 constexpr uint8_t kLevelPasses[kLevelCount] = {0x0U, 0x1U, 0x2U, 0xFU};
 constexpr uint8_t kMatrixPasses = 0x7U;
 
