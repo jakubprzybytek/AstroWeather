@@ -28,11 +28,11 @@ void testPassTable()
 
     expectEqual(Display::numericLevelPercent(0), 0U, "numeric level 0 off");
     expectEqual(Display::numericLevelPercent(1), 12U, "numeric level 1 is 12 %");
-    expectEqual(Display::numericLevelPercent(2), 39U, "numeric level 2 is 39 %");
+    expectEqual(Display::numericLevelPercent(2), 35U, "numeric level 2 is 35 %");
     expectEqual(Display::numericLevelPercent(3), 100U, "numeric level 3 is full");
     expectEqual(Display::matrixLevelPercent(0), 0U, "matrix level 0 off");
     expectEqual(Display::matrixLevelPercent(1), 12U, "matrix level 1 is 12 %");
-    expectEqual(Display::matrixLevelPercent(2), 39U, "matrix level 2 is 39 %");
+    expectEqual(Display::matrixLevelPercent(2), 35U, "matrix level 2 is 35 %");
     expectEqual(Display::matrixLevelPercent(3), 70U, "matrix full is 70 %");
 
     for (uint8_t level = 1; level < Display::kLevelCount; ++level) {

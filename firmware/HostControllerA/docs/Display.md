@@ -88,13 +88,13 @@ Additional integer overloads may be provided. All setters convert their input to
 Every lit segment and pixel has two attributes, stored in `Display::BoardAttributes` next to the content in the same layout, as three bit-planes: `blink`, and `level0`/`level1`, the two bits of a brightness level 0 to 3. The default is nothing blinking and everything at level 3, full. An attribute on an unlit element has no effect, and attributes persist across content updates, so the clock sets its colon to blink once and keeps calling `setTime()`. Like the content, they are last-writer-wins: an astro refresh resets the numerics' attributes of every board it draws (the clock re-applies its colon on every redraw) and sets the matrix rows' from the payload.
 
 - **Blink** is on/off: a blinking element is shown in the on half-period and dark in the off one, 0.5 s each at the 50 Hz frame rate (`RefreshSequencer::kBlinkHalfPeriodFrames`). The phase is the board's own and free-running; boards drift apart within a minute, which does not matter as long as no blinking element spans boards.
-- **Levels** are made in time. Each multiplexing slot is shown as four passes of 12, 39, 19 and 30 % of its 4 ms, and a level lights the passes in `Display::kLevelPasses`: level 1 the first, level 2 the second, level 3 all four. A numeric segment at levels 1, 2 and 3 is therefore lit for 12, 39 and 100 % of the slot, percentages chosen by eye for even-looking steps (brightness perception is roughly logarithmic, so equal steps of light would look uneven). The matrix LEDs are visibly brighter than the numeric ones, so the matrix sits out the last pass (`Display::kMatrixPasses`) and its levels get 12, 39 and 70 %.
+- **Levels** are made in time. Each multiplexing slot is shown as four passes of 12, 35, 23 and 30 % of its 4 ms, and a level lights the passes in `Display::kLevelPasses`: level 1 the first, level 2 the second, level 3 all four. A numeric segment at levels 1, 2 and 3 is therefore lit for 12, 35 and 100 % of the slot, percentages chosen by eye for even-looking steps (brightness perception is roughly logarithmic, so equal steps of light would look uneven). The matrix LEDs are visibly brighter than the numeric ones, so the matrix sits out the last pass (`Display::kMatrixPasses`) and its levels get 12, 35 and 70 %.
 
 | Level | Numeric segment | Matrix pixel |
 | --- | ---: | ---: |
 | 0 | off | off |
 | 1 | 12 % | 12 % |
-| 2 | 39 % | 39 % |
+| 2 | 35 % | 35 % |
 | 3 (default) | 100 % | 70 % |
 
 The pass lengths are the one tunable: `display passes <a> <b> <c> <d>` changes them at run time, to judge a curve by eye; the encoder's level-to-pass table is fixed. The levels multiply with the analog brightness (the light sensor and `display low`), so level 1 in low brightness in a dark room may be near invisible; the table above was tuned at normal brightness. See [Refresh Operation](#refresh-operation) for how the passes are shown.
@@ -283,7 +283,7 @@ The encoder reads normalized A-G and DP segment values, then applies the wiring 
 
 ## Refresh Operation
 
-A complete multiplexing frame is five slots of 4 ms, a 50 Hz frame. Each slot is shown as four passes (`RefreshSequencer`), longest first, so the slot switch and its settle time come out of the longest pass rather than the shortest: with the default table the order is 39, 30, 19 and 12 % of the slot, 1560, 1200, 760 and 480 us.
+A complete multiplexing frame is five slots of 4 ms, a 50 Hz frame. Each slot is shown as four passes (`RefreshSequencer`), longest first, so the slot switch and its settle time come out of the longest pass rather than the shortest: with the default table the order is 35, 30, 23 and 12 % of the slot, 1400, 1200, 920 and 480 us.
 
 The whole refresh runs from the timer's update interrupt, once per pass, with no task:
 

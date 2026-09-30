@@ -63,7 +63,7 @@ const char* const kDisplay[] = {
     "    and the digits, each level also blinking",
     "display clear                      everything off, no blink, full level",
     "display passes [<a> <b> <c> <d>]   show or set the pass lengths behind the levels,",
-    "    percent of a slot summing to 100; default 12 39 19 30",
+    "    percent of a slot summing to 100; default 12 35 23 30",
     "display low [on|off]               low brightness on every board; saved, and",
     "    switch 2 toggles it. 'display low' shows the state in use and the saved one.",
     "All but 'low' change this board only; 'astro refresh' redraws every board.",

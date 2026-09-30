@@ -37,8 +37,8 @@ void testSetPassPercentValidation()
 {
     Display::RefreshSequencer sequencer;
     const auto before = sequencer.passMicros();
-    expect(!sequencer.setPassPercent({12, 39, 19, 31}), "sum above 100 rejected");
-    expect(!sequencer.setPassPercent({12, 39, 19, 29}), "sum below 100 rejected");
+    expect(!sequencer.setPassPercent({12, 35, 23, 31}), "sum above 100 rejected");
+    expect(!sequencer.setPassPercent({12, 35, 23, 29}), "sum below 100 rejected");
     expect(!sequencer.setPassPercent({0, 50, 25, 25}), "a zero-length pass rejected");
     expect(sequencer.passMicros() == before, "rejected table leaves the lengths");
 
@@ -59,7 +59,7 @@ void testFrameSequence()
     Display::RefreshSequencer sequencer;
     expectEqual(sequencer.frames(), 0U, "no frame before the first step");
 
-    // Default table 12/39/19/30: longest first is pass 1, 3, 2, 0.
+    // Default table 12/35/23/30: longest first is pass 1, 3, 2, 0.
     const uint8_t expectedOrder[Display::kPassCount] = {1, 3, 2, 0};
     for (uint8_t slot = 0; slot < Display::kSlotCount; ++slot) {
         for (uint8_t position = 0; position < Display::kPassCount; ++position) {
