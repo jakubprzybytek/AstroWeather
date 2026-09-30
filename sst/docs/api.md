@@ -41,6 +41,28 @@ hostname over both HTTP and HTTPS without redirects; see the API edge section
 in [architecture.md](architecture.md) for the security constraints of plain
 HTTP.
 
+### Demo configuration `test`
+
+`GET /astro/test` returns a made-up forecast that shows every display variant,
+for trying the boards out. `test` is not in `configurations.ts` and is not
+listed by `GET /configurations`; the web UI offers it on the Home view only,
+and the device fetches it with `astro test` (or with `api path /astro/test`).
+The payload is a normal protocol 3 response for six consecutive nights
+(`forecast/demo.ts`):
+
+- `time` is the real time in Europe/Warsaw, since the device sets its clock
+  from it; `lastWeatherFetchTime` is `?` and `refreshIntervalMinutes` is `360`.
+- Sunset and sunrise start at random times and move by 1–3 minutes a night;
+  the moon rises 40–60 minutes later each night. The sun and moon rows follow
+  those times.
+- Each night has a theme: clear sky with an aurora storm blinking "now";
+  overcast with rain; thunderstorms clearing; a frosty evening clouding over
+  with an aurora burst; every level and blink in turn; and missing data (gaps,
+  whole-row `?`, unavailable temperatures and moon). Together the cloud,
+  precipitation and aurora rows use every cell character.
+- Temperatures cover one and two digits, both signs and zero (`4`, `-3`,
+  `17`, `28`, `-14`, `0`), and `?`.
+
 ## Response Format
 
 The endpoint is consumed by an STM32-based device without a JSON parser. A

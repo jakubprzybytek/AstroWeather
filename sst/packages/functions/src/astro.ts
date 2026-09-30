@@ -1,5 +1,6 @@
 import { configurations } from "./configurations";
 import { assembleForecast } from "./forecast/assemble";
+import { DEMO_CONFIGURATION_ID, DEMO_TIMEZONE, demoForecast } from "./forecast/demo";
 import { localDateTime, localDateTimeMillis, utcOffset } from "./forecast/nights";
 import { serializeError, serializeForecast } from "./forecast/protocol";
 import { createWeatherReader } from "./forecast/weather-reader";
@@ -27,12 +28,20 @@ export function createHandler(
 ) {
   return async (event: AstroEvent) => {
     const configurationId = event.pathParameters?.configurationId;
+    const now = dependencies.now ?? (() => new Date());
+
+    if (configurationId === DEMO_CONFIGURATION_ID) {
+      // Made-up forecast data; only the time is real, for the device's clock.
+      const { displays, refreshIntervalMinutes } = demoForecast(now());
+      const sentAt = now();
+      const time = localDateTimeMillis(sentAt, DEMO_TIMEZONE) + utcOffset(sentAt, DEMO_TIMEZONE);
+      return textResponse(200, serializeForecast(configurationId, time, "?", refreshIntervalMinutes, displays));
+    }
 
     if (!configurationId || !isConfigurationId(configurationId)) {
       return textResponse(404, serializeError("configuration_not_found"));
     }
 
-    const now = dependencies.now ?? (() => new Date());
     const { location, aurora } = configurations[configurationId];
 
     try {

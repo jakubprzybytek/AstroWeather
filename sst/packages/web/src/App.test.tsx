@@ -22,6 +22,20 @@ describe("AstroWeather app", () => {
     expect(await screen.findByRole("option", { name: "Wrocław" })).toBeInTheDocument();
   });
 
+  test("offers the demo configuration on Home only", async () => {
+    fetchMock.mockResolvedValueOnce(configurationsResponse());
+    render(<App />);
+    expect(await screen.findByRole("option", { name: "Test (demo data)" })).toHaveValue("test");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Clearoutside" }));
+    await screen.findByRole("option", { name: "Kraków" });
+    expect(screen.queryByRole("option", { name: "Test (demo data)" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "GFZ Hp60" }));
+    await screen.findByRole("option", { name: "Kraków" });
+    expect(screen.queryByRole("option", { name: "Test (demo data)" })).not.toBeInTheDocument();
+  });
+
   test("submits the selected location and renders results", async () => {
     fetchMock
       .mockResolvedValueOnce(configurationsResponse())

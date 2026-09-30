@@ -10,6 +10,10 @@ import { ClearOutsideTool } from "./components/ClearOutsideTool";
 
 type View = "main" | "clearoutside" | AuroraToolId;
 
+// Not a real configuration: the API serves made-up data showing every display
+// variant. Offered on Home only; the tools need real locations.
+const DEMO_CONFIGURATION: Configuration = { id: "test", label: "Test (demo data)" };
+
 const views: { id: View; label: string }[] = [
   { id: "main", label: "Home" },
   { id: "clearoutside", label: "Clearoutside" },
@@ -83,7 +87,7 @@ export default function App() {
                     <ConfigSelect
                       value={selectedId}
                       onChange={setSelectedId}
-                      configurations={configurations}
+                      configurations={[...configurations, DEMO_CONFIGURATION]}
                       disabled={configurationsLoading}
                     />
                     <Button className="mt-3" type="submit" disabled={!selectedId || loading}>
