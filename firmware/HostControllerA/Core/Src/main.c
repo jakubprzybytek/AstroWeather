@@ -25,6 +25,7 @@
 /* USER CODE BEGIN Includes */
 #include <AstroWeather.hpp>
 #include "task.h"
+#include "stm32g0xx_ll_crs.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -117,7 +118,13 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  /* CubeMX generates HSI48CalibrationValue = 32 whatever the GUI shows: the
+     midpoint of the 6-bit TRIM on other families. The G0's TRIM is 7 bits
+     with its midpoint and reset value at 64, so start the CRS there. USB is
+     not running yet, so the CRS has not trimmed anything. */
+  LL_CRS_DisableAutoTrimming();
+  LL_CRS_SetHSI48SmoothTrimming(LL_CRS_HSI48CALIBRATION_DEFAULT);
+  LL_CRS_EnableAutoTrimming();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -189,6 +196,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_CRSInitTypeDef pInit = {0};
 
   /** Configure the main internal regulator output voltage
   */
@@ -222,6 +230,21 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+
+  /** Enable the SYSCFG APB clock
+  */
+  __HAL_RCC_CRS_CLK_ENABLE();
+
+  /** Configures CRS
+  */
+  pInit.Prescaler = RCC_CRS_SYNC_DIV1;
+  pInit.Source = RCC_CRS_SYNC_SOURCE_USB;
+  pInit.Polarity = RCC_CRS_SYNC_POLARITY_RISING;
+  pInit.ReloadValue = __HAL_RCC_CRS_RELOADVALUE_CALCULATE(48000000,1000);
+  pInit.ErrorLimitValue = 34;
+  pInit.HSI48CalibrationValue = 32;
+
+  HAL_RCCEx_CRSConfig(&pInit);
 }
 
 /**

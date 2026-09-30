@@ -386,10 +386,20 @@ or on a Windows machine without the September update would settle it.
 full-speed USB needs within 0.25 %. The firmware did not enable the clock
 recovery system (CRS), so HSI48 ran on its factory trim. Once the CRS was
 enabled, it settled at `TRIM` 58 instead of the default 64, which puts the
-untrimmed clock about 0.8 % fast. The CRS is now enabled in
-`HAL_PCD_MspInit()` (`USB_Device/Target/usbd_conf.c`, user code section 1),
+untrimmed clock about 0.8 % fast. The CRS is now enabled in CubeMX (RCC, CRS
+SYNC source USB), which generates its setup in `SystemClock_Config()`,
 synchronised to the host's start-of-frame packets. This alone did not stop the
-failures. To check it on a running board, read `CRS_CR` over SWD:
+failures.
+
+The CRS should start from `TRIM` 64: the G0's field is 7 bits and 64 is its
+reset value and midpoint (`RCC_CRS_HSI48CALIBRATION_DEFAULT`). CubeMX shows
+64 as the HSI48 calibration value, but does not save it in the `.ioc` and
+generates `HSI48CalibrationValue = 32`, the midpoint on families with a 6-bit
+field (seen with the CubeMX in use on 2026-09-30; changing the value and back
+did not help). That would start every boot several percent off. `main()` puts
+`TRIM` back to 64 in its `SysInit` user code section, before USB starts.
+
+To check the CRS on a running board, read `CRS_CR` over SWD:
 
 ```bash
 STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 0x40006C00 4
