@@ -103,7 +103,19 @@ void HAL_PCD_MspInit(PCD_HandleTypeDef* pcdHandle)
     HAL_NVIC_SetPriority(USB_UCPD1_2_IRQn, 3, 0);
     HAL_NVIC_EnableIRQ(USB_UCPD1_2_IRQn);
   /* USER CODE BEGIN USB_DRD_FS_MspInit 1 */
-
+    /* USB runs from HSI48, which is only factory-trimmed (on the first board
+       it ran about 0.8 % fast), while full-speed USB allows 0.25 %. The clock
+       recovery system trims HSI48 continuously against the host's 1 kHz
+       start-of-frame packets. See docs/Development.md. */
+    RCC_CRSInitTypeDef crs = {0};
+    __HAL_RCC_CRS_CLK_ENABLE();
+    crs.Prescaler = RCC_CRS_SYNC_DIV1;
+    crs.Source = RCC_CRS_SYNC_SOURCE_USB;
+    crs.Polarity = RCC_CRS_SYNC_POLARITY_RISING;
+    crs.ReloadValue = __HAL_RCC_CRS_RELOADVALUE_CALCULATE(48000000U, 1000U);
+    crs.ErrorLimitValue = RCC_CRS_ERRORLIMIT_DEFAULT;
+    crs.HSI48CalibrationValue = RCC_CRS_HSI48CALIBRATION_DEFAULT;
+    HAL_RCCEx_CRSConfig(&crs);
   /* USER CODE END USB_DRD_FS_MspInit 1 */
   }
 }

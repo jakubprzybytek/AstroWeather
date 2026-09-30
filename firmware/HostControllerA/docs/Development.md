@@ -179,9 +179,11 @@ and the command console. [Console.md](Console.md) covers connecting, the
 `tools/astro_console.py` client, the output format and the full command
 reference. In short:
 
-- Use the board's own **USB Serial Device** port (`COM4` on the development
-  workstation), not the ST-LINK virtual COM port, which carries no firmware
-  output. The baud rate is ignored.
+- Use the board's own **USB Serial Device** port, not the ST-LINK virtual COM
+  port, which carries no firmware output. The baud rate is ignored. It is
+  normally `COM4` on the development workstation, but the number can change
+  (see [The COM number changes](#the-com-number-changes)), so let
+  `astro_console.py` detect the port rather than passing `--port`.
 - `python tools/astro_console.py send status` checks that the board is alive;
   `capture` and `shell` cover longer sessions.
 - Only one application can hold the port at a time. Close Serial Monitor, HTerm
@@ -216,20 +218,25 @@ in the EEPROM across power cycles.
 
 ### COM port disappears or will not open
 
-The STM32 USB CDC port intermittently stops working, most often after repeated
-flash and reset cycles. This is a known issue with the ST USB device stack
-rather than a fault in this firmware. Typical symptoms:
+The STM32 USB CDC port intermittently stops working, most often after a flash
+or a reset. Since late September 2026 the likely cause is on the Windows side;
+see [Why it happens](#why-it-happens). Typical symptoms:
 
 - `python tools/astro_console.py list` still lists the port, but opening it
   fails with `could not open port 'COM4': FileNotFoundError(2, ...)`.
+- Opening it fails with `PermissionError(13, 'A device attached to the system
+  is not functioning.', None, 31)`. Despite the exception type, this is Windows
+  error 31, a failed device, not another program holding the port.
+- The port comes back under a different number, such as `COM7`; see
+  [The COM number changes](#the-com-number-changes).
 - The port appears in Device Manager but is missing from
   `HKLM\HARDWARE\DEVICEMAP\SERIALCOMM`, which is the authoritative list of
   active serial devices.
 - The device reports `CM_PROB_FAILED_START`.
 
-The open failure is `FileNotFoundError` (the device is gone), not
-`PermissionError` (another application holds the port). For the latter, close
-the other holder instead.
+These are device failures. A port held by another application fails instead
+with `PermissionError(13, 'Access is denied.', None, 5)`; for that, close the
+other holder.
 
 Reading the RTC over SWD (`python tools/rtc_offset.py`) is another way to see
 that the firmware is alive while the console is unreachable.
@@ -290,6 +297,19 @@ In order of escalation:
    re-enumerates the board on another host controller. It also cuts power, so
    the RTC loses the time; see [RTC.md](RTC.md#reset-and-power-loss).
 
+5. **Remove the device node** and let Windows create it again, from an
+   *elevated* prompt:
+
+   ```powershell
+   pnputil /remove-device "USB\VID_0483&PID_5740\3257327B3534"
+   pnputil /scan-devices
+   ```
+
+   On 2026-09-30 this was the only step that worked. Once COM4's node was in
+   `CM_PROB_FAILED_START`, resets, reflashing, re-plugging and moving to
+   another port all came back failed. The instance ID is the board's; list the
+   nodes as shown under [The COM number changes](#the-com-number-changes).
+
 Confirm recovery with:
 
 ```powershell
@@ -303,6 +323,122 @@ should also reappear under `SERIALCOMM`:
 ```powershell
 Get-ItemProperty 'HKLM:\HARDWARE\DEVICEMAP\SERIALCOMM'
 ```
+
+#### The COM number changes
+
+Windows names a USB device node after the device's serial number when it
+accepts one, and otherwise after the hub port it is plugged into. The firmware
+reports a serial number built from the chip's unique ID (`Get_SerialNum()` in
+`USB_Device/App/usbd_desc.c`), and the node named after it is the one that
+holds `COM4`. When an enumeration goes wrong, Windows sometimes creates a
+port-based node instead, and that node gets its own COM number. On 2026-09-30
+the board came back as `COM7` twice, and later as `COM4` again. The workstation
+had accumulated these nodes:
+
+| Instance ID | Port | Kind |
+| --- | --- | --- |
+| `USB\VID_0483&PID_5740\3257327B3534` | `COM4` | named after the serial number |
+| `USB\VID_0483&PID_5740\6&1ECD3977&1&2`, `...&1&3`, `...&1&4` | `COM7`, `COM6`, `COM5` | named after the hub port |
+| `USB\VID_0000&PID_0002\...` | none | failed enumerations, `Device Descriptor Request Failed` |
+
+To list them all, including the ones not currently connected (`CM_PROB_PHANTOM`):
+
+```powershell
+Get-PnpDevice | Where-Object { $_.InstanceId -like '*VID_0483&PID_5740*' -or
+                               $_.InstanceId -like '*VID_0000&PID_0002*' } |
+    Select-Object Status, Problem, FriendlyName, InstanceId
+```
+
+The number itself does no harm: `astro_console.py` without `--port` takes
+whichever USB Serial Device is present. Stale nodes can be removed from an
+elevated prompt with `pnputil /remove-device "<instance ID>"`, which frees their
+COM numbers. Windows can also be told to ignore the serial number for this
+VID/PID (`IgnoreHWSerNum04835740` under
+`HKLM\SYSTEM\CurrentControlSet\Control\UsbFlags`), which pins the COM number
+to the hub port instead. Neither has been needed so far.
+
+#### Why it happens
+
+Investigated on 2026-09-30 with a temporary trace in `usbd_conf.c` that logged
+every setup request, completed transfer, stall, bus reset and suspend with a
+timestamp in a RAM ring buffer, read over SWD after a failure.
+
+**Most likely: Windows' USB serial driver.** In the failing boots traced, the
+board answered every request Windows sent, including the complete
+configuration descriptor. Windows then stopped: no `SET_CONFIGURATION`, no
+further requests, and the port was suspended a few milliseconds later.
+`C:\Windows\INF\setupapi.dev.log` shows `usbser.sys` failing to start within
+11 ms (`CM_PROB_FAILED_START`, problem status `0xc0000001`). In a successful
+boot, the next requests at that point are the configuration descriptor with
+wLength 265, `SET_CONFIGURATION 1` and the CDC line-coding requests.
+
+The workstation runs Windows 11 25H2 build 26200.9457, the September 2026
+security update (KB5124008) plus its out-of-band fix (KB5129195). That update
+is known to make other USB class drivers fail with Code 10: Microsoft lists
+USB Audio Class 1.0 devices, and CDC-NCM network adapters fail on this same
+build with stricter descriptor validation blamed. The USB serial driver is
+not on Microsoft's list, and the board has not been tried on another computer,
+so this is not confirmed. The problem was first written up here on
+2026-09-20, a week after the update was installed. Trying the board on Linux
+or on a Windows machine without the September update would settle it.
+
+**Fixed: the USB clock was out of tolerance.** USB runs from HSI48, which
+full-speed USB needs within 0.25 %. The firmware did not enable the clock
+recovery system (CRS), so HSI48 ran on its factory trim. Once the CRS was
+enabled, it settled at `TRIM` 58 instead of the default 64, which puts the
+untrimmed clock about 0.8 % fast. The CRS is now enabled in
+`HAL_PCD_MspInit()` (`USB_Device/Target/usbd_conf.c`, user code section 1),
+synchronised to the host's start-of-frame packets. This alone did not stop the
+failures. To check it on a running board, read `CRS_CR` over SWD:
+
+```bash
+STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 0x40006C00 4
+```
+
+`0x00003A60` means counting and auto-trim are on (bits 5 and 6) with `TRIM`
+at `0x3A`; `0x00004000` means the CRS is off.
+
+**Possible, not established: bad packets from the board.** Two early failures
+looked different: Windows abandoned the serial-number string read (and named
+the node after the hub port instead, see above), and one descriptor request
+never completed. The trace cannot tell whether a packet was corrupted on the
+board or refused by the PC.
+
+**Ruled out:**
+
+- **The hub.** It fails the same way on a root port of the PC.
+- **A reset too short for the host to see a disconnect.** Holding the
+  device detached for 100 ms, and later 3 s, after reset before
+  `USBD_Start()` did not help.
+- **Start-up activity.** Starting USB 3 s after boot, after the WiFi module
+  and display are running, did not help.
+- **The display pass table.** The previous table fails the same way.
+
+Other ways reported for STM32 CDC devices, not tried here:
+
+- **Flash with the core held in reset** (`STM32_Programmer_CLI -c port=SWD
+  mode=UR ...`), so the device looks unplugged during the flash instead of
+  attached and silent. It did not bring back a node that had already failed.
+- **Use a separate USB-to-UART adapter** for the console. It stays connected
+  while the MCU resets. This needs a spare UART on the board.
+- **Make the client reconnect** when the port vanishes and comes back.
+
+Sources: [STM32 USB device enumeration (Stm32World
+Wiki)](https://stm32world.com/wiki/STM32_USB_Device_Enumeration_(re-enumeration)),
+[USB device: re-connect after a reset (ST
+Community)](https://community.st.com/t5/stm32-mcus-products/usb-device-re-connect-after-a-reset/td-p/555119),
+[USB CDC: how to avoid Windows creating a new COM port for every device (ST
+Community)](https://community.st.com/t5/stm32-mcus-embedded-software/usb-cdc-how-to-avoid-windows-from-creating-a-new-com-port-for/td-p/357198),
+[USB device-specific registry settings
+(Microsoft)](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-device-specific-registry-settings),
+[Code 10 - CM_PROB_FAILED_START
+(Microsoft)](https://learn.microsoft.com/en-us/windows-hardware/drivers/install/cm-prob-failed-start),
+[Windows 11 24H2 known issues
+(Microsoft)](https://learn.microsoft.com/en-us/windows/release-health/status-windows-11-24h2),
+[CDC-NCM Code 10 after KB5124008 (VirtualBox issue
+877)](https://github.com/VirtualBox/virtualbox/issues/877),
+[STM32G431 crystal-less USB (ST
+Community)](https://community.st.com/t5/stm32-mcus-embedded-software/stm32g431-crystal-less-usb/m-p/313308).
 
 #### Reduce how often it happens
 
