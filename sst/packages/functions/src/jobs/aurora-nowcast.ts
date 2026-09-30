@@ -1,6 +1,7 @@
 import SunCalc from "suncalc";
-import { levelForNowcast, probabilityAtLeast } from "../aurora/levels";
+import { flagKp, levelForNowcast, probabilityAtLeast } from "../aurora/levels";
 import { mergeAurora } from "../aurora/merge";
+import { loadLiveKp, type LiveKp } from "../aurora/noaa-live";
 import { loadOvationGrid, type OvationGrid } from "../aurora/ovation";
 import { auroraExpireAt, auroraKey, createAuroraStore, type AuroraStore, type OvationItem } from "../aurora/storage";
 import { configurations } from "../configurations";
@@ -25,7 +26,10 @@ export type AuroraNowcastDependencies = {
   now: () => Date;
   loadOvation: () => Promise<OvationGrid>;
   refreshForecasts: () => Promise<unknown>;
+  // NOAA's live Kp estimate: catches a storm no forecast flagged.
+  loadLiveKp: () => Promise<LiveKp>;
   isDark?: (instant: Date, latitude: number, longitude: number) => boolean;
+  sunAltitude?: (instant: Date, latitude: number, longitude: number) => number;  // degrees, for the log
   log?: (message: string, details: Record<string, unknown>) => void;
 };
 
@@ -36,6 +40,10 @@ export type AuroraNowcastSummary = {
 
 function sunIsDown(instant: Date, latitude: number, longitude: number): boolean {
   return SunCalc.getPosition(instant, latitude, longitude).altitude < DARK_ALTITUDE_RAD;
+}
+
+function sunAltitudeDegrees(instant: Date, latitude: number, longitude: number): number {
+  return Math.round(SunCalc.getPosition(instant, latitude, longitude).altitude * 180 / Math.PI * 10) / 10;
 }
 
 function createProductionDependencies(): AuroraNowcastDependencies {
@@ -49,6 +57,7 @@ function createProductionDependencies(): AuroraNowcastDependencies {
     // The forecast sources the calibration sample compares with; the outlook
     // does not change within a night.
     refreshForecasts: () => ingestAuroraForecast(undefined, ["GFZ", "NOAA3"]),
+    loadLiveKp,
     log
   };
 }
@@ -58,17 +67,56 @@ export async function sampleAuroraNowcast(
 ): Promise<AuroraNowcastSummary> {
   const now = dependencies.now();
   const isDark = dependencies.isDark ?? sunIsDown;
+  const sunAltitude = dependencies.sunAltitude ?? sunAltitudeDegrees;
   const active: Array<[string, ConfigurationCollection[string], string]> = [];
+  const checks: Array<Record<string, unknown>> = [];
 
-  for (const [configurationId, configuration] of Object.entries(dependencies.configurations)) {
+  // Every condition is checked and logged for every location, so each run
+  // says why it sampled or skipped. The live Kp is fetched only after dark.
+  const locations = Object.entries(dependencies.configurations).map(([configurationId, configuration]) => {
     const { lat, lon, tz } = configuration.location;
-    const nightId = nightIdFor(now, tz);
-    if (!isDark(now, lat, lon)) continue;
-    if (!await dependencies.store.get(configurationId, nightId, "FLAG")) continue;
-    active.push([configurationId, configuration, nightId]);
+    return { configurationId, configuration, nightId: nightIdFor(now, tz), dark: isDark(now, lat, lon) };
+  });
+  let live: LiveKp | null = null;
+  if (locations.some((location) => location.dark)) {
+    try {
+      live = await dependencies.loadLiveKp();
+    } catch (cause) {
+      dependencies.log?.("Aurora nowcast live Kp failed", {
+        error: cause instanceof Error ? cause.message : String(cause)
+      });
+    }
+  }
+
+  for (const { configurationId, configuration, nightId, dark } of locations) {
+    const { lat, lon, tz } = configuration.location;
+    let flagged = !!await dependencies.store.get(configurationId, nightId, "FLAG");
+    const liveTriggers = live !== null && live.kp >= flagKp(configuration.aurora.kpMain);
+    if (dark && !flagged && live && liveTriggers) {
+      // A storm the forecasts missed: flag the night, which also switches the
+      // device to hourly refreshes from its next pull.
+      const reason = `live kp=${live.kp} at ${live.at}`;
+      await dependencies.store.put({
+        ...auroraKey(configurationId, nightId, "FLAG"),
+        configurationId,
+        nightId,
+        source: "FLAG",
+        reason,
+        fetchedAt: now.toISOString(),
+        expireAt: auroraExpireAt(nightId, tz)
+      });
+      flagged = true;
+      dependencies.log?.("Aurora storm night flagged", { configurationId, nightId, reason });
+    }
+    checks.push({
+      configurationId, nightId, flagged, dark, sunAltitudeDeg: sunAltitude(now, lat, lon),
+      liveKp: live?.kp ?? null, liveTriggers
+    });
+    if (dark && flagged) active.push([configurationId, configuration, nightId]);
   }
 
   const summary: AuroraNowcastSummary = { active: active.map(([id]) => id), stored: [] };
+  dependencies.log?.(active.length ? "Aurora nowcast sampling" : "Aurora nowcast skipped", { locations: checks });
   if (active.length === 0) return summary;
 
   try {
@@ -121,9 +169,10 @@ export async function sampleAuroraNowcast(
       summary.stored.push(`${configurationId}/${key}`);
     }
 
-    await logCalibrationSample(dependencies, configurationId, configuration, nightId, grid, cellPct, now, isDark);
+    await logCalibrationSample(dependencies, configurationId, configuration, nightId, grid, cellPct, now, isDark, live);
   }
 
+  dependencies.log?.("Aurora nowcast sampled", { validAt: grid.validAt, stored: summary.stored });
   return summary;
 }
 
@@ -135,7 +184,8 @@ async function logCalibrationSample(
   grid: OvationGrid,
   cellPct: number,
   now: Date,
-  isDark: (instant: Date, latitude: number, longitude: number) => boolean
+  isDark: (instant: Date, latitude: number, longitude: number) => boolean,
+  live: LiveKp | null
 ): Promise<void> {
   const { lat, lon, tz } = configuration.location;
   const { kpMain } = configuration.aurora;
@@ -151,7 +201,7 @@ async function logCalibrationSample(
   const forecast = mergeAurora(nightId, tz, kpMain, { gfz, noaa3 }, now)
     .find((slot) => slot.start.getTime() <= validAt && validAt < slot.start.getTime() + 3_600_000);
 
-  dependencies.log?.("aurora-calibration", {
+  const sample = {
     configurationId,
     observedAt: grid.observedAt,
     validAt: grid.validAt,
@@ -162,9 +212,22 @@ async function logCalibrationSample(
     hp60Max: hp60?.maximum ?? null,
     probLevel1: hp60 ? probabilityAtLeast(hp60, kpMain - 1) : null,
     kpEstimated: estimated?.kp ?? null,
+    liveKp: live?.kp ?? null,
+    liveKpAt: live?.at ?? null,
     level: forecast?.level ?? null,
-    dark: isDark(new Date(validAt), lat, lon)
-  });
+    dark: isDark(new Date(validAt), lat, lon),
+    sampledAt: now.toISOString()
+  };
+  dependencies.log?.("aurora-calibration", sample);
+  try {
+    await dependencies.store.putCalibration(sample);
+  } catch (cause) {
+    // The log line still carries the sample.
+    dependencies.log?.("Aurora calibration sample not stored", {
+      configurationId,
+      error: cause instanceof Error ? cause.message : String(cause)
+    });
+  }
 }
 
 export const handler = async () => sampleAuroraNowcast();

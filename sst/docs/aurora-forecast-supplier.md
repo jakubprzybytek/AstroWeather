@@ -286,6 +286,7 @@ aurora. The flag is:
 | Quiet (no location flagged) | with the existing weather job, every 6 h at 00/06/12/18 local | Hp60, NOAA 3-day, 27-day outlook |
 | Daily | once at ~03:00 UTC | 27-day outlook (issued Mondays ~02:20 UTC; catches a mid-week reissue) |
 | Storm night (a location flagged and dark there) | **every 10 minutes** | Hp60, NOAA 3-day, OVATION |
+| Any dark night | every 10 minutes | NOAA live Kp (28 KB): a storm no forecast flagged sets the flag and starts the sampling |
 
 The three forecast feeds are global: one fetch per run serves every
 configured location. Every source sends `Last-Modified`, so the runs poll
@@ -346,11 +347,27 @@ at 47° CGM, and the placeholder thresholds above (`1` ≥ 5 %, `2` ≥ 15 %,
 come a few nights a year, so the logging has to be in place **before** the
 next one, and the nowcast must not shape the display until it is done.
 
-### What to log on every storm-night run
+### When samples are taken, and where they are kept
 
-One structured log line per location per ten-minute run, with a fixed prefix
-(`aurora-calibration`) and a JSON body, so CloudWatch Logs Insights can pull a
-storm night out in one query:
+A storm the forecasts missed is the case calibration needs most, so sampling
+does not rely on the forecast flag alone. Every ten-minute run on a dark night
+reads NOAA's live Kp estimate
+(`https://services.swpc.noaa.gov/json/planetary_k_index_1m.json`, one row per
+minute) and takes its maximum over the last 30 minutes. At or above the
+location's flag Kp, the run flags the night itself (reason `live kp=…`), which
+also switches the device to hourly refreshes from its next pull, and samples.
+If the live file cannot be read, the run falls back to the flag alone.
+
+Each sample is written twice: as the `aurora-calibration` log line (CloudWatch
+keeps 30 days) and as a DynamoDB item that never expires, under
+`pk = LOC#<configurationId>`, `sk = CALIBRATION#AURORA#<observedAt>`, one per
+location and run. Storms worth calibrating on come a few times a year, so the
+items are the record to analyse; the log line is for looking at a night while
+it happens. A failed write is logged and does not stop the run.
+
+### What each sample holds
+
+One structured sample per location per ten-minute run:
 
 | Field | Source | Why |
 | --- | --- | --- |
@@ -359,6 +376,8 @@ storm night out in one query:
 | `northPct[]` | OVATION, the cells 1°–8° north on the same meridian | An observer at 47° CGM sees the oval low on the northern horizon, hundreds of kilometres away; the cell overhead can read 0 % while the cells at 54°–56° N read 30 % and the glow is plainly visible. The profile shows which cell, if any, predicts what is seen. |
 | `hp60Median`, `hp60Max`, `probAtLeast6` | GFZ Hp60 for the hour of `validAt` | The forecast the nowcast is compared with. |
 | `kpEstimated` | NOAA 3-day, the `estimated` bin covering `validAt` | NOAA's running estimate of the current Kp. |
+| `liveKp`, `liveKpAt` | NOAA live Kp, the last 30 minutes' maximum | The minute-by-minute Kp that also gates the sampling. |
+| `sampledAt` | the run | When the sample was taken. |
 | `level` | the row's forecast level for that slot | What the display would have shown without the nowcast. |
 | `dark` | astronomy for the location | Daylight samples are excluded from the analysis. |
 

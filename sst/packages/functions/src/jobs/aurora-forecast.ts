@@ -1,5 +1,5 @@
 import { loadGfzHp60, type GfzHp60Span, type GfzHp60Values } from "../aurora/gfz-hp60";
-import { gfzTriggers, noaaTriggers } from "../aurora/levels";
+import { flagKp, gfzTriggers, noaaTriggers, probabilityAtLeast } from "../aurora/levels";
 import { loadNoaaKpForecast, type NoaaKpSpan, type NoaaKpValues } from "../aurora/noaa-kp";
 import { loadNoaa27DayOutlook, type NoaaOutlookValues } from "../aurora/noaa-outlook";
 import { groupSpansByNight, type Span } from "../aurora/spans";
@@ -89,6 +89,14 @@ export async function ingestAuroraForecast(
         }
       }
       stored.push(source);
+      dependencies.log?.("Aurora forecast source stored", {
+        source,
+        lastModified: result.lastModified,
+        ...(result.issuedAt ? { issuedAt: result.issuedAt } : {}),
+        spans: result.spans.length,
+        from: result.spans[0]?.start ?? null,
+        to: result.spans[result.spans.length - 1]?.end ?? null
+      });
     } catch (cause) {
       failed.push(source);
       dependencies.log?.("Aurora forecast source failed", {
@@ -125,11 +133,26 @@ async function flagStormNights(
     const gfzNights = new Map(groupSpansByNight(gfz ?? [], tz).map((night) => [night.nightId, night.spans]));
     const noaaNights = new Map(groupSpansByNight(noaa3 ?? [], tz).map((night) => [night.nightId, night.spans]));
 
+    // How close each night came to the flag, one line per location, so a
+    // quiet week can be told from a broken check.
+    const outlook: Array<Record<string, unknown>> = [];
     for (const nightId of nextNightIds(now, tz, NIGHT_COUNT)) {
-      const gfzHit = gfzNights.get(nightId)?.find((span) => gfzTriggers(span, kpMain));
-      const noaaHit = noaaNights.get(nightId)?.find((span) => span.status !== "observed" && noaaTriggers(span.kp, kpMain));
+      const gfzSpans = gfzNights.get(nightId) ?? [];
+      const noaaSpans = (noaaNights.get(nightId) ?? []).filter((span) => span.status !== "observed");
+      const max = (values: number[]) => values.length ? Math.round(Math.max(...values) * 100) / 100 : null;
+      const gfzHit = gfzSpans.find((span) => gfzTriggers(span, kpMain));
+      const noaaHit = noaaSpans.find((span) => noaaTriggers(span.kp, kpMain));
+      const alreadyFlagged = !!(gfzHit || noaaHit) && !!await dependencies.store.get(configurationId, nightId, "FLAG");
+      outlook.push({
+        nightId,
+        gfzMedianMax: max(gfzSpans.map((span) => span.median)),
+        gfzQ75Max: max(gfzSpans.map((span) => span.quantile75)),
+        gfzProbLevel1Max: max(gfzSpans.map((span) => probabilityAtLeast(span, kpMain - 1))),
+        noaaKpMax: max(noaaSpans.map((span) => span.kp)),
+        flag: gfzHit || noaaHit ? (alreadyFlagged ? "kept" : "new") : "no"
+      });
       if (!gfzHit && !noaaHit) continue;
-      if (await dependencies.store.get(configurationId, nightId, "FLAG")) continue;
+      if (alreadyFlagged) continue;
 
       const reason = gfzHit
         ? `gfz ${gfzHit.start}: q75=${gfzHit.quantile75} median=${gfzHit.median}`
@@ -146,6 +169,12 @@ async function flagStormNights(
       flagged.push(`${configurationId}/${nightId}`);
       dependencies.log?.("Aurora storm night flagged", { configurationId, nightId, reason });
     }
+    dependencies.log?.("Aurora forecast outlook", {
+      configurationId,
+      kpMain,
+      flagAt: { kp: flagKp(kpMain), probLevel1: 0.25 },
+      nights: outlook
+    });
   }
   return flagged;
 }

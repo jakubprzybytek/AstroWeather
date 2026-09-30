@@ -54,7 +54,8 @@ Current coverage:
 | `aurora/fetch.test.ts` | Source fetch: last-modified header, retry on server failure only |
 | `aurora/levels.test.ts` | Kp → level around `kpMain`, nowcast thresholds, ensemble band sums, storm-night triggers |
 | `aurora/merge.test.ts` | Source cascade (GFZ, NOAA 3-day, 27-day), a night split at the UTC day boundary, GFZ freshness, past hours from observed bins, the nowcast raising and blinking slots |
-| `jobs/aurora-jobs.test.ts` | Aurora ingestion: per-night items, one failed source, a sticky flag; nowcast: flag and darkness gates, slot targeting, hour maximum, calibration log |
+| `aurora/noaa-live.test.ts` | Live Kp: the 30-minute maximum, malformed rows, an empty feed |
+| `jobs/aurora-jobs.test.ts` | Aurora ingestion: per-night items, one failed source, a sticky flag, the per-run source and outlook lines; nowcast: flag, darkness and live-Kp gates, a live-Kp flag, slot targeting, hour maximum, calibration log and kept samples |
 | `tools/handler.test.ts` | `POST /tools/<source>` factory: configuration or coordinates plus timezone, night grouping, `502` on source failure |
 
 The forecast weather reader (`forecast/weather-reader.ts`) and astronomy

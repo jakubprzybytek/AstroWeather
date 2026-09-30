@@ -90,8 +90,24 @@ export function addToNight(night: AuroraNight, item: AuroraItem): void {
   }
 }
 
+// One nowcast sample per location and run, kept for good (no `expireAt`, so
+// the table's TTL never removes it): the data the nowcast thresholds are
+// calibrated from after real storms. See
+// docs/aurora-forecast-supplier.md#calibrating-the-nowcast.
+export type CalibrationSample = {
+  configurationId: string;
+  observedAt: string;
+  validAt: string;
+  [field: string]: unknown;
+};
+
+export function calibrationKey(configurationId: string, observedAt: string) {
+  return { pk: `LOC#${configurationId}`, sk: `CALIBRATION#AURORA#${observedAt}` };
+}
+
 export type AuroraStore = {
   put(item: AuroraItem): Promise<void>;
+  putCalibration(sample: CalibrationSample): Promise<void>;
   get<K extends AuroraItemKind>(configurationId: string, nightId: string, kind: K): Promise<Extract<AuroraItem, { source: K }> | undefined>;
   // The items of consecutive nights, skipping expired ones.
   readNights(configurationId: string, nightIds: string[], now: Date): Promise<Map<string, AuroraNight>>;
@@ -104,6 +120,12 @@ export function createAuroraStore(
   return {
     async put(item) {
       await client.send(new PutCommand({ TableName: tableName, Item: item }));
+    },
+    async putCalibration(sample) {
+      await client.send(new PutCommand({
+        TableName: tableName,
+        Item: { ...calibrationKey(sample.configurationId, sample.observedAt), ...sample }
+      }));
     },
     async get(configurationId, nightId, kind) {
       const response = await client.send(new GetCommand({ TableName: tableName, Key: auroraKey(configurationId, nightId, kind) }));

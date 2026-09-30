@@ -244,11 +244,15 @@ weather data for night X"):
   `NIGHT#…#AURORA#FLAG` item for a night that may reach the location's aurora
   threshold, which switches the device to hourly refreshes.
 - **Aurora nowcast (implemented)**: the `AuroraNowcast` `CronV2` runs every
-  ten minutes (`cron(3/10 * * * ? *)`). It returns at once unless a location's
-  current night is flagged and it is dark there (sun below −6°); then it
-  refreshes GFZ and NOAA 3-day, fetches the OVATION grid once, stores the
-  location's percentage in `NIGHT#…#AURORA#OVATION` for the slot the nowcast
-  describes (latest and maximum), and logs an `aurora-calibration` sample.
+  ten minutes (`cron(3/10 * * * ? *)`). After dark (sun below −6°) it reads
+  NOAA's live Kp estimate and flags a location's night itself when that
+  reaches the flag Kp. It returns at once unless a location's current night is
+  flagged and it is dark there; then it refreshes GFZ and NOAA 3-day, fetches
+  the OVATION grid once, stores the location's percentage in
+  `NIGHT#…#AURORA#OVATION` for the slot the nowcast describes (latest and
+  maximum), and writes an `aurora-calibration` sample both to the log and as a
+  `CALIBRATION#AURORA#<observedAt>` item that never expires. Every run logs one
+  line saying, per location, whether it sampled and why.
   See [Aurora Forecast Supplier Evaluation](aurora-forecast-supplier.md).
 
 Each writer is a small, independent Lambda + schedule, matching the existing

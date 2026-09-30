@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 import type { GfzHp60Values } from "../aurora/gfz-hp60";
 import type { OvationGrid } from "../aurora/ovation";
 import { utcSpan } from "../aurora/spans";
-import { addToNight, type AuroraItem, type AuroraNight, type AuroraStore } from "../aurora/storage";
+import { addToNight, type AuroraItem, type AuroraNight, type AuroraStore, type CalibrationSample } from "../aurora/storage";
 import { ingestAuroraForecast, type AuroraForecastDependencies } from "./aurora-forecast";
 import { sampleAuroraNowcast, type AuroraNowcastDependencies } from "./aurora-nowcast";
 
@@ -13,8 +13,10 @@ const locations = {
 
 function memoryStore() {
   const items = new Map<string, AuroraItem>();
+  const samples: CalibrationSample[] = [];
   const store: AuroraStore = {
     put: vi.fn(async (item: AuroraItem) => { items.set(`${item.pk}|${item.sk}`, item); }),
+    putCalibration: vi.fn(async (sample: CalibrationSample) => { samples.push(sample); }),
     get: vi.fn(async (configurationId: string, nightId: string, kind: AuroraItem["source"]) =>
       items.get(`LOC#${configurationId}|NIGHT#${nightId}#AURORA#${kind}`)) as AuroraStore["get"],
     readNights: vi.fn(async () => {
@@ -27,7 +29,7 @@ function memoryStore() {
       return nights;
     })
   };
-  return { store, items };
+  return { store, items, samples };
 }
 
 function gfzHour(start: Date, values: Partial<GfzHp60Values> = {}) {
@@ -84,7 +86,22 @@ describe("ingestAuroraForecast", () => {
     // Old observed bins and outlook days beyond the six nights are not stored.
     expect(items.get("LOC#wroclaw|NIGHT#2026-10-01#AURORA#NOAA27")).toMatchObject({ issuedAt: "2026-09-28T02:21:00.000Z" });
 
+    expect(dependencies.log).toHaveBeenCalledWith("Aurora forecast source stored", expect.objectContaining({
+      source: "GFZ", lastModified: "Thu, 01 Oct 2026 09:05:00 GMT", spans: 2
+    }));
+    expect(dependencies.log).toHaveBeenCalledWith("Aurora forecast outlook", expect.objectContaining({
+      configurationId: "wroclaw", kpMain: 7,
+      nights: expect.arrayContaining([
+        expect.objectContaining({ nightId: "2026-10-01", gfzQ75Max: 2, noaaKpMax: 2, flag: "no" }),
+        expect.objectContaining({ nightId: "2026-10-02", gfzQ75Max: 5.3, flag: "new" })
+      ])
+    }));
+
     expect((await ingestAuroraForecast(dependencies)).flagged).toEqual([]);
+    expect(dependencies.log).toHaveBeenLastCalledWith("Aurora forecast ingestion completed", expect.anything());
+    expect(dependencies.log).toHaveBeenCalledWith("Aurora forecast outlook", expect.objectContaining({
+      nights: expect.arrayContaining([expect.objectContaining({ nightId: "2026-10-02", flag: "kept" })])
+    }));
   });
 
   test("stores the other sources when one fails, then reports the failure", async () => {
@@ -108,7 +125,7 @@ function grid(pct: number): OvationGrid {
 }
 
 function nowcastDependencies(flagged: boolean, overrides: Partial<AuroraNowcastDependencies> = {}) {
-  const { store, items } = memoryStore();
+  const { store, items, samples } = memoryStore();
   if (flagged) {
     items.set("LOC#wroclaw|NIGHT#2026-10-01#AURORA#FLAG", {
       pk: "LOC#wroclaw", sk: "NIGHT#2026-10-01#AURORA#FLAG", configurationId: "wroclaw",
@@ -121,11 +138,12 @@ function nowcastDependencies(flagged: boolean, overrides: Partial<AuroraNowcastD
     now: () => DARK_NOW,
     loadOvation: vi.fn(async () => grid(12)),
     refreshForecasts: vi.fn(async () => undefined),
+    loadLiveKp: vi.fn(async () => ({ kp: 2, at: "2026-10-01T20:05:00.000Z", latestAt: "2026-10-01T20:09:00.000Z" })),
     isDark: () => true,
     log: vi.fn(),
     ...overrides
   };
-  return { dependencies, items };
+  return { dependencies, items, samples };
 }
 
 describe("sampleAuroraNowcast", () => {
@@ -134,18 +152,46 @@ describe("sampleAuroraNowcast", () => {
 
     expect(await sampleAuroraNowcast(dependencies)).toEqual({ active: [], stored: [] });
     expect(dependencies.loadOvation).not.toHaveBeenCalled();
+    expect(dependencies.log).toHaveBeenCalledWith("Aurora nowcast skipped", {
+      locations: [expect.objectContaining({ configurationId: "wroclaw", nightId: "2026-10-01", flagged: false, dark: true })]
+    });
     expect(dependencies.refreshForecasts).not.toHaveBeenCalled();
   });
 
   test("does nothing in daylight", async () => {
-    const { dependencies } = nowcastDependencies(true, { isDark: () => false });
+    const { dependencies } = nowcastDependencies(true, { isDark: () => false, sunAltitude: () => 12.5 });
 
     expect((await sampleAuroraNowcast(dependencies)).active).toEqual([]);
+    expect(dependencies.log).toHaveBeenCalledWith("Aurora nowcast skipped", {
+      locations: [expect.objectContaining({ flagged: true, dark: false, sunAltitudeDeg: 12.5 })]
+    });
     expect(dependencies.loadOvation).not.toHaveBeenCalled();
+    expect(dependencies.loadLiveKp).not.toHaveBeenCalled();
+  });
+
+  test("flags and samples a storm the forecasts missed, from NOAA's live Kp", async () => {
+    const { dependencies, items } = nowcastDependencies(false, {
+      loadLiveKp: vi.fn(async () => ({ kp: 5.33, at: "2026-10-01T20:02:00.000Z", latestAt: "2026-10-01T20:09:00.000Z" }))
+    });
+
+    const summary = await sampleAuroraNowcast(dependencies);
+
+    expect(summary.active).toEqual(["wroclaw"]);
+    expect(items.get("LOC#wroclaw|NIGHT#2026-10-01#AURORA#FLAG")).toMatchObject({ reason: "live kp=5.33 at 2026-10-01T20:02:00.000Z" });
+    expect(dependencies.log).toHaveBeenCalledWith("Aurora nowcast sampling", {
+      locations: [expect.objectContaining({ flagged: true, liveKp: 5.33, liveTriggers: true })]
+    });
+  });
+
+  test("keeps to the flag when the live Kp cannot be read", async () => {
+    const { dependencies } = nowcastDependencies(false, { loadLiveKp: vi.fn().mockRejectedValue(new Error("HTTP 503")) });
+
+    expect((await sampleAuroraNowcast(dependencies)).active).toEqual([]);
+    expect(dependencies.log).toHaveBeenCalledWith("Aurora nowcast live Kp failed", { error: "HTTP 503" });
   });
 
   test("stores the nowcast in the slot it describes, keeping the hour's maximum, and logs a sample", async () => {
-    const { dependencies, items } = nowcastDependencies(true);
+    const { dependencies, items, samples } = nowcastDependencies(true);
 
     await sampleAuroraNowcast(dependencies);
     dependencies.loadOvation = vi.fn(async () => grid(4));
@@ -159,7 +205,11 @@ describe("sampleAuroraNowcast", () => {
     expect(dependencies.refreshForecasts).toHaveBeenCalledTimes(2);
     expect(dependencies.log).toHaveBeenCalledWith("aurora-calibration", expect.objectContaining({
       configurationId: "wroclaw", cellPct: 4, validAt: "2026-10-01T21:20:00.000Z",
-      northPct: [14, 14, 14, 14, 14, 14, 14, 14]
+      northPct: [14, 14, 14, 14, 14, 14, 14, 14], liveKp: 2
     }));
+    // Kept for good: one sample per run, without an expiry.
+    expect(samples).toHaveLength(2);
+    expect(samples[1]).toMatchObject({ configurationId: "wroclaw", observedAt: "2026-10-01T20:03:00.000Z", cellPct: 4 });
+    expect(samples[1]).not.toHaveProperty("expireAt");
   });
 });
