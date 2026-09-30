@@ -57,7 +57,7 @@ const char* const kDisplay[] = {
     "display show <n> <value>     numeric n (0-3): a number with up to 3 decimals,",
     "    a time HH:MM, ? (the unavailable pattern) or blank. e.g. 'display show 0 12.34'",
     "display row <r> <cells>      matrix row r (0-4, 0 at the top), one character per",
-    "    column as the forecast payload: 0-3 level, * full and blinking, . or ? off",
+    "    column as the payload: 0-3 level, a-c level 1-3 blinking, * as c, . or ? off",
     "display blink <n> off|colon|all    blink nothing, the colon, or all of display n",
     "display level <n> <0-3>            brightness of display n; 3 is full",
     "display test                       everything lit: levels 0-3 across the matrix",

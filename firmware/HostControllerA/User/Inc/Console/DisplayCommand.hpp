@@ -17,7 +17,7 @@ enum class CommandResult {
 // success ('OK display ...'); see docs/Console.md#display.
 //
 //   display show <n> <value>     numeric n: a number, HH:MM, ? or blank
-//   display row <r> <cells>      matrix row r, the payload's cells 0-3 * ? (. is off)
+//   display row <r> <cells>      matrix row r, the payload's cells 0-3 a-c * ? (. is off)
 //   display blink <n> off|colon|all
 //   display level <n> <0-3>
 //   display test                 levels and blinking on every element
