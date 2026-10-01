@@ -307,6 +307,25 @@ AstroParseStatus parseNumeric(const char* text, AstroNumericValue& output,
     return AstroParseStatus::Success;
 }
 
+// A `last...FetchTime` record. Informational only: a bad value does not cost
+// the forecast.
+void parseFetchTime(const char* value, AstroFetchTime& fetch)
+{
+    fetch.present = true;
+    AstroServerTime time{};
+    if (valueEquals(value, "?"))
+    {
+        fetch.valid = true;
+    }
+    else if (parseServerTime(value, time) && !time.hasMilliseconds)
+    {
+        fetch.valid = true;
+        fetch.available = true;
+        fetch.value = time.value;
+        fetch.utcOffset = time.utcOffset;
+    }
+}
+
 } // namespace
 
 bool parseMatrixRow(const char* text, AstroMatrixRow& row)
@@ -387,21 +406,21 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
             if (std::strcmp(key, "lastWeatherFetchTime") == 0 &&
                 !parsed.lastWeatherFetch.present)
             {
-                // Informational only: a bad value does not cost the forecast.
-                AstroWeatherFetchTime& fetch = parsed.lastWeatherFetch;
-                fetch.present = true;
-                AstroServerTime time{};
-                if (valueEquals(value, "?"))
+                parseFetchTime(value, parsed.lastWeatherFetch);
+                continue;
+            }
+            bool auroraFetch = false;
+            for (std::size_t feed = 0U; feed < kAuroraFeedCount; ++feed)
+            {
+                if (std::strcmp(key, kAuroraFetchRecords[feed]) == 0 &&
+                    !parsed.lastAuroraFetch[feed].present)
                 {
-                    fetch.valid = true;
+                    parseFetchTime(value, parsed.lastAuroraFetch[feed]);
+                    auroraFetch = true;
                 }
-                else if (parseServerTime(value, time) && !time.hasMilliseconds)
-                {
-                    fetch.valid = true;
-                    fetch.available = true;
-                    fetch.value = time.value;
-                    fetch.utcOffset = time.utcOffset;
-                }
+            }
+            if (auroraFetch)
+            {
                 continue;
             }
             if (std::strcmp(key, "refreshIntervalMinutes") == 0 &&

@@ -3,6 +3,7 @@
 #include <Clock/CalendarDate.hpp>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 
@@ -72,22 +73,30 @@ struct AstroServerTime
     AstroUtcOffset utcOffset{};
 };
 
-// The `lastWeatherFetchTime` header record: the server's local time when it
-// last fetched the weather in this response, to the second. Specific to the
-// weather source.
-struct AstroWeatherFetchTime
+// A `last...FetchTime` header record: the server's local time when it last
+// fetched one source in this response, to the second.
+struct AstroFetchTime
 {
     bool present = false;    // the payload has the record
     bool valid = false;      // present and either `?` or a well-formed date and time
-    bool available = false;  // valid and a time, not `?` (no weather on the server)
+    bool available = false;  // valid and a time, not `?` (no such data on the server)
     Calendar::DateTime value{};
     AstroUtcOffset utcOffset{};
 };
 
+// The aurora feeds with a fetch-time record, in payload order: the record
+// names, and the short names the log and 'status' use.
+constexpr std::size_t kAuroraFeedCount = 4U;
+constexpr const char* kAuroraFetchRecords[kAuroraFeedCount] = {
+    "lastGfzFetchTime", "lastNoaaKpFetchTime", "lastNoaaOutlookFetchTime", "lastOvationFetchTime"};
+constexpr const char* kAuroraFeedNames[kAuroraFeedCount] = {"GFZ", "NOAA Kp", "NOAA outlook",
+                                                            "OVATION"};
+
 struct AstroData
 {
     AstroServerTime serverTime{};
-    AstroWeatherFetchTime lastWeatherFetch{};
+    AstroFetchTime lastWeatherFetch{};
+    std::array<AstroFetchTime, kAuroraFeedCount> lastAuroraFetch{};
     // The `refreshIntervalMinutes` header record: 60 or 360, or 0 when it is
     // absent or has any other value (the schedule then keeps its interval).
     uint16_t refreshIntervalMinutes = 0U;

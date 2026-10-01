@@ -175,6 +175,39 @@ void testLastWeatherFetchTime()
     }
 }
 
+void testLastAuroraFetchTimes()
+{
+    HostController::AstroData data{};
+    expect(parse(validPayload(), data) == HostController::AstroParseStatus::Success,
+           "payload without aurora fetch times");
+    for (const auto& fetch : data.lastAuroraFetch) {
+        expect(!fetch.present, "aurora fetch time absent");
+    }
+
+    std::string payload = withWeatherFetchTime("2026-09-22T18:00:04+02:00");
+    payload.insert(payload.find("\n\n") + 1U,
+                   "lastGfzFetchTime=2026-09-22T17:03:40+02:00\n"
+                   "lastNoaaKpFetchTime=?\n"
+                   "lastNoaaOutlookFetchTime=2026-09-22 11:03:41\n"
+                   "lastOvationFetchTime=2026-09-22T17:13:02+02:00\n"
+                   "lastGfzFetchTime=2026-09-22T01:00:00+02:00\n");
+    expect(parse(payload, data) == HostController::AstroParseStatus::Success,
+           "payload with aurora fetch times");
+    const HostController::AstroFetchTime& gfz = data.lastAuroraFetch[0];
+    expect(gfz.present && gfz.valid && gfz.available && gfz.value.hour == 17U &&
+               gfz.value.minute == 3U && gfz.value.second == 40U && gfz.utcOffset.minutes == 120,
+           "GFZ fetch time, the first record of it kept");
+    expect(data.lastAuroraFetch[1].present && data.lastAuroraFetch[1].valid &&
+               !data.lastAuroraFetch[1].available,
+           "NOAA Kp fetch time unavailable");
+    expect(data.lastAuroraFetch[2].present && !data.lastAuroraFetch[2].valid,
+           "a malformed NOAA outlook fetch time is flagged and keeps the forecast");
+    expect(data.lastAuroraFetch[3].available && data.lastAuroraFetch[3].value.minute == 13U,
+           "OVATION fetch time");
+    expect(data.lastWeatherFetch.available && data.lastWeatherFetch.value.hour == 18U,
+           "weather fetch time still parsed next to them");
+}
+
 void testUtcOffset()
 {
     HostController::AstroData data{};
@@ -515,6 +548,7 @@ int main()
     testUnknownKeysAreIgnored();
     testServerTime();
     testLastWeatherFetchTime();
+    testLastAuroraFetchTimes();
     testUtcOffset();
     testLineLengthLimit();
     testCrlfLineEndings();

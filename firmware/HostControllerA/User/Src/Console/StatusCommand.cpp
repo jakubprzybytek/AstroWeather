@@ -14,6 +14,7 @@
 #include "FreeRTOS.h"
 #include "cmsis_os2.h"
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -22,7 +23,7 @@ namespace Console {
 namespace {
 
 // The whole reply is one burst, so it must stay under the 16-line log queue;
-// see HelpCommand.cpp. It is currently 14 lines.
+// see HelpCommand.cpp. It is currently 14 lines after "OK status".
 
 void line(const char* format, ...)
 {
@@ -128,11 +129,30 @@ void reportSchedule()
          schedule.intervalMinutes == 60U ? "hour (storm night)" : "6 h", next, last);
 }
 
+// Minutes from a server fetch time to now, when the clock is set and the fetch
+// is not in the future. Both are local wall-clock times.
+bool minutesSince(const Calendar::DateTime& t, uint32_t& minutes)
+{
+    ClockTask::DateTime now{};
+    if (!ClockTask::instance().isTimeSet() || !ClockTask::instance().readDateTime(now)) {
+        return false;
+    }
+    const uint32_t nowSeconds = Calendar::secondsSince2000(now.year, now.month, now.day,
+                                                           now.hour, now.minute, now.second);
+    const uint32_t fetchSeconds =
+        Calendar::secondsSince2000(t.year, t.month, t.day, t.hour, t.minute, t.second);
+    if (nowSeconds < fetchSeconds) {
+        return false;
+    }
+    minutes = (nowSeconds - fetchSeconds) / 60U;
+    return true;
+}
+
 // The server's last weather fetch, as the last parsed response reported it.
 void reportWeatherFetch(const HostController::RefreshSummary& last)
 {
-    const HostController::AstroWeatherFetchTime& fetch = last.lastWeatherFetch;
-    if (!last.weatherFetchKnown) {
+    const HostController::AstroFetchTime& fetch = last.lastWeatherFetch;
+    if (!last.fetchTimesKnown) {
         line("weather    last fetch time unknown until a refresh succeeds");
         return;
     }
@@ -150,18 +170,11 @@ void reportWeatherFetch(const HostController::RefreshSummary& last)
     }
     const Calendar::DateTime& t = fetch.value;
     char age[40] = "";
-    ClockTask::DateTime now{};
-    if (ClockTask::instance().isTimeSet() && ClockTask::instance().readDateTime(now)) {
-        const uint32_t nowSeconds = Calendar::secondsSince2000(now.year, now.month, now.day,
-                                                               now.hour, now.minute, now.second);
-        const uint32_t fetchSeconds =
-            Calendar::secondsSince2000(t.year, t.month, t.day, t.hour, t.minute, t.second);
-        if (nowSeconds >= fetchSeconds) {
-            const uint32_t minutes = (nowSeconds - fetchSeconds) / 60U;
-            std::snprintf(age, sizeof(age), ", %lu h %02lu min ago",
-                          static_cast<unsigned long>(minutes / 60U),
-                          static_cast<unsigned long>(minutes % 60U));
-        }
+    uint32_t minutes = 0U;
+    if (minutesSince(t, minutes)) {
+        std::snprintf(age, sizeof(age), ", %lu h %02lu min ago",
+                      static_cast<unsigned long>(minutes / 60U),
+                      static_cast<unsigned long>(minutes % 60U));
     }
     char offset[8];
     HostController::formatUtcOffset(fetch.utcOffset, offset);
@@ -170,6 +183,45 @@ void reportWeatherFetch(const HostController::RefreshSummary& last)
          static_cast<unsigned>(t.day), static_cast<unsigned>(t.hour),
          static_cast<unsigned>(t.minute), static_cast<unsigned>(t.second),
          offset[0] != '\0' ? " " : "", offset, age);
+}
+
+// The server's last fetch of each aurora feed, on one line: the reply must
+// stay under the log queue depth. An age when the clock is set, else the time.
+void reportAuroraFetch(const HostController::RefreshSummary& last)
+{
+    using namespace HostController;
+    if (!last.fetchTimesKnown) {
+        line("aurora     last fetch times unknown until a refresh succeeds");
+        return;
+    }
+    char feeds[136] = "";
+    std::size_t used = 0U;
+    for (std::size_t feed = 0U; feed < kAuroraFeedCount; ++feed) {
+        const AstroFetchTime& fetch = last.lastAuroraFetch[feed];
+        char when[24] = "none";
+        uint32_t minutes = 0U;
+        if (!fetch.present) {
+            std::snprintf(when, sizeof(when), "not sent");
+        } else if (!fetch.valid) {
+            std::snprintf(when, sizeof(when), "malformed");
+        } else if (fetch.available && minutesSince(fetch.value, minutes)) {
+            std::snprintf(when, sizeof(when), "%lu h %02lu min ago",
+                          static_cast<unsigned long>(minutes / 60U),
+                          static_cast<unsigned long>(minutes % 60U));
+        } else if (fetch.available) {
+            std::snprintf(when, sizeof(when), "%02u-%02u %02u:%02u",
+                          static_cast<unsigned>(fetch.value.month),
+                          static_cast<unsigned>(fetch.value.day),
+                          static_cast<unsigned>(fetch.value.hour),
+                          static_cast<unsigned>(fetch.value.minute));
+        }
+        const int written = std::snprintf(feeds + used, sizeof(feeds) - used, "%s%s %s",
+                                          feed != 0U ? ", " : "", kAuroraFeedNames[feed], when);
+        if (written > 0) {
+            used = std::min(sizeof(feeds) - 1U, used + static_cast<std::size_t>(written));
+        }
+    }
+    line("aurora     last fetched by the server: %s", feeds);
 }
 
 void reportAstro()
@@ -237,17 +289,19 @@ void reportRemoteBoards(Display::Display* display)
 // The local board's own refresh: a late shift is a refresh interrupt that
 // came later than a whole pass, which shows as one pass kept on; the
 // interrupt time is what every other interrupt has to wait for.
+// The brightness in use, and the local board's refresh when it reports one.
 void reportLocalRefresh(Display::Display* display)
 {
-    if (display == nullptr) {
-        return;
-    }
+    const char* brightness = LowBrightness::isEnabled() ? "low" : "normal";
     Display::DisplayBoard::RefreshStats stats{};
-    if (!display->local().refreshStats(stats)) {
+    if (display == nullptr || !display->local().refreshStats(stats)) {
+        line("display    %s brightness", brightness);
         return;
     }
-    line("display    %lu frames, %lu late shifts, %lu late interrupts, refresh interrupt up to %lu us",
-         static_cast<unsigned long>(stats.frames), static_cast<unsigned long>(stats.lateShifts),
+    line("display    %s brightness; %lu frames, %lu late shifts, %lu late interrupts, "
+         "refresh interrupt up to %lu us",
+         brightness, static_cast<unsigned long>(stats.frames),
+         static_cast<unsigned long>(stats.lateShifts),
          static_cast<unsigned long>(stats.lateInterrupts),
          static_cast<unsigned long>(stats.maxInterruptMicros));
 }
@@ -271,14 +325,16 @@ CommandResult handleStatusCommand(const char* command, Display::Display* display
     line("stats      %s", LogService::instance().statsEnabled() ? "on, every 5 s" : "off");
     reportEeprom(eeprom, settings);
     reportAstro();
-    reportWeatherFetch(HostController::AstroDataRefreshTask::instance().lastRefresh());
+    const HostController::RefreshSummary lastRefresh =
+        HostController::AstroDataRefreshTask::instance().lastRefresh();
+    reportWeatherFetch(lastRefresh);
+    reportAuroraFetch(lastRefresh);
     reportSchedule();
     {
         const HostController::ApiTarget target = HostController::resolveApiTarget(settings);
         line("api        http://%s%s (%s)", target.host, target.path,
              (target.hostSaved || target.pathSaved) ? "saved" : "built-in");
     }
-    line("brightness %s", LowBrightness::isEnabled() ? "low" : "normal");
     reportLocalRefresh(display);
     reportRemoteBoards(display);
     return CommandResult::Ok;

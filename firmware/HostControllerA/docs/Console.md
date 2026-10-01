@@ -351,10 +351,10 @@ settings   loaded at boot: ok; adc log off, adc display on, time display on, tri
 wifi       'MyNetwork' stored; last connect ok 0d 00:03:05 ago (channel 2, -39 dBm)
 astro      last refresh ok, 0d 00:02:25 ago, from console
 weather    last fetched by the server 2026-09-23 09:05:12 +02:00, 1 h 07 min ago
+aurora     last fetched by the server: GFZ 0 h 09 min ago, NOAA Kp 0 h 09 min ago, NOAA outlook 6 h 09 min ago, OVATION none
 schedule   every 6 h from 00:10; next 12:10; last ok 2026-09-23 10:10
 api        http://api.example.com/astro/wroclaw (built-in)
-brightness normal
-display    3078 frames, 0 late shifts, 0 late interrupts, refresh interrupt up to 170 us
+display    normal brightness; 3078 frames, 0 late shifts, 0 late interrupts, refresh interrupt up to 170 us
 remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 ```
 
@@ -369,10 +369,10 @@ remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 | `wifi` | `not configured; set credentials with 'wifi set <ssid> <password>'`, or `'<ssid>' stored;` followed by `not connected since boot ('wifi test' to try)`, `last connect ok <age> ago (channel <n>, <rssi> dBm)` or `last connect FAILED <age> ago: <reason>`. The reasons are listed in [WiFi.md](WiFi.md). |
 | `astro` **HC** | `no refresh since boot; try 'astro refresh'`, `first refresh running now`, or `last refresh <outcome>, <age> ago, from <trigger>`. Outcomes are `ok`, `fetch-failed`, `crc-failed`, `parse-failed` and `publish-failed`; a fetch failure adds its cause in brackets, such as `(no HTTP response)` or `(http 404)`. Triggers are `switch1`, `console`, `scheduled` and `wifi-test`. `; another running now` is appended while a refresh is in progress. |
 | `weather` **HC** | When the server last fetched the weather, from the last good response, with its age if the clock is set. Otherwise `last fetch time unknown until a refresh succeeds`, `... not reported by the server`, `... malformed in the response`, or `none on the server at the last refresh`. |
+| `aurora` **HC** | When the server last fetched each aurora feed, from the last good response: GFZ Hp60, NOAA 3-day Kp, NOAA 27-day outlook and the OVATION nowcast. Each shows its age if the clock is set, else `MM-DD HH:MM`; `none` when the server had no data from that feed (OVATION is normally `none`: it is fetched only on storm nights), `not sent` from a server without the record, or `malformed`. `last fetch times unknown until a refresh succeeds` before that. See [api-payload.md](../../../sst/docs/api-payload.md). |
 | `schedule` **HC** | The next slot and the last success. `next` reads `once the clock is set` before the time is known; after failures it reads `retry <n> in <s> s`, `retry <n> now` or `no WiFi credentials, then <HH:MM>`. `last ok` reads `none since power-up` until a refresh succeeds. See [AstroRefresh.md](AstroRefresh.md). |
 | `api` **HC** | The URL the next fetch uses, `(saved)` if `api host` or `api path` is saved, else `(built-in)`. See [api](#api). |
-| `brightness` **HC** | `normal` or `low`: the state in use. It normally matches `low brightness` in the `settings` line, since both controls save; see [display low](#display). |
-| `display` | The local board's refresh, since boot: frames shown (50 a second), refresh interrupts that came later than a whole pass (`late shifts`) or than the pass they start (`late interrupts`), and the longest refresh interrupt. See [Display.md](Display.md#refresh-operation). |
+| `display` | `normal brightness` or `low brightness`, the state in use; it normally matches `low brightness` in the `settings` line, since both controls save (see [display low](#display)). Then the local board's refresh, since boot: frames shown (50 a second), refresh interrupts that came later than a whole pass (`late shifts`) or than the pass they start (`late interrupts`), and the longest refresh interrupt. See [Display.md](Display.md#refresh-operation). |
 | `remote` | Each remote display board, probed now on I2C: `yes` if it answered. `no display boards in this variant` without a display. |
 
 WiFi has no link state of its own, so the `astro` line is the evidence that the

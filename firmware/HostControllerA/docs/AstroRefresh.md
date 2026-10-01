@@ -34,7 +34,7 @@ implementation phases, is in
 | `User/Inc/Astro/AstroDisplayMapper.hpp`, `User/Src/Astro/AstroDisplayMapper.cpp` | Pure display mapping: `AstroData` to the six boards' numerics and matrix rows, with the rows' levels and blinking. Tested by `tests/AstroDisplayMapperTests.cpp`. |
 | `User/Inc/Astro/AstroProgressBar.hpp`, `User/Src/Astro/AstroProgressBar.cpp` | Pure progress bar: the row's columns and blink mask per step, and the outcome indicator's timing. Tested by `tests/AstroProgressBarTests.cpp`. |
 | `../Common/Inc/Utils/Crc32.hpp` | The CRC-32 of the recheck. Tested by `../Common/tests/Crc32Tests.cpp`. |
-| `User/Inc/Astro/AstroData.hpp` | The parsed model: six boards, the server `time` and `lastWeatherFetchTime`. |
+| `User/Inc/Astro/AstroData.hpp` | The parsed model: six boards, the server `time`, `lastWeatherFetchTime` and the four aurora fetch times. |
 | `User/Inc/Astro/AstroDataParser.hpp`, `User/Src/Astro/AstroDataParser.cpp` | Pure parser, no HAL or RTOS. Tested by `tests/AstroDataParserTests.cpp`. |
 | `User/Inc/Astro/RefreshSchedule.hpp` | Pure schedule arithmetic: slots, retry delays, when a refresh is due. Tested by `tests/RefreshScheduleTests.cpp`. |
 | `User/Src/MainLoopTask.cpp` | Switch 1 → `requestRefresh(RefreshTrigger::Switch1)`. |
@@ -99,9 +99,12 @@ for the refresh to finish; the outcome follows in the log. See
 4. **Parse** into a local `AstroData`. The progress bar moves to its last
    segment first. A failure logs `AstroDataRefresh parse status=<status>` and
    leaves the display untouched.
-5. **Last weather fetch.** The response's `lastWeatherFetchTime` is kept for
-   `status`. A later failed refresh leaves it alone.
-6. **Parsed data log**: the `lastWeatherFetchTime` line, then for each board
+5. **Last fetch times.** The response's `lastWeatherFetchTime` and aurora
+   fetch times are kept for `status`. A later failed refresh leaves them
+   alone, and so does `astro test`.
+6. **Parsed data log**: one line for `lastWeatherFetchTime` and one for each
+   aurora fetch time, such as `AstroDataRefresh lastGfzFetchTime=...` or
+   `AstroDataRefresh lastOvationFetchTime=? (none)`, then for each board
    its `nightId`, the four numerics and the four matrix rows as hex.
 7. **Clock sync** from the `time` record; see
    [RTC.md](RTC.md#sync-from-the-api). A missing or malformed `time` skips the
@@ -151,15 +154,17 @@ whole payload has validated.
 1. The first record must be `protocol`, and its value exactly `3`. Versions 1 (on/off cells) and 2 (no blinking levels, no aurora row) are rejected.
 2. The second must be `configurationId`, with a value of at most 20
    characters. The value is not compared with the configuration requested.
-3. Before `display=0`, `time` and `lastWeatherFetchTime` are recognised in
-   either order; only the first of each counts. Any other key is ignored.
+3. Before `display=0`, `time`, `lastWeatherFetchTime`, the aurora fetch times
+   and `refreshIntervalMinutes` are recognised in any order; only the first of
+   each counts. Any other key is ignored.
 
 | Record | Accepted form | Bad value |
 | --- | --- | --- |
 | `time` | `YYYY-MM-DDTHH:MM:SS` or `YYYY-MM-DDTHH:MM:SS.mmm`, a real date in 2000..2099, then optionally `Z` or a UTC offset `+HH:MM` / `-HH:MM` | Kept as present but invalid; the clock sync is skipped, the forecast is kept. |
 | `lastWeatherFetchTime` | `YYYY-MM-DDTHH:MM:SS`, no milliseconds, with the same optional offset, or `?` for no weather | Kept as present but invalid; reported by `status`, the forecast is kept. |
+| `lastGfzFetchTime`, `lastNoaaKpFetchTime`, `lastNoaaOutlookFetchTime`, `lastOvationFetchTime` | As `lastWeatherFetchTime`; `?` for none of that feed | As `lastWeatherFetchTime`. |
 
-Both may be absent.
+All may be absent.
 
 ### Display blocks
 
@@ -212,9 +217,9 @@ Within each block the records must come in this order:
 
 The firmware follows `api-payload.md` except in these details:
 
-- The contract lists the header as `protocol`, `configurationId`, `time`,
-  `lastWeatherFetchTime`, in that order. The firmware requires only the first
-  two in order and accepts the other two in either order.
+- The contract lists the header records in a fixed order. The firmware
+  requires only `protocol` and `configurationId` in order and accepts the
+  others in any order.
 - The contract has one empty line between sections. The firmware ignores empty
   lines wherever they are.
 - `configurationId` is limited to 20 characters by the firmware, not by the
@@ -224,7 +229,7 @@ The firmware follows `api-payload.md` except in these details:
   seconds, no offset, and `Z`.
 - The UTC offset is kept and shown by the log and `status`, but the RTC is set
   from the wall-clock part only; see [RTC.md](RTC.md#limits).
-- A bad `time` or `lastWeatherFetchTime` does not reject the payload; the
+- A bad `time` or fetch time does not reject the payload; the
   contract's rejection rules cover only required records.
 - `nightId` is not checked to be a date, and times are not range-checked.
 - The contract rejects a body shorter than its `Content-Length`. That check is
@@ -425,7 +430,7 @@ Native tests, run with the other suites; see [Development.md](Development.md).
   unavailable values, every matrix cell kind and its planes, the rejected
   version 1 rows, one malformed temperature, an unknown header key, and the
   `time` and `lastWeatherFetchTime` records in all their accepted and
-  malformed forms.
+  malformed forms, and the aurora fetch times.
 - `tests/RefreshScheduleTests.cpp`: slot boundaries, retry delays, the first
   refresh being due at once, a success covering its slot, a manual refresh
   counting, missed slots caught up once, backoff and its reset at the next

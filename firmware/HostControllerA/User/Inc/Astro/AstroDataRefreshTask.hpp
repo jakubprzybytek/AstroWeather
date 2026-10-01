@@ -57,8 +57,9 @@ struct RefreshSummary
     uint32_t finishedTick = 0U;  // osKernelGetTickCount() when it finished
     bool running = false;
     // From the last response that parsed, which a later failure leaves alone.
-    bool weatherFetchKnown = false;
-    AstroWeatherFetchTime lastWeatherFetch{};
+    bool fetchTimesKnown = false;
+    AstroFetchTime lastWeatherFetch{};
+    std::array<AstroFetchTime, kAuroraFeedCount> lastAuroraFetch{};
 };
 
 // Where the scheduled refresh stands, for status reporting.

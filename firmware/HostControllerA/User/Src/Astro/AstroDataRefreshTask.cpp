@@ -128,22 +128,22 @@ void syncClock(const AstroServerTime& serverTime, uint32_t responseTick)
                                        serverTime.hasMilliseconds, responseTick);
 }
 
-void logWeatherFetch(const AstroWeatherFetchTime& fetch)
+// One `last...FetchTime` record. `?` is logged at `noneLevel`: a warning for
+// the weather, but normal for an aurora feed such as the storm-night nowcast.
+void logFetchTime(const char* record, const AstroFetchTime& fetch, LogService::Level noneLevel,
+                  const char* noneMeaning)
 {
     if (!fetch.present)
     {
-        LogService::instance().log(LogService::Level::Info,
-                                   "AstroDataRefresh lastWeatherFetchTime absent");
+        LogService::instance().logf(LogService::Level::Info, "AstroDataRefresh %s absent", record);
     }
     else if (!fetch.valid)
     {
-        LogService::instance().log(LogService::Level::Warn,
-                                   "AstroDataRefresh lastWeatherFetchTime malformed");
+        LogService::instance().logf(LogService::Level::Warn, "AstroDataRefresh %s malformed", record);
     }
     else if (!fetch.available)
     {
-        LogService::instance().log(LogService::Level::Warn,
-                                   "AstroDataRefresh lastWeatherFetchTime=? (no weather)");
+        LogService::instance().logf(noneLevel, "AstroDataRefresh %s=? (%s)", record, noneMeaning);
     }
     else
     {
@@ -152,7 +152,7 @@ void logWeatherFetch(const AstroWeatherFetchTime& fetch)
         formatUtcOffset(fetch.utcOffset, offset);
         LogService::instance().logf(
             LogService::Level::Info,
-            "AstroDataRefresh lastWeatherFetchTime=%04u-%02u-%02uT%02u:%02u:%02u%s",
+            "AstroDataRefresh %s=%04u-%02u-%02uT%02u:%02u:%02u%s", record,
             static_cast<unsigned int>(t.year), static_cast<unsigned int>(t.month),
             static_cast<unsigned int>(t.day), static_cast<unsigned int>(t.hour),
             static_cast<unsigned int>(t.minute), static_cast<unsigned int>(t.second), offset);
@@ -161,7 +161,13 @@ void logWeatherFetch(const AstroWeatherFetchTime& fetch)
 
 void logParsedData(const AstroData& data)
 {
-    logWeatherFetch(data.lastWeatherFetch);
+    logFetchTime("lastWeatherFetchTime", data.lastWeatherFetch, LogService::Level::Warn,
+                 "no weather");
+    for (std::size_t feed = 0U; feed < kAuroraFeedCount; ++feed)
+    {
+        logFetchTime(kAuroraFetchRecords[feed], data.lastAuroraFetch[feed], LogService::Level::Info,
+                     "none");
+    }
     for (uint8_t displayIndex = 0U; displayIndex < data.boards.size(); ++displayIndex)
     {
         const AstroBoardData& board = data.boards[displayIndex];
@@ -404,8 +410,9 @@ void AstroDataRefreshTask::executeRefresh(RefreshTrigger trigger)
             if (trigger != RefreshTrigger::Test)
             {
                 taskENTER_CRITICAL();
-                last_.weatherFetchKnown = true;
+                last_.fetchTimesKnown = true;
                 last_.lastWeatherFetch = data.lastWeatherFetch;
+                last_.lastAuroraFetch = data.lastAuroraFetch;
                 scheduler_.setIntervalMinutes(data.refreshIntervalMinutes);
                 taskEXIT_CRITICAL();
             }
