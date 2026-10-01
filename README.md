@@ -49,6 +49,7 @@ weather supplier ──> sst API (AWS) ──HTTP──> host board ──I2C─
 **Hardware (`KiCad/`)**
 
 - [Hardware_Review.md](KiCad/Hardware_Review.md): design review, open issues, and measured current draw
+- [Display-Issues.md](firmware/HostControllerA/docs/Display-Issues.md): hardware problems seen on the LED displays, such as the prototype's matrix column faults around `U505`
 - [Display_Board_Purchasing.md](firmware/HostControllerA/docs/Display_Board_Purchasing.md) and [Display_Board_BOM.csv](firmware/HostControllerA/docs/Display_Board_BOM.csv): parts for the display boards
 
 ## Status

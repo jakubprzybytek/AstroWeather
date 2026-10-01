@@ -279,7 +279,7 @@ The encoder reads normalized A-G and DP segment values, then applies the wiring 
 - On each numeric display, special indicators L1 and L2 are the two dots between the second and third digits; L3 is the apostrophe before the fourth digit.
 - L1 uses the numeric display's segment-A mapping, L2 uses segment-B mapping, and L3 uses segment-C mapping while `DISPLAY_5_EN` is active.
 - L3 is not currently exposed through the public interface and remains off unless future API support is added.
-- Dot-matrix columns 1 through 21 map directly to SCT bits 0 through 20. Bits 21 through 23 are zero.
+- Dot-matrix columns 1 through 21 map directly to SCT bits 0 through 20. Bits 21 through 23 are zero. Columns 1–16 are `U505` outputs 0–15 and columns 17–21 are `U510` outputs 0–4; faults found on the prototype's `U505` are in [Display-Issues.md](Display-Issues.md#matrix-column-faults-around-u505).
 
 ## Refresh Operation
 
