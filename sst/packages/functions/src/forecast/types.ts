@@ -18,10 +18,16 @@ export type ForecastDisplay = {
   minimumTemperature: string;
 };
 
+// The aurora feeds with a fetch time in the payload, as `AuroraNight` names them.
+export type AuroraFeed = "gfz" | "noaa3" | "noaa27" | "ovation";
+
 export type AssembledForecast = {
   displays: ForecastDisplay[];
   // Newest `fetchedAt` among the weather items used; absent when there were none.
   lastWeatherFetch?: Date;
+  // Per feed, the newest `fetchedAt` among the aurora items read for the
+  // nights served; a feed is absent when none of its items was there.
+  lastAuroraFetch: Partial<Record<AuroraFeed, Date>>;
   // How often the device should refresh: hourly on a storm night, else six-hourly.
   refreshIntervalMinutes: 60 | 360;
 };

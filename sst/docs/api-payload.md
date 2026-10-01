@@ -22,6 +22,10 @@ protocol=3
 configurationId=krakow
 time=2026-09-22T23:22:45.678+02:00
 lastWeatherFetchTime=2026-09-22T18:00:04+02:00
+lastGfzFetchTime=2026-09-22T23:03:40+02:00
+lastNoaaKpFetchTime=2026-09-22T23:03:41+02:00
+lastNoaaOutlookFetchTime=2026-09-22T23:03:41+02:00
+lastOvationFetchTime=2026-09-22T23:13:02+02:00
 refreshIntervalMinutes=60
 
 display=0
@@ -117,7 +121,9 @@ Framing and parsing rules
 - Split each record at the first equals sign. Unknown keys must be ignored so
   fields can be added in a later protocol version.
 - Header records occur once and in the documented order: `protocol`,
-  `configurationId`, `time`, `lastWeatherFetchTime`, `refreshIntervalMinutes`.
+  `configurationId`, `time`, `lastWeatherFetchTime`, `lastGfzFetchTime`,
+  `lastNoaaKpFetchTime`, `lastNoaaOutlookFetchTime`, `lastOvationFetchTime`,
+  `refreshIntervalMinutes`.
 - A display=<index> record starts a display block. It is followed by that
   block's records in the documented order.
 - Each matrix record contains either 21 slot characters or the single `?`
@@ -141,6 +147,9 @@ protocol
   row and the `refreshIntervalMinutes` header record; see Matrix encoding.
   Version 2 (levels and `*` only, no aurora) was retired with it: a device
   accepts only version 3. Version 2 had replaced version 1's on/off cells.
+  The aurora fetch-time records were added to version 3 later without a
+  version change: they are additive, and a device that does not know them
+  ignores them.
 
 board
   Display format identifier. Version 3 supports only
@@ -175,6 +184,16 @@ lastWeatherFetchTime
   their own `<source>FetchTime` record. It is the server's fetch from the
   supplier, not the time the supplier's model ran. `?` means the response
   carries no weather. It appears only in successful responses.
+
+lastGfzFetchTime, lastNoaaKpFetchTime, lastNoaaOutlookFetchTime, lastOvationFetchTime
+  The same for each aurora feed: the newest `fetchedAt` among that feed's
+  items for the six nights in the response, in the same format as
+  `lastWeatherFetchTime`, or `?` when there is none. The feeds are GFZ's Hp60
+  forecast (nights 1–3, primary), NOAA's 3-day Kp forecast (nights 1–3,
+  fallback), NOAA's 27-day outlook (nights 4–7) and NOAA's OVATION nowcast.
+  A feed that keeps failing keeps its last time, so its value grows old while
+  the others move on. OVATION is fetched only on a storm night after dark, so
+  it is normally `?`. They appear only in successful responses.
 
 refreshIntervalMinutes
   How often the device should fetch the forecast, in minutes: `360` normally

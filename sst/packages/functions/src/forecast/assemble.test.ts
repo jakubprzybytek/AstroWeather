@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+import type { Noaa27Item, OvationItem } from "../aurora/storage";
 import { assembleForecast } from "./assemble";
 
 describe("assembleForecast", () => {
@@ -72,5 +73,41 @@ describe("assembleForecast", () => {
     });
 
     expect(result.lastWeatherFetch?.toISOString()).toBe("2026-09-17T04:00:03.000Z");
+  });
+
+  test("reports the newest fetch of each aurora feed among the nights read", async () => {
+    const base = (nightId: string, source: string, fetchedAt: string) => ({
+      pk: "LOC#krakow", sk: `NIGHT#${nightId}#AURORA#${source}`, configurationId: "krakow",
+      nightId, fetchedAt, expireAt: 2_000_000_000
+    });
+    const noaa27 = (nightId: string, fetchedAt: string): Noaa27Item =>
+      ({ ...base(nightId, "NOAA27", fetchedAt), source: "NOAA27", lastModified: null, spans: [] });
+    const ovation = (nightId: string, fetchedAt: string): OvationItem =>
+      ({ ...base(nightId, "OVATION", fetchedAt), source: "OVATION", slots: {} });
+    const result = await assembleForecast("krakow", { lat: 50, lon: 20, tz: "Europe/Warsaw" }, { kpMain: 7.5 }, {
+      now: () => new Date("2026-09-17T10:00:00Z"),
+      readWeather: async () => new Map(),
+      readAurora: async () => new Map([
+        ["2026-09-17", { noaa27: noaa27("2026-09-17", "2026-09-16T12:03:41.000Z"), ovation: ovation("2026-09-17", "not a date") }],
+        ["2026-09-20", { noaa27: noaa27("2026-09-20", "2026-09-17T06:03:41.000Z") }]
+      ]),
+      log: vi.fn()
+    });
+
+    expect(result.lastAuroraFetch.noaa27?.toISOString()).toBe("2026-09-17T06:03:41.000Z");
+    expect(result.lastAuroraFetch.gfz).toBeUndefined();
+    expect(result.lastAuroraFetch.noaa3).toBeUndefined();
+    expect(result.lastAuroraFetch.ovation).toBeUndefined();
+  });
+
+  test("reports no aurora fetch when the aurora read fails", async () => {
+    const result = await assembleForecast("krakow", { lat: 50, lon: 20, tz: "Europe/Warsaw" }, { kpMain: 7.5 }, {
+      now: () => new Date("2026-09-17T10:00:00Z"),
+      readWeather: async () => new Map(),
+      readAurora: async () => { throw new Error("DynamoDB down"); },
+      log: vi.fn()
+    });
+
+    expect(result.lastAuroraFetch).toEqual({});
   });
 });

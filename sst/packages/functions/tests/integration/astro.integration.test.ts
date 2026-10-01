@@ -22,9 +22,18 @@ describe("GET /astro/{configurationId}", () => {
     expect(Math.abs(renderedAt - Date.now())).toBeLessThan(60_000);
     // Weather is ingested every six hours, so a working deployment has a value.
     expect(lines[3]).toMatch(/^lastWeatherFetchTime=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+0[12]:00$/);
-    expect(lines[4]).toMatch(/^refreshIntervalMinutes=(60|360)$/);
-    expect(lines[5]).toBe("");
-    expect(lines[6]).toBe("display=0");
+    // A feed can be `?`: OVATION is fetched only on storm nights, and a stage
+    // may not have run every aurora job yet.
+    const fetchTime = String.raw`(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+0[12]:00|\?)`;
+    expect(lines.slice(4, 8)).toEqual([
+      expect.stringMatching(new RegExp(`^lastGfzFetchTime=${fetchTime}$`)),
+      expect.stringMatching(new RegExp(`^lastNoaaKpFetchTime=${fetchTime}$`)),
+      expect.stringMatching(new RegExp(`^lastNoaaOutlookFetchTime=${fetchTime}$`)),
+      expect.stringMatching(new RegExp(`^lastOvationFetchTime=${fetchTime}$`))
+    ]);
+    expect(lines[8]).toMatch(/^refreshIntervalMinutes=(60|360)$/);
+    expect(lines[9]).toBe("");
+    expect(lines[10]).toBe("display=0");
     expect(body).toContain("\n\ndisplay=1");
 
     expect(lines.filter((line) => line.startsWith("display="))).toEqual([

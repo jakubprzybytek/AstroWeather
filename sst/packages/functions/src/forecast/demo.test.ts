@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { createHandler } from "../astro";
 import { handler as configurationsHandler } from "../configurations-handler";
 import { DEMO_NIGHTS, demoForecast } from "./demo";
-import { serializeForecast } from "./protocol";
+import { NO_AURORA_FETCH, serializeForecast } from "./protocol";
 
 const NOW = new Date("2026-10-01T18:00:00Z");
 
@@ -18,7 +18,7 @@ describe("demo forecast", () => {
       "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-06"
     ]);
     expect(refreshIntervalMinutes).toBe(360);
-    expect(() => serializeForecast("test", "2026-10-01T20:00:00.000+02:00", "?", 360, displays)).not.toThrow();
+    expect(() => serializeForecast("test", "2026-10-01T20:00:00.000+02:00", "?", NO_AURORA_FETCH, 360, displays)).not.toThrow();
   });
 
   test("moves sunset and sunrise by a few minutes a night, and the sun row follows them", () => {
@@ -62,9 +62,10 @@ describe("demo forecast", () => {
     const response = await handler({ pathParameters: { configurationId: "test" } });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body.split("\n").slice(0, 5)).toEqual([
+    expect(response.body.split("\n").slice(0, 9)).toEqual([
       "protocol=3", "configurationId=test", "time=2026-10-01T20:00:00.000+02:00",
-      "lastWeatherFetchTime=?", "refreshIntervalMinutes=360"
+      "lastWeatherFetchTime=?", "lastGfzFetchTime=?", "lastNoaaKpFetchTime=?",
+      "lastNoaaOutlookFetchTime=?", "lastOvationFetchTime=?", "refreshIntervalMinutes=360"
     ]);
     const listed = JSON.parse((await configurationsHandler()).body) as Array<{ id: string }>;
     expect(listed.map((configuration) => configuration.id)).not.toContain("test");

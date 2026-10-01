@@ -2,7 +2,7 @@ import { configurations } from "./configurations";
 import { assembleForecast } from "./forecast/assemble";
 import { DEMO_CONFIGURATION_ID, DEMO_TIMEZONE, demoForecast } from "./forecast/demo";
 import { localDateTime, localDateTimeMillis, utcOffset } from "./forecast/nights";
-import { serializeError, serializeForecast } from "./forecast/protocol";
+import { NO_AURORA_FETCH, serializeError, serializeForecast, type AuroraFetchTimes } from "./forecast/protocol";
 import { createWeatherReader } from "./forecast/weather-reader";
 import { createAuroraStore } from "./aurora/storage";
 
@@ -35,7 +35,7 @@ export function createHandler(
       const { displays, refreshIntervalMinutes } = demoForecast(now());
       const sentAt = now();
       const time = localDateTimeMillis(sentAt, DEMO_TIMEZONE) + utcOffset(sentAt, DEMO_TIMEZONE);
-      return textResponse(200, serializeForecast(configurationId, time, "?", refreshIntervalMinutes, displays));
+      return textResponse(200, serializeForecast(configurationId, time, "?", NO_AURORA_FETCH, refreshIntervalMinutes, displays));
     }
 
     if (!configurationId || !isConfigurationId(configurationId)) {
@@ -45,7 +45,7 @@ export function createHandler(
     const { location, aurora } = configurations[configurationId];
 
     try {
-      const { displays, lastWeatherFetch, refreshIntervalMinutes } = await assembleForecast(configurationId, location, aurora, {
+      const { displays, lastWeatherFetch, lastAuroraFetch, refreshIntervalMinutes } = await assembleForecast(configurationId, location, aurora, {
         now,
         readWeather: dependencies.readWeather ?? createWeatherReader().read,
         readAurora: dependencies.readAurora ?? createAuroraStore().readNights,
@@ -54,10 +54,14 @@ export function createHandler(
       // Read the clock after assembly so the device's RTC sync is as close to sending as possible.
       const sentAt = now();
       const time = localDateTimeMillis(sentAt, location.tz) + utcOffset(sentAt, location.tz);
-      const lastWeatherFetchTime = lastWeatherFetch
-        ? localDateTime(lastWeatherFetch, location.tz) + utcOffset(lastWeatherFetch, location.tz)
-        : "?";
-      return textResponse(200, serializeForecast(configurationId, time, lastWeatherFetchTime, refreshIntervalMinutes, displays));
+      const fetchTime = (at: Date | undefined) => at ? localDateTime(at, location.tz) + utcOffset(at, location.tz) : "?";
+      const auroraFetchTimes: AuroraFetchTimes = {
+        gfz: fetchTime(lastAuroraFetch.gfz),
+        noaa3: fetchTime(lastAuroraFetch.noaa3),
+        noaa27: fetchTime(lastAuroraFetch.noaa27),
+        ovation: fetchTime(lastAuroraFetch.ovation)
+      };
+      return textResponse(200, serializeForecast(configurationId, time, fetchTime(lastWeatherFetch), auroraFetchTimes, refreshIntervalMinutes, displays));
     } catch (cause) {
       dependencies.log?.("Forecast response failed", {
         configurationId,

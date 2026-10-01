@@ -16,9 +16,10 @@ describe("astro handler", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["content-type"]).toBe("text/plain; charset=utf-8");
-    expect(response.body.split("\n").slice(0, 6)).toEqual([
+    expect(response.body.split("\n").slice(0, 10)).toEqual([
       "protocol=3", "configurationId=krakow", "time=2026-09-22T23:22:45.678+02:00",
-      "lastWeatherFetchTime=?", "refreshIntervalMinutes=360", ""
+      "lastWeatherFetchTime=?", "lastGfzFetchTime=?", "lastNoaaKpFetchTime=?",
+      "lastNoaaOutlookFetchTime=?", "lastOvationFetchTime=?", "refreshIntervalMinutes=360", ""
     ]);
   });
 
@@ -37,6 +38,25 @@ describe("astro handler", () => {
     const response = await handler({ pathParameters: { configurationId: "krakow" } });
 
     expect(response.body).toContain("\nlastWeatherFetchTime=2026-09-22T18:00:04+02:00\n");
+  });
+
+  test("renders each aurora feed's last fetch time in local time, or ? without it", async () => {
+    const handler = createHandler({
+      now: () => new Date("2026-09-22T21:22:45.678Z"),
+      readWeather: async () => new Map(),
+      readAurora: async (_configurationId, nightIds) => new Map([[nightIds[1], {
+        gfz: {
+          pk: "LOC#krakow", sk: `NIGHT#${nightIds[1]}#AURORA#GFZ`, configurationId: "krakow",
+          nightId: nightIds[1], source: "GFZ" as const, lastModified: null, spans: [],
+          fetchedAt: "2026-09-22T15:03:40.512Z", expireAt: 2_000_000_000
+        }
+      }]]),
+      log: vi.fn()
+    });
+    const response = await handler({ pathParameters: { configurationId: "krakow" } });
+
+    expect(response.body).toContain("\nlastGfzFetchTime=2026-09-22T17:03:40+02:00\nlastNoaaKpFetchTime=?\n" +
+      "lastNoaaOutlookFetchTime=?\nlastOvationFetchTime=?\n");
   });
 
   test("pads the milliseconds to three digits", async () => {

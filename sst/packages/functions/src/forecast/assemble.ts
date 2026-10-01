@@ -3,9 +3,10 @@ import { calculateAstronomy } from "./astronomy";
 import { encodeMatrix } from "./matrix";
 import { nextNightIds } from "./nights";
 import { projectWeather } from "./weather-reader";
-import type { AssembledForecast, ForecastDependencies, ForecastDisplay } from "./types";
+import type { AssembledForecast, AuroraFeed, ForecastDependencies, ForecastDisplay } from "./types";
 
 const BOARD = "num4x4_matrix5x21" as const;
+const AURORA_FEEDS: AuroraFeed[] = ["gfz", "noaa3", "noaa27", "ovation"];
 
 function emptyDisplay(display: number, nightId: string): ForecastDisplay {
   return {
@@ -61,11 +62,19 @@ export async function assembleForecast(
 
   // Six-hourly unless tonight is a storm night; also when the aurora is unknown.
   let refreshIntervalMinutes: 60 | 360 = 360;
+  const lastAuroraFetch: Partial<Record<AuroraFeed, Date>> = {};
   try {
     const nights = await dependencies.readAurora(configurationId, nightIds, now);
     for (const display of displays) {
       const night = nights.get(display.nightId);
       if (!night) continue;
+      for (const feed of AURORA_FEEDS) {
+        const fetchedAt = new Date(night[feed]?.fetchedAt ?? NaN);
+        const newest = lastAuroraFetch[feed];
+        if (!Number.isNaN(fetchedAt.getTime()) && (!newest || fetchedAt > newest)) {
+          lastAuroraFetch[feed] = fetchedAt;
+        }
+      }
       display.aurora = encodeMatrix(mergeAurora(display.nightId, location.tz, aurora.kpMain, night, now).map(auroraCell));
     }
     if (nights.get(nightIds[0])?.flag) refreshIntervalMinutes = 60;
@@ -78,5 +87,5 @@ export async function assembleForecast(
     });
   }
 
-  return { displays, lastWeatherFetch, refreshIntervalMinutes };
+  return { displays, lastWeatherFetch, lastAuroraFetch, refreshIntervalMinutes };
 }

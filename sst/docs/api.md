@@ -51,7 +51,8 @@ The payload is a normal protocol 3 response for six consecutive nights
 (`forecast/demo.ts`):
 
 - `time` is the real time in Europe/Warsaw, since the device sets its clock
-  from it; `lastWeatherFetchTime` is `?` and `refreshIntervalMinutes` is `360`.
+  from it; `lastWeatherFetchTime` and the four aurora fetch times are `?`, and
+  `refreshIntervalMinutes` is `360`.
 - Sunset and sunrise start at random times and move by 1–3 minutes a night;
   the moon rises 40–60 minutes later each night. The sun and moon rows follow
   those times.
@@ -70,10 +71,12 @@ successful request returns `text/plain; charset=utf-8` using the versioned ASCII
 `key=value` protocol defined in [api-payload.md](api-payload.md).
 
 The response contains the `protocol=3`, `configurationId`, `time`,
-`lastWeatherFetchTime` and `refreshIntervalMinutes` header records, followed by six fixed-order display
-blocks. `time` is the configuration's local wall-clock time with its UTC
+`lastWeatherFetchTime`, `lastGfzFetchTime`, `lastNoaaKpFetchTime`,
+`lastNoaaOutlookFetchTime`, `lastOvationFetchTime` and `refreshIntervalMinutes`
+header records, followed by six fixed-order display blocks. `time` is the configuration's local wall-clock time with its UTC
 offset as `YYYY-MM-DDTHH:MM:SS.mmm+HH:MM`; `lastWeatherFetchTime` is the local
-`YYYY-MM-DDTHH:MM:SS+HH:MM` of the last successful weather fetch, or `?`. Each block contains, in order,
+`YYYY-MM-DDTHH:MM:SS+HH:MM` of the last successful weather fetch, or `?`, and
+the four aurora records are the same for each aurora feed. Each block contains, in order,
 `display`, `board`, `nightId`, `numeric_0`, `numeric_1`, `matrix_0` through
 `matrix_4`, `numeric_2`, and `numeric_3`. `numeric_0` and `numeric_1`
 are sunset and sunrise; `matrix_0` through `matrix_4` are sun, moon, cloud,
@@ -120,6 +123,27 @@ it, so a failed run leaves the value at the last success, and the value grows
 old when ingestion keeps failing. It is `?` when no weather item is available.
 The record is specific to weather: a future source adds its own record rather
 than sharing this one.
+
+### Last aurora fetch times
+
+Each aurora feed has its own record, built the same way from the `fetchedAt`
+of that feed's `#AURORA` items for the six nights served:
+
+| Record | Feed | Item |
+|---|---|---|
+| `lastGfzFetchTime` | GFZ Hp60 forecast, nights 1–3 | `#AURORA#GFZ` |
+| `lastNoaaKpFetchTime` | NOAA 3-day Kp forecast, nights 1–3 | `#AURORA#NOAA3` |
+| `lastNoaaOutlookFetchTime` | NOAA 27-day outlook, nights 4–7 | `#AURORA#NOAA27` |
+| `lastOvationFetchTime` | NOAA OVATION nowcast | `#AURORA#OVATION` |
+
+The forecast job writes a feed's item only when that feed was fetched and
+parsed, so one failing feed shows as an old time while the others stay
+current; a single aurora record would hide that. The nowcast rewrites the
+`OVATION` item each time it samples, which happens only on a storm night after
+dark, so `lastOvationFetchTime` is normally `?`. A record is `?` when none of
+the feed's items is there, and all four are `?` when the aurora read fails.
+The `FLAG` item is not a feed and has no record. The demo configuration sends
+`?` for all four.
 
 ### Astronomy
 
@@ -227,7 +251,8 @@ client. Operational details belong in structured Lambda logs.
    `YYYY-MM-DDTHH:MM:SS.mmm+HH:MM` at render time, with the offset of that
    instant, including after a DST change.
 12. A successful response carries `lastWeatherFetchTime` as the local time and
-   UTC offset of the newest weather `fetchedAt` used, or `?` without weather.
+   UTC offset of the newest weather `fetchedAt` used, or `?` without weather,
+   and one such record per aurora feed, `?` for a feed without items.
 13. Available `#AURORA` items supply `matrix_4`, merged as in
    [aurora-forecast-supplier.md](aurora-forecast-supplier.md#merging-sources);
    missing or failed aurora leaves it `?` and `refreshIntervalMinutes=360`
