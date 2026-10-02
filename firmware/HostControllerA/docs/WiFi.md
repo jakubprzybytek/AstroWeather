@@ -332,7 +332,9 @@ The `api host` and `api path` commands apply the same rules before saving.
 ## HTTP
 
 Plain HTTP only. HTTPS is planned in
-[ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md).
+[ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md), which
+weighs mbedTLS on the host against switching the module to the T01 firmware,
+where TCP/IP and TLS run in the module and LwIP leaves the host.
 
 1. **DNS.** `dns_gethostbyname()` through LwIP, waiting up to
    `APP_ST67_DNS_TIMEOUT_MS` (5 s). The result must be a non-zero IPv4

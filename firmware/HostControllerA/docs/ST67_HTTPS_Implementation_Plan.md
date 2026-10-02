@@ -1,7 +1,16 @@
 # ST67 HTTPS Implementation Plan
 
-**Status: not started as of 2026-09-23.** The firmware fetches over plain HTTP
+**Status: not started as of 2026-10-02.** The firmware fetches over plain HTTP
 only; the current Wi-Fi stack is described in [WiFi.md](WiFi.md).
+
+There are two ways to get TLS on this board, and the first decision is which
+one to take; see [Two routes](#2-two-routes). Route A keeps the current T02
+architecture and runs mbedTLS on the STM32. Route B switches the module to
+ST's T01 architecture, where the module runs TCP/IP and TLS itself. As of
+2026-10-02 Route B is the preferred candidate and is to be tried first; the
+T02 choice was never backed by a requirement (see [History](#history-of-the-architecture-choice)).
+Sections 4 to 8 describe Route A in detail; section 3 lists the decisions both
+routes need and section 2b outlines Route B.
 
 ## 1. Goal
 
@@ -21,7 +30,50 @@ The production path must provide:
 
 HTTPS is not accepted if certificate verification is disabled or optional.
 
-## 2. Current State and Constraints
+## 2. Two Routes
+
+| | Route A: mbedTLS on the host (T02) | Route B: TLS in the module (T01) |
+| --- | --- | --- |
+| Module firmware | `st67w611m_mission_t02_v2.0.106.bin`, as flashed today | `st67w611m_mission_t01_v2.0.106.bin`; `W6X_Init()` refuses a mismatch, so the host build and the module image change together |
+| TCP/IP, DNS | LwIP on the STM32 (today) | Inside the module; host calls `W6X_Net_*` |
+| TLS | mbedTLS 3.6.4 from X-CUBE-ST67W61 1.3.0, compiled into the STM32 image | Inside the module: `W6X_Net_Socket(..., "SSL")`, `W6X_Net_TLS_Credential_AddByContent()`, or the one-call `W6X_HTTP_Client_Request()` with `https_certificate` and `server_name` (SNI) |
+| HTTP | `User/Src/WiFi/HttpClient.cpp` over a transport (to be refactored) | Module's HTTP client via `W6X_HTTP_Client_Request()`, or `HttpClient.cpp` over a `W6X_Net` "SSL" socket |
+| Entropy | **Open problem**: STM32G0B1 has no RNG; ST's own example seeds mbedTLS from the U5 RNG (`MBEDTLS/Target/hardware_rng.c`) | Module's hardware RNG; nothing to do on the host |
+| Certificate time | **Open problem**: RTC is unset after power loss, holds local time; see [Certificate time](#certificate-time) | Module has SNTP (`W6X_Net_SNTP_*`); the host RTC is not involved |
+| Host RAM | Needs roughly 20 to 30 KiB more heap with trimmed TLS buffers, 45 KiB or more with mbedTLS defaults, plus 4 to 6 KiB more `St67HttpFetch` stack. Static reservation is already 91.5% (`docs/Firmware-RAM-Usage.md`) | Frees LwIP: 33.5 KiB heap, about 11 KiB pools, the 4 KiB `tcpip_thread` and 2 KiB netif stacks. ST's stated minimum for the driver is 48 KiB RAM |
+| Host flash | Release 197 KiB of 512 KiB is fine. Debug is `-O0` and already 391 KiB; mbedTLS at `-O0` will likely not fit unless it is built with `-Os` separately | Shrinks |
+| Handshake CPU | Cortex-M0+ at 64 MHz, no crypto hardware: several seconds per handshake; raise `APP_ST67_HTTP_TOTAL_TIMEOUT_MS` | In the module |
+| Host code change | Transport refactor of `HttpClient.cpp`, new `TlsTransport`, trust store, entropy and time policies, tests | Rewrite `St67NetworkSession` and `St67HttpFetcher`/`HttpClient` against `W6X_Net`/`W6X_HTTP` instead of LwIP BSD sockets; remove LwIP from CubeMX |
+| What stays User-verifiable | Everything: the verification policy is in our code and host-testable | Verification policy lives in the module firmware; what it checks (chain, hostname, validity dates) must be established on the bench against bad certificates |
+| Known risks | Fit. Entropy source needs an analysis. ST's example disables the validity-date check (`MBEDTLS_HAVE_TIME` undefined) | ST release notes for 1.3.0, T01: "SSL sockets support a limited amount of algorithms, handshake might fail if unsupported algorithm is used by the server" and "SSL sockets has specific internal buffer configurations, this might result in failure when server doesn't acknowledge those changes". Also DHCP/static-IP caveats. Must be proven against CloudFront |
+
+The API is CloudFront with an ACM certificate (`sst/docs/architecture.md`), so
+the server side is the same for both routes: TLS 1.2 with ECDHE, an RSA-2048
+leaf by default, and a chain ending in an Amazon root.
+
+### Decision order
+
+1. **Route B spike first.** Flash one module with the T01 image, build a
+   minimal T01 host (no LwIP), and run `W6X_HTTP_Client_Request()` against
+   `https://api.astroweather.albedoonline.com` with Amazon Root CA 1 as
+   `https_certificate`. Then run it against a wrong CA, a hostname mismatch
+   and an expired certificate (a local test server is enough) and record what
+   the module rejects. Record `heapFree`/`heapMin` and the image size.
+2. If the module verifies the chain and hostname and fails closed, adopt
+   Route B and write its plan (section 2b) in full; Route A sections remain as
+   the fallback.
+3. If the module does not verify, or cannot talk to CloudFront, fall back to
+   Route A with the decisions in section 3.
+
+### History of the architecture choice
+
+T02 was chosen in August 2026 without a requirement behind it; the archived
+plans call it "required" only because the LwIP-on-host examples were being
+followed. Nothing in the product needs the TCP/IP stack on the host. The
+module in the field already runs T02 2.0.106 and must be re-flashed for
+Route B; the Phase 2 notes in `archive/` cover the module programming path.
+
+## 2a. Current State and Constraints (Route A)
 
 The active path is:
 
@@ -61,24 +113,68 @@ client has a port-443 branch. That branch is not production-ready:
 Do not route the application back through the generated HTTP client or patch
 its non-USER sections. Use it only as an API reference.
 
+mbedTLS does not need to be fetched from its upstream repository: X-CUBE-ST67W61
+1.3.0 ships mbedTLS 3.6.4 as a CubeMX component (pack class **Security**,
+component **mbedTLS**), offered only when LwIP and the T02 architecture are
+selected, which is this project's configuration. ST's `ST67W6X_FOTA_LWIP`
+example (NUCLEO-U575ZI-Q) shows the generated result: `MBEDTLS/App/mbedtls_config.h`,
+`MBEDTLS/App/mbedtls.c` and `MBEDTLS/Target/hardware_rng.c`, and the `.ioc`
+keys `SecurityJjmbedTLS_Checked=true` and `mbedTLSCcSecurityJjmbedTLS=true`.
+The older 1.1.0 pack also installed on the development PC has no mbedTLS
+component. The component is not available in T01, where TLS is in the module.
+
 Memory is a primary constraint. The STM32G0B1 has 144 KiB RAM, the current
 image statically reserves about 90%, and the 40 KiB FreeRTOS heap is shared by
 ST67 tasks, LwIP, application tasks, and future TLS allocations. TLS sizing
 must be measured, not inferred from a successful link.
 
+## 2b. Route B Outline (TLS in the Module, T01)
+
+To be expanded into phases once the spike in [Decision order](#decision-order)
+passes. The shape is:
+
+1. **Module and CubeMX.** Flash the T01 mission image. In CubeMX switch the
+   X-CUBE-ST67W61 *ST67 Architecture* to T01 and untick LwIP; `ST67_ARCH`
+   becomes `W6X_ARCH_T01`. Regenerate; `LWIP/` and `altls_mbedtls.c` go away.
+   Record flash, `.data` and `.bss` against the plain-HTTP baseline.
+2. **Network session.** `St67NetworkSession` keeps `W6X_WiFi_*` for join and
+   disconnect; DHCP and DNS move to the module (`W6X_Net_ResolveHostAddress()`).
+3. **Fetch.** Either call `W6X_HTTP_Client_Request()` with `server_name`,
+   `https_certificate`, `timeout`, `max_response_len` and the receive/result
+   callbacks, or keep `HttpClient.cpp`'s parser over a `W6X_Net` "SSL" socket
+   with `TLS_SEC_TAG_LIST`, `TLS_HOSTNAME` and `TLS_ALPN_LIST` socket options.
+   The second keeps the existing bounded parser and status/content-type checks;
+   the first is less code. Decide after the spike shows what the module's HTTP
+   client enforces.
+4. **Trust material.** Amazon Root CA 1 as a const PEM in a User-owned
+   source (ST's example passes PEM text through `W6X_Certificate_t::content`);
+   the certificate is public data. No host LittleFS is needed for a single CA.
+5. **Time.** The module checks validity dates against its own SNTP time, if it
+   checks them at all. The host RTC continues to be set from the `time` record
+   (see [RTC.md](RTC.md)) and the generated SNTP client stays off.
+6. **Failure mapping and tests.** Map `W6X_Status_t`/HTTP result codes to the
+   existing fetch results; the HTTP parser tests apply only if the parser is
+   kept. Bench validation reuses section 8's cases, with the certificate
+   failure cases being the ones that establish what the module verifies.
+
 ## 3. Decisions Required Before Implementation
 
 Record these decisions in this document before enabling the production path.
+The trust model and protocol profile apply to both routes; certificate time and
+entropy are Route A problems, as the module solves them in Route B.
 
 ### Trust model
 
 Choose one:
 
 1. **Pinned private CA** for an endpoint under project control. This is the
-   preferred smallest trust store and simplifies certificate rotation if the
-   issuing CA remains stable.
+   smallest trust store, but it is not available here: the production endpoint
+   is CloudFront with an ACM-issued certificate, so the issuer is Amazon's.
 2. **Curated public roots** containing only roots needed by the production
-   endpoint. Assign an owner and update procedure for CA rotation.
+   endpoint: Amazon Root CA 1 (ACM's default chain, RSA 2048, valid to 2038),
+   optionally the other Amazon roots and Starfield Services Root G2 in case
+   ACM changes the chain. Assign an owner and update procedure for CA
+   rotation. **This is the expected choice.**
 3. **SPKI pinning** only if CA validation cannot fit and the endpoint operator
    can provide an explicit key-rotation mechanism.
 
@@ -124,18 +220,32 @@ Unauthenticated SNTP alone must not be treated as the root of trust for the
 first TLS connection. Whatever is chosen, the time a certificate is checked
 against must never come from an unauthenticated response.
 
+For calibration: ST's own `ST67W6X_FOTA_LWIP` configuration does not define
+`MBEDTLS_HAVE_TIME`, so it never checks validity dates and relies on chain and
+hostname verification alone. That is a defensible policy for this product too,
+provided it is written down; the dates only add protection against a leaked
+but expired certificate.
+
 ### Entropy
 
-STM32G0B1 has no enabled hardware RNG in this project. Verify the entropy
-source used by the selected mbedTLS package. It must be suitable for seeding a
-client DRBG and must fail closed if unavailable. Investigate a documented
-public ST67 random API or another board entropy source; do not substitute tick,
-MAC address, ADC noise without analysis, or a fixed seed.
+STM32G0B1 has no hardware RNG at all; ST's example seeds mbedTLS
+(`MBEDTLS_ENTROPY_HARDWARE_ALT`, `MBEDTLS_NO_PLATFORM_ENTROPY`) from the U5's
+RNG peripheral in `MBEDTLS/Target/hardware_rng.c`, which this MCU cannot copy.
+The T02 driver exposes no random API from the module. The entropy source must
+be suitable for seeding a client DRBG and must fail closed if unavailable. The
+candidates are mbedTLS's NV seed (`MBEDTLS_ENTROPY_NV_SEED`) kept in the
+settings EEPROM and re-stirred on every boot, combined with a jitter source
+such as sampling the LSI-clocked RTC against the HSI-clocked timer, with a
+written analysis of the entropy per sample. Do not substitute tick, MAC
+address, ADC noise without analysis, or a fixed seed. This is the largest open
+item of Route A and does not exist in Route B.
 
 ### Protocol profile
 
 Start with TLS 1.2 and the smallest cipher/signature set supported by the
-production endpoint and mbedTLS package. Add TLS 1.3 only if required and after
+production endpoint: ECDHE with P-256, RSA-2048 signatures (ACM default; add
+ECDSA P-256 only if the ACM certificate is reissued as ECDSA), AES-128-GCM and
+SHA-256. Add TLS 1.3 only if required and after
 measuring its flash/RAM cost. Require SNI and hostname verification using
 the resolved API host (`ApiTarget::host`: the saved `api host`, or
 `APP_ST67_HTTP_HOST` as the fallback); ALPN should advertise only `http/1.1`.
@@ -145,8 +255,8 @@ the resolved API host (`ApiTarget::host`: the saved `api host`, or
 This phase is a configuration handoff because middleware selection is
 CubeMX-owned.
 
-1. In STM32CubeMX, enable the package-compatible mbedTLS middleware for the
-   HostController image and its LwIP socket integration.
+1. In STM32CubeMX, under Software Packs > X-CUBE-ST67W61, tick
+   **Security > mbedTLS** (3.6.4); it is only selectable with LwIP and T02.
 2. Select only required client features: TLS client, X.509 parsing and
    verification, PEM only if certificates are not compiled as DER, SHA-256,
    the endpoint's key/signature algorithms, SNI, and optional maximum fragment
@@ -159,7 +269,14 @@ CubeMX-owned.
    changes are confined to expected files and USER sections.
 6. Build both firmware variants before application changes. This isolates
    middleware-integration failures from HTTPS-client failures.
-7. Record flash, `.data`, and `.bss` deltas from the plain-HTTP baseline.
+7. Record flash, `.data`, and `.bss` deltas from the plain-HTTP baseline
+   (2026-10-02: Debug text 391 496 B, Release text 197 640 B, `.bss` 138 412 B
+   in Debug). Expect the `-O0` Debug build to need mbedTLS compiled at `-Os`.
+8. Set `MBEDTLS_SSL_IN_CONTENT_LEN`/`MBEDTLS_SSL_OUT_CONTENT_LEN` below the
+   16 KiB defaults from the start; the server's certificate message is about
+   4 KiB and CloudFront is not guaranteed to honour the maximum-fragment-length
+   extension, so the inbound size must be found by test, not set to the
+   response limit.
 
 If the generated middleware cannot fit the image or conflicts with the package
 version, stop and resolve that constraint rather than manually copying an
@@ -289,7 +406,7 @@ consumers first; do not weaken verification or silently increase buffers.
 
 | File or area | Planned change |
 | --- | --- |
-| `HostControllerA.ioc` | User performs mbedTLS configuration in CubeMX (the RTC is already enabled) |
+| `HostControllerA.ioc` | Route A: tick Security > mbedTLS. Route B: ST67 Architecture T01, LwIP removed |
 | Generated CMake/middleware configuration | Regenerated mbedTLS sources, includes, and config; no manual edits outside USER sections |
 | `Appli/App/app_config.h` | Transport selection, HTTPS port, handshake/total deadlines, and TLS limits |
 | `Appli/App/app_credentials.h.template` | Empty host/path values only |
@@ -347,6 +464,8 @@ HTTPS support is complete only when:
 - no secret, private key, payload, or insecure verification mode is committed
   or logged.
 
-If these gates cannot be met on STM32G0B1, document the measured limiting
-resource and reconsider the endpoint trust model, protocol, or MCU. Do not ship
-HTTPS with optional/disabled certificate validation.
+If these gates cannot be met on STM32G0B1 with Route A, document the measured
+limiting resource and take Route B; the trust model, fail-closed behaviour and
+resource-stability gates apply to Route B unchanged, with "mbedTLS" read as
+"the module's TLS". Do not ship HTTPS with optional/disabled certificate
+validation on either route.
