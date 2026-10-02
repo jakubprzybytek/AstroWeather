@@ -104,6 +104,22 @@ describe("ingestAuroraForecast", () => {
     }));
   });
 
+  test("reports a flagged night as kept after the forecast drops below the trigger", async () => {
+    const { dependencies } = forecastDependencies();
+    await ingestAuroraForecast(dependencies);
+    dependencies.loadGfz = vi.fn(async () => ({
+      spans: [gfzHour(new Date("2026-10-02T20:00:00Z"))], lastModified: null
+    }));
+
+    await ingestAuroraForecast(dependencies);
+
+    expect(dependencies.log).toHaveBeenLastCalledWith("Aurora forecast ingestion completed", expect.objectContaining({ flagged: [] }));
+    const outlooks = vi.mocked(dependencies.log!).mock.calls.filter(([message]) => message === "Aurora forecast outlook");
+    expect(outlooks[outlooks.length - 1][1]).toMatchObject({
+      nights: expect.arrayContaining([expect.objectContaining({ nightId: "2026-10-02", gfzQ75Max: 2, flag: "kept" })])
+    });
+  });
+
   test("stores the other sources when one fails, then reports the failure", async () => {
     const { dependencies, items } = forecastDependencies({ loadGfz: vi.fn().mockRejectedValue(new Error("HTTP 503")) });
 

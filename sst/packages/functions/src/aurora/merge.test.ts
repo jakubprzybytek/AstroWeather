@@ -99,6 +99,20 @@ describe("mergeAurora", () => {
     expect(row(night, now).slice(0, 12)).toBe("222111000000");
   });
 
+  // NOAA marks the rest of the UTC day `estimated`; a bin that has not started
+  // is a forecast, so GFZ outranks it and it only fills in where GFZ is absent.
+  test("treats an estimated bin that has not started as a forecast", () => {
+    const now = at(19);
+    const noaa = noaa3([[18, 1, "estimated"], [21, 8, "estimated"]]);
+
+    const withGfz = mergeAurora(NIGHT, TZ, 7, { gfz: gfz(hours(19, 24, 1), at(19)), noaa3: noaa }, now);
+    expect(withGfz[6]).toMatchObject({ source: "noaa-observed", level: 0 });   // 18Z, in progress
+    expect(withGfz[9]).toMatchObject({ source: "gfz-hp60", level: 0 });        // 21Z, GFZ wins
+
+    const withoutGfz = mergeAurora(NIGHT, TZ, 7, { noaa3: noaa }, now);
+    expect(withoutGfz[9]).toMatchObject({ source: "noaa-3day", level: 3 });
+  });
+
   test("raises slots with the nowcast and blinks the current and next hour", () => {
     const now = new Date(at(20).getTime() + 10 * 60_000);
     const night = {

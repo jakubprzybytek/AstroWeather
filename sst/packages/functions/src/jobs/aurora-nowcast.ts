@@ -196,7 +196,11 @@ async function logCalibrationSample(
   ]);
   const within = (span: { start: string; end: string }) => Date.parse(span.start) <= validAt && validAt < Date.parse(span.end);
   const hp60 = gfz?.spans.find(within);
-  const estimated = noaa3?.spans.find((span) => span.status === "estimated" && within(span));
+  // NOAA's running estimate is the `estimated` bin in progress now; the bin
+  // covering `validAt` has usually not started and is then still a forecast.
+  const current = noaa3?.spans.find((span) => span.status !== "predicted"
+    && Date.parse(span.start) <= now.getTime() && now.getTime() < Date.parse(span.end));
+  const noaaAtValid = noaa3?.spans.find(within);
   // The row's forecast level for that slot, without the nowcast.
   const forecast = mergeAurora(nightId, tz, kpMain, { gfz, noaa3 }, now)
     .find((slot) => slot.start.getTime() <= validAt && validAt < slot.start.getTime() + 3_600_000);
@@ -211,7 +215,9 @@ async function logCalibrationSample(
     hp60Median: hp60?.median ?? null,
     hp60Max: hp60?.maximum ?? null,
     probLevel1: hp60 ? probabilityAtLeast(hp60, kpMain - 1) : null,
-    kpEstimated: estimated?.kp ?? null,
+    kpEstimated: current?.kp ?? null,
+    kpNoaaAtValid: noaaAtValid?.kp ?? null,
+    kpNoaaAtValidStatus: noaaAtValid?.status ?? null,
     liveKp: live?.kp ?? null,
     liveKpAt: live?.at ?? null,
     level: forecast?.level ?? null,

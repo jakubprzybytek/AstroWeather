@@ -137,5 +137,5 @@ export function demoForecast(now: Date, random: () => number = Math.random): Ass
     };
   });
 
-  return { displays, refreshIntervalMinutes: 360 };
+  return { displays, lastAuroraFetch: {}, refreshIntervalMinutes: 360 };
 }

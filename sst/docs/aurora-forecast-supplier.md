@@ -375,7 +375,8 @@ One structured sample per location per ten-minute run:
 | `cellPct` | OVATION, the location's cell | The value the placeholder mapping uses. |
 | `northPct[]` | OVATION, the cells 1°–8° north on the same meridian | An observer at 47° CGM sees the oval low on the northern horizon, hundreds of kilometres away; the cell overhead can read 0 % while the cells at 54°–56° N read 30 % and the glow is plainly visible. The profile shows which cell, if any, predicts what is seen. |
 | `hp60Median`, `hp60Max`, `probAtLeast6` | GFZ Hp60 for the hour of `validAt` | The forecast the nowcast is compared with. |
-| `kpEstimated` | NOAA 3-day, the `estimated` bin covering `validAt` | NOAA's running estimate of the current Kp. |
+| `kpEstimated` | NOAA 3-day, the `observed` or `estimated` bin in progress when the sample is taken | NOAA's running estimate of the current Kp. |
+| `kpNoaaAtValid`, `kpNoaaAtValidStatus` | NOAA 3-day, the bin covering `validAt` | What NOAA says for the hour the nowcast describes; usually still a forecast. NOAA marks the whole rest of the current UTC day `estimated`, so the status alone does not tell a measurement from a forecast. |
 | `liveKp`, `liveKpAt` | NOAA live Kp, the last 30 minutes' maximum | The minute-by-minute Kp that also gates the sampling. |
 | `sampledAt` | the run | When the sample was taken. |
 | `level` | the row's forecast level for that slot | What the display would have shown without the nowcast. |
@@ -437,7 +438,7 @@ OVATION's odd-minute windows without special cases.
 | Rank | Source | Covers | Unit |
 | --- | --- | --- | --- |
 | 0 | OVATION nowcast | slots its `Forecast Time` fell in (latest and max over the hour) | % → level; **raise-only** until calibrated |
-| 1 | NOAA observed / estimated Kp | past three-hour bins | Kp |
+| 1 | NOAA observed Kp, and the estimated bin in progress | three-hour bins that have started | Kp |
 | 2 | GFZ Hp60 | now → +72 h, hourly | Hp60 median, blinking up when the ensemble reaches level `3` |
 | 3 | NOAA 3-day predicted | three-hour bins to the end of UTC day 3 | Kp |
 | 4 | NOAA 27-day outlook | UTC days | largest Kp of the day |
@@ -461,7 +462,9 @@ consecutive UTC days, split at local 01:00 or 02:00.
    level stage.
 2. **Past hours have a source.** GFZ starts at the current hour, so tonight's
    earlier slots would otherwise fall through to the outlook or to `?`.
-   NOAA's `observed` and `estimated` bins cover them, and on a storm night the
+   NOAA's `observed` bins and the `estimated` bin in progress cover them (an
+   `estimated` bin that has not started is a forecast and ranks with the
+   predicted ones, below GFZ), and on a storm night the
    nowcast's max over the hour raises them further, so past hours show what
    happened rather than an old forecast. (The web tool drops those bins; the
    merge keeps them.)

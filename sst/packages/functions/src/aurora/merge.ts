@@ -38,8 +38,13 @@ function covering<T>(spans: Span<T>[] | undefined, instant: number): Span<T> | u
 }
 
 export function mergeAurora(nightId: string, timezone: string, kpMain: number, night: AuroraNight, now: Date): AuroraSlot[] {
-  const observed = night.noaa3?.spans.filter((span) => span.status !== "predicted");
-  const predicted = night.noaa3?.spans.filter((span) => span.status === "predicted");
+  // NOAA marks the rest of the current UTC day `estimated`: the bin in
+  // progress is its running estimate, but a bin that has not started is still
+  // a forecast, and must not outrank GFZ.
+  const measured = (span: { status: string; start: string }) =>
+    span.status === "observed" || (span.status === "estimated" && Date.parse(span.start) <= now.getTime());
+  const observed = night.noaa3?.spans.filter(measured);
+  const predicted = night.noaa3?.spans.filter((span) => !measured(span));
   const gfz = gfzUsable(night.gfz, now) ? night.gfz?.spans : undefined;
 
   return observingSlots(nightId, timezone).map((slot) => {

@@ -142,14 +142,15 @@ async function flagStormNights(
       const max = (values: number[]) => values.length ? Math.round(Math.max(...values) * 100) / 100 : null;
       const gfzHit = gfzSpans.find((span) => gfzTriggers(span, kpMain));
       const noaaHit = noaaSpans.find((span) => noaaTriggers(span.kp, kpMain));
-      const alreadyFlagged = !!(gfzHit || noaaHit) && !!await dependencies.store.get(configurationId, nightId, "FLAG");
+      // The flag is sticky, so a night can stay flagged after the forecast drops.
+      const alreadyFlagged = !!await dependencies.store.get(configurationId, nightId, "FLAG");
       outlook.push({
         nightId,
         gfzMedianMax: max(gfzSpans.map((span) => span.median)),
         gfzQ75Max: max(gfzSpans.map((span) => span.quantile75)),
         gfzProbLevel1Max: max(gfzSpans.map((span) => probabilityAtLeast(span, kpMain - 1))),
         noaaKpMax: max(noaaSpans.map((span) => span.kp)),
-        flag: gfzHit || noaaHit ? (alreadyFlagged ? "kept" : "new") : "no"
+        flag: alreadyFlagged ? "kept" : (gfzHit || noaaHit ? "new" : "no")
       });
       if (!gfzHit && !noaaHit) continue;
       if (alreadyFlagged) continue;
