@@ -23,6 +23,7 @@
 
 /* USER CODE BEGIN INCLUDE */
 #include "Console/ConsoleServiceBridge.h"
+#include "Debug/ActivityLedBridge.h"
 /* USER CODE END INCLUDE */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -281,6 +282,7 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
+  ActivityLed_Pulse(ACTIVITY_LED_USB_PULSE_MS);
   ConsoleService_OnUsbRxData(Buf, *Len);
 
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
@@ -315,6 +317,10 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
   }
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, Buf, Len);
   result = USBD_CDC_TransmitPacket(&hUsbDeviceFS);
+  if (result == USBD_OK)
+  {
+    ActivityLed_Pulse(ACTIVITY_LED_USB_PULSE_MS);
+  }
   /* USER CODE END 7 */
   return result;
 }

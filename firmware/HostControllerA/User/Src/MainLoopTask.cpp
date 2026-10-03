@@ -4,7 +4,7 @@
 #include <Display/LowBrightness.hpp>
 #include <Debug/LogService.hpp>
 #include <Settings/SettingsStore.hpp>
-#include <Utils/Led.hpp>
+#include <Debug/PulseLed.hpp>
 
 MainLoopTask& MainLoopTask::instance()
 {
@@ -17,7 +17,7 @@ MainLoopTask::MainLoopTask()
 {
 }
 
-void MainLoopTask::init(Led& led, Settings::Store* settings)
+void MainLoopTask::init(PulseLed& led, Settings::Store* settings)
 {
     led_ = &led;
     settings_ = settings;
@@ -40,7 +40,7 @@ void MainLoopTask::run()
                                        "MainLoopTask SWITCH_1 press");
             if (led_ != nullptr)
             {
-                led_->blink(250U);
+                led_->pulse(250U);
             }
             HostController::AstroDataRefreshTask::instance().requestRefresh(
                 HostController::RefreshTrigger::Switch1);
@@ -66,7 +66,7 @@ void MainLoopTask::run()
             }
             if (led_ != nullptr)
             {
-                led_->blink(50U);
+                led_->pulse(50U);
             }
         }
     }

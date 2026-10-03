@@ -32,7 +32,7 @@ shows it on seven-segment and dot-matrix LED displays.
 | SCT2xxx | LED drivers in one SPI3 daisy chain, multiplexed in five slots |
 | INA180A2 | Current-sense amplifier into ADC1 channel 10 (`PB2`) |
 | `SWITCH_1`, `SWITCH_2` | Push buttons on `PB12` (astro refresh) and `PB13` (low brightness) |
-| `LED_1`, `LED_2` | Heartbeat (`PC13`) and switch feedback (`PB9`) |
+| `LED_1`, `LED_2` | Heartbeat (`PC13`); switch presses and USB console traffic (`PB9`) |
 | USB FS | CDC virtual COM port for the console |
 
 Each display board has four four-digit seven-segment displays and a 5x21 dot

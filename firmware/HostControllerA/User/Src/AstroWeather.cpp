@@ -5,6 +5,7 @@
 #include <Console/ConsoleService.hpp>
 #include <Debug/BlinkingLed.hpp>
 #include <Debug/LogService.hpp>
+#include <Debug/PulseLed.hpp>
 #include <Device/Eeprom24AA04.hpp>
 #include <Device/I2cBus.hpp>
 #include <Device/SCT2xxx.hpp>
@@ -15,7 +16,6 @@
 #include <MainLoopTask.hpp>
 #include <Sensors/CurrentSenseTask.hpp>
 #include <Settings/SettingsStore.hpp>
-#include <Utils/Led.hpp>
 #include <Utils/SwitchInput.hpp>
 #include <WiFi/St67HttpFetchTask.hpp>
 
@@ -57,12 +57,13 @@ Device::Eeprom24AA04 settingsEeprom(i2c1Bus);
 
 Settings::Store settingsStore(settingsEeprom);
 
-Led led2(LED_2_GPIO_Port, LED_2_Pin);
 
 // Runs from main() before osKernelStart(), so nothing here may block on the
 // scheduler; the tasks started below only run once it is up.
 void AstroWeather_Init() {
   led1.start();
+  // LED2: switch presses and USB CDC traffic; before the USB device starts.
+  activityLed().init();
 
   LogService::instance().init();
   LogService::instance().start();
@@ -106,7 +107,7 @@ void AstroWeather_Init() {
   HostController::StartSt67HttpFetchTask();
   HostController::AstroDataRefreshTask::instance().init(&display);
   HostController::AstroDataRefreshTask::instance().start();
-  MainLoopTask::instance().init(led2, &settingsStore);
+  MainLoopTask::instance().init(activityLed(), &settingsStore);
   MainLoopTask::instance().start();
   Utils::SwitchInput::instance().attach(
       MainLoopTask::instance().getHandle(), MainLoopTask::kEventSwitch1,

@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-class Led;
+class PulseLed;
 
 namespace Settings {
 class Store;
@@ -19,7 +19,7 @@ public:
     static constexpr uint32_t kEventSwitch2 = 1U << 1;
 
     // `settings` may be null; switch 2 then changes brightness without saving it.
-    void init(Led& led, Settings::Store* settings);
+    void init(PulseLed& led, Settings::Store* settings);
 
 protected:
     void run() override;
@@ -27,6 +27,6 @@ protected:
 private:
     MainLoopTask();
 
-    Led* led_ = nullptr;
+    PulseLed* led_ = nullptr;
     Settings::Store* settings_ = nullptr;
 };

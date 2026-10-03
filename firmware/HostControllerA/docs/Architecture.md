@@ -39,7 +39,8 @@ create their FreeRTOS mutexes from static storage at that point.
 ### Init order
 
 `AstroWeather_Init()` first starts the `Led1` `BlinkingLed` task on `LED_1`
-(on 20 ms, off 1980 ms: a heartbeat every 2 s), then, in order:
+(on 20 ms, off 1980 ms: a heartbeat every 2 s) and creates the timer of the
+`activityLed()` `PulseLed` on `LED_2`, then, in order:
 
 1. `LogService` `init()` (creates the log queue) and `start()`.
 2. `settingsStore.load()` reads the EEPROM; the outcome, not the values, is
@@ -60,7 +61,7 @@ create their FreeRTOS mutexes from static storage at that point.
    credentials on every connect.
 9. `AstroDataRefreshTask`: `init(&display)` restores the last successful
    refresh time from backup register DR1 when the RTC is set, then `start()`.
-10. `MainLoopTask`: `init(led2, &settingsStore)` (switch 2 saves low
+10. `MainLoopTask`: `init(activityLed(), &settingsStore)` (switch 2 saves low
     brightness), `start()`.
 11. `SwitchInput::attach()` routes the `SWITCH_1`/`SWITCH_2` EXTI interrupts to
     `MainLoopTask` as thread flags.
@@ -112,7 +113,7 @@ others hold a reference to it.
 | `display` | `Display::Display` | `localBoard` plus the five remote boards |
 | `settingsEeprom` | `Device::Eeprom24AA04` | `i2c1Bus`, address `0x50` |
 | `settingsStore` | `Settings::Store` | `settingsEeprom` and the in-RAM `Values` |
-| `led2` | `Led` | `LED_2`, blinked by `MainLoopTask` |
+| `activityLed()` | `PulseLed` (`Debug/PulseLed.cpp`) | `LED_2`: a 250 ms pulse for switch 1, 50 ms for switch 2 (`MainLoopTask`), and 20 ms for every USB CDC transfer in either direction (`CDC_Receive_FS` in the USB interrupt, `CDC_Transmit_FS` after a successful send). The pin is set at once and a static FreeRTOS one-shot timer clears it, so a pulse never blocks and works from an interrupt; overlapping pulses merge. |
 
 The tasks other than `Led1` are singletons reached through
 `instance()`. The fetch task is private to `User/Src/WiFi/St67HttpFetchTask.cpp`
@@ -239,7 +240,7 @@ From `Core/Inc/main.h` and `HostControllerA.ioc`.
 | RTC | none (LSI) | Calendar and backup registers |
 | USB FS device, CDC | `PA11` DM, `PA12` DP | Console |
 | GPIO EXTI | `PB12` `SWITCH_1`, `PB13` `SWITCH_2` | Switches, falling edge |
-| GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat, switch feedback |
+| GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat; switch presses and USB CDC traffic |
 | GPIO | `PB8` `LOW_POWER_EN` | Low-brightness step for every board, set by `display low` and toggled by switch 2 (HostController only; see [Display.md](Display.md#low-brightness)) |
 | GPIO inputs | `PB10`, `PB11`, `PB14` = `ADDR_0`..`ADDR_2` | Board address straps, read only by the unused `detectBoardAddress()` |
 | SWD | `PA13`, `PA14` | Debug |
