@@ -46,7 +46,7 @@ bool save(Settings::Store& store)
 void setHost(const char* host, Settings::Store& store)
 {
     if (std::strncmp(host, "http://", 7U) == 0 || std::strncmp(host, "https://", 8U) == 0) {
-        reply("ERR api-host: give the bare host name, without http:// (HTTP only, port 80), "
+        reply("ERR api-host: give the bare host name, without a scheme, port or path, "
               "e.g. api host api.example.com");
         return;
     }

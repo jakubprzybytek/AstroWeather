@@ -333,8 +333,11 @@ normally 0. It goes through the same path as `time set`, so the time is marked
 set and survives a reset. The first sync on the first board stepped the RTC by
 −28.574 s; `tools/rtc_offset.py` then found it within 10 ms of the PC clock.
 
-The ST SNTP client in `LWIP/App/sntp.c` also writes the RTC when it runs. It is
-not started, and must stay off, or the two would fight.
+Under the T02 architecture the generated SNTP client in `LWIP/App/sntp.c` also
+wrote the RTC when it ran, so it was kept off. Since the T01 switch
+(2026-10-03) the module has its own SNTP (`W6X_Net_SNTP_*`), not enabled by
+the firmware; it would set the module's clock, not the RTC, so there is nothing
+to keep off on the host.
 
 ### Drift measurement
 

@@ -5,15 +5,15 @@
 
 namespace HostController {
 
+// The station as the module reports it (W6X_WiFi_Station_GetState). With the
+// TCP/IP stack in the module there is no host netif to look at.
 struct St67StationStatus {
-  bool wifiDisconnected;
-  bool interfaceUp;
-  bool linkUp;
-  bool hasIpv4;
+  bool wifiDisconnected;  // disconnected or off
+  bool linkUp;            // associated, with or without an address
+  bool hasIpv4;           // DHCP finished
 };
 
 bool St67GetStationStatus(St67StationStatus* status);
-bool St67NetworkInterfacesReady();
 
 }  // namespace HostController
 

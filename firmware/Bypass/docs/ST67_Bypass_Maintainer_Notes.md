@@ -274,6 +274,25 @@ Recorded 2026-08-19 - **plan Stage D is closed**:
   corrupt any delivered byte.
 
 
+Recorded 2026-10-03/04, the first T01 programming of the AstroWeather board
+(STM32G0B1 on the same pins; `Release-Bootloader` build of this firmware
+flashed over ST-LINK, then the HostController flashed back the same way):
+
+- `Query-ST67.sh --port COM4` matched the 2026-08-16 identity exactly (same
+  chip ID, MAC, part number, anti-rollback enabled).
+- `Program-ST67.sh --port COM4 --profile MissionT01 --force`: erase, program
+  and verify in 16.2 s; device-side SHA-256 of `st67w611m_mission_t01_v2.0.106.bin`
+  `33198f446ac7c1b9c48e25573f3498e7277119dff43da12a3e25791078b552f3`, equal
+  to the file; the vendor `littlefs.bin` verified at `0x378000` as well.
+- Same again with `--config-path tools/astroweather_t01_flash_prog_cfg.ini`,
+  writing `tools/littlefs/littlefs.bin` (one file, `AmazonRootCA1.pem`)
+  instead of the vendor image: all three regions verified. This is the
+  configuration the HostController needs; see the README.
+- The module reports a stored file's size rounded up to 256 bytes after a
+  restart (`AT+FS=0,4` gives 1280 for a 1208-byte file), which the X-CUBE
+  driver takes as a changed file. Harmless here (one rewrite per boot), noted
+  in case an image is ever compared by size.
+
 ## Open items / suggested next steps
 
 1. Re-validate `Dump-ST67-Flash.sh` across boards with different flash chips.

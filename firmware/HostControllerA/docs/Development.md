@@ -261,6 +261,35 @@ undisturbed. A value that increases between the two reads shows the scheduler is
 running. A value far larger than a few seconds also rules out a reset loop,
 since the counter would otherwise keep restarting from zero.
 
+#### If the tick has stopped: find where the firmware is
+
+A tick that does not advance means a handler is spinning with interrupts off:
+`Error_Handler`, `HardFault_Handler`, `vApplicationStackOverflowHook` or
+FreeRTOS's `configASSERT`, all of which end in `while (1)`. The core
+registers say which, without reflashing anything:
+
+```bash
+STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -coreReg
+arm-none-eabi-addr2line -e build/Debug/HostControllerA.elf -f -a <PC> <LR>
+```
+
+- `PRIMASK = 0x01` confirms the interrupts-off spin. `XPSR` bits 0-8 are the
+  active exception: 0 is thread mode (an assert or hook called from a task),
+  3 is a HardFault. `CONTROL = 0x02` means the task stack (`PSP`) is in use.
+- `addr2line` on `PC` names the loop; `LR` names the caller. On 2026-10-04 this
+  gave `vQueueDelete` ← `W6X_Net_DeInit` (a `configASSERT` on a null
+  semaphore inside the driver) and, another time, `vApplicationStackOverflowHook`.
+- The overflow hook stores the task name: resolve `g_stackOverflowTaskName`
+  with `arm-none-eabi-nm`, read the pointer with `-r32`, then the string with
+  `-r8 <pointer> 0x10`.
+- The log lines queued but never sent are still in `LogService`'s RAM:
+  `arm-none-eabi-nm -C` gives the address and size of
+  `LogService::instance()::service`; dump it with `-r8` and look for text.
+
+Converting the tick to time: `xTickCount` counts milliseconds, so `0x3AC9C`
+is 240 796 ms, 0:04:00.8 of uptime, which places the stop against the console
+timestamps.
+
 #### Recover the port
 
 In order of escalation:
@@ -323,6 +352,22 @@ should also reappear under `SERIALCOMM`:
 ```powershell
 Get-ItemProperty 'HKLM:\HARDWARE\DEVICEMAP\SERIALCOMM'
 ```
+
+**Observed on 2026-10-04, over about twenty sessions:** on the development PC
+the port opens exactly **once per board reset**. The first `Open()` after a
+reset works for as long as it is held; after it is closed, the next `Open()`
+fails with Windows error 31 ("A device attached to the system is not
+functioning"), `SERIALCOMM` keeps stale duplicates (`USBSER001` and
+`USBSER002` both `COM4`), and after a few such cycles the node goes to
+`CM_PROB_FAILED_START` or re-enumerates as a new instance (`5&...&0&8`, a new
+COM number) in the same state. A software reset (`-rst`) brought the port
+back about two times in three, a hardware reset (`mode=HOTPLUG -hardRst`) the
+rest of the time, each after waiting 10 to 15 s for enumeration; when neither
+did, the elevated `pnputil /remove-device` + `/scan-devices` step was needed.
+The firmware was alive every time (tick advancing). The practical rule for
+bench work is therefore one session per reset that contains everything the
+test needs; `tools/console_capture.ps1` is written for that (open once, send
+a scheduled list of commands, log for a fixed time, close).
 
 #### The COM number changes
 

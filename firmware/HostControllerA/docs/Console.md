@@ -524,6 +524,7 @@ Details in [WiFi.md](WiFi.md).
 | `wifi set <ssid> [password]` | `OK wifi-set ssid='<ssid>' password=<set>; saved.`, or `... no password (open network); saved.` Then, on the HostController, a connection test starts. |
 | `wifi test` | `OK wifi-test`, then a connection test. |
 | `wifi clear` | `OK settings-wifi-clear` |
+| `wifi stress` | `OK wifi-stress mode=<m> cycles=<n>` and an explanation, then the bench batch from [WiFi.md](WiFi.md#stress-batch): `<n>` connect, DHCP, fetch, disconnect cycles about 1 s apart (about 25 min for 100), each logging `ST67 cycle=...`, then `ST67 batch-final ...` and the module powered down. Refreshes are refused as `Busy` meanwhile; it cannot be stopped. A second `wifi stress` while one runs is ignored with `ST67 batch trigger rejected: active` at the end. |
 
 `wifi set` rules:
 

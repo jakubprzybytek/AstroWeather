@@ -73,7 +73,7 @@ const char* const kDisplay[] = {
 const char* const kApi[] = {
     "api show          the host and path fetched from, each marked saved or built-in",
     "api host <host>",
-    "    Save the server host name: no http://, port or path; HTTP on port 80.",
+    "    Save the server host name: no scheme, port or path; HTTPS on port 443.",
     "    e.g. 'api host api.example.com'",
     "api path <path>",
     "    Save the path, starting with /, up to 64 characters. e.g. 'api path /astro/wroclaw'",
@@ -148,6 +148,9 @@ const char* const kWifi[] = {
     "    words: passed, network not found, wrong password, and so on.",
     "wifi clear",
     "    Forget the stored credentials. WiFi stays off until new ones are set.",
+    "wifi stress",
+    "    Bench: 100 connect-fetch-disconnect cycles (~25 min, cannot be stopped),",
+    "    logged as 'ST67 cycle=' and 'ST67 batch-final'; then the module is off.",
     "'status' shows what is stored and how the last connection went.",
 };
 

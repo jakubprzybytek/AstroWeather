@@ -112,7 +112,7 @@ void publishClientResult(St67Runtime& runtime) {
   }
 }
 
-class St67HttpFetchTask : public Task<2560> {
+class St67HttpFetchTask : public Task<4096> {
  public:
   static St67HttpFetchTask& instance() {
     static St67HttpFetchTask task;
@@ -197,7 +197,10 @@ class St67HttpFetchTask : public Task<2560> {
 
  private:
   St67HttpFetchTask()
-      : Task<2560>("St67HttpFetch", osPriorityBelowNormal),
+      // 2560 B left about 840 B under T02; the W6X_Net socket path and the
+      // driver's AT trace (W61_AT_LOG_ENABLE) both run on this stack, and the
+      // trace overflowed it during the join on 2026-10-04.
+      : Task<4096>("St67HttpFetch", osPriorityBelowNormal),
         network_(runtime_), fetcher_(runtime_) {}
 
   bool runStationIteration() {

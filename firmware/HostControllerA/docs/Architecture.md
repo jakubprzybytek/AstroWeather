@@ -10,11 +10,12 @@ subsystem in depth.
 
 The firmware is C++17 on top of the STM32CubeMX-generated C code for an
 STM32G0B1CETx (Cortex-M0+, 16 MHz from HSI16, 512 KB flash, 144 KB RAM),
-FreeRTOS through CMSIS-RTOS2, the ST67W6X network driver and LwIP. Application
+FreeRTOS through CMSIS-RTOS2 and the ST67W6X network driver in its T01
+architecture, where TCP/IP and TLS run in the Wi-Fi module. Application
 code lives under `User/` and, for the parts shared with the DisplayController
 firmware, under `../Common/` (see [Shared Code](#shared-code)); CubeMX owns
 `Core/`, `Drivers/`, `Middlewares/`,
-`LWIP/`, `USB_Device/` and `ST67W6X_Network_Driver/`, and application changes
+`USB_Device/` and `ST67W6X_Network_Driver/`, and application changes
 there stay inside `USER CODE` sections (see [CubeMXCompliance.md](CubeMXCompliance.md)).
 
 ## Boot Sequence
@@ -139,10 +140,8 @@ DMA, so its timing depends on interrupt latency only; see
 
 | Task name | Owner | Priority | Stack (bytes) | Allocation | Does |
 | --- | --- | --- | ---: | --- | --- |
-| `netif` | `LWIP/App/lwip_netif.c` | 50 | 2048 | heap | Passes received frames from the ST67 driver to LwIP |
 | `Modem_Process` | ST67 driver `w61_at_common.c` | 47 | 2048 | heap | AT response and event handling |
 | `spi_xfer_engine` | ST67 driver `spi_iface.c` | 46 | 1536 | heap | SPI1 transfers to the module |
-| `tcpip_thread` | LwIP `tcpip.c` | Normal4 (28) | 4096 | heap | LwIP core |
 | `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | heap | Starts USB, then idles |
 | `LogService` | `Debug/LogService.cpp` | Normal (24) | 1536 | static | Drains the log queue to USB CDC; `stats` output |
 | `ConsoleService` | `Console/ConsoleService.cpp` | Normal (24) | 2048 | static | Assembles and runs console commands |
@@ -150,15 +149,15 @@ DMA, so its timing depends on interrupt latency only; see
 | `MainLoopTask` | `MainLoopTask.cpp` | Normal (24) | 1536 | static | Switch presses: switch 1 requests a refresh, switch 2 toggles low brightness and saves it |
 | `CurrentSense` | `Sensors/CurrentSenseTask.cpp` | BelowNormal (16) | 2048 | static | ADC every 100 ms, idle while `adc display` and `adc log` are both off |
 | `Clock` | `Clock/ClockTask.cpp` | BelowNormal (16) | 1024 | static | RTC, `HH:MM` on display 3 |
-| `St67HttpFetch` | `WiFi/St67HttpFetchTask.cpp` | BelowNormal (16) | 2560 | static | Owns the ST67 session and the HTTP fetch |
+| `St67HttpFetch` | `WiFi/St67HttpFetchTask.cpp` | BelowNormal (16) | 4096 | static | Owns the ST67 session and the HTTPS fetch |
 | `Led1` | `Debug/BlinkingLed.cpp` | Low (8) | 768 | static | Heartbeat on `LED_1` |
 | `Tmr Svc` | FreeRTOS | 2 | 1024 | static | FreeRTOS timer service |
 | `IDLE` | FreeRTOS | 0 | 512 | static | Idle |
 
-The four middleware tasks are created on the first fetch: `Modem_Process` and
-`spi_xfer_engine` by `W6X_Init()`, `tcpip_thread` and `netif` by
-`MX_LWIP_Init()`. After an ordinary refresh the module and LwIP stay up, so they
-persist. The driver priorities 46 and 47 are overridden in
+The two middleware tasks are created on the first fetch by `W6X_Init()`. After
+an ordinary refresh the module stays up, so they persist. (Under the T02
+architecture used until 2026-10-03 there were two more, LwIP's `tcpip_thread`
+and the generated `netif` task.) The driver priorities 46 and 47 are overridden in
 `ST67W6X_Network_Driver/Target/w61_driver_config.h`, from when the display
 refresh was a task they had to stay below; it now runs from TIM2's interrupt
 and no task priority affects it.
@@ -264,10 +263,11 @@ Both survive a reset and are lost with power, like the calendar.
 
 ## Memory
 
-FreeRTOS uses `heap_4.c` with `configTOTAL_HEAP_SIZE` of 40000 bytes. The heap
-holds `defaultTask`, the four middleware tasks, the CMSIS objects created
-without static memory, and the ST67 and LwIP allocations; application tasks and
-their stacks are static. LwIP has its own heap. See
+FreeRTOS uses `heap_4.c` with `configTOTAL_HEAP_SIZE` of 32000 bytes (40000
+until 2026-10-04, reduced after measuring a 15.9 KB peak under T01). The heap
+holds `defaultTask`, the two middleware tasks, the CMSIS objects created
+without static memory, and the ST67 driver's allocations, including the HTTP
+client's per-request buffers; application tasks and their stacks are static. See
 [Firmware-RAM-Usage.md](Firmware-RAM-Usage.md) for the breakdown and
 `stats on` ([Console.md](Console.md)) for live heap and stack headroom.
 
@@ -308,14 +308,11 @@ firmware:
 - **`Display::detectBoardAddress()`** (`../Common/Src/Display/DisplayAddress.cpp`):
   reads the `ADDR_0`..`ADDR_2` straps, meant for the DisplayController I2C
   target; no callers in this project.
-- **`LWIP/App/sntp.c`, `LWIP/App/altls_mbedtls.c`**: compiled by the CubeMX CMake
-  list, with no callers; discarded at link time.
-- **`LWIP/App/dhcp_server_raw.c`**: linked, because the soft-AP link-up callback
-  registered by `MX_LWIP_Init()` calls `dhcpd_start()`, but the firmware never
-  starts a soft-AP.
-- **`LWIP/App/http_client.c`**: the generated HTTP client. The firmware uses its
-  own `HttpClient_Get()` in `User/Src/WiFi/HttpClient.cpp` and only borrows the
-  types from `http_client.h`; the generated one is discarded at link time.
+- **The driver's HTTP, MQTT and BLE services** (`Middlewares/ST/ST67W6X_Network_Driver/Core/w6x_http.c`,
+  `w6x_mqtt.c`, `w6x_ble.c`): compiled by the CubeMX CMake list, with no
+  callers; discarded at link time. The firmware uses its own
+  `HttpClient::get()` in `User/Src/WiFi/HttpClient.cpp`; see
+  [WiFi.md](WiFi.md#why-a-user-owned-http-client).
 - **`Appli/App/main_app.h`, `User/Inc/logshell_ctrl.h`**: empty headers.
 - **`St67Runtime::httpPayload`**: a 4 KB buffer inside the fetch task object,
   written only by the stress batches (no client request); every refresh writes to

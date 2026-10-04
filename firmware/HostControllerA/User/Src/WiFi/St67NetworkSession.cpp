@@ -8,8 +8,6 @@
 #include <Settings/SettingsStore.hpp>
 
 #include "app_config.h"
-#include "lwip.h"
-#include "lwip_netif.h"
 #include "main.h"
 
 #include "FreeRTOS.h"
@@ -47,6 +45,7 @@ static_assert(St67ConnectDiagnosis::kReasonAuthenticationFailure ==
 // Bits 0-5 of the fetch task's flags are taken by the trigger, the session and
 // the HTTP fetcher.
 constexpr uint32_t kFlagScanDone = 1U << 6;
+constexpr uint32_t kFlagGotIp = 1U << 7;
 constexpr uint32_t kScanTimeoutMs = 8000U;
 
 volatile int32_t scanCount = -1;
@@ -155,6 +154,20 @@ void wifiCallback(W6X_event_id_t eventId, void* eventArgs) {
     osThreadFlagsSet(activeRuntime->taskHandle, kFlagConnected);
   } else if (eventId == W6X_WIFI_EVT_DISCONNECTED_ID) {
     osThreadFlagsSet(activeRuntime->taskHandle, kFlagDisconnected);
+  } else if (eventId == W6X_WIFI_EVT_GOT_IP_ID) {
+    osThreadFlagsSet(activeRuntime->taskHandle, kFlagGotIp);
+  }
+}
+
+// W6X_Net_Init() refuses to run without a registered net callback, and its
+// failure path then deletes semaphores it never created (configASSERT, so the
+// firmware stops with interrupts off). The driver only ever reports
+// W6X_NET_EVT_SOCK_DATA_ID here, which the synchronous HTTP client does not
+// need, so the callback just records the event.
+void netCallback(W6X_event_id_t eventId, void* eventArgs) {
+  (void)eventArgs;
+  if (activeRuntime != nullptr) {
+    activeRuntime->lastNetEvent = eventId;
   }
 }
 
@@ -195,17 +208,29 @@ bool finalHardwareState() {
          HAL_GPIO_ReadPin(ST67_RDY_GPIO_Port, ST67_RDY_Pin) == GPIO_PIN_RESET;
 }
 
+// DHCP runs in the module. The GOT_IP event wakes the wait early; the station
+// state is what decides, polled every 100 ms in case the event is missed.
 bool waitForDhcp() {
   const uint32_t deadline = HAL_GetTick() + APP_ST67_DHCP_TIMEOUT_MS;
   do {
     St67StationStatus status{};
-    if (St67GetStationStatus(&status) && status.interfaceUp && status.linkUp &&
-        status.hasIpv4) {
+    if (St67GetStationStatus(&status) && status.linkUp && status.hasIpv4) {
       return true;
     }
-    osDelay(100U);
+    (void)osThreadFlagsWait(kFlagGotIp, osFlagsWaitAny, 100U);
   } while (static_cast<int32_t>(HAL_GetTick() - deadline) < 0);
   return false;
+}
+
+void logStationAddress() {
+  uint8_t ip[4] = {};
+  uint8_t gateway[4] = {};
+  uint8_t netmask[4] = {};
+  if (W6X_Net_Station_GetIPAddress(ip, gateway, netmask) == W6X_STATUS_OK) {
+    LogService::instance().logf(LogService::Level::Debug, "ST67 ip=%u.%u.%u.%u gw=%u.%u.%u.%u",
+                                ip[0], ip[1], ip[2], ip[3], gateway[0], gateway[1],
+                                gateway[2], gateway[3]);
+  }
 }
 
 }  // namespace
@@ -252,6 +277,7 @@ bool St67NetworkSession::initialize(bool logModule) {
   }
   if (!runtime_.wifiInitialized) {
     runtime_.callbacks.APP_wifi_cb = &wifiCallback;
+    runtime_.callbacks.APP_net_cb = &netCallback;
     runtime_.callbacks.APP_error_cb = &errorCallback;
     runtime_.lastStatus = W6X_RegisterAppCb(&runtime_.callbacks);
     if (!logStage(runtime_, "callback-register", runtime_.lastStatus, startedAt)) {
@@ -265,23 +291,21 @@ bool St67NetworkSession::initialize(bool logModule) {
     }
     runtime_.wifiInitialized = true;
   }
-  if (!runtime_.lwipInitialized) {
-    if (MX_LWIP_Init() != 0) {
-      fail(runtime_, "lwip-init");
+  if (!runtime_.netInitialized) {
+    // Sockets, DNS and DHCP in the module. ST's order: after W6X_WiFi_Init().
+    runtime_.lastStatus = W6X_Net_Init();
+    if (!logStage(runtime_, "net-init", runtime_.lastStatus, startedAt)) {
+      fail(runtime_, "net-init");
       return false;
     }
-    runtime_.lwipInitialized = true;
-  }
-  if (!St67NetworkInterfacesReady()) {
-    fail(runtime_, "lwip-netif");
-    return false;
+    runtime_.netInitialized = true;
   }
   runtime_.state = St67State::Ready;
   return true;
 }
 
 bool St67NetworkSession::open() {
-  osThreadFlagsClear(kFlagConnected | kFlagDisconnected | kFlagDriverError);
+  osThreadFlagsClear(kFlagConnected | kFlagDisconnected | kFlagDriverError | kFlagGotIp);
   // Read on every connect, so 'wifi set' takes effect on the next attempt.
   Credentials credentials{};
   if (!loadCredentials(credentials)) {
@@ -317,10 +341,14 @@ bool St67NetworkSession::open() {
     disconnect();
     return false;
   }
+  // With DHCP in the module the station can already report GOT_IP here.
   W6X_WiFi_StaStateType_e stationState = W6X_WIFI_STATE_STA_OFF;
   W6X_WiFi_Connect_t connection{};
   if (W6X_WiFi_Station_GetState(&stationState, &connection) != W6X_STATUS_OK ||
-      stationState != W6X_WIFI_STATE_STA_CONNECTED) {
+      (stationState != W6X_WIFI_STATE_STA_CONNECTED &&
+       stationState != W6X_WIFI_STATE_STA_GOT_IP)) {
+    LogService::instance().logf(LogService::Level::Debug, "ST67 station state=%d",
+                                static_cast<int>(stationState));
     recordConnect(WifiConnectResult::Failed, credentials.ssid, runtime_.lastWifiReason);
     reportConnectFailure(WifiConnectResult::Failed, credentials.ssid, runtime_.lastWifiReason);
     fail(runtime_, "connect-state");
@@ -340,6 +368,7 @@ bool St67NetworkSession::open() {
     disconnect();
     return false;
   }
+  logStationAddress();
   recordConnect(WifiConnectResult::Connected, credentials.ssid, kNoReason,
                 static_cast<int32_t>(connection.Rssi),
                 static_cast<uint32_t>(connection.Channel));
@@ -353,8 +382,8 @@ bool St67NetworkSession::isStationDisconnected() const {
 
 bool St67NetworkSession::isReady() const {
   return runtime_.state == St67State::Ready && runtime_.w6xInitialized &&
-         runtime_.wifiInitialized && runtime_.lwipInitialized &&
-      stationDisconnected(runtime_) && St67NetworkInterfacesReady();
+         runtime_.wifiInitialized && runtime_.netInitialized &&
+         stationDisconnected(runtime_);
 }
 
 bool St67NetworkSession::disconnect() {
@@ -388,6 +417,10 @@ bool St67NetworkSession::disconnect() {
 bool St67NetworkSession::stop() {
   if (runtime_.wifiInitialized && !stationDisconnected(runtime_)) {
     disconnect();
+  }
+  if (runtime_.netInitialized) {
+    W6X_Net_DeInit();
+    runtime_.netInitialized = false;
   }
   if (runtime_.wifiInitialized) {
     W6X_WiFi_DeInit();

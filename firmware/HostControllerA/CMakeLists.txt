@@ -93,9 +93,15 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${COMMON_INCLUDE_DIR}
 )
 
+# Bench variant: trust ISRG Root X1 instead of Amazon Root CA 1, so the
+# badssl.com test hosts exercise the module's certificate checks
+# (docs/ST67_HTTPS_Implementation_Plan.md, section 8). Off for every real build.
+option(APP_ST67_TLS_BENCH_ANCHOR_ISRG "Trust ISRG Root X1 for the badssl.com bench cases" OFF)
+
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
+    $<$<BOOL:${APP_ST67_TLS_BENCH_ANCHOR_ISRG}>:APP_ST67_TLS_BENCH_ANCHOR_ISRG=1>
 )
 
 # Remove wrong libob.a library dependency when using cpp files

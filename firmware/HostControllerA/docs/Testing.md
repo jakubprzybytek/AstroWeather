@@ -256,6 +256,20 @@ smoke test on `tools/astro_console.py capture` (boot, `status`,
 `astro refresh`, check the success lines) and the ADC known-voltage test from
 the [hardware review](../../../KiCad/Hardware_Review.md) cover them.
 
+**HTTPS certificate cases** (plan section 8, run 2026-10-04) need no test
+server and no module reflash. Build with
+`cmake --preset Debug -DAPP_ST67_TLS_BENCH_ANCHOR_ISRG=ON` so the anchor is
+ISRG Root X1, flash, and in one console session (`tools/console_capture.ps1`)
+run `astro refresh` against, in turn, the production host (wrong CA),
+`sha256.badssl.com` or `rsa2048.badssl.com` (positive control, expect
+`http=200`), `wrong.host.badssl.com` (hostname mismatch),
+`untrusted-root.badssl.com`, `self-signed.badssl.com` and
+`ecc256.badssl.com` (other root); set each with `api host <name>` and
+`api path /`, finish with `api default`. A refused handshake logs
+`ST67 https failed: connect ...`; a completed one logs the HTTP status. Then
+reconfigure with `=OFF` and rebuild before flashing a production image; the
+fetch log line's `ca=` names the anchor in use.
+
 ### Targets
 
 - After phase 2 (met): every pure-logic unit has a suite, and the known bugs
@@ -287,8 +301,9 @@ test that pins one says "current behaviour".
 
 **Fetch status** (`st67_fetch_status_map_tests`):
 
-- Failures at module-info, callback-register, lwip-init, lwip-netif,
-  disconnect and other stages all report `HttpFailure`.
+- Failures at module-info, callback-register, disconnect and other stages all
+  report `HttpFailure`; w6x-init, wifi-init and net-init report
+  `DriverFailure`.
 - A `Content-Length` over 4096 reports `HttpFailure`, not `ResponseTooLarge`:
   the response is refused before the body callback that sets the flag.
 - `CleanupFailure` cannot happen for a client fetch.

@@ -12,6 +12,7 @@
 #include <WiFi/St67HttpFetchTask.hpp>
 
 #include "FreeRTOS.h"
+#include "app_config.h"
 #include "cmsis_os2.h"
 
 #include <algorithm>
@@ -332,7 +333,8 @@ CommandResult handleStatusCommand(const char* command, Display::Display* display
     reportSchedule();
     {
         const HostController::ApiTarget target = HostController::resolveApiTarget(settings);
-        line("api        http://%s%s (%s)", target.host, target.path,
+        line("api        %s://%s%s (%s)", (APP_ST67_HTTP_USE_TLS != 0) ? "https" : "http",
+             target.host, target.path,
              (target.hostSaved || target.pathSaved) ? "saved" : "built-in");
     }
     reportLocalRefresh(display);

@@ -3,16 +3,25 @@
 ## Overview
 
 The HostController fetches the astro forecast over WiFi with an ST67W611M1
-module. The module runs ST's **T02** firmware: it is only the radio and MAC,
-and the TCP/IP stack, DNS and HTTP run on the STM32 in LwIP. The two talk over
-SPI1 with DMA, paced by the module's `ST67_RDY` line.
+module. The module runs ST's **T01** firmware: TCP/IP, DHCP, DNS and TLS run
+inside the module, and the STM32 drives them through the driver's `W6X_Net_*`
+socket API. The two talk over SPI1 with DMA, paced by the module's `ST67_RDY`
+line. Until 2026-10-03 the module ran the T02 firmware with LwIP on the STM32;
+the switch is recorded in
+[ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md).
 
 One task, `St67HttpFetchTask`, owns the module. Every fetch joins the network,
-gets an address by DHCP, downloads one plain-HTTP response into the caller's
-buffer and disconnects. The module and LwIP are started on the first fetch and
-then kept running; see [Lifecycle](#lifecycle). The SSID and password come from
-the EEPROM (`wifi set`), the server host and path from the EEPROM (`api host`,
+waits for the module's DHCP, downloads one HTTPS response into the caller's
+buffer and disconnects. The module is started on the first fetch and then kept
+running; see [Lifecycle](#lifecycle). The SSID and password come from the
+EEPROM (`wifi set`), the server host and path from the EEPROM (`api host`,
 `api path`), each falling back to a compile-time default; see [Server](#server).
+
+**Bench status (2026-10-04):** HTTPS fetches from the CloudFront API through
+the module pass, and the module refuses a wrong CA, a hostname mismatch, an
+untrusted root and a self-signed certificate in the handshake (see
+[Bench results](#bench-results) and the plan's bench record). The validity
+date check and the 100-cycle run are still to do.
 
 The only regular client is the astro refresh; see
 [AstroRefresh.md](AstroRefresh.md). The task can also run a stress batch, a
@@ -22,38 +31,36 @@ Only the HostController has WiFi: `User/Src/WiFi` belongs to this project and
 is not part of the shared `../Common` code.
 
 This document replaces the ST67 phase plans, now in
-[archive](archive/ST67_Daily_Fetch_Implementation_Plan.md). HTTPS is a separate
-plan, [ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md),
-not started. Rules for generated code are in
-[CubeMXCompliance.md](CubeMXCompliance.md).
+[archive](archive/ST67_Daily_Fetch_Implementation_Plan.md). The HTTPS work,
+including the T02 to T01 switch and its bench plan, is in
+[ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md). Rules
+for generated code are in [CubeMXCompliance.md](CubeMXCompliance.md).
 
 ## Architecture
 
 ```text
 AstroDataRefreshTask ── FetchSt67Data() ──┐   (caller's thread, waits)
                                           v
-St67HttpFetchTask (osPriorityBelowNormal, 2560 B)
+St67HttpFetchTask (osPriorityBelowNormal, 4096 B)
   ├─ St67NetworkSession   W6X init, WiFi join, DHCP wait, disconnect
   ├─ St67HttpFetcher      host/path check, DNS, callbacks, result
-  │    └─ HttpClient_Get  LwIP socket, GET, header/body parsing
+  │    └─ HttpClient::get W6X_Net socket (TLS or TCP), GET, header/body parsing
   └─ St67Runtime          shared state and the 4 KB service buffer
         │
-LwIP tcpip thread (osPriorityNormal4, 4096 B)   LWIP/Target/lwipopts.h
-LwIP netif task   (priority 50, 2048 B)         LWIP/App/lwip_netif.h
 W6X modem RX task (priority 47, 2048 B)         w61_driver_config.h / w61_at_common.h
 W6X SPI engine    (priority 46, 1536 B)         w61_driver_config.h
         │
 SPI1 + DMA1 ch1 (RX) / ch2 (TX), CS, CHIP_EN, ST67_RDY (PA4, EXTI)
         │
-ST67W611M1, T02 firmware
+ST67W611M1, T01 firmware: TCP/IP, DHCP, DNS, TLS
 ```
 
 ### Hardware and transport
 
 | Item | Setting |
 | --- | --- |
-| Module firmware | T02, SDK 2.0.106, reported at start-up as `ST67 module=... sdk=...` |
-| Driver | X-CUBE-ST67W61 1.3.0, `ST67_ARCH=W6X_ARCH_T02` (`cmake/stm32cubemx/CMakeLists.txt`) |
+| Module firmware | T01, SDK 2.0.106 (`st67w611m_mission_t01_v2.0.106.bin`, programmed with `firmware/Bypass`), reported at start-up as `ST67 module=... sdk=...`. `W6X_Init()` refuses a module running the T02 image |
+| Driver | X-CUBE-ST67W61 1.3.0, `ST67_ARCH=W6X_ARCH_T01` (`cmake/stm32cubemx/CMakeLists.txt`) |
 | SPI | SPI1 master, HSI 16 MHz / 8 = 2 MHz; DMA1 channel 1 RX, channel 2 TX, high priority, IRQ priority 3 |
 | Largest SPI transfer | `W61_MAX_SPI_XFER = 1520` (`ST67W6X_Network_Driver/Target/w61_driver_config.h`) |
 | `ST67_RDY` | PA4, EXTI on both edges (EXTI4_15, priority 3) |
@@ -69,11 +76,12 @@ switches (`../Common/Src/Utils/SwitchInput.cpp`).
 
 | Task | Priority | Stack | Set in |
 | --- | --- | --- | --- |
-| `St67HttpFetch` | `osPriorityBelowNormal` (16) | 2560 B, static | `St67HttpFetchTask.cpp` |
-| LwIP `tcpip_thread` | 28 (`osPriorityNormal4`) | 4096 B | `LWIP/Target/lwipopts.h` |
-| `netif` | 50 | 2048 B | `LWIP/App/lwip_netif.h` (generated) |
+| `St67HttpFetch` | `osPriorityBelowNormal` (16) | 4096 B, static (2560 B until 2026-10-04; the W6X socket path and the driver's AT trace run on it) | `St67HttpFetchTask.cpp` |
 | W61 modem RX | 47 | 2048 B | priority in `w61_driver_config.h`, stack default in `w61_at_common.h` |
 | `spi_xfer_engine` | 46 | 1536 B | `w61_driver_config.h` |
+
+The LwIP `tcpip_thread` (4096 B) and the generated `netif` task (2048 B,
+priority 50) went with T02.
 
 The driver's two tasks default to 53 and 54, above the display multiplexing
 task `DisplayRefresh`, then at `osPriorityRealtime` (48). There they held a display
@@ -83,14 +91,15 @@ BEGIN EC` block of `w61_driver_config.h`: definitions on the CMake target never
 reach the driver, which is compiled in the generated `STM32_Drivers` library.
 See [CubeMXCompliance.md](CubeMXCompliance.md#st67-driver-task-settings).
 
-The generated `netif` task runs at 50, a value that cannot be overridden (see
+The generated `netif` task ran at 50, a value that could not be overridden (see
 CubeMXCompliance.md). At 50 it held the display off for up to 5.4 ms during a
 refresh, so `DisplayRefresh` was raised to `osPriorityRealtime7` (55), above
 all of these tasks; the display refresh has since moved into the TIM2
 interrupt and competes with no task at all.
 
-The driver and LwIP tasks are created from the 40 000-byte FreeRTOS heap when
-the module is first started. See [Firmware-RAM-Usage.md](Firmware-RAM-Usage.md).
+The driver tasks are created from the 32 000-byte FreeRTOS heap when the module
+is first started; the module idle costs about 10.6 KB of it and a fetch about
+5 KB more. See [Firmware-RAM-Usage.md](Firmware-RAM-Usage.md).
 
 The driver's own log output goes through `vLoggingPrintf()`, defined in
 `St67HttpFetchTask.cpp`, into `LogService`, truncated to 95 characters.
@@ -104,12 +113,13 @@ The driver's own log output goes through `vLoggingPrintf()`, defined in
 | `User/Inc/WiFi/St67FetchTypes.hpp` | `St67FetchRequest`, `St67FetchResult`, `St67FetchStatus`, `FetchStage`, the client timeout. |
 | `User/Src/WiFi/St67NetworkSession.cpp`, `.../St67NetworkSession.hpp` | `initialize()`, `open()`, `disconnect()`, `stop()`. Credentials, the SSID scan, `LastWifiConnect()`. |
 | `User/Src/WiFi/St67ConnectDiagnosis.cpp`, `.../St67ConnectDiagnosis.hpp` | Connect-failure diagnosis: reason code to `WifiConnectResult`, the scan fallback, and the log line for each result. Pure. |
-| `User/Src/WiFi/St67NetworkAdapter.cpp`, `.../St67NetworkAdapter.hpp` | Station state from public APIs only: `W6X_WiFi_Station_GetState()` plus the LwIP `NETIF_STA` netif (up, link, IPv4). |
-| `User/Src/WiFi/St67HttpFetcher.cpp`, `.../St67HttpFetcher.hpp` | Checks the host and path, resolves DNS, runs one GET, checks `Content-Type`, copies the body and computes its CRC-32. |
+| `User/Src/WiFi/St67NetworkAdapter.cpp`, `.../St67NetworkAdapter.hpp` | Station state from `W6X_WiFi_Station_GetState()`: disconnected, associated, got an IP. |
+| `User/Src/WiFi/St67HttpFetcher.cpp`, `.../St67HttpFetcher.hpp` | Checks the host and path, resolves DNS in the module, runs one GET, checks `Content-Type`, copies the body and computes its CRC-32. |
 | `User/Src/WiFi/St67HttpRules.cpp`, `.../St67HttpRules.hpp` | The fetcher's host/path check (`isValidTarget()`) and `Content-Type` check (`checkContentType()`). Pure. |
-| `User/Src/WiFi/HttpClient.cpp`, `User/Inc/WiFi/HttpClient.hpp` | `HttpClient_Get()`: a bounded synchronous HTTP/1.1 GET on an LwIP socket. |
-| `User/Src/WiFi/HttpResponseParser.cpp`, `.../HttpResponseParser.hpp` | `HttpResponse::`: header end, status line, `Content-Length`, the header buffer and body limits, used by `HttpClient_Get()`. Pure. |
-| `User/Inc/WiFi/St67Runtime.hpp` | `St67Runtime`: init flags, state, DNS and HTTP results, the first failure, the 4096-byte `httpPayload` buffer, the client request being served. |
+| `User/Src/WiFi/HttpClient.cpp`, `User/Inc/WiFi/HttpClient.hpp` | `HttpClient::get()`: a bounded synchronous HTTP/1.1 GET on a `W6X_Net` socket, TLS or plain. |
+| `User/Src/WiFi/HttpResponseParser.cpp`, `.../HttpResponseParser.hpp` | `HttpResponse::`: header end, status line, `Content-Length`, the header buffer and body limits, used by `HttpClient::get()`. Pure. |
+| `User/Src/WiFi/TrustedCa.cpp`, `User/Inc/WiFi/TrustedCa.hpp` | Amazon Root CA 1 as PEM text: the trust anchor for the API's CloudFront certificate. |
+| `User/Inc/WiFi/St67Runtime.hpp` | `St67Runtime`: init flags, state, the resolved server address, HTTP results, the first failure, the 4096-byte `httpPayload` buffer, the client request being served. |
 | `User/Src/WiFi/St67SpiReady.cpp` | The `ST67_RDY` rising-edge bridge. |
 | `User/Src/WiFi/St67ProbeTask.cpp` | Dead code: the raw AT/CWLAP probe from before the driver was used. Compiled, never started. |
 | `Appli/App/app_config.h` | Timeouts, limits, lifecycle mode. See [Configuration](#configuration). |
@@ -122,14 +132,15 @@ after it starts; a request made earlier waits with it.
 
 ### Why a User-owned HTTP client
 
-T02 has no HTTP or socket offload in the module: ST's documentation says HTTP
-must be built on host LwIP. CubeMX generates `LWIP/App/http_client.c`, which is
-still compiled but not called. The project had customized it for request
-ownership, cancellation, response limits and cleanup, and a regeneration
-overwrote those changes, as most were outside `USER CODE` blocks.
-`HttpClient.cpp` replaces it under `User/`, so it survives regeneration. It
-still uses the generated `http_client.h` types (`HTTP_connection_t`, the
-callbacks and status codes), so the fetcher's callback shape did not change.
+The driver has its own HTTP client for T01, `W6X_HTTP_Client_Request()` in
+`Middlewares/ST/ST67W6X_Network_Driver/Core/w6x_http.c`. It is not used:
+it never reads the `timeout` and `max_response_len` it is given, treats only
+HTTP 200 as success, does not check `Content-Type`, and runs each request in a
+task of its own. `HttpClient.cpp` does the same socket work (`W6X_Net_Socket`,
+the TLS options, `W6X_Net_Connect`, `W6X_Net_Send`, `W6X_Net_Recv`) under the
+project's bounded parser instead, with its own result codes and no dependency
+on generated headers. Under T02 the same file ran over LwIP sockets; the parser
+and its tests did not change.
 
 ## Client API
 
@@ -187,15 +198,18 @@ The task records the first failing step as a stage name
 | `Busy` | a fetch or a stress batch is already running |
 | `InvalidArgument` | null request or buffer, capacity 0 or over 4096 |
 | `NoCredentials` | no SSID stored (stage `credentials`); checked before the module is powered |
-| `DriverFailure` | `W6X_Init()` or `W6X_WiFi_Init()` failed (`w6x-init`, `wifi-init`) |
+| `DriverFailure` | `W6X_Init()`, `W6X_WiFi_Init()` or `W6X_Net_Init()` failed (`w6x-init`, `wifi-init`, `net-init`) |
 | `NetworkFailure` | join failed or no DHCP address (`connect`, `connect-state`, `dhcp`); `LastWifiConnect()` says why |
 | `ResponseTooLarge` | the body overflowed the caller's buffer |
-| `HttpFailure` | everything else: invalid host/path, DNS, TCP, HTTP status outside 2xx, wrong `Content-Type`, a malformed or truncated response, and also `module-info`, `callback-register`, `lwip-init`, `lwip-netif` and disconnect failures |
+| `HttpFailure` | everything else: invalid host/path, DNS, TCP connect or TLS handshake, HTTP status outside 2xx, wrong `Content-Type`, a malformed, truncated or overdue response, and also `module-info`, `callback-register` and disconnect failures |
 | `CleanupFailure` | `final-state` (CHIP_EN or RDY still high after `stop()`), or `netif-stop`, which nothing produces any more. A client fetch never calls `stop()`, so clients do not see it. |
 | `Timeout` | set by the caller's wait after 180 s, not by the task |
 
-A response whose `Content-Length` is over 4096 is refused by `HttpClient_Get`
+A response whose `Content-Length` is over 4096 is refused by `HttpClient::get()`
 before any body is read, and shows as `HttpFailure`, not `ResponseTooLarge`.
+The log line `ST67 https failed: <reason> status=... bytes=... elapsed=...ms`
+names the step: `socket`, `tls-setup`, `connect` (TCP or the TLS handshake),
+`send`, `response` or `timeout`.
 
 ### Stages
 
@@ -221,15 +235,16 @@ The refresh task shows these on the bottom matrix row; see
 1. **Initialize, once per boot.** `St67NetworkSession::initialize()` checks
    that an SSID is stored, then, each only if not already done:
    `W6X_Init()` (powers the module up through `CHIP_EN`), `W6X_GetModuleInfo()`
-   (logged), `W6X_RegisterAppCb()`, `W6X_WiFi_Init()`, `MX_LWIP_Init()`. It
-   then checks that the LwIP station and soft-AP netifs exist. ST requires this
-   order: `MX_LWIP_Init()` reads the module's MAC addresses.
+   (logged), `W6X_RegisterAppCb()`, `W6X_WiFi_Init()`, `W6X_Net_Init()`, in
+   ST's order.
 2. **Open.** `open()` reads the credentials again, calls `W6X_WiFi_Connect()`
    with one reconnection attempt, checks the station state, logs
-   `ST67 connected ssid=... channel=... rssi=...`, then polls every 100 ms for
-   up to `APP_ST67_DHCP_TIMEOUT_MS` (15 s) until the station netif is up,
-   linked and has an IPv4 address. The password is wiped from the stack
-   buffers once passed to the driver.
+   `ST67 connected ssid=... channel=... rssi=...`, then waits for up to
+   `APP_ST67_DHCP_TIMEOUT_MS` (15 s) until the station state is
+   `W6X_WIFI_STATE_STA_GOT_IP`: the module's `GOT_IP` event wakes the wait,
+   and the state is polled every 100 ms in case the event is missed. The
+   address is logged as `ST67 ip=... gw=...`. The password is wiped from the
+   stack buffers once passed to the driver.
 3. **Fetch.** `St67HttpFetcher::fetch()`; see [HTTP](#http).
 4. **Disconnect.** `disconnect()` calls `W6X_WiFi_Disconnect(1)`, where `1`
    restores the station so it does not reconnect on its own, waits up to
@@ -237,27 +252,27 @@ The refresh task shows these on the bottom matrix row; see
    checks 100 ms later that the link is down and the address cleared. A failed
    join or DHCP also disconnects.
 
-The module, the driver tasks and LwIP stay up between fetches, with the
-station disconnected and the module in its automatic power save. Each client
+The module and the driver tasks stay up between fetches, with the station
+disconnected and the module in its automatic power save. Each client
 fetch logs `ST67 cycle=<n> result=complete|fault stage=... heap=... min=...
 tasks=...` and `ST67 batch-final mode=1 pass=... fail=...`.
 
 ### Why persistent
 
 The original plan was to shut the module down (`CHIP_EN` low, about 200 nA)
-between daily fetches. That needs a full LwIP teardown, which the generated
-code does not provide: `MX_LWIP_DeInit()` and the private netif and timer
-cleanup existed only as customizations of generated files, and a CubeMX
-regeneration removed them. They were not restored, because they would have to
-be written outside `USER CODE` blocks. Even with them, 20 cold restarts lost
-about 6 KB of heap; see [Bench results](#bench-results).
+between daily fetches. Under T02 that needed a full LwIP teardown, which the
+generated code did not provide, and even with a customized one 20 cold
+restarts lost about 6 KB of heap; see [Bench results](#bench-results).
 
 Keeping everything initialized passed 100 cycles with a flat heap, so client
-fetches always use it. `stop()` exists (`W6X_WiFi_DeInit()`, `W6X_DeInit()`,
-then a check that `CHIP_EN` and `ST67_RDY` are low) but deinitializes only the
-W6X layers. LwIP stays initialized, and a later `initialize()` re-inits W6X
-under the existing netifs. That path has not been tested since the
-regeneration.
+fetches always use it. `stop()` exists (`W6X_Net_DeInit()`,
+`W6X_WiFi_DeInit()`, `W6X_DeInit()`, then a check that `CHIP_EN` and
+`ST67_RDY` are low) and a later `initialize()` re-inits all three layers. With
+LwIP gone the teardown obstacle is gone too: on 2026-10-04 a `wifi test`
+after the stress batch's `stop()` re-initialised the driver and fetched
+normally, with the heap back to 38 840 B of the 39 080 B at boot in between.
+That is one restart; the old T02 heap loss was never explained, so the
+persistent policy stands until a cold-restart batch (mode 2) is measured.
 
 ### Lifecycle modes
 
@@ -314,16 +329,18 @@ Each part that is not saved falls back to its built-in value,
 `Appli/App/app_credentials.h`, a git-ignored copy of
 `Appli/App/app_credentials.h.template`, which `app_config.h` includes when it
 exists. With neither a saved nor a built-in value, every fetch fails as
-`HttpFailure` with `ST67 fetch-config invalid`. The port is always 80.
+`HttpFailure` with `ST67 fetch-config invalid`. The port is
+`APP_ST67_HTTPS_PORT` (443), or `APP_ST67_HTTP_PORT` (80) when the firmware is
+built with `-DAPP_ST67_HTTP_USE_TLS=0` for bench diagnostics.
 
-Each fetch logs the target at `Debug` level: `ST67 fetch http://<host><path>
+Each fetch logs the target at `Debug` level: `ST67 fetch https://<host><path>
 (saved|built-in)`, where `saved` means at least one part was saved.
 
 Before each fetch the fetcher rejects:
 
-- a host that is empty, longer than `HTTP_SNI_MAX_SIZE`, or contains `://`,
-  `:`, `/`, a space, tab, CR or LF. So no scheme, no port and no path: the port
-  is `APP_ST67_HTTP_PORT` (80);
+- a host that is empty, longer than `W6X_NET_SNI_MAX_SIZE` (64, the module's
+  SNI limit), or contains `://`, `:`, `/`, a space, tab, CR or LF. So no
+  scheme, no port and no path;
 - a path that is empty, does not start with `/`, or contains a space, tab, CR
   or LF.
 
@@ -331,44 +348,65 @@ The `api host` and `api path` commands apply the same rules before saving.
 
 ## HTTP
 
-Plain HTTP only. HTTPS is planned in
-[ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md), which
-weighs mbedTLS on the host against switching the module to the T01 firmware,
-where TCP/IP and TLS run in the module and LwIP leaves the host.
+HTTPS by default, with TLS in the module; plain HTTP is a build option for the
+bench (`APP_ST67_HTTP_USE_TLS=0`). The design, its history and the bench plan
+are in [ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md).
 
-1. **DNS.** `dns_gethostbyname()` through LwIP, waiting up to
-   `APP_ST67_DNS_TIMEOUT_MS` (5 s). The result must be a non-zero IPv4
-   address. Failure logs `ST67 dns failed elapsed=...`.
-2. **Connect and send.** One TCP socket with `SO_RCVTIMEO` and `SO_SNDTIMEO`
-   of `APP_ST67_HTTP_IO_TIMEOUT_MS` (5 s). The request is exactly:
+1. **DNS.** `W6X_Net_ResolveHostAddress()`: the module's resolver, synchronous,
+   bounded by the driver's own timeout (`APP_ST67_DNS_TIMEOUT_MS` is not
+   involved). The result must be a non-zero IPv4 address. Failure logs
+   `ST67 dns failed elapsed=...`.
+2. **Socket and TLS.** `W6X_Net_Socket()` with `IPPROTO_TLS_1_2`, or
+   `IPPROTO_TCP` for plain HTTP, with `SO_RCVTIMEO` and `SO_SNDTIMEO` of
+   `APP_ST67_HTTP_IO_TIMEOUT_MS` (5 s). For TLS the client then uploads
+   Amazon Root CA 1 (`TrustedCa`) into the module's file system as
+   `AmazonRootCA1.pem` with `W6X_Net_TLS_Credential_AddByContent()`, selects
+   it with `TLS_SEC_TAG_LIST`, sets the SNI (`TLS_HOSTNAME`) to the host and
+   ALPN to `http/1.1`. With a CA set the driver asks the module for server
+   authentication (`AT+CIPSSLCCONF` auth mode 2). Before the upload the
+   driver lists the module's file system (`AT+FS=0,5`) and compares an
+   existing copy by size and content, so the module must carry the slim
+   LittleFS image from `firmware/Bypass/tools/Build-LittleFS.sh`: with ST's
+   stock image the listing alone takes longer than the driver's 2 s command
+   timeout and every fetch fails as `tls-setup`. The host-side credential
+   tag is released when the socket closes; the file stays on the module.
+   After a module restart the module reports the file's size rounded up to
+   256 bytes, so the first fetch of each boot rewrites it (about 3 s); later
+   fetches find it unchanged. The module enforces chain and hostname
+   verification and fails closed (plan, section 8); what it does about
+   validity dates is still to be established.
+3. **Connect and send.** `W6X_Net_Connect()` does the TCP connect and, on a
+   TLS socket, the handshake; the driver's own timeout bounds it. The request
+   is exactly:
 
    ```text
    GET <path> HTTP/1.1\r\nHost: <host>\r\nConnection: close\r\n\r\n
    ```
 
-   built in a 512-byte heap buffer. The connect itself has no separate
-   timeout beyond LwIP's.
-3. **Headers.** Received in 1024-byte reads into a 2048-byte heap buffer,
+   built in a 512-byte heap buffer.
+4. **Headers.** Received in 1024-byte reads into a 2048-byte heap buffer,
    `HttpResponse::kHeaderCapacity` in `HttpResponseParser.hpp`. Everything read until the blank line,
    including body bytes that arrive in the same read, must fit in 2048 bytes.
    The status line must be `HTTP/x.y nnn` with `nnn` up to 599.
-4. **Checks.** Success needs a 2xx status and a `Content-Type` that starts with
+5. **Checks.** Success needs a 2xx status and a `Content-Type` that starts with
    `APP_ST67_HTTP_EXPECTED_CONTENT_TYPE`, `text/plain; charset=utf-8`. A
    `Content-Length` over 4096 is refused. Header names are matched
    case-sensitively, as `Content-Type:` and `Content-Length:`.
-5. **Body.** Copied straight into the caller's buffer (or `httpPayload` for a
+6. **Body.** Copied straight into the caller's buffer (or `httpPayload` for a
    stress batch) while the CRC is updated. With `Content-Length` the body
    must be exactly that long; without it the body ends when the server closes
    the connection. Chunked encoding is not supported: a chunked body would be
    passed on with its chunk markers.
-6. **Cleanup.** The socket and both heap buffers are freed on every path, then
-   the result callback runs once.
+7. **Cleanup.** The socket, the uploaded certificate and both heap buffers are
+   released on every path, then the result callback runs once.
 
-`HttpClient_Get()` is synchronous: it returns when the transfer ends or a
-socket operation times out. There is no overall deadline and no cancellation.
-`APP_ST67_HTTP_TOTAL_TIMEOUT_MS` is defined but not used; a slow server can
-keep the fetch going as long as each read arrives within 5 s, bounded only by
-the caller's 180 s.
+`HttpClient::get()` is synchronous. Each read waits up to the 5 s socket
+timeout, and the whole response, from connect to the last body byte, must
+arrive within `APP_ST67_HTTP_TOTAL_TIMEOUT_MS` (15 s), or the fetch fails as
+`timeout`. There is no cancellation. Two driver traits shape the receive loop:
+`W6X_Net_Recv()` returns 0 on a read timeout, and −1 both when the peer closed
+and when the socket failed, so a close-delimited body (no `Content-Length`)
+cannot be told from a reset; this API always sends `Content-Length`.
 
 ## Connect failure diagnosis
 
@@ -424,10 +462,12 @@ reason code and its name, SSID, tick, and on success RSSI and channel.
 | `APP_ST67_DISCONNECT_TIMEOUT_MS` | 12000 | yes |
 | `APP_ST67_SHUTDOWN_SETTLING_DELAY_MS` | 100 | yes, in `stop()` |
 | `APP_ST67_COLD_RESTART_DELAY_MS` | 1000 | yes, mode 2 batches |
-| `APP_ST67_HTTP_PORT` | 80 | yes |
-| `APP_ST67_DNS_TIMEOUT_MS` | 5000 | yes |
+| `APP_ST67_HTTP_USE_TLS` | 1 | yes: HTTPS; `0` builds the plain-HTTP bench variant |
+| `APP_ST67_HTTPS_PORT` | 443 | yes, with TLS |
+| `APP_ST67_HTTP_PORT` | 80 | yes, without TLS |
+| `APP_ST67_DNS_TIMEOUT_MS` | 5000 | **no**; the module's resolver has its own timeout |
 | `APP_ST67_HTTP_IO_TIMEOUT_MS` | 5000 | yes, socket send and receive timeouts |
-| `APP_ST67_HTTP_TOTAL_TIMEOUT_MS` | 15000 | **no**; there is no total deadline |
+| `APP_ST67_HTTP_TOTAL_TIMEOUT_MS` | 15000 | yes: connect, handshake and response together |
 | `APP_ST67_HTTP_MAX_HEADER_BYTES` | 2048 | **no**; `HttpResponseParser.hpp` hardcodes 2048 |
 | `APP_ST67_HTTP_MAX_RESPONSE_BYTES` | 4096 | yes: body limit, `httpPayload` and the refresh task's buffer |
 | `APP_ST67_LIFECYCLE_MODE` | 3 | stress batches only |
@@ -439,16 +479,26 @@ reason code and its name, SSID, tick, and on success RSSI and channel.
 | `APP_ST67_HTTP_HOST`, `APP_ST67_HTTP_PATH` | `""` unless set in `app_credentials.h`; the fallback for `api host` / `api path` | yes |
 | `APP_ST67_HTTP_EXPECTED_CONTENT_TYPE` | `"text/plain; charset=utf-8"` | yes |
 
+### Driver AT trace
+
+`W61_AT_LOG_ENABLE` in `ST67W6X_Network_Driver/Target/w61_driver_config.h`
+(a generated line, 0 in the repository) makes the driver log every AT command
+and reply as `AT> ...` / `AT< ...` Debug lines. It is the fastest way to see
+what the module answers, and it found the file-listing timeout above. Two
+cautions: it logs `AT+CWJAP="<ssid>","<password>"`, so the Wi-Fi password
+goes into the console and any capture of it, and it must never be committed
+on; and it runs on the calling task's stack, which is what overflowed the
+fetch task at 2560 B on 2026-10-04.
+
 ## Stress batch
 
-**Bench and test behaviour, not a product feature, and currently not
-triggered.** Switch 2 used to start it; since 2026-09-24 it only toggles low
-brightness ([Display.md](Display.md#low-brightness)), and nothing calls
-`TriggerSt67ConnectivityCycle()`. The code is kept for bench use: calling it
-starts a batch in
-`APP_ST67_LIFECYCLE_MODE`: by default 100 join, DHCP, fetch and disconnect
-cycles, 1 s apart, then `stop()`, which powers the module down. With the
-server answering in a second or two, that takes several minutes.
+**Bench and test behaviour, not a product feature.** The console command
+`wifi stress` ([Console.md](Console.md#wifi)) calls
+`TriggerSt67ConnectivityCycle()`; switch 2 used to, but since 2026-09-24 it
+only toggles low brightness ([Display.md](Display.md#low-brightness)). The
+trigger starts a batch in `APP_ST67_LIFECYCLE_MODE`: by default 100 join,
+DHCP, fetch and disconnect cycles, 1 s apart, then `stop()`, which powers the
+module down. At about 13 s per HTTPS cycle that takes about 25 minutes.
 
 - It downloads into the task's own 4 KB `httpPayload`, which nothing reads.
 - It cannot be cancelled, except by a reset.
@@ -459,8 +509,8 @@ server answering in a second or two, that takes several minutes.
 - It ends with `ST67 batch-final mode=3 pass=<n> fail=<n> first=<cycle>
   stage=<stage> status=<w6x> heap=<start>/<end> min=<low> tasks=<start>/<end>`,
   the line to read for a stress result.
-- After it, the module is off and the next fetch re-initializes W6X under
-  the running LwIP, the path not tested since the regeneration.
+- After it, the module is off and the next fetch re-initializes the driver;
+  exercised once under T01 on 2026-10-04 (see [Bench results](#bench-results)).
 
 `TriggerSt67SmokeTest()` is an unused alias for the same trigger.
 
@@ -480,6 +530,7 @@ the customized LwIP teardown, since removed.
 | CubeMX regeneration | 2026-08-26 | With the User-owned `HttpClient`, adapter and RDY bridge: smoke test, 100/100 persistent and 100/100 HTTP persistent cycles, min heap 18 944 B, `St67HttpFetch` 840 B stack left. [CubeMXCompliance.md](CubeMXCompliance.md) |
 | Driver priorities | 2026-09-21 | Longest display slot gap during WiFi fell from 14 ms to 8 ms with fetches still succeeding. |
 | Connect diagnosis | 2026-09-21 | A wrong WPA2 password reported reason 7 and was classified `WrongPassword`. |
+| T01 and HTTPS | 2026-10-03..04 | Host rewritten against `W6X_Net`; `.bss` 91 808 B against 138 412 B under T02. Module programmed with `mission_t01_v2.0.106` through `firmware/Bypass`. Three faults found and fixed on the bench: `W6X_Net_Init()` asserting without a registered net callback; the station reporting `GOT_IP` straight after the join; the driver's file listing of ST's 31 sample certificates overrunning its 2 s timeout before every certificate upload (fixed by programming a LittleFS image holding only Amazon Root CA 1, `Bypass/tools/Build-LittleFS.sh`). The driver's AT trace also overflowed the 2560 B fetch stack, now 4096 B. **First HTTPS fetch passed**: DNS 0.3 s, certificate upload 3 s (first time only), TLS handshake with CloudFront about 1 s, HTTP 200, 1906 bytes, CRC valid, parse OK; `heapMin` 24 368 B. Certificate cases on a bench build trusting ISRG Root X1 (`-DAPP_ST67_TLS_BENCH_ANCHOR_ISRG=ON`, badssl.com hosts): wrong CA, hostname mismatch, untrusted root, self-signed and an ISRG Root X2 chain all refused in the handshake; `sha256`/`rsa2048.badssl.com` completed with HTTP 200. `wifi stress`: **100/100 HTTPS cycles** in 21.5 min, free heap 29 384 B after every cycle, `heapMin` 24 368 B throughout, 13 tasks; after `stop()` 38 840 B free and a `wifi test` restarted the module and fetched. Repeated with the heap at 32 000 B: 99/100 (one transient connect failure, recovered), `heapMin` 16 336 B. Details in the plan's bench record. The date check is left open. |
 
 ## Open items
 
@@ -487,31 +538,35 @@ the customized LwIP teardown, since removed.
   automatic power save between fetches. Its current in that state, during a
   transfer and in `CHIP_EN` shutdown has not been measured, nor have CS, RDY
   and `CHIP_EN` levels or back-powering through GPIO.
+- **T01 bench validation** is outstanding: the module must be programmed with
+  the T01 image through `firmware/Bypass`, then the plan's spike run
+  (good CA, wrong CA, hostname mismatch, expired certificate, heap and size
+  readings, 100 cycles). See
+  [ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md).
 - **Cold restart.** Full shutdown and restart lost about 6 KB of heap over 20
-  cycles in Phase 3. The cause was not found. Since the regeneration
-  `MX_LWIP_DeInit()` and the private LwIP teardown are gone, so `stop()` only
-  deinitializes W6X; restarting W6X under a running LwIP (modes 0 and 2, and
-  the first fetch after a stress batch) is untested.
+  cycles in Phase 3 under T02. The cause was not found. `stop()` now
+  deinitializes Net, WiFi and W6X; one restart after a stress batch worked
+  under T01 (2026-10-04), the repeated cold-restart batches (modes 0 and 2)
+  have not been run.
 - **HTTP error paths untested at runtime:** DNS failure, connection refused,
-  timeouts, malformed, truncated, oversized and chunked responses, loss of the
-  network mid-transfer. None has been exercised on the bench.
-- **No total deadline or cancellation.** `APP_ST67_HTTP_TOTAL_TIMEOUT_MS` is
-  unused; a fetch cannot be stopped once started, and a timed-out client
-  leaves the task busy until it finishes.
-- **Unused configuration.** `APP_ST67_SCAN_*`,
-  `APP_ST67_HTTP_TOTAL_TIMEOUT_MS`, `APP_ST67_HTTP_MAX_HEADER_BYTES`,
-  `APP_ST67_WIFI_SSID` and `APP_ST67_WIFI_PASSWORD` are defined but not used.
+  TLS failures, timeouts, malformed, truncated, oversized and chunked
+  responses, loss of the network mid-transfer. None has been exercised on the
+  bench.
+- **Small heap retentions.** In the 2026-10-04 stress runs a cycle that
+  failed in the TLS connect kept 32 B of heap for good, and every
+  `stop()`/re-initialisation keeps about 240 to 270 B (plan, section 8).
+  Successful cycles keep nothing. Not located in the driver yet.
+- **No cancellation.** A fetch cannot be stopped once started, and a
+  timed-out client leaves the task busy until it finishes; the 15 s total
+  deadline bounds the HTTP part only.
+- **Unused configuration.** `APP_ST67_SCAN_*`, `APP_ST67_DNS_TIMEOUT_MS`,
+  `APP_ST67_HTTP_MAX_HEADER_BYTES`, `APP_ST67_WIFI_SSID` and
+  `APP_ST67_WIFI_PASSWORD` are defined but not used.
 - **Mode 0 runs 20 cycles**, not one, as it falls through to the cold-restart
   count.
-- **HTTPS** is not started; see
-  [ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md).
 - **Dead code.** `St67ProbeTask.cpp` is compiled but never started;
-  `TriggerSt67ConnectivityCycle()` and its alias `TriggerSt67SmokeTest()` are
-  never called (kept for bench use); the generated
-  `LWIP/App/http_client.c` is compiled but not called.
+  `TriggerSt67SmokeTest()` is an unused alias of the `wifi stress` trigger.
 - **Unit tests** cover only the WiFi layer's pure parts: the response
   parser, the host/path and `Content-Type` rules, the connect diagnosis and
   the stage-to-status mapping (see [Testing.md](Testing.md)). The socket,
   DNS and driver calls are not tested natively.
-- **The `netif` task at priority 50** is above the display task and has not
-  been measured against it.

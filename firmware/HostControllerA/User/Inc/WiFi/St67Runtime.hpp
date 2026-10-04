@@ -5,10 +5,10 @@
 
 #include "cmsis_os2.h"
 #include "app_config.h"
-#include "http_client.h"
-#include "lwip/dns.h"
 #include "w6x_api.h"
 
+#include <WiFi/HttpClient.hpp>
+#include <WiFi/HttpResponseParser.hpp>
 #include <WiFi/St67FetchTypes.hpp>
 
 namespace HostController {
@@ -31,14 +31,13 @@ struct St67Runtime {
   const char* lastErrorFunction = nullptr;
   uint32_t lastWifiReason = 0U;
   W6X_event_id_t lastWifiEvent = 0U;
+  W6X_event_id_t lastNetEvent = 0U;
   bool w6xInitialized = false;
   bool wifiInitialized = false;
-  bool lwipInitialized = false;
-  bool dnsPending = false;
-  err_t dnsStatus = ERR_INPROGRESS;
-  ip_addr_t dnsAddress{};
-  HTTP_Status_Code_e httpStatus = HTTP_VERSION_NOT_SUPPORTED;
-  int32_t httpError = HTTP_CLIENT_ERR;
+  bool netInitialized = false;
+  uint8_t serverIpv4[4]{};  // the API host, resolved by the module's DNS
+  uint32_t httpStatus = HttpResponse::kNoStatus;
+  int32_t httpError = HttpClient::kErrorResponse;
   uint32_t httpReceivedBytes = 0U;
   uint8_t httpPayload[APP_ST67_HTTP_MAX_RESPONSE_BYTES]{};
   uint32_t httpPayloadLength = 0U;

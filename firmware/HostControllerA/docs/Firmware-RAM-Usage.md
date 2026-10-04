@@ -1,5 +1,35 @@
 # Firmware RAM Usage
 
+## T01 switch, 2026-10-03
+
+The ST67 driver moved from the T02 architecture (LwIP on the host) to T01
+(TCP/IP in the module); see [WiFi.md](WiFi.md). The Debug build linked on
+2026-10-03 has `.data` 644 and `.bss` **90 264** bytes (Release: 456 and
+90 260), against `.bss` 138 412 the day before: the LwIP heap (33 551), its
+pools and tables (about 11 000) and the `tcpip_thread` and `netif` stacks are
+gone, and the FreeRTOS heap no longer has to carry those two tasks. Text is
+215 832 bytes in Debug and 110 152 in Release. The HTTP client now allocates
+per request from the FreeRTOS heap: a 2 KiB header buffer, a 1 KiB read
+buffer, a 512-byte request, plus the driver's own socket state. Run-time
+`heapMin` under T01, measured on 2026-10-04 with the fetch task at 4096 B:
+39 080 B free before the module starts, 29 384 B free with the module and
+its two tasks up, **24 368 B minimum** through an HTTPS fetch, the same after
+a second fetch in the same boot and across three boots. Under T02 the same
+figure was 14 680 to 18 944 B.
+
+**Heap reduced to 32 000 B, 2026-10-04.** With the peak demand measured at
+15 632 B (15 888 B on a re-initialisation after `stop()`) and flat over 100
+HTTPS cycles, `configTOTAL_HEAP_SIZE` went from 40 000 to 32 000 in the
+`.ioc`. Debug `.bss` is now **83 808** B. Measured afterwards: 31 080 B free
+before the module starts, 21 384 B with it up, `heapMin` **16 368 B** through
+an HTTPS fetch, twice the 8 KiB floor. 100 cycles at this size: 99 passed,
+one transient connect failure, `heapMin` 16 336 B, 30 808 B free after the
+batch's `stop()`; details in the HTTPS plan's bench record.
+
+The sections below are the T02 measurements and remain valid as the record of
+that configuration; the per-subsystem figures will be re-measured once the T01
+build has been on the bench.
+
 ## Summary
 
 Measured on 2026-09-24 from the Debug HostController build in
@@ -66,7 +96,8 @@ the copy it hands over. See [Reduction Plan](#reduction-plan).
 
 ### Static reservation
 
-- FreeRTOS dynamic heap: `40000` bytes
+- FreeRTOS dynamic heap: `40000` bytes at the time of this measurement
+  (`32000` since 2026-10-04, see above)
 - Idle task stack: `512` bytes (`configMINIMAL_STACK_SIZE` 128 words)
 - Timer task stack: `1024` bytes (`configTIMER_TASK_STACK_DEPTH` 256 words)
 - Idle and timer TCBs: `384` bytes each
@@ -186,12 +217,16 @@ The queue, then in `DebugService`, held 64 events of about 200 bytes, some
 overflow policy drops the oldest event, so producers never block; burst
 tolerance is lower, and `[STATS] dropped=` shows when that bites.
 
-### 2. Measure before reducing the FreeRTOS heap: not done
+### 2. Measure before reducing the FreeRTOS heap: done 2026-10-04
 
 Run the full ST67 workflow, including association, DHCP, HTTP, repeated
 requests, and TLS if TLS is required. Record the lowest `heapMin` value. Reduce
 `configTOTAL_HEAP_SIZE` only when that value leaves an explicit margin for
 error paths and future changes.
+
+Done under T01 with HTTPS: 100 persistent cycles, certificate failure cases
+and a restart after `stop()` gave a peak demand of 15 888 B, and the heap was
+reduced to 32 000 B (see the T01 section at the top). Saved 8 000 B of `.bss`.
 
 Do not infer required heap from the current free value after initialization;
 temporary HTTP, TLS, and scan allocations can produce a lower watermark later.

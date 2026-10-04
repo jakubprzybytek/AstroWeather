@@ -25,7 +25,8 @@ St67FetchStatus fetchStatusForFailure(const char* firstFailureStage, bool respon
     return St67FetchStatus::NetworkFailure;
   }
   if (std::strcmp(firstFailureStage, "w6x-init") == 0 ||
-      std::strcmp(firstFailureStage, "wifi-init") == 0) {
+      std::strcmp(firstFailureStage, "wifi-init") == 0 ||
+      std::strcmp(firstFailureStage, "net-init") == 0) {
     return St67FetchStatus::DriverFailure;
   }
   return St67FetchStatus::HttpFailure;

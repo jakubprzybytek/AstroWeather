@@ -1,7 +1,18 @@
 # ST67 HTTPS Implementation Plan
 
-**Status: not started as of 2026-10-02.** The firmware fetches over plain HTTP
-only; the current Wi-Fi stack is described in [WiFi.md](WiFi.md).
+**Status: Route B spike step 1 passed, 2026-10-04.** The host runs T01 against
+`W6X_Net` with HTTPS on by default (`APP_ST67_HTTP_USE_TLS`), the module
+carries `mission_t01_v2.0.106` with a LittleFS holding only Amazon Root CA 1,
+and the first fetch from `https://api.int.astroweather.albedoonline.com`
+completed with a verified-chain configuration (HTTP 200, 1906 bytes, CRC OK).
+The wrong-CA, hostname-mismatch, untrusted-root and self-signed cases all
+fail closed in the handshake ([Bench record](#bench-record-2026-10-04-route-b)),
+so Route B is adopted; 100 persistent HTTPS cycles ran with a flat heap and
+the module restarted from power-down afterwards. Still open: the
+expired-certificate case (left as an outstanding issue) and the Route B
+write-up of sections 4 to 8. The Wi-Fi stack
+as built is described in [WiFi.md](WiFi.md), including the three driver
+faults found on the way.
 
 There are two ways to get TLS on this board, and the first decision is which
 one to take; see [Two routes](#2-two-routes). Route A keeps the current T02
@@ -48,15 +59,22 @@ HTTPS is not accepted if certificate verification is disabled or optional.
 | Known risks | Fit. Entropy source needs an analysis. ST's example disables the validity-date check (`MBEDTLS_HAVE_TIME` undefined) | ST release notes for 1.3.0, T01: "SSL sockets support a limited amount of algorithms, handshake might fail if unsupported algorithm is used by the server" and "SSL sockets has specific internal buffer configurations, this might result in failure when server doesn't acknowledge those changes". Also DHCP/static-IP caveats. Must be proven against CloudFront |
 
 The API is CloudFront with an ACM certificate (`sst/docs/architecture.md`), so
-the server side is the same for both routes: TLS 1.2 with ECDHE, an RSA-2048
-leaf by default, and a chain ending in an Amazon root.
+the server side is the same for both routes. Observed with `openssl s_client`
+on 2026-10-03 against `api.int.astroweather.albedoonline.com` (only the `int`
+stage is deployed at present): leaf `CN=api.int.astroweather.albedoonline.com`,
+RSA 2048, valid 2026-09-18 to 2027-04-03, issued by `Amazon RSA 2048 M04`,
+which is issued by **Amazon Root CA 1** (the server also sends the Starfield
+G2 cross-certificate, which a client trusting Amazon Root CA 1 never needs).
+OpenSSL negotiated TLS 1.3 with X25519 and `TLS_AES_128_GCM_SHA256`; the
+module offers TLS 1.2, which CloudFront's default security policy also
+accepts, so the 1.2 handshake and cipher choice are a bench item.
 
 ### Decision order
 
 1. **Route B spike first.** Flash one module with the T01 image, build a
-   minimal T01 host (no LwIP), and run `W6X_HTTP_Client_Request()` against
-   `https://api.astroweather.albedoonline.com` with Amazon Root CA 1 as
-   `https_certificate`. Then run it against a wrong CA, a hostname mismatch
+   minimal T01 host (no LwIP), and fetch from
+   `https://api.int.astroweather.albedoonline.com` with Amazon Root CA 1 as
+   the CA. Then run it against a wrong CA, a hostname mismatch
    and an expired certificate (a local test server is enough) and record what
    the module rejects. Record `heapFree`/`heapMin` and the image size.
 2. If the module verifies the chain and hostname and fails closed, adopt
@@ -71,7 +89,11 @@ T02 was chosen in August 2026 without a requirement behind it; the archived
 plans call it "required" only because the LwIP-on-host examples were being
 followed. Nothing in the product needs the TCP/IP stack on the host. The
 module in the field already runs T02 2.0.106 and must be re-flashed for
-Route B; the Phase 2 notes in `archive/` cover the module programming path.
+Route B. The programming path is the `firmware/Bypass` project: a bridge
+firmware for the same STM32 that holds the module in its ROM bootloader and
+lets ST's `QConn_Flash_Cmd` program it over USB (`firmware/Bypass/README.md`,
+`docs/ST67_Bypass_Maintainer_Notes.md`). It was validated on 2026-08-18 by
+programming the T02 2.0.106 image and reading all 4 MiB back byte-exact.
 
 ## 2a. Current State and Constraints (Route A)
 
@@ -131,7 +153,9 @@ must be measured, not inferred from a successful link.
 ## 2b. Route B Outline (TLS in the Module, T01)
 
 To be expanded into phases once the spike in [Decision order](#decision-order)
-passes. The shape is:
+passes. Sections [Spike preconditions](#spike-preconditions) and
+[What the T01 driver does](#what-the-t01-driver-does) record what was checked
+on 2026-10-03; the shape of the implementation is:
 
 1. **Module and CubeMX.** Flash the T01 mission image. In CubeMX switch the
    X-CUBE-ST67W61 *ST67 Architecture* to T01 and untick LwIP; `ST67_ARCH`
@@ -156,6 +180,58 @@ passes. The shape is:
    existing fetch results; the HTTP parser tests apply only if the parser is
    kept. Bench validation reuses section 8's cases, with the certificate
    failure cases being the ones that establish what the module verifies.
+
+### Spike preconditions
+
+Checked 2026-10-03. Everything the spike needs is on disk; the order below is
+the one to follow, because `W6X_Init()` refuses a host/module architecture
+mismatch and the device cannot fetch until both sides agree.
+
+1. **Host first.** Switch CubeMX to T01, regenerate, and get the T01 host to
+   build and link before the module is touched. This finds fit and
+   regeneration problems with no hardware at risk, and leaves the T02 build
+   in git to restore the field configuration.
+2. **Bypass.** `firmware/Bypass` has only a `Debug-Manufacture` build; build
+   a `*-Bootloader` preset (toolchain PATH recipe in its maintainer notes),
+   flash it to the STM32 over ST-LINK, then
+   `./tools/Query-ST67.sh --port COM4` (non-destructive),
+   `./tools/Program-ST67.sh --port COM4 --profile MissionT01` (dry run, checks
+   every input) and the same with `--force`. `Bypass.ioc` names an
+   `STM32G0B0CETx` while the board carries an `STM32G0B1CET6`; the pins are
+   identical and the T02 flash worked, so this is a documentation
+   inconsistency, not a blocker.
+3. **Assets.** The vendored pack `firmware/Bypass/External/x-cube-st67w61` is
+   1.3.0 (git-ignored, present on the development PC). Its
+   `st67w611m_mission_t01_v2.0.106.bin` is byte-identical to the copy in the
+   installed CubeMX pack, so the module image and the host driver come from
+   the same release. Both the `mission_t01` and the `mission_t02` flash
+   configurations also write ST's `LittleFS/littlefs/littlefs.bin` (sample
+   certificates) to the module at `0x378000`, so the module already carries
+   that partition today.
+4. **Flash the T01 host** over ST-LINK and run the spike. Keep the T02 host
+   image and the `MissionT02` profile at hand to roll back.
+
+### What the T01 driver does
+
+Verified in X-CUBE-ST67W61 1.3.0, `Middlewares/ST/ST67W6X_Network_Driver`.
+The plan's requirements in [Goal](#1-goal) map onto it as follows.
+
+| Topic | Driver behaviour | Consequence |
+| --- | --- | --- |
+| Verification mode | With a CA set, `w6x_net.c` sends `AuthMode = 2` ("Server Only") in `AT+CIPSSLCCONF`, so the module is asked to verify the chain | Chain verification is requested; whether it is enforced is a bench case |
+| Hostname | SNI goes to the module in `AT+CIPSSLCSNI`; nothing on the host compares the name with the leaf | Whether the module checks the hostname is **unknown**; the mismatch bench case decides Route B |
+| TLS version, ALPN | Port 443 gives an `IPPROTO_TLS_1_2` socket; ALPN is hardcoded `"http/1.1,http/1.2"` | Matches the protocol profile |
+| `settings.timeout`, `settings.max_response_len` | **Never read** in `w6x_http.c` | No total deadline and no response cap from the driver. The 4096-byte limit and the request deadline must be enforced in our `recv_fn` (return a negative value to abort), or the existing parser is kept over a `W6X_Net` SSL socket |
+| Status | Only HTTP 200 is a success; other codes reach `result_fn` without a body | Equivalent to today's 2xx rule for this API |
+| `Content-Type` | Not checked; `headers_done_fn` receives the raw header buffer | Run `checkContentType()` there |
+| Body end | `Content-Length` when present, otherwise a trailing `\r\n\r\n` heuristic; parsing is `strstr`-based | Fine for this text payload; not close-delimited |
+| Resources | One `xTaskCreate` worker per request (`W6X_HTTP_CLIENT_THREAD_STACK_SIZE`, 1536 B), a malloc'd receive buffer (`W6X_HTTP_CLIENT_DATA_RECV_SIZE`: 1024 in the config template, 4096 in the header default) and a malloc'd request string | Measure heap minima across repeated requests as in section 8 |
+| Certificate | `W6X_Net_TLS_Credential_AddByContent()` writes the PEM into the **module's** LittleFS before each request and `Credential_Delete` removes it after. Needs `LFS_ENABLE == 0` on our host (no host LittleFS) | One flash write per daily fetch; acceptable. Alternative: bake the CA into `littlefs.bin` with `LittleFS/mklfs/mklfs.exe` and use `AddByName` |
+| Session | T01 needs `W6X_Net_Init()` after `W6X_WiFi_Init()`; DHCP runs in the module (`W6X_NET_DHCP 1`); IP readiness is the `W6X_WIFI_EVT_GOT_IP_ID` event or station state `W6X_WIFI_STATE_STA_GOT_IP` | `St67NetworkAdapter` and the DHCP wait in `St67NetworkSession` are rewritten against these |
+| Generated types | `User/Src/WiFi/HttpClient.cpp` uses `HTTP_connection_t` and the callbacks from the generated `LWIP/App/http_client.h`, which T01 removes | Move to `W6X_HTTP_connection_t` and the `W6X_HTTP_*` callbacks, or drop `HttpClient.cpp` |
+| CubeMX | T01 is the pack's default variant with no condition; `w6x_http.c` is in `ServiceAPI` and already compiled. Our `w6x_config.h` holds only `W6X_POWER_SAVE_AUTO` and `W6X_CLOCK_MODE`; regeneration adds the `W6X_NET_*` and `W6X_HTTP_*` group from `Conf/w6x_config_template.h` | Review the generated values, especially the receive buffer sizes, against the RAM budget |
+| Time | `W6X_Net_SNTP_*` exists but nothing enables it by default | Whether the module checks validity dates at all is the "expired certificate" bench case |
+| Release notes | 1.3.0, T01 known limitations: "SSL sockets support a limited amount of algorithms, handshake might fail if unsupported algorithm is used by the server" and "SSL sockets has specific internal buffer configurations, this might result in failure when server doesn't acknowledge those changes" | The spike must run against the real CloudFront endpoint |
 
 ## 3. Decisions Required Before Implementation
 
@@ -402,6 +478,50 @@ set a larger TLS-specific margin before release based on measured worst-case
 error paths. If TLS cannot maintain a defensible margin, reduce measured static
 consumers first; do not weaken verification or silently increase buffers.
 
+### Bench record, 2026-10-04 (Route B)
+
+Board 1, module `mission_t01_v2.0.106` with the slim LittleFS, Debug host
+builds of this branch, access point `lemo`, all from the USB console. The
+failure cases ran on a build configured with
+`-DAPP_ST67_TLS_BENCH_ANCHOR_ISRG=ON`, which trusts ISRG Root X1 instead of
+Amazon Root CA 1, with the server chosen by `api host`; `api default` restored
+the saved host afterwards. The firmware's failure line names the step:
+`connect` is a refused TLS handshake, `response` means the handshake
+completed and the HTTP exchange followed.
+
+| Case | Server | Chain under the anchor | Name | Result |
+| --- | --- | --- | --- | --- |
+| Production fetch, production anchor | `api.int.astroweather.albedoonline.com` | Amazon Root CA 1, trusted | match | **HTTP 200**, 1904..1906 B, CRC valid, parse OK; 13 s request to result, handshake about 1 s; `heapMin` 24 368 B after two fetches (run three times across resets) |
+| Wrong CA | same server, ISRG anchor | untrusted | match | **refused in `connect`** |
+| Positive control, ISRG anchor | `sha256.badssl.com`, `rsa2048.badssl.com` | trusted | match | handshake and HTTP completed, **status 200** (fetch then fails on the `text/plain` Content-Type rule, as designed) |
+| Hostname mismatch | `wrong.host.badssl.com` (serves the same `*.badssl.com` certificate as `badssl.com`) | trusted | **mismatch** | **refused in `connect`**, while `badssl.com` with the same certificate passed the handshake: the module checks the name against the SNI |
+| Untrusted root | `untrusted-root.badssl.com` | untrusted | match | refused in `connect` |
+| Self-signed | `self-signed.badssl.com` | untrusted | match | refused in `connect` |
+| Other root, ECDSA chain | `ecc256.badssl.com` (ISRG Root X2) | untrusted | match | refused in `connect` |
+| Expired certificate | not tested | | | `expired.badssl.com` chains to COMODO, so it would fail on the chain, not the date; needs a server with an expired leaf under a trusted root. Since the production fetch passed with no SNTP configured, the module either checks dates against a clock it set itself or does not check them. Left open. |
+| 100 persistent cycles (`wifi stress`, mode 3) | production API, production anchor | trusted | match | **100/100 complete in 21.5 min**, about 12.9 s per cycle including the 1 s gap. Free heap 29 384 B after every cycle, `heapMin` 24 368 B from cycle 1 to 100, 13 tasks throughout. After the batch's `stop()`: 38 840 B free (39 080 at boot), 11 tasks. A `wifi test` 8 min later re-initialised the driver from the powered-down module and fetched normally (`heapMin` 24 112 B), the restart path previously untested |
+| 100 persistent cycles, heap reduced to 32 000 B | production API, production anchor | trusted | match | **99/100**: cycle 41 failed in `connect` after 8.9 s with no driver error (TCP or handshake to CloudFront not completed in time), cycle 42 onward recovered with no reset. Free heap 21 384 B after cycles 1 to 40, 21 352 B after the failed cycle and every cycle after it: **the failed connect retained 32 B**, success cycles retain nothing. `heapMin` 16 368 then 16 336 B. After `stop()` 30 808 B free (31 080 at boot, about 270 B retained per stop); `wifi test` afterwards passed, `heapMin` 16 072 B |
+
+Conclusions: chain verification and hostname verification are enforced by
+the module and fail closed with no response bytes delivered; the trust
+model in section 3 (Amazon Root CA 1 only) works against CloudFront; TLS 1.2
+is negotiated (OpenSSL sees 1.3 from the same server); 200 cycles over two
+runs show no heap, task or socket trend on success, and the module restarts
+from power-down. Two small retentions to keep an eye on, neither a threat
+to the 16 KiB margin: a failed `connect` keeps 32 B (one in 200 cycles), and
+each `stop()`/re-init keeps about 240 to 270 B; a daily fetch never calls
+`stop()`. Open: the date check, and one observation: `badssl.com` itself (11 673-byte
+body) completed the handshake but delivered no parsable status line
+(`response`, status 505) where the 500-byte hosts delivered `200`; bodies
+over 4 KiB are outside this product's envelope, but the behaviour of the
+module's socket with a response larger than its receive buffer is worth a
+trace when convenient.
+
+Driver quirk seen on every boot: after the module restarts it reports the
+stored certificate's size rounded up to 256 bytes (1208 as 1280), so the
+driver's size comparison fails and it rewrites the file once per boot, about
+3 s; within a boot the size matches and the content is compared instead.
+
 ## 9. Expected File Changes
 
 | File or area | Planned change |
@@ -411,7 +531,7 @@ consumers first; do not weaken verification or silently increase buffers.
 | `Appli/App/app_config.h` | Transport selection, HTTPS port, handshake/total deadlines, and TLS limits |
 | `Appli/App/app_credentials.h.template` | Empty host/path values only |
 | `User/Inc/WiFi/HttpClient.hpp` | Transport-neutral request options and result contract |
-| `User/Src/WiFi/HttpClient.cpp` | Shared bounded HTTP request/response logic over a transport |
+| `User/Src/WiFi/HttpClient.cpp` | Route A: shared bounded HTTP request/response logic over a transport. Route B: rewritten against `W6X_HTTP_*` types or removed, as the generated `LWIP/App/http_client.h` it depends on goes away |
 | `User/Inc/WiFi/TlsTransport.hpp` | User-owned TLS transport boundary |
 | `User/Src/WiFi/TlsTransport.cpp` | Per-request mbedTLS setup, verified handshake, I/O, deadlines, cleanup |
 | `User/Inc/WiFi/TrustedCa.hpp` and corresponding source | Const DER trust anchor(s) and documented rotation metadata |

@@ -106,6 +106,23 @@ flashing the STM32 itself.
    touching the device - use that first to sanity-check your arguments.
    A PowerShell equivalent, `tools/Program-ST67.ps1`, is also available with
    the same flags for native PowerShell/CI use on Windows.
+
+   **For the AstroWeather HostController use the project's own flash
+   configuration**, which replaces the vendor LittleFS image (31 sample
+   certificates and keys) with one holding only the CA the firmware trusts:
+
+   ```bash
+   ./tools/Build-LittleFS.sh
+   ./tools/Program-ST67.sh --port COM4 --profile MissionT01 \
+       --config-path tools/astroweather_t01_flash_prog_cfg.ini --force
+   ```
+
+   The X-CUBE driver lists the module's whole file system before every
+   certificate upload, one entry per ~100 ms, and gives up after 2 s; with
+   the vendor image every HTTPS fetch failed in `W6X_FS_ListFiles`
+   (2026-10-04). The certificate source is
+   `tools/littlefs/Certificates/lfs/AmazonRootCA1.pem`, which must stay
+   byte-identical to `HostControllerA/User/Src/WiFi/TrustedCa.cpp`.
 4. `tools/Dump-ST67-Flash.sh` reads flash content back for inspection, e.g.
    to confirm which image a board is actually running:
 

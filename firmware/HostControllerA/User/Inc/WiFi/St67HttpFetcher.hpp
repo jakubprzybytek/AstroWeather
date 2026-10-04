@@ -5,8 +5,6 @@
 
 #include <Astro/ApiTarget.hpp>
 
-#include "http_client.h"
-
 namespace HostController {
 
 struct St67Runtime;
@@ -21,7 +19,7 @@ class St67HttpFetcher {
  private:
   St67Runtime& runtime_;
   // Resolved at the start of each fetch. A member, not a local, because the
-  // HTTP settings keep a pointer to the host for the whole request.
+  // HTTP request keeps a pointer to the host for the whole request.
   ApiTarget target_{};
 };
 

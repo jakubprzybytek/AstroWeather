@@ -27,7 +27,7 @@ shows it on seven-segment and dot-matrix LED displays.
 | Part | Role |
 | --- | --- |
 | STM32G0B1CETx | MCU: Cortex-M0+, 512 KB flash, 144 KB RAM, run at 16 MHz |
-| ST67W611M1 | Wi-Fi module, on SPI1 with DMA; the TCP/IP stack (LwIP) runs on the MCU |
+| ST67W611M1 | Wi-Fi module, on SPI1 with DMA; runs ST's T01 firmware, so TCP/IP, DNS and TLS are in the module |
 | 24AA04 | 512-byte I2C EEPROM for settings, on I2C1 at `0x50` |
 | SCT2xxx | LED drivers in one SPI3 daisy chain, multiplexed in five slots |
 | INA180A2 | Current-sense amplifier into ADC1 channel 10 (`PB2`) |
@@ -76,8 +76,8 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | Wi-Fi connection (ST67W611M1): join, DHCP, failure diagnosis | ✅ Done | Credentials are set with `wifi set` and saved to the EEPROM | [WiFi.md](docs/WiFi.md) |
 | Fetch data over HTTP | ✅ Done | Plain HTTP on port 80 only | [WiFi.md](docs/WiFi.md) |
 | Server host and path from the console | ✅ Done | `api host`, `api path`, saved; the built-in values from `app_credentials.h` are the fallback | [WiFi.md](docs/WiFi.md#server) |
-| Fetch data over HTTPS | 🔴 Not started | Planned; mbedTLS is not linked | [HTTPS plan](docs/ST67_HTTPS_Implementation_Plan.md) |
-| Module power saving between fetches | 🔴 Not started | The module and LwIP stay up between fetches | [WiFi.md](docs/WiFi.md#open-items) |
+| Fetch data over HTTPS | 🟡 In progress | Host switched to T01 (TLS in the module) and rewritten against `W6X_Net`; builds, not yet on the bench. mbedTLS on the host is the fallback | [HTTPS plan](docs/ST67_HTTPS_Implementation_Plan.md) |
+| Module power saving between fetches | 🔴 Not started | The module stays up between fetches | [WiFi.md](docs/WiFi.md#open-items) |
 | **Astro data** | | | |
 | Payload parser (protocol 1, 6 blocks) | ✅ Done | Unit tested | [AstroRefresh.md](docs/AstroRefresh.md) |
 | Refresh every 6 hours with retry and catch-up | ✅ Done | The last success is lost on power loss | [AstroRefresh.md](docs/AstroRefresh.md#schedule) |

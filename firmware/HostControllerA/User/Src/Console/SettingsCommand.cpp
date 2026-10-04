@@ -3,6 +3,9 @@
 #include <Debug/LogService.hpp>
 #include <Settings/SettingsStore.hpp>
 #include <Astro/AstroDataRefreshTask.hpp>
+#include <WiFi/St67HttpFetchTask.hpp>
+
+#include "app_config.h"
 
 #include <cstdarg>
 #include <cstddef>
@@ -249,6 +252,29 @@ CommandResult handleSettingsCommand(const char* line, Settings::Store* store)
         }
         reply("OK wifi-test");
         startWifiTest(values.wifiSsid);
+        return CommandResult::Ok;
+    }
+
+    if (std::strcmp(line, "wifi stress") == 0) {
+        // The bench batch (WiFi.md, "Stress batch"): APP_ST67_LIFECYCLE_MODE
+        // cycles of join, DHCP, fetch and disconnect into the task's own buffer,
+        // then stop(), which powers the module down. Refreshes are refused as
+        // Busy while it runs and it cannot be cancelled.
+        if (store->values().wifiSsid[0] == '\0') {
+            reply("ERR wifi-stress: no credentials stored. Set them with "
+                  "'wifi set <ssid> <password>'.");
+            return CommandResult::Ok;
+        }
+        constexpr unsigned int kMode = APP_ST67_LIFECYCLE_MODE;
+        constexpr unsigned int kCycles =
+            kMode == APP_ST67_LIFECYCLE_PERSISTENT_STRESS ? APP_ST67_PERSISTENT_STRESS_CYCLES
+            : kMode == APP_ST67_LIFECYCLE_HTTP_PERSISTENT_STRESS ? APP_ST67_HTTP_PERSISTENT_STRESS_CYCLES
+            : APP_ST67_COLD_RESTART_STRESS_CYCLES;
+        reply("OK wifi-stress mode=%u cycles=%u", kMode, kCycles);
+        reply("Running %u connect-fetch-disconnect cycles; each logs 'ST67 cycle=', the "
+              "summary 'ST67 batch-final'. Refreshes are refused until it ends, and the "
+              "module is powered down afterwards.", kCycles);
+        HostController::TriggerSt67ConnectivityCycle();
         return CommandResult::Ok;
     }
 

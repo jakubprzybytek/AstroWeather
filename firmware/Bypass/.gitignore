@@ -3,3 +3,4 @@ mx.scratch
 !.settings
 
 External
+tools/littlefs/littlefs.bin

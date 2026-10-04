@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 
-// The socket-free half of HttpClient_Get(): finding the end of the response
+// The socket-free half of HttpClient::get(): finding the end of the response
 // headers, reading the status line and Content-Length, and the body limits.
-// No LwIP or FreeRTOS types, so it runs in the native tests.
+// No driver or FreeRTOS types, so it runs in the native tests.
 
 namespace HostController {
 namespace HttpResponse {
@@ -14,8 +14,8 @@ namespace HttpResponse {
 // that arrive in the same read as the blank line.
 constexpr uint32_t kHeaderCapacity = 2048U;
 
-// Status code HttpClient_Get() reports when no status line was parsed
-// (HTTP_VERSION_NOT_SUPPORTED in http_client.h).
+// Status code HttpClient::get() reports when no status line was parsed
+// (HTTP_VERSION_NOT_SUPPORTED in the driver's W6X_HTTP_Status_Code_e).
 constexpr uint32_t kNoStatus = 505U;
 
 struct Head {
@@ -63,7 +63,7 @@ bool isBodyComplete(const Head& head, uint32_t received);
 // only when there is no Content-Length to satisfy.
 bool closeEndsBody(const Head& head);
 
-// Any 2xx is a success (the fetcher's rule; HttpClient_Get() itself returns
+// Any 2xx is a success (the fetcher's rule; HttpClient::get() itself returns
 // any status to the caller).
 bool isSuccessStatus(uint32_t statusCode);
 

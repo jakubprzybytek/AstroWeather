@@ -36,6 +36,7 @@ void testMappedStages()
     expectEqual(statusFor("credentials"), St67FetchStatus::NoCredentials, "credentials");
     expectEqual(statusFor("w6x-init"), St67FetchStatus::DriverFailure, "w6x-init");
     expectEqual(statusFor("wifi-init"), St67FetchStatus::DriverFailure, "wifi-init");
+    expectEqual(statusFor("net-init"), St67FetchStatus::DriverFailure, "net-init");
     expectEqual(statusFor("connect"), St67FetchStatus::NetworkFailure, "connect");
     expectEqual(statusFor("connect-state"), St67FetchStatus::NetworkFailure, "connect-state");
     expectEqual(statusFor("dhcp"), St67FetchStatus::NetworkFailure, "dhcp");
@@ -44,13 +45,11 @@ void testMappedStages()
 
 void testKnownGaps()
 {
-    // Current behaviour: driver and network-stack set-up failures other than
-    // w6x-init/wifi-init report HttpFailure, not DriverFailure.
+    // Current behaviour: driver set-up failures other than
+    // w6x-init/wifi-init/net-init report HttpFailure, not DriverFailure.
     expectEqual(statusFor("module-info"), St67FetchStatus::HttpFailure, "module-info");
     expectEqual(statusFor("callback-register"), St67FetchStatus::HttpFailure,
                 "callback-register");
-    expectEqual(statusFor("lwip-init"), St67FetchStatus::HttpFailure, "lwip-init");
-    expectEqual(statusFor("lwip-netif"), St67FetchStatus::HttpFailure, "lwip-netif");
     // Current behaviour: a failed disconnect after the body arrived turns the
     // whole fetch into HttpFailure.
     expectEqual(statusFor("disconnect"), St67FetchStatus::HttpFailure, "disconnect");
@@ -82,7 +81,7 @@ void testResponseTooLarge()
     expectEqual(statusFor("credentials", true), St67FetchStatus::ResponseTooLarge,
                 "overflow wins over any stage");
     // Current behaviour: a Content-Length over 4096 is refused by
-    // HttpClient_Get() before any body reaches the fetcher's data callback, the
+    // HttpClient::get() before any body reaches the fetcher's data callback, the
     // only place the overflow flag is set, so it shows as a plain fetch failure.
     expectEqual(statusFor("fetch", false), St67FetchStatus::HttpFailure,
                 "Content-Length over 4096 is HttpFailure, not ResponseTooLarge");
@@ -91,7 +90,7 @@ void testResponseTooLarge()
 void testNeverProduced()
 {
     const char* stages[] = {"credentials", "w6x-init", "module-info", "callback-register",
-                            "wifi-init", "lwip-init", "lwip-netif", "connect",
+                            "wifi-init", "net-init", "connect",
                             "connect-state", "dhcp", "disconnect", "link-down", "reconnect",
                             "final-state", "netif-stop", "fetch", "persistent-ready"};
     for (const char* stage : stages) {

@@ -15,6 +15,17 @@
 #define APP_ST67_SHUTDOWN_SETTLING_DELAY_MS 100U
 #define APP_ST67_COLD_RESTART_DELAY_MS 1000U
 #define APP_ST67_HTTP_PORT 80U
+#define APP_ST67_HTTPS_PORT 443U
+/* 1: HTTPS on APP_ST67_HTTPS_PORT with the module verifying the server against
+   TrustedCa; 0: plain HTTP on APP_ST67_HTTP_PORT, for bench diagnostics only. */
+#ifndef APP_ST67_HTTP_USE_TLS
+#define APP_ST67_HTTP_USE_TLS 1
+#endif
+/* Bench only (cmake -DAPP_ST67_TLS_BENCH_ANCHOR_ISRG=ON): trust ISRG Root X1
+   instead of Amazon Root CA 1, for the badssl.com certificate failure cases. */
+#ifndef APP_ST67_TLS_BENCH_ANCHOR_ISRG
+#define APP_ST67_TLS_BENCH_ANCHOR_ISRG 0
+#endif
 #define APP_ST67_DNS_TIMEOUT_MS 5000U
 #define APP_ST67_HTTP_IO_TIMEOUT_MS 5000U
 #define APP_ST67_HTTP_TOTAL_TIMEOUT_MS 15000U

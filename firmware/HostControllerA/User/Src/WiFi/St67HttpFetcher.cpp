@@ -1,6 +1,7 @@
 #include <WiFi/St67HttpFetcher.hpp>
 
 #include <cstdio>
+#include <cstring>
 
 #include <Debug/LogService.hpp>
 #include <WiFi/HttpClient.hpp>
@@ -8,71 +9,47 @@
 #include <WiFi/St67HttpFetchTask.hpp>
 #include <WiFi/St67HttpRules.hpp>
 #include <WiFi/St67Runtime.hpp>
+#include <WiFi/TrustedCa.hpp>
 #include <Utils/Crc32.hpp>
 
 #include "app_config.h"
-#include "lwip/dns.h"
 #include "main.h"
-
-#include <cstring>
+#include "w6x_api.h"
 
 namespace HostController {
 namespace {
 
-constexpr uint32_t kFlagDns = 1U << 4;
-constexpr uint32_t kFlagHttp = 1U << 5;
+constexpr bool kUseTls = APP_ST67_HTTP_USE_TLS != 0;
+constexpr uint16_t kPort = kUseTls ? APP_ST67_HTTPS_PORT : APP_ST67_HTTP_PORT;
+constexpr HttpClient::Tls kTrust{TrustedCa::kAnchorName, TrustedCa::kAnchorPem};
 
-void dnsCallback(const char* name, const ip_addr_t* address, void* argument) {
-  (void)name;
-  St67Runtime& runtime = *static_cast<St67Runtime*>(argument);
-  runtime.dnsPending = false;
-  runtime.dnsStatus = address != nullptr ? ERR_OK : ERR_VAL;
-  if (address != nullptr) {
-    runtime.dnsAddress = *address;
-  }
-  if (runtime.taskHandle != nullptr) {
-    osThreadFlagsSet(runtime.taskHandle, kFlagDns);
-  }
-}
-
-void httpResultCallback(void* argument, HTTP_Status_Code_e status,
-                       uint32_t receivedBytes, uint32_t serverResult,
-                       int32_t error) {
-  (void)serverResult;
+void httpResultCallback(void* argument, uint32_t status, uint32_t receivedBytes,
+                        int32_t error) {
   St67Runtime& runtime = *static_cast<St67Runtime*>(argument);
   runtime.httpStatus = status;
   runtime.httpReceivedBytes = receivedBytes;
-  runtime.httpError = error;
-  if (runtime.taskHandle != nullptr) {
-    osThreadFlagsSet(runtime.taskHandle, kFlagHttp);
+  // A refused Content-Type or an overflowing body already set a reason.
+  if (runtime.httpError == HttpClient::kSuccess) {
+    runtime.httpError = error;
   }
 }
 
-int32_t httpHeadersCallback(HTTP_state_t* connection, void* argument,
-                            uint8_t* headers, uint16_t headerLength,
+int32_t httpHeadersCallback(void* argument, const uint8_t* headers, uint32_t headerLength,
                             uint32_t contentLength) {
-  (void)connection;
   (void)contentLength;
   St67Runtime& runtime = *static_cast<St67Runtime*>(argument);
   runtime.httpResponseTick = osKernelGetTickCount();
   const St67HttpRules::ContentTypeCheck contentType = St67HttpRules::checkContentType(
       headers, headerLength, APP_ST67_HTTP_EXPECTED_CONTENT_TYPE);
-  if (contentType == St67HttpRules::ContentTypeCheck::Missing) {
-    return -1;
-  }
-  if (contentType == St67HttpRules::ContentTypeCheck::Mismatch) {
-    runtime.httpError = HTTP_CLIENT_BAD_PARAM;
+  if (contentType != St67HttpRules::ContentTypeCheck::Match) {
+    runtime.httpError = HttpClient::kErrorResponse;
     return -1;
   }
   return 0;
 }
 
-int32_t httpDataCallback(void* argument, HTTP_buffer_t* buffer, int32_t error) {
+int32_t httpBodyCallback(void* argument, const HttpClient::Body& body) {
   St67Runtime& runtime = *static_cast<St67Runtime*>(argument);
-  if (error != 0 || buffer == nullptr || buffer->data == nullptr ||
-      buffer->length < 0) {
-    return -1;
-  }
   uint8_t* destination = runtime.httpPayload;
   uint32_t* destinationLength = &runtime.httpPayloadLength;
   uint32_t destinationCapacity = sizeof(runtime.httpPayload);
@@ -82,40 +59,25 @@ int32_t httpDataCallback(void* argument, HTTP_buffer_t* buffer, int32_t error) {
     destinationCapacity = runtime.clientRequest->capacity;
   }
   if (*destinationLength > destinationCapacity ||
-      static_cast<uint32_t>(buffer->length) > destinationCapacity - *destinationLength) {
+      body.length > destinationCapacity - *destinationLength) {
     runtime.responseTooLarge = true;
-    runtime.httpError = HTTP_CLIENT_BAD_PARAM;
+    runtime.httpError = HttpClient::kErrorResponse;
     return -1;
   }
-  std::memcpy(destination + *destinationLength, buffer->data,
-              static_cast<size_t>(buffer->length));
-  *destinationLength += static_cast<uint32_t>(buffer->length);
-  runtime.httpReceivedBytes += static_cast<uint32_t>(buffer->length);
-  runtime.httpCrc = Crc32::update(runtime.httpCrc,
-                                  reinterpret_cast<const uint8_t*>(buffer->data),
-                                  static_cast<uint32_t>(buffer->length));
+  std::memcpy(destination + *destinationLength, body.data, body.length);
+  *destinationLength += body.length;
+  runtime.httpCrc = Crc32::update(runtime.httpCrc, body.data, body.length);
   return 0;
 }
 
+// The module's DNS. Synchronous; the driver bounds it with its own timeout, so
+// APP_ST67_DNS_TIMEOUT_MS is not involved.
 bool resolveHost(St67Runtime& runtime, const char* host) {
-  osThreadFlagsClear(kFlagDns);
-  runtime.dnsPending = true;
-  runtime.dnsStatus = ERR_INPROGRESS;
-  const err_t status = dns_gethostbyname(host, &runtime.dnsAddress,
-                                         &dnsCallback, &runtime);
-  if (status == ERR_OK) {
-    runtime.dnsPending = false;
-    return true;
-  }
-  if (status != ERR_INPROGRESS) {
-    runtime.dnsPending = false;
-    runtime.dnsStatus = status;
+  std::memset(runtime.serverIpv4, 0, sizeof(runtime.serverIpv4));
+  if (W6X_Net_ResolveHostAddress(host, runtime.serverIpv4) != W6X_STATUS_OK) {
     return false;
   }
-  const uint32_t flags = osThreadFlagsWait(kFlagDns, osFlagsWaitAny,
-                                           APP_ST67_DNS_TIMEOUT_MS);
-  return (flags & kFlagDns) != 0U && !runtime.dnsPending &&
-         runtime.dnsStatus == ERR_OK;
+  return ATON(runtime.serverIpv4) != 0U;
 }
 
 }  // namespace
@@ -128,26 +90,26 @@ bool St67HttpFetcher::fetch(St67FetchRequest* request) {
   if (request->pathOverride != nullptr) {
     std::snprintf(target_.path, sizeof(target_.path), "%s", request->pathOverride);
   }
-  LogService::instance().logf(LogService::Level::Debug, "ST67 fetch http://%s%s (%s)",
-                              target_.host, target_.path,
+  LogService::instance().logf(LogService::Level::Debug, "ST67 fetch %s://%s%s (%s) ca=%s",
+                              kUseTls ? "https" : "http", target_.host, target_.path,
                               request->pathOverride != nullptr ? "one-off path"
-                              : (target_.hostSaved || target_.pathSaved) ? "saved" : "built-in");
-  if (!St67HttpRules::isValidTarget(target_.host, target_.path, HTTP_SNI_MAX_SIZE)) {
+                              : (target_.hostSaved || target_.pathSaved) ? "saved" : "built-in",
+                              kUseTls ? TrustedCa::kAnchorName : "none");
+  // The host doubles as the SNI, which the module caps at W6X_NET_SNI_MAX_SIZE.
+  if (!St67HttpRules::isValidTarget(target_.host, target_.path, W6X_NET_SNI_MAX_SIZE)) {
     LogService::instance().log(LogService::Level::Error,
                                  "ST67 fetch-config invalid");
     return false;
   }
-  const uint32_t startedAt = HAL_GetTick();
-  if (!resolveHost(runtime_, target_.host) || !IP_IS_V4(&runtime_.dnsAddress) ||
-      ip4_addr_get_u32(ip_2_ip4(&runtime_.dnsAddress)) == 0U) {
+  uint32_t startedAt = HAL_GetTick();
+  if (!resolveHost(runtime_, target_.host)) {
     LogService::instance().logf(LogService::Level::Error,
                                   "ST67 dns failed elapsed=%lums",
                                   static_cast<unsigned long>(HAL_GetTick() - startedAt));
     return false;
   }
-  osThreadFlagsClear(kFlagHttp);
-  runtime_.httpStatus = HTTP_VERSION_NOT_SUPPORTED;
-  runtime_.httpError = HTTP_CLIENT_ERR;
+  runtime_.httpStatus = HttpResponse::kNoStatus;
+  runtime_.httpError = HttpClient::kSuccess;
   runtime_.httpReceivedBytes = 0U;
   runtime_.httpPayloadLength = 0U;
   runtime_.clientPayloadLength = 0U;
@@ -155,24 +117,40 @@ bool St67HttpFetcher::fetch(St67FetchRequest* request) {
   runtime_.httpCrc = Crc32::kInitial;
   runtime_.httpResponseTick = 0U;
   runtime_.clientRequest = request;
-  HTTP_connection_t settings{};
-  settings.server_name = target_.host;
-  settings.timeout = APP_ST67_HTTP_IO_TIMEOUT_MS;
-  settings.max_response_len = APP_ST67_HTTP_MAX_RESPONSE_BYTES;
-  settings.callback_arg = &runtime_;
-  settings.result_fn = &httpResultCallback;
-  settings.headers_done_fn = &httpHeadersCallback;
-  settings.recv_fn = &httpDataCallback;
-  settings.recv_fn_arg = &runtime_;
-  const int32_t requestStatus = HttpClient_Get(
-      &runtime_.dnsAddress, APP_ST67_HTTP_PORT, target_.host,
-      target_.path, &settings);
-  if (requestStatus != HTTP_CLIENT_SUCCESS) {
-    return false;
+
+  HttpClient::Request http{};
+  std::memcpy(http.serverIpv4, runtime_.serverIpv4, sizeof(http.serverIpv4));
+  http.port = kPort;
+  http.host = target_.host;
+  http.path = target_.path;
+  http.tls = kUseTls ? &kTrust : nullptr;
+  http.ioTimeoutMs = APP_ST67_HTTP_IO_TIMEOUT_MS;
+  http.totalTimeoutMs = APP_ST67_HTTP_TOTAL_TIMEOUT_MS;
+  http.maxResponseLength = APP_ST67_HTTP_MAX_RESPONSE_BYTES;
+  http.onHeaders = &httpHeadersCallback;
+  http.onBody = &httpBodyCallback;
+  http.onResult = &httpResultCallback;
+  http.arg = &runtime_;
+  startedAt = HAL_GetTick();
+  const int32_t requestStatus = HttpClient::get(http);
+  const bool success = requestStatus == HttpClient::kSuccess &&
+                       runtime_.httpError == HttpClient::kSuccess &&
+                       HttpResponse::isSuccessStatus(runtime_.httpStatus);
+  if (!success) {
+    // lastErrorFunction names the driver call the error callback reported last,
+    // which says which AT exchange failed inside the client's step.
+    LogService::instance().logf(
+        LogService::Level::Error,
+        "ST67 %s failed: %s status=%lu bytes=%lu elapsed=%lums w6x=%d(%s) in %s",
+        kUseTls ? "https" : "http",
+        HttpClient::resultName(requestStatus != HttpClient::kSuccess ? requestStatus
+                                                                     : runtime_.httpError),
+        static_cast<unsigned long>(runtime_.httpStatus),
+        static_cast<unsigned long>(runtime_.httpReceivedBytes),
+        static_cast<unsigned long>(HAL_GetTick() - startedAt),
+        static_cast<int>(runtime_.lastStatus), W6X_StatusToStr(runtime_.lastStatus),
+        runtime_.lastErrorFunction != nullptr ? runtime_.lastErrorFunction : "-");
   }
-  const bool success =
-      runtime_.httpError == 0 &&
-      HttpResponse::isSuccessStatus(static_cast<uint32_t>(runtime_.httpStatus));
   return success;
 }
 

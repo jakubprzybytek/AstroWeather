@@ -23,7 +23,9 @@ This plan is consistent with the following ST documentation:
 - [How to use X-CUBE-ST67W61 STM32CubeMX pack](https://wiki.st.com/stm32mcu/wiki/Connectivity:Wi-Fi_How_to_use_X_CUBE_ST67W61_STM32CubeMx_pack)
 - [ST67W6X Echo Application](https://wiki.st.com/stm32mcu/wiki/Connectivity:Wi-Fi_ST67W6X_Echo_Application)
 
-The project selects ST67 architecture T02 with lwIP 2.2.1 on the STM32 host. ST documents that, for T02:
+**2026-10-03:** the project now selects ST67 architecture **T01** without lwIP (`ST67_ARCH=W6X_ARCH_T01`); TCP/IP, DNS and TLS run in the module and the host uses the driver's `W6X_Net_*` sockets. The lwIP statements below record the T02 period (2026-08 to 2026-10) and the migration work done then; the rules about generated code are unchanged. See [ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md) for the switch.
+
+Until 2026-10-03 the project selected ST67 architecture T02 with lwIP 2.2.1 on the STM32 host. ST documents that, for T02:
 
 - lwIP owns TCP/IP and BSD sockets on the host;
 - the ST Net and HTTP services are disabled;
