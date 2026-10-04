@@ -88,9 +88,9 @@ UI change are always released at the same time.
 
 1. Run the local suites: `npm run test` and `npm run test:web`.
 2. Deploy to `int`: `npm run deploy -- --stage int`.
-3. Run the integration suite against `int` (see below) and spot-check the
-   public hostname, for example
-   `curl -si https://api.int.astroweather.albedoonline.com/astro/krakow`.
+3. Run the integration suite against `int` (see below), and sign in to the web
+   UI at `https://int.astroweather.albedoonline.com` to check the signed-in
+   path, which the suite does not cover.
 4. Deploy to `prod` and repeat the checks against its hostname.
 
 ### Testing a deployed stage

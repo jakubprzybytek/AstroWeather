@@ -50,10 +50,11 @@ device key) instead of the payload.
 
 ### Demo configuration `test`
 
-`GET /astro/test` returns a made-up forecast that shows every display variant,
-for trying the boards out. `test` is not in `configurations.ts` and is not
-listed by `GET /configurations`; the web UI offers it on the Home view only,
-and the device fetches it with `astro test` (or with `api path /astro/test`).
+`GET /astro/test` (and `GET /device/astro/test` with the device key) returns a
+made-up forecast that shows every display variant, for trying the boards out.
+`test` is not in `configurations.ts` and is not listed by
+`GET /configurations`; the web UI offers it on the Home view only, and the
+device fetches it with `astro test` (or with `api path /device/astro/test`).
 The payload is a normal protocol 3 response for six consecutive nights
 (`forecast/demo.ts`):
 
@@ -226,6 +227,9 @@ Gateway. The API does not currently emit cache headers or use response caching.
 |---|---|---|
 | `200` | Forecast response | The configuration exists, including when astronomy or weather is partly unavailable |
 | `404` | `error=configuration_not_found` response | The identifier is missing or unknown |
+| `401` | `{"message":"Unauthorized"}` from API Gateway | No Cognito token on `/astro/...`, or no `key` on `/device/astro/...` |
+| `403` | `{"message":"Forbidden"}` from API Gateway | Wrong device key |
+| `429` | API Gateway's throttling response | Over the stage's one request per second |
 | `500` | `error=forecast_unavailable` response | No trustworthy protocol response can be assembled |
 
 The API does not expose upstream errors, AWS details, or stack traces to the

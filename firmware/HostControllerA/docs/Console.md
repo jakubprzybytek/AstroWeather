@@ -353,7 +353,7 @@ astro      last refresh ok, 0d 00:02:25 ago, from console
 weather    last fetched by the server 2026-09-23 09:05:12 +02:00, 1 h 07 min ago
 aurora     last fetched by the server: GFZ 0 h 09 min ago, NOAA Kp 0 h 09 min ago, NOAA outlook 6 h 09 min ago, OVATION none
 schedule   every 6 h from 00:10; next 12:10; last ok 2026-09-23 10:10
-api        http://api.example.com/astro/wroclaw (built-in)
+api        https://api.example.com/device/astro/wroclaw (built-in)
 display    normal brightness; 3078 frames, 0 late shifts, 0 late interrupts, refresh interrupt up to 170 us
 remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 ```

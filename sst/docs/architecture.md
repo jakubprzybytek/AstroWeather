@@ -10,7 +10,7 @@ to call a separate endpoint for each data source.
 ## Core Components
 ### 1. API Gateway (SST `ApiGatewayV2`)
 - **Endpoint**: `GET /configurations`
-  - **Output**: JSON array of public configuration identifiers and labels for UI selectors.
+  - **Output**: JSON array of configuration identifiers and labels for UI selectors.
 - **Endpoint**: `GET /astro/{configurationId}`
   - **Input**: `configurationId` (path parameter)
   - **Output**: `text/plain; charset=utf-8` version 1 payload containing six fixed
@@ -293,8 +293,10 @@ changes or breaks.
 - **Cloud Provider**: AWS
 
 ## Data Flow
-1. Client calls `GET /astro/krakow` over HTTPS.
-2. API Gateway triggers the forecast Lambda.
+1. The web UI calls `GET /astro/krakow` over HTTPS with a Cognito access
+   token, or the device calls `GET /device/astro/krakow?key=<key>`.
+2. API Gateway checks the credential (see [Access control](#access-control))
+   and triggers the forecast Lambda.
 3. The Lambda resolves the `krakow` configuration and its location.
 4. The Lambda calculates astronomy and queries the stored weather items for the
    six requested nights.

@@ -318,14 +318,20 @@ template are left over from before `wifi set` and are not used.
 
 ### Server
 
-The host and path are set on the console with `api host <host>` and
-`api path <path>`, saved in the EEPROM (tags `ApiHost`, `ApiPath`; see
-[Settings.md](Settings.md#tag-registry)), and read at the start of every fetch,
-so a change applies from the next one. `api show` and the `api` line of
+The host, path and device key are set on the console with `api host <host>`,
+`api path <path>` and `api key <key>`, saved in the EEPROM (tags `ApiHost`,
+`ApiPath`, `ApiKey`; see [Settings.md](Settings.md#tag-registry)), and read at
+the start of every fetch, so a change applies from the next one. The API wants
+the path `/device/astro/<configurationId>` and the stage's key; the fetch
+appends the key as `?key=<key>` (`St67HttpRules::formatRequestPath`), because
+the T01 driver cannot add a request header. Without a key the server answers
+401, with a wrong one 403
+(`sst/docs/architecture.md#access-control`). `api show` and the `api` line of
 `status` show what is used; see [Console.md](Console.md#api).
 
 Each part that is not saved falls back to its built-in value,
-`APP_ST67_HTTP_HOST` / `APP_ST67_HTTP_PATH`. Those come from
+`APP_ST67_HTTP_HOST` / `APP_ST67_HTTP_PATH` / `APP_ST67_HTTP_KEY` (an empty
+key sends none). Those come from
 `Appli/App/app_credentials.h`, a git-ignored copy of
 `Appli/App/app_credentials.h.template`, which `app_config.h` includes when it
 exists. With neither a saved nor a built-in value, every fetch fails as
@@ -334,7 +340,8 @@ exists. With neither a saved nor a built-in value, every fetch fails as
 built with `-DAPP_ST67_HTTP_USE_TLS=0` for bench diagnostics.
 
 Each fetch logs the target at `Debug` level: `ST67 fetch https://<host><path>
-(saved|built-in)`, where `saved` means at least one part was saved.
+key=<set>|<none> (saved|built-in)`, where `saved` means at least one part was
+saved. The key itself is never logged.
 
 Before each fetch the fetcher rejects:
 

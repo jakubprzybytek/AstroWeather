@@ -7,8 +7,8 @@ shows it on seven-segment and dot-matrix LED displays.
 ## What It Does
 
 - Every 6 hours, at 00:10, 06:10, 12:10 and 18:10 local time, it joins Wi-Fi
-  and fetches a line-based forecast payload over plain HTTP from the AstroWeather
-  server (`../../sst`). A slot missed while the board was off or offline is caught
+  and fetches a line-based forecast payload over HTTPS from the AstroWeather
+  server (`../../sst`), sending the device key saved with `api key`. A slot missed while the board was off or offline is caught
   up once, and failures are retried with a growing delay.
 - It checks the payload's CRC, parses it, and shows it on its own LED board and
   on up to five remote display boards reached over I2C (addresses `0x10`–`0x14`).
