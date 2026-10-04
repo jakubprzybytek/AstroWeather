@@ -37,11 +37,16 @@ export type AuroraForecastDependencies = {
 export type AuroraForecastSummary = {
   stored: AuroraSourceKey[];
   failed: AuroraSourceKey[];
+  stale: AuroraSourceKey[];
   flagged: string[];  // `configurationId/nightId` newly flagged
 };
 
 // The six displayed nights, as the payload shows them.
 const NIGHT_COUNT = 6;
+
+// Every source republishes at least six-hourly, so a file this old means the
+// supplier has stopped; it is still stored, and the merge passes it over.
+const STALE_AFTER_MS = 12 * 3_600_000;
 
 function createProductionDependencies(): AuroraForecastDependencies {
   return {
@@ -63,6 +68,7 @@ export async function ingestAuroraForecast(
   const fetchedAt = now.toISOString();
   const stored: AuroraSourceKey[] = [];
   const failed: AuroraSourceKey[] = [];
+  const stale: AuroraSourceKey[] = [];
   const loaders = { GFZ: dependencies.loadGfz, NOAA3: dependencies.loadNoaa3, NOAA27: dependencies.loadNoaa27 };
   const loaded: Partial<Record<AuroraSourceKey, Loaded<unknown>>> = {};
 
@@ -97,6 +103,16 @@ export async function ingestAuroraForecast(
         from: result.spans[0]?.start ?? null,
         to: result.spans[result.spans.length - 1]?.end ?? null
       });
+      const modified = result.lastModified ? Date.parse(result.lastModified) : NaN;
+      if (now.getTime() - modified > STALE_AFTER_MS) {
+        stale.push(source);
+        dependencies.log?.("Aurora forecast source stale", {
+          source,
+          lastModified: result.lastModified,
+          ageHours: Math.round((now.getTime() - modified) / 3_600_000),
+          status: "stale"
+        });
+      }
     } catch (cause) {
       failed.push(source);
       dependencies.log?.("Aurora forecast source failed", {
@@ -110,7 +126,7 @@ export async function ingestAuroraForecast(
   const flagged = await flagStormNights(dependencies, now, fetchedAt,
     loaded.GFZ?.spans as GfzHp60Span[] | undefined, loaded.NOAA3?.spans as NoaaKpSpan[] | undefined);
 
-  const summary = { stored, failed, flagged };
+  const summary = { stored, failed, stale, flagged };
   dependencies.log?.("Aurora forecast ingestion completed", summary);
   if (failed.length > 0) {
     throw new Error(`Aurora forecast ingestion failed for: ${failed.join(", ")}`);

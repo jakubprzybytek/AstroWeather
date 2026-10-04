@@ -74,7 +74,7 @@ describe("ingestAuroraForecast", () => {
 
     const summary = await ingestAuroraForecast(dependencies);
 
-    expect(summary).toEqual({ stored: ["GFZ", "NOAA3", "NOAA27"], failed: [], flagged: ["wroclaw/2026-10-02"] });
+    expect(summary).toEqual({ stored: ["GFZ", "NOAA3", "NOAA27"], failed: [], stale: [], flagged: ["wroclaw/2026-10-02"] });
     expect([...items.keys()].sort()).toEqual([
       "LOC#wroclaw|NIGHT#2026-10-01#AURORA#GFZ",
       "LOC#wroclaw|NIGHT#2026-10-01#AURORA#NOAA27",
@@ -117,6 +117,22 @@ describe("ingestAuroraForecast", () => {
     const outlooks = vi.mocked(dependencies.log!).mock.calls.filter(([message]) => message === "Aurora forecast outlook");
     expect(outlooks[outlooks.length - 1][1]).toMatchObject({
       nights: expect.arrayContaining([expect.objectContaining({ nightId: "2026-10-02", gfzQ75Max: 2, flag: "kept" })])
+    });
+  });
+
+  test("stores a source whose file has stopped updating, and warns that it is stale", async () => {
+    const { dependencies, items } = forecastDependencies({
+      loadGfz: vi.fn(async () => ({
+        spans: [gfzHour(new Date("2026-10-01T20:00:00Z"))], lastModified: "Wed, 30 Sep 2026 21:05:00 GMT"
+      }))
+    });
+
+    const summary = await ingestAuroraForecast(dependencies);
+
+    expect(summary).toMatchObject({ stored: ["GFZ", "NOAA3", "NOAA27"], stale: ["GFZ"] });
+    expect(items.has("LOC#wroclaw|NIGHT#2026-10-01#AURORA#GFZ")).toBe(true);
+    expect(dependencies.log).toHaveBeenCalledWith("Aurora forecast source stale", {
+      source: "GFZ", lastModified: "Wed, 30 Sep 2026 21:05:00 GMT", ageHours: 13, status: "stale"
     });
   });
 

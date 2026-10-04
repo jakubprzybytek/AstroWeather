@@ -297,6 +297,13 @@ pull a nowcast at most seven minutes old. NOAA's `Cache-Control: max-age=60`
 is far above any of these rates. On a storm night the job moves about 55 MB
 (OVATION is 920 KB) in ~60 invocations; on a quiet night, ~30 KB in four.
 
+A feed that answers but has stopped updating does not fail the run: the file
+is stored as usual, and the merge passes it over (see
+[Merging Sources](#merging-sources)). When its `Last-Modified` is more than
+12 hours old the run logs `Aurora forecast source stale` and lists the source
+under `stale` in its summary. GFZ went quiet this way from 3 October 2026,
+and nothing showed it in the logs.
+
 ### Why ten minutes and not an hour
 
 For the display alone, hourly at :03 would do: the device pulls hourly and
