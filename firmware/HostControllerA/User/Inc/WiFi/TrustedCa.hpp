@@ -1,8 +1,9 @@
 #ifndef INC_HOSTCONTROLLER_TRUSTEDCA_HPP_
 #define INC_HOSTCONTROLLER_TRUSTEDCA_HPP_
 
-// The trust anchor for the astro API. The API is served by CloudFront with an
-// ACM certificate, whose default chain ends in Amazon Root CA 1 (RSA 2048,
+// The trust anchor for the astro API. The API is served on an API Gateway
+// custom domain with an ACM certificate (CloudFront until October 2026; same
+// chain), whose default chain ends in Amazon Root CA 1 (RSA 2048,
 // valid to 2038-01-17). Public data, so it lives in source; the Wi-Fi password
 // does not. If ACM ever changes the chain, add the new root here and record
 // the rotation in docs/ST67_HTTPS_Implementation_Plan.md.

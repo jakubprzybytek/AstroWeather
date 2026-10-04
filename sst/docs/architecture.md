@@ -68,6 +68,8 @@ Route Lambdas
 - The certificate is ACM RSA 2048 and chains to Amazon Root CA 1, the trust
   anchor the HostController loads into the ST67 module.
 - The generated `execute-api` URL stays reachable and serves the same routes.
+  SST's `AstroApi` URL output, and with it the integration tests, uses the
+  custom domain.
 - The web UI calls the API through `VITE_API_URL`, and CORS allows only the
   HTTPS web origin plus local Vite origins.
 

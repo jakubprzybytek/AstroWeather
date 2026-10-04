@@ -118,7 +118,7 @@ The driver's own log output goes through `vLoggingPrintf()`, defined in
 | `User/Src/WiFi/St67HttpRules.cpp`, `.../St67HttpRules.hpp` | The fetcher's host/path check (`isValidTarget()`) and `Content-Type` check (`checkContentType()`). Pure. |
 | `User/Src/WiFi/HttpClient.cpp`, `User/Inc/WiFi/HttpClient.hpp` | `HttpClient::get()`: a bounded synchronous HTTP/1.1 GET on a `W6X_Net` socket, TLS or plain. |
 | `User/Src/WiFi/HttpResponseParser.cpp`, `.../HttpResponseParser.hpp` | `HttpResponse::`: header end, status line, `Content-Length`, the header buffer and body limits, used by `HttpClient::get()`. Pure. |
-| `User/Src/WiFi/TrustedCa.cpp`, `User/Inc/WiFi/TrustedCa.hpp` | Amazon Root CA 1 as PEM text: the trust anchor for the API's CloudFront certificate. |
+| `User/Src/WiFi/TrustedCa.cpp`, `User/Inc/WiFi/TrustedCa.hpp` | Amazon Root CA 1 as PEM text: the trust anchor for the API's ACM certificate (API Gateway custom domain). |
 | `User/Inc/WiFi/St67Runtime.hpp` | `St67Runtime`: init flags, state, the resolved server address, HTTP results, the first failure, the 4096-byte `httpPayload` buffer, the client request being served. |
 | `User/Src/WiFi/St67SpiReady.cpp` | The `ST67_RDY` rising-edge bridge. |
 | `User/Src/WiFi/St67ProbeTask.cpp` | Dead code: the raw AT/CWLAP probe from before the driver was used. Compiled, never started. |

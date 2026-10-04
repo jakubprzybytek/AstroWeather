@@ -63,7 +63,7 @@ outputs:
 | `apiUrl` | Public API hostname, an API Gateway custom domain served over HTTPS only |
 | `siteUrl` | Web UI |
 | `forecastDataTableName` | DynamoDB table used by the ingestion job and forecast API |
-| `AstroApi` | Generated API Gateway URL, used by the integration tests |
+| `AstroApi` | API URL of the stage (the custom domain), used by the integration tests |
 
 The Lambda handler and web UI are deployed together, so an API change and its
 UI change are always released at the same time.

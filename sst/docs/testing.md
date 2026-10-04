@@ -109,7 +109,7 @@ Integration tests call a deployed API over HTTP. They live in
 
 `npm run test:integration` wraps Vitest in `sst shell`, which makes the stage's
 linked resources available. `globalSetup.ts` reads `Resource.AstroApi.url`, the
-generated API Gateway URL of the selected stage, prints it, and hands it to the
+custom-domain API URL of the selected stage, prints it, and hands it to the
 test files through Vitest's `provide`/`inject`. Test files must use
 `inject("apiUrl")` rather than `Resource`: on Windows, Vitest workers receive
 environment variable names upper-cased, which hides the SST links from
@@ -135,9 +135,9 @@ The suite covers:
 - a missing path parameter is not `200`;
 - `GET /configurations` returns the configuration list.
 
-Because the tests call the generated API Gateway URL, they do not exercise the
-public API hostname or its certificate. Check those manually after
-infrastructure changes:
+The tests call the public API hostname over HTTPS, so they exercise its
+certificate too. They do not check that plain HTTP is refused. After
+infrastructure changes, check the hostname by hand:
 
 ```bash
 curl -si https://api.<stage>.astroweather.albedoonline.com/astro/krakow
