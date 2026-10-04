@@ -11,8 +11,8 @@ display boards on an STM32G070.
 | --- | --- |
 | `Src/Display`, `Inc/Display` | Logical display content (`DisplayTypes`), the PCB segment and matrix encoding (`DisplayCodec`), the multiplexing refresh task (`PcbDisplayBoard`), the I2C message format (`DisplayI2cProtocol`), the address straps (`DisplayAddress`) and the `DisplayBoard` interface |
 | `Src/Device`, `Inc/Device` | The `SCT2xxx` LED driver chain over SPI |
-| `Src/Utils`, `Inc/Utils` | `Task`/`TaskBase` (CMSIS-RTOS2 tasks with static stacks and a registry), `Mutex`, `Led`, `SwitchInput`, `Crc32` |
-| `Src/Debug`, `Inc/Debug` | `BlinkingLed` |
+| `Src/Utils`, `Inc/Utils` | `Task`/`TaskBase` (CMSIS-RTOS2 tasks with static stacks and a registry), `Mutex`, `SwitchInput`, `Crc32` |
+| `Src/Debug`, `Inc/Debug` | `BlinkingLed` (the `LED_1` heartbeat), `PulseLed` and `activityLed()` (`LED_2`, also from interrupts and C through `ActivityLedBridge.h`) |
 | `tests/` | Native unit tests for the above, and the pieces both projects' own tests reuse: the HAL and RTOS stubs (`stubs/`), `Expect.hpp` (`support/`), `add_native_test()` (`NativeTest.cmake`) and a stand-in `main.h` (`board/`) |
 
 The display code is described in

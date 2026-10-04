@@ -4,7 +4,6 @@
 #include <FrameAssembler.hpp>
 #include <I2cTarget.hpp>
 #include <NoDataTimer.hpp>
-#include <Utils/Led.hpp>
 #include <Utils/Task.hpp>
 
 #include <cstdint>
@@ -26,7 +25,7 @@ public:
     // the day.
     static constexpr uint32_t kNoDataTimeoutMs = 7UL * 60UL * 60UL * 1000UL;
 
-    DisplayApp(Display::DisplayBoard& board, I2cTarget& link, Led& activityLed);
+    DisplayApp(Display::DisplayBoard& board, I2cTarget& link);
 
 protected:
     void run() override;
@@ -39,7 +38,6 @@ private:
     static constexpr uint32_t kAddressScreenMs = 3000U;
     static constexpr uint32_t kTestScreenMs = 60000U;
     static constexpr uint32_t kPollMs = 1000U;
-    static constexpr uint32_t kActivityBlinkMs = 20U;
 
     bool receiveFrames(uint32_t now);
     void setScreen(Screen screen, uint32_t now);
@@ -49,7 +47,6 @@ private:
 
     Display::DisplayBoard& board_;
     I2cTarget& link_;
-    Led& activityLed_;
     DisplayController::NoDataTimer noData_{kNoDataTimeoutMs};
     DisplayController::FrameAssembler frames_;
     Screen screen_ = Screen::Data;

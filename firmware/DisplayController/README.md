@@ -9,9 +9,9 @@ EEPROM; see
 
 ## Features
 
-Started 2026-09-25. The firmware implements the features below, but no display
-board has been built yet: everything marked 🔵 compiles and its logic is unit
-tested, but it has not run on hardware.
+Started 2026-09-25. The first display board runs it since 2026-10-04, on the
+host's I2C bus at `0x11`. Everything marked 🔵 compiles and its logic is unit
+tested, but has not yet been checked on that board.
 
 The display behaviour and the I2C link are documented once, for both boards, in
 the host's [Display.md](../HostControllerA/docs/Display.md); how this firmware
@@ -33,19 +33,19 @@ Status: ✅ done · 🔵 built, not yet run on a board · 🔴 not started.
 | "No data" state: segment G on the last digit of every numeric display, matrix blank | 🔵 Built | Shared (`Display::noDataState()`); after the boot screens until the first frame. The host shows it too (verified on the host board) | [Display.md](../HostControllerA/docs/Display.md#no-data) |
 | Back to "no data" after 7 h without a frame | 🔵 Built | Just over the host's 6-hour refresh interval, since the host sends only on a refresh or a `display` command | [Display.md](../HostControllerA/docs/Display.md#no-data) |
 | **I2C link to the host** | | | |
-| Address from the `ADDR_0..2` straps (27 IDs, `0x10`–`0x2A`) | 🔵 Built | `detectBoardAddress()`; the pins are left analog afterwards | [Display.md](../HostControllerA/docs/Display.md#i2c-transport) |
-| I2C target: receive the 36-byte message, command `0x01` | 🔵 Built | Interrupt listen mode; the message is decoded in the `DisplayApp` task | [Architecture.md](docs/Architecture.md#i2c-target) |
-| Listen only once the address is known | 🔵 Built | I2C1 is re-initialised with the strap address before listening starts | [Architecture.md](docs/Architecture.md#i2c-target) |
+| Address from the `ADDR_0..2` straps (27 IDs, `0x10`–`0x2A`) | ✅ Done | `detectBoardAddress()`, floating 0, ground 1, VCC 2, so no straps is `0x10`; the pins are left analog afterwards. Board 1 reads `0x11` (`ADDR_0` grounded) | [Display.md](../HostControllerA/docs/Display.md#i2c-transport) |
+| I2C target: receive the 36-byte message, command `0x01` | ✅ Done | Interrupt listen mode; the message is decoded in the `DisplayApp` task. On the bench `astro test` gave 1 frame and 3 attribute messages accepted, nothing rejected, no bus errors; `status` and `eeprom scan` probes answered | [Architecture.md](docs/Architecture.md#i2c-target) |
+| Listen only once the address is known | ✅ Done | I2C1 is re-initialised with the strap address before listening starts; the host sees `0x11` and nothing on CubeMX's placeholder `0x10` | [Architecture.md](docs/Architecture.md#i2c-target) |
 | Reject unknown commands and short writes, keeping the previous frame | 🔵 Built | Counted in `g_displayStats` | [Architecture.md](docs/Architecture.md#i2c-target) |
 | Recover from bus errors | 🔵 Built | Listening is restarted after an error, and checked every second | [Architecture.md](docs/Architecture.md#i2c-target) |
 | **Brightness** | | | |
 | Never drive the bussed `LOW_POWER_ENABLE` line | ✅ Done | PB8 is analog ([Hardware review](../../KiCad/Hardware_Review.md) M-4) | [Display.md](../HostControllerA/docs/Display.md#low-brightness) |
 | **Development aids** | | | |
 | Heartbeat on `LED_1` | ✅ Done | 20 ms on every 2 s from power-up, the host's rate (`BlinkingLed::kHeartbeatOnMs`/`kHeartbeatOffMs` in `../Common`) | [Architecture.md](docs/Architecture.md#tasks) |
-| `LED_2` flashes on each accepted frame | 🔵 Built | 20 ms | [Architecture.md](docs/Architecture.md#screens) |
+| `LED_2` flashes on every I2C transaction addressed to the board | 🔵 Built | 20 ms, from the address-match interrupt, through the host's `PulseLed` (now in `../Common`) | [Architecture.md](docs/Architecture.md#screens) |
 | Switch 1 steps through test screens, switch 2 shows the address | 🔵 Built | All segments, then an identify pattern, then back; test screens close after 60 s, the address after 3 s | [Architecture.md](docs/Architecture.md#screens) |
-| Diagnostic counters | 🔵 Built | `g_displayStats`, read over SWD: frames accepted and rejected, short writes, probes, bus errors, listen restarts, stale timeouts | [Architecture.md](docs/Architecture.md#diagnostics) |
-| Stack overflow hook, as on the host | 🔵 Built | Halts with the task name in `g_stackOverflowTaskName` | [Architecture.md](docs/Architecture.md#diagnostics) |
+| Diagnostic counters | ✅ Done | `g_displayStats`, read over SWD: frames accepted and rejected, short writes, probes, bus errors, listen restarts, stale timeouts | [Architecture.md](docs/Architecture.md#diagnostics) |
+| Stack overflow hook, as on the host | ✅ Done | Halts with the task name in `g_stackOverflowTaskName`; it caught `DisplayApp` on its first board run (stack now 2048) | [Architecture.md](docs/Architecture.md#diagnostics) |
 | Console over USART2 (PA2/PA3, 115200) | 🔴 Not started | The G070 has no USB; USART2 is disabled in CubeMX for now. Wiring in [Display_Board_Purchasing.md](../HostControllerA/docs/Display_Board_Purchasing.md#console-over-uart) | |
 | **Tests** | | | |
 | Native tests for the shared code (codec, protocol, address, "no data") | ✅ Done | 5 suites in `../Common/tests` | [Testing.md](../HostControllerA/docs/Testing.md) |
@@ -65,7 +65,7 @@ shared code compiles unchanged.
 | I2C1, target, interrupt | `PA9` SCL, `PA10` SDA | Messages from the host, at `0x10` + the strap ID |
 | GPIO inputs, pull-down at reset | `PB10`, `PB11`, `PB14` = `ADDR_0`..`ADDR_2` | Board address straps; analog once read |
 | GPIO EXTI, falling edge | `PB12` `SWITCH_1`, `PB13` `SWITCH_2` | Switches, for `Utils::SwitchInput` |
-| GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat, frame received |
+| GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat, I2C traffic |
 | Analog | `PB8` `LOW_POWER_ENABLE` | Bussed net driven by the host; never driven here ([Hardware review](../../KiCad/Hardware_Review.md) M-4) |
 | SWD | `PA13`, `PA14` | Debug |
 | TIM1 | none | HAL time base |

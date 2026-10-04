@@ -9,9 +9,10 @@
 
 // An LED lit for a while by pulse(), from a task or an interrupt, without
 // blocking: the pin is set at once and a one-shot timer clears it. Pulses
-// that overlap merge, so the LED stays lit until the latest one ends. LED2
-// shows switch presses (long pulses) and USB CDC traffic (short ones); see
-// docs/Console.md.
+// that overlap merge, so the LED stays lit until the latest one ends. On the
+// host LED2 shows switch presses (long pulses) and USB CDC traffic (short
+// ones), see HostControllerA/docs/Console.md; on a display board it shows
+// every I2C transaction addressed to it.
 class PulseLed
 {
 public:

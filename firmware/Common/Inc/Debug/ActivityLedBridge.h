@@ -10,7 +10,7 @@ extern "C" {
 /* Pulses LED2 for `ms`, from a task or an interrupt; see Debug/PulseLed.hpp. */
 void ActivityLed_Pulse(uint32_t ms);
 
-/* The pulse for one USB CDC transfer, in either direction. */
+/* The pulse for one USB CDC transfer, in either direction (host). */
 #define ACTIVITY_LED_USB_PULSE_MS 20U
 
 #ifdef __cplusplus

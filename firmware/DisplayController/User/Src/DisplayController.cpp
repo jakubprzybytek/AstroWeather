@@ -1,6 +1,7 @@
 #include <DisplayController.hpp>
 
 #include <Debug/BlinkingLed.hpp>
+#include <Debug/PulseLed.hpp>
 #include <Device/SCT2xxx.hpp>
 #include <Display/DisplayAddress.hpp>
 #include <Display/PcbDisplayBoard.hpp>
@@ -8,7 +9,6 @@
 #include <I2cTarget.hpp>
 #include <Screens.hpp>
 #include <Stats.hpp>
-#include <Utils/Led.hpp>
 #include <Utils/SwitchInput.hpp>
 
 #include "main.h"
@@ -33,17 +33,16 @@ static Display::PcbDisplayBoard board(
     {DISPLAY_1_EN_Pin, DISPLAY_2_EN_Pin, DISPLAY_3_EN_Pin, DISPLAY_4_EN_Pin,
      DISPLAY_5_EN_Pin});
 
-// Flashes briefly for every accepted frame.
-static Led led2(LED_2_GPIO_Port, LED_2_Pin);
-
 static I2cTarget link(hi2c1);
 
-static DisplayApp app(board, link, led2);
+static DisplayApp app(board, link);
 
 // Runs from main() before osKernelStart(); the tasks started here only run
 // once the scheduler is up.
 void DisplayController_Init() {
   led1.start();
+  // LED_2: every I2C transaction; before listening starts.
+  activityLed().init();
 
   // Prepare the self-test before the refresh starts, so the first frames
   // latched are the self-test rather than whatever the drivers held at reset.

@@ -3,9 +3,8 @@
 #include <Screens.hpp>
 #include <Stats.hpp>
 
-DisplayApp::DisplayApp(Display::DisplayBoard& board, I2cTarget& link, Led& activityLed)
-    : Task<2048>("DisplayApp", osPriorityNormal), board_(board), link_(link),
-      activityLed_(activityLed)
+DisplayApp::DisplayApp(Display::DisplayBoard& board, I2cTarget& link)
+    : Task<2048>("DisplayApp", osPriorityNormal), board_(board), link_(link)
 {
 }
 
@@ -76,7 +75,6 @@ bool DisplayApp::receiveFrames(uint32_t now)
             noData_.onFrame(now);
             ++g_displayStats.framesAccepted;
             g_displayStats.lastFrameTick = now;
-            activityLed_.blink(kActivityBlinkMs);
             break;
         case DisplayController::FrameAssembler::Result::Staged:
             ++g_displayStats.attributesAccepted;

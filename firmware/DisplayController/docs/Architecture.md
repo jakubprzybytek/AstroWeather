@@ -20,7 +20,8 @@ the stale-data timeout are unit tested.
 `DisplayController_Init()` (`User/Src/DisplayController.cpp`), before the
 scheduler starts:
 
-1. Starts the `Led1` heartbeat.
+1. Starts the `Led1` heartbeat and creates the `activityLed()` timer for
+   `LED_2`.
 2. Loads the all-segments self-test into the board and starts the refresh
    (`PcbDisplayBoard::start()`: enables the SCT outputs and starts TIM6, whose
    interrupt then multiplexes the board with SPI1 DMA transfers, no task
@@ -86,7 +87,10 @@ The test screens and "no data" are plain: full brightness, nothing blinking.
 Switch 1 steps through all segments, identify, and back to the data; each test
 screen closes by itself after 60 s. A frame that arrives while a test or
 address screen is up is kept and shown when it closes. `LED_2` flashes for
-20 ms on every accepted frame.
+20 ms on every I2C transaction addressed to the board (frames, attributes,
+the host's probes and reads), from the address-match interrupt
+(`I2cTarget::onAddress()`) through the shared `PulseLed`; transactions
+closer together than that merge into one flash.
 
 The stale-data timeout is 7 hours (`DisplayApp::kNoDataTimeoutMs`), just over
 the host's 6-hour refresh interval: the host sends to the remote boards only on

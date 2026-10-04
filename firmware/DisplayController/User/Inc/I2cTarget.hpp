@@ -13,9 +13,13 @@
 // through a thread flag. The message format is Display::deserializeI2c();
 // see HostControllerA/docs/Display.md#i2c-transport.
 //
-// One instance, for hi2c1; the HAL callbacks are routed to it.
+// One instance, for hi2c1; the HAL callbacks are routed to it. Every
+// transaction addressed to this board, read or write, pulses LED_2.
 class I2cTarget {
 public:
+    // As long as the host's pulse for one USB CDC transfer.
+    static constexpr uint32_t kActivityPulseMs = 20U;
+
     explicit I2cTarget(I2C_HandleTypeDef& handle);
 
     // Thread and flag to signal when a complete message has arrived. Set

@@ -84,8 +84,8 @@ labels for the pins it uses.
 | --- | --- |
 | `../Common/Src/Display/`, `Inc/Display/` | `DisplayTypes`, `DisplayCodec`, `DisplayI2cProtocol`, `DisplayAddress`, the `DisplayBoard` interface and `PcbDisplayBoard` |
 | `../Common/Src/Device/` | `SCT2xxx` |
-| `../Common/Src/Utils/`, `Inc/Utils/` | `Task`, `TaskBase`, `Mutex`, `Led`, `SwitchInput`, `Crc32` |
-| `../Common/Src/Debug/` | `BlinkingLed` |
+| `../Common/Src/Utils/`, `Inc/Utils/` | `Task`, `TaskBase`, `Mutex`, `SwitchInput`, `Crc32` |
+| `../Common/Src/Debug/` | `BlinkingLed`, `PulseLed` |
 | `../Common/tests/` | Their native tests, and the HAL/RTOS stubs, `Expect.hpp` and `add_native_test()` that this project's tests reuse |
 
 Everything else under `User/` is host-only: `Astro/` (the refresh task, parser,
@@ -114,7 +114,7 @@ others hold a reference to it.
 | `display` | `Display::Display` | `localBoard` plus the five remote boards |
 | `settingsEeprom` | `Device::Eeprom24AA04` | `i2c1Bus`, address `0x50` |
 | `settingsStore` | `Settings::Store` | `settingsEeprom` and the in-RAM `Values` |
-| `activityLed()` | `PulseLed` (`Debug/PulseLed.cpp`) | `LED_2`: a 250 ms pulse for switch 1, 50 ms for switch 2 (`MainLoopTask`), and 20 ms for every USB CDC transfer in either direction (`CDC_Receive_FS` in the USB interrupt, `CDC_Transmit_FS` after a successful send). The pin is set at once and a static FreeRTOS one-shot timer clears it, so a pulse never blocks and works from an interrupt; overlapping pulses merge. |
+| `activityLed()` | `PulseLed` (`../Common/Src/Debug/PulseLed.cpp`) | `LED_2`: a 250 ms pulse for switch 1, 50 ms for switch 2 (`MainLoopTask`), and 20 ms for every USB CDC transfer in either direction (`CDC_Receive_FS` in the USB interrupt, `CDC_Transmit_FS` after a successful send). The pin is set at once and a static FreeRTOS one-shot timer clears it, so a pulse never blocks and works from an interrupt; overlapping pulses merge. |
 
 The tasks other than `Led1` are singletons reached through
 `instance()`. The fetch task is private to `User/Src/WiFi/St67HttpFetchTask.cpp`

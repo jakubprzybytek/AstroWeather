@@ -1,5 +1,6 @@
 #include <I2cTarget.hpp>
 
+#include <Debug/PulseLed.hpp>
 #include <Stats.hpp>
 
 #include "FreeRTOS.h"
@@ -63,6 +64,7 @@ bool I2cTarget::takeMessage(Display::I2cMessage& message)
 
 void I2cTarget::onAddress(uint8_t direction)
 {
+    activityLed().pulse(kActivityPulseMs);
     finishReceive();
     if (direction == I2C_DIRECTION_TRANSMIT) {
         // The host writes: receive one whole message.
