@@ -19,8 +19,9 @@ extern TIM_HandleTypeDef htim6;
 
 volatile DisplayControllerStats g_displayStats = {};
 
-// Heartbeat on LED_1: on for 20 ms every 2 s, as on the host.
-static BlinkingLed led1(LED_1_GPIO_Port, LED_1_Pin, 20, 1980, "Led1");
+// Heartbeat on LED_1, at the same rate as the host (Common BlinkingLed).
+static BlinkingLed led1(LED_1_GPIO_Port, LED_1_Pin, BlinkingLed::kHeartbeatOnMs,
+                        BlinkingLed::kHeartbeatOffMs, "Led1");
 
 static SCT2xxx sct(&hspi1, SCT_ENABLE_GPIO_Port, SCT_ENABLE_Pin,
                    SCT_LATCH_GPIO_Port, SCT_LATCH_Pin);

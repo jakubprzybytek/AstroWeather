@@ -41,7 +41,7 @@ Status: ✅ done · 🔵 built, not yet run on a board · 🔴 not started.
 | **Brightness** | | | |
 | Never drive the bussed `LOW_POWER_ENABLE` line | ✅ Done | PB8 is analog ([Hardware review](../../KiCad/Hardware_Review.md) M-4) | [Display.md](../HostControllerA/docs/Display.md#low-brightness) |
 | **Development aids** | | | |
-| Heartbeat on `LED_1` | ✅ Done | 20 ms on every 2 s | [Architecture.md](docs/Architecture.md#tasks) |
+| Heartbeat on `LED_1` | ✅ Done | 20 ms on every 2 s from power-up, the host's rate (`BlinkingLed::kHeartbeatOnMs`/`kHeartbeatOffMs` in `../Common`) | [Architecture.md](docs/Architecture.md#tasks) |
 | `LED_2` flashes on each accepted frame | 🔵 Built | 20 ms | [Architecture.md](docs/Architecture.md#screens) |
 | Switch 1 steps through test screens, switch 2 shows the address | 🔵 Built | All segments, then an identify pattern, then back; test screens close after 60 s, the address after 3 s | [Architecture.md](docs/Architecture.md#screens) |
 | Diagnostic counters | 🔵 Built | `g_displayStats`, read over SWD: frames accepted and rejected, short writes, probes, bus errors, listen restarts, stale timeouts | [Architecture.md](docs/Architecture.md#diagnostics) |

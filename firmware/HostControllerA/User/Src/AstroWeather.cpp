@@ -27,7 +27,8 @@ extern SPI_HandleTypeDef hspi3;
 extern I2C_HandleTypeDef hi2c1;
 extern TIM_HandleTypeDef htim2;
 
-static BlinkingLed led1(LED_1_GPIO_Port, LED_1_Pin, 20, 1980, "Led1");
+static BlinkingLed led1(LED_1_GPIO_Port, LED_1_Pin, BlinkingLed::kHeartbeatOnMs,
+                        BlinkingLed::kHeartbeatOffMs, "Led1");
 
 // Declared before its clients: within a translation unit static objects are
 // constructed in declaration order, and the boards below hold a reference to it.
