@@ -17,7 +17,7 @@ running; see [Lifecycle](#lifecycle). The SSID and password come from the
 EEPROM (`wifi set`), the server host and path from the EEPROM (`api host`,
 `api path`), each falling back to a compile-time default; see [Server](#server).
 
-**Bench status (2026-10-04):** HTTPS fetches from the CloudFront API through
+**Bench status (2026-10-04):** HTTPS fetches from the API (CloudFront, then the API Gateway custom domain) through
 the module pass, and the module refuses a wrong CA, a hostname mismatch, an
 untrusted root and a self-signed certificate in the handshake (see
 [Bench results](#bench-results) and the plan's bench record). The validity
@@ -531,6 +531,7 @@ the customized LwIP teardown, since removed.
 | Driver priorities | 2026-09-21 | Longest display slot gap during WiFi fell from 14 ms to 8 ms with fetches still succeeding. |
 | Connect diagnosis | 2026-09-21 | A wrong WPA2 password reported reason 7 and was classified `WrongPassword`. |
 | T01 and HTTPS | 2026-10-03..04 | Host rewritten against `W6X_Net`; `.bss` 91 808 B against 138 412 B under T02. Module programmed with `mission_t01_v2.0.106` through `firmware/Bypass`. Three faults found and fixed on the bench: `W6X_Net_Init()` asserting without a registered net callback; the station reporting `GOT_IP` straight after the join; the driver's file listing of ST's 31 sample certificates overrunning its 2 s timeout before every certificate upload (fixed by programming a LittleFS image holding only Amazon Root CA 1, `Bypass/tools/Build-LittleFS.sh`). The driver's AT trace also overflowed the 2560 B fetch stack, now 4096 B. **First HTTPS fetch passed**: DNS 0.3 s, certificate upload 3 s (first time only), TLS handshake with CloudFront about 1 s, HTTP 200, 1906 bytes, CRC valid, parse OK; `heapMin` 24 368 B. Certificate cases on a bench build trusting ISRG Root X1 (`-DAPP_ST67_TLS_BENCH_ANCHOR_ISRG=ON`, badssl.com hosts): wrong CA, hostname mismatch, untrusted root, self-signed and an ISRG Root X2 chain all refused in the handshake; `sha256`/`rsa2048.badssl.com` completed with HTTP 200. `wifi stress`: **100/100 HTTPS cycles** in 21.5 min, free heap 29 384 B after every cycle, `heapMin` 24 368 B throughout, 13 tasks; after `stop()` 38 840 B free and a `wifi test` restarted the module and fetched. Repeated with the heap at 32 000 B: 99/100 (one transient connect failure, recovered), `heapMin` 16 336 B. Details in the plan's bench record. The date check is left open. |
+| API without CloudFront | 2026-10-04 | The API moved from CloudFront to an API Gateway custom domain, HTTPS only (`sst/docs/architecture.md`). Same ACM chain to Amazon Root CA 1, so the firmware is unchanged; build from `main` at `64e3b54`. On `int`: `astro refresh` (module cold start) and `wifi test` each fetched `/astro/wroclaw` with HTTP 200, 1906 bytes, CRC valid, parse OK, about 10 s and 8 s; free heap 21 384 B, `heapMin` 16 560 B. Before the router was restarted it kept serving the deleted CloudFront addresses for over 30 min after the DNS change, with a fresh TTL each time; the device resolves through it, so after a hostname move check its answer before testing. |
 
 ## Open items
 
