@@ -4,7 +4,7 @@
 #include <Stats.hpp>
 
 DisplayApp::DisplayApp(Display::DisplayBoard& board, I2cTarget& link, Led& activityLed)
-    : Task<1024>("DisplayApp", osPriorityNormal), board_(board), link_(link),
+    : Task<2048>("DisplayApp", osPriorityNormal), board_(board), link_(link),
       activityLed_(activityLed)
 {
 }

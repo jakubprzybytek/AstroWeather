@@ -47,7 +47,7 @@ for 2 s, and then the host's data, or "no data" if none has arrived yet.
 
 | Task | Owner | Priority | Stack (bytes) | Does |
 | --- | --- | --- | ---: | --- |
-| `DisplayApp` | `User/Src/DisplayApp.cpp` | Normal (24) | 1024 | Chooses what is shown: boot screens, data with its attributes, "no data", test screens |
+| `DisplayApp` | `User/Src/DisplayApp.cpp` | Normal (24) | 2048 (peaks at ~1056 on the board) | Chooses what is shown: boot screens, data with its attributes, "no data", test screens |
 | `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | Idles |
 | `Led1` | `Debug::BlinkingLed` (Common) | Low (8) | 768 | Heartbeat on `LED_1`, 20 ms every 2 s |
 

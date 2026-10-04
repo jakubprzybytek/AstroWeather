@@ -13,7 +13,9 @@
 // blink and level attributes, "no data" before the first frame and after the
 // data goes stale, and the switch-driven test screens. Owns no hardware; the
 // refresh itself runs from PcbDisplayBoard's timer interrupt.
-class DisplayApp : public Task<1024> {
+// 2048 B: show() -> submit() -> encodePasses() needs about 1 KB with the context
+// switch frame (measured with -fstack-usage); 1024 overflowed on the first show().
+class DisplayApp : public Task<2048> {
 public:
     static constexpr uint32_t kFlagFrame = 1U << 0;
     static constexpr uint32_t kFlagSwitch1 = 1U << 1;
