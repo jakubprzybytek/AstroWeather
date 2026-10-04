@@ -164,6 +164,38 @@ void testFirstOccurrenceWins()
 
 } // namespace
 
+void testKeys()
+{
+    expect(isValidKey("f219422af6b130b38edd108d114d2171", 32U), "32 hex characters");
+    expect(isValidKey("Ab-_.~9", 32U), "unreserved characters");
+    expect(!isValidKey("", 32U), "empty key");
+    expect(!isValidKey(std::string(33U, 'k').c_str(), 32U), "33 characters");
+    expect(!isValidKey("a b", 32U), "space");
+    expect(!isValidKey("a&b", 32U), "ampersand would split the query");
+    expect(!isValidKey("a#b", 32U), "hash would end the query");
+    expect(!isValidKey("a%20", 32U), "percent-encoding is not accepted");
+}
+
+void testRequestPath()
+{
+    char out[80];
+    expect(formatRequestPath(out, sizeof(out), "/device/astro/wroclaw", "abc") &&
+               std::string(out) == "/device/astro/wroclaw?key=abc",
+           "key appended as the query");
+    expect(formatRequestPath(out, sizeof(out), "/x?a=1", "abc") && std::string(out) == "/x?a=1&key=abc",
+           "key appended to an existing query");
+    expect(formatRequestPath(out, sizeof(out), "/astro/wroclaw", "") &&
+               std::string(out) == "/astro/wroclaw",
+           "no key leaves the path alone");
+
+    char small[13];  // "/dev?key=abc" and its NUL
+    expect(formatRequestPath(small, sizeof(small), "/dev", "abc") &&
+               std::string(small) == "/dev?key=abc",
+           "exactly fills the buffer");
+    expect(!formatRequestPath(small, sizeof(small), "/devi", "abc") && small[0] == '\0',
+           "one byte too long is refused, not cut");
+}
+
 int main()
 {
     testValidHosts();
@@ -173,5 +205,7 @@ int main()
     testContentTypeMismatches();
     testContentTypeMissing();
     testFirstOccurrenceWins();
+    testKeys();
+    testRequestPath();
     return Test::finish("St67HttpRules");
 }

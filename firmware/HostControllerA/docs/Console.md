@@ -422,7 +422,7 @@ bursts of 8 lines with a 30 ms pause, so up to 17 lines fit through the
 | Command | Reply |
 | --- | --- |
 | `astro refresh` | `OK astro-refresh=started`. The fetch runs in the background; progress and the result follow in the log. |
-| `astro test` | `OK astro-refresh=started`. As `astro refresh`, but fetches the server's demo forecast (`/astro/test`) once, which shows every display variant; the saved path, the schedule and the weather status are unchanged. |
+| `astro test` | `OK astro-refresh=started`. As `astro refresh`, but fetches the server's demo forecast (`/device/astro/test`, with the key) once, which shows every display variant; the saved path, the schedule and the weather status are unchanged. |
 
 `ERR astro-refresh-busy` means a refresh is already running, and
 `ERR astro-refresh-unavailable` that the refresh task is not ready. Any other
@@ -437,20 +437,27 @@ line starting with `astro` gets `ERR invalid-argument`. The refresh task logs
 
 | Command | Reply |
 | --- | --- |
-| `api` or `api show` | Two lines: `OK api host=<host> (saved\|built-in)` and `OK api path=<path> (saved\|built-in)`. |
+| `api` or `api show` | Three lines: `OK api host=<host> (saved\|built-in)`, `OK api path=<path> (saved\|built-in)` and `OK api key=<set>\|<none> (saved\|built-in)`. The key itself is never shown. |
 | `api host <host>` | `OK api-host=<host>`. A bare host name, 1–64 characters, no scheme, port, path or whitespace. Saved. |
-| `api path <path>` | `OK api-path=<path>`. Starts with `/`, 1–64 characters, no whitespace. Saved. |
-| `api default` | `OK api-default`, then the `api show` lines. Forgets both saved values. |
+| `api path <path>` | `OK api-path=<path>`. Starts with `/`, 1–32 characters, no whitespace. Saved. |
+| `api key <key>` | `OK api-key=<set>`. The API's device key, 1–32 letters, digits or `- _ . ~`. Saved; sent as `?key=<key>` after the path. |
+| `api default` | `OK api-default`, then the `api show` lines. Forgets the saved host, path and key. |
 
-Each part not saved uses its built-in value, `APP_ST67_HTTP_HOST` or
-`APP_ST67_HTTP_PATH` from `app_credentials.h`. A change applies from the next
-fetch and does not start one; run `astro refresh` to try it. A wrong path shows
-up there as `fetch-failed (http 404)`.
+Each part not saved uses its built-in value, `APP_ST67_HTTP_HOST`,
+`APP_ST67_HTTP_PATH` or `APP_ST67_HTTP_KEY` from `app_credentials.h`; with no
+key at all the request carries none. The API (see
+`sst/docs/architecture.md#access-control`) wants path
+`/device/astro/<configurationId>` and the stage's `DeviceApiKey`. A change
+applies from the next fetch and does not start one; run `astro refresh` to try
+it. A wrong path shows up there as `fetch-failed (http 404)`, a missing key as
+`http 401` and a wrong one as `http 403`. The fetch log line shows the key only
+as `key=<set>` or `key=<none>`.
 
 A value that breaks the rules is refused with the reason, for example
 `ERR api-host: give the bare host name, without http:// (HTTP only, port 80), ...`
-or `ERR api-path: must start with / and be 1-64 characters with no spaces, ...`.
-`api host` or `api path` with no value gets `ERR api-host: missing value. ...`,
+`ERR api-path: must start with / and be 1-32 characters with no spaces, ...`
+or `ERR api-key: must be 1-32 letters, digits or - _ . ~`.
+`api host`, `api path` or `api key` with no value gets `ERR api-host: missing value. ...`,
 any other `api` line `ERR unknown command '<line>'; see 'help api'.`, and a
 failed save `ERR settings-unavailable`.
 
@@ -488,7 +495,7 @@ Details in [Settings.md](Settings.md).
 
 | Command | Reply |
 | --- | --- |
-| `settings show` | Five lines, shown below. |
+| `settings show` | Six lines, shown below. |
 | `settings save` | `OK settings-save` |
 | `settings defaults` | `OK settings-defaults` |
 
@@ -496,13 +503,15 @@ Details in [Settings.md](Settings.md).
 OK settings adc-log=off adc-display=on time-display=on time-trim=+18400ppm display-low=off
 OK settings wifi-ssid=MyNetwork wifi-password=<set>
 OK settings api-host=<built-in>
-OK settings api-path=/astro/wroclaw
+OK settings api-path=/device/astro/wroclaw
+OK settings api-key=<set>
 OK settings boot-load=ok
 ```
 
 `settings show` prints the values the firmware is using. The password appears
 only as `<set>` or `<unset>`, and an empty SSID as `<unset>`. An API host or
-path that is not saved shows as `<built-in>`. `boot-load` is
+path that is not saved shows as `<built-in>`; the key shows as `<set>` or
+`<built-in>`, never its value. `boot-load` is
 what the EEPROM held at power-up, not its present content.
 
 `settings save` rewrites the stored copy, which is needed only after
@@ -610,7 +619,10 @@ The WiFi password is stored in the EEPROM in the clear.
   and connection test log only the SSID. The driver's AT command log, which
   would contain the password, is compiled out. `help wifi` on current firmware
   still says the line is echoed; that text is out of date.
-- `settings show` and `status` never print the password.
+- `settings show` and `status` never print the password. `api show`,
+  `settings show` and the fetch log never print the API key either; the key
+  is in the EEPROM in the clear as well, and the typed `api key` line passes
+  through the host's terminal like `wifi set`.
 - `eeprom dump` and `eeprom read` over the settings area print it as hex bytes.
 - The typed line does pass through the host's terminal, its scroll-back and any
   capture file.

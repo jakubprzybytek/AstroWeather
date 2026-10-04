@@ -62,6 +62,11 @@
 #define APP_ST67_HTTP_PATH ""
 #endif
 
+/* The API's device key, sent as ?key=; empty sends none. */
+#ifndef APP_ST67_HTTP_KEY
+#define APP_ST67_HTTP_KEY ""
+#endif
+
 #ifndef APP_ST67_HTTP_EXPECTED_CONTENT_TYPE
 #define APP_ST67_HTTP_EXPECTED_CONTENT_TYPE "text/plain; charset=utf-8"
 #endif

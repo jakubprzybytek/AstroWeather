@@ -90,13 +90,20 @@ bool St67HttpFetcher::fetch(St67FetchRequest* request) {
   if (request->pathOverride != nullptr) {
     std::snprintf(target_.path, sizeof(target_.path), "%s", request->pathOverride);
   }
-  LogService::instance().logf(LogService::Level::Debug, "ST67 fetch %s://%s%s (%s) ca=%s",
+  // The key itself is never logged.
+  LogService::instance().logf(LogService::Level::Debug, "ST67 fetch %s://%s%s key=%s (%s) ca=%s",
                               kUseTls ? "https" : "http", target_.host, target_.path,
+                              target_.key[0] != '\0' ? "<set>" : "<none>",
                               request->pathOverride != nullptr ? "one-off path"
-                              : (target_.hostSaved || target_.pathSaved) ? "saved" : "built-in",
+                              : (target_.hostSaved || target_.pathSaved || target_.keySaved)
+                                  ? "saved" : "built-in",
                               kUseTls ? TrustedCa::kAnchorName : "none");
   // The host doubles as the SNI, which the module caps at W6X_NET_SNI_MAX_SIZE.
-  if (!St67HttpRules::isValidTarget(target_.host, target_.path, W6X_NET_SNI_MAX_SIZE)) {
+  if (!St67HttpRules::isValidTarget(target_.host, target_.path, W6X_NET_SNI_MAX_SIZE) ||
+      (target_.key[0] != '\0' &&
+       !St67HttpRules::isValidKey(target_.key, Settings::kMaxApiKeyLength)) ||
+      !St67HttpRules::formatRequestPath(requestPath_, sizeof(requestPath_), target_.path,
+                                        target_.key)) {
     LogService::instance().log(LogService::Level::Error,
                                  "ST67 fetch-config invalid");
     return false;
@@ -122,7 +129,7 @@ bool St67HttpFetcher::fetch(St67FetchRequest* request) {
   std::memcpy(http.serverIpv4, runtime_.serverIpv4, sizeof(http.serverIpv4));
   http.port = kPort;
   http.host = target_.host;
-  http.path = target_.path;
+  http.path = requestPath_;
   http.tls = kUseTls ? &kTrust : nullptr;
   http.ioTimeoutMs = APP_ST67_HTTP_IO_TIMEOUT_MS;
   http.totalTimeoutMs = APP_ST67_HTTP_TOTAL_TIMEOUT_MS;

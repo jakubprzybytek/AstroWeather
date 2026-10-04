@@ -15,6 +15,15 @@ namespace St67HttpRules {
 // whitespace or CR/LF.
 bool isValidTarget(const char* host, const char* path, size_t maxHostLength);
 
+// A device key: 1..maxLength characters, each a letter, digit, '-', '_', '.'
+// or '~', so it needs no percent-encoding in a query string.
+bool isValidKey(const char* key, size_t maxLength);
+
+// Writes the request path: `path`, then "?key=<key>" ("&key=" if the path
+// already has a query) when `key` is non-empty. False, with `out` empty, if
+// the result does not fit in `size` bytes including the NUL.
+bool formatRequestPath(char* out, size_t size, const char* path, const char* key);
+
 enum class ContentTypeCheck : uint8_t {
   Missing,   // no "Content-Type:" in the headers
   Mismatch,  // present, but its value does not start with the expected type

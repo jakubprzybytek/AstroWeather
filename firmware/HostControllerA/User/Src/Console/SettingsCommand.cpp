@@ -64,6 +64,9 @@ void showSettings(const Settings::Store& store)
     std::snprintf(message, sizeof(message), "OK settings api-path=%s",
                   (values.apiPath[0] != '\0') ? values.apiPath : "<built-in>");
     LogService::instance().sendLine(message);
+    std::snprintf(message, sizeof(message), "OK settings api-key=%s",
+                  (values.apiKey[0] != '\0') ? "<set>" : "<built-in>");
+    LogService::instance().sendLine(message);
 
     // Describes what load() found at startup, not the chip's present content,
     // so it still reads "blank" after the first save of a fresh chip.

@@ -31,7 +31,7 @@ const char* const kIndex[] = {
     "  display ...       numbers, times and matrix rows on this board",
     "  astro refresh     fetch the sky forecast and publish it to all boards",
     "  astro test        fetch the server's demo forecast once, every variant",
-    "  api ...           show or set the server host and path (saved)",
+    "  api ...           show or set the server host, path and key (saved)",
     "  time ...          show, set and trim the clock; show it on display 3",
     "  adc ...           current-sense logging and readout (saved)",
     "  settings ...      show, save or reset the saved settings",
@@ -71,14 +71,16 @@ const char* const kDisplay[] = {
 };
 
 const char* const kApi[] = {
-    "api show          the host and path fetched from, each marked saved or built-in",
+    "api show          the host, path and key (shown only as <set>), each saved or built-in",
     "api host <host>",
     "    Save the server host name: no scheme, port or path; HTTPS on port 443.",
     "    e.g. 'api host api.example.com'",
     "api path <path>",
-    "    Save the path, starting with /, up to 64 characters. e.g. 'api path /astro/wroclaw'",
+    "    Save the path, starting with /, up to 32 characters. e.g. 'api path /device/astro/wroclaw'",
+    "api key <key>",
+    "    Save the API's device key, up to 32 letters, digits or - _ . ~; sent as ?key=.",
     "api default",
-    "    Forget both saved values and use the built-in ones from app_credentials.h.",
+    "    Forget the saved values and use the built-in ones from app_credentials.h.",
     "Changes apply from the next fetch; run 'astro refresh' to try them.",
 };
 

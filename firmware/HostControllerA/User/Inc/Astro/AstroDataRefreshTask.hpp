@@ -26,7 +26,7 @@ enum class RefreshTrigger : uint8_t
 };
 
 // The server's demo forecast: every display variant, with the real time.
-constexpr const char* kTestPath = "/astro/test";
+constexpr const char* kTestPath = "/device/astro/test";
 
 enum class RefreshRequestResult : uint8_t
 {

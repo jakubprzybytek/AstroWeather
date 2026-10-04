@@ -40,6 +40,7 @@ void testRoundTrip()
     std::strcpy(written.wifiSsid, "AstroNet");
     std::strcpy(written.apiHost, "api.example.com");
     std::strcpy(written.apiPath, "/astro/wroclaw");
+    std::strcpy(written.apiKey, "f219422af6b130b38edd108d114d2171");
     std::strcpy(written.wifiPassword, "correcthorsebattery");
 
     uint8_t image[Settings::kImageSize] = {};
@@ -58,6 +59,8 @@ void testRoundTrip()
     expect(std::strcmp(read.wifiPassword, "correcthorsebattery") == 0, "round trip password");
     expect(std::strcmp(read.apiHost, "api.example.com") == 0, "round trip api host");
     expect(std::strcmp(read.apiPath, "/astro/wroclaw") == 0, "round trip api path");
+    expect(std::strcmp(read.apiKey, "f219422af6b130b38edd108d114d2171") == 0,
+           "round trip api key");
 }
 
 void testBlankChipYieldsDefaults()
@@ -75,7 +78,7 @@ void testBlankChipYieldsDefaults()
     expect(read.clockTrimPpm == 0, "blank chip restores clock trim default");
     expect(!read.lowBrightness, "blank chip restores normal brightness");
     expect(read.wifiSsid[0] == '\0', "blank chip leaves ssid empty");
-    expect(read.apiHost[0] == '\0' && read.apiPath[0] == '\0',
+    expect(read.apiHost[0] == '\0' && read.apiPath[0] == '\0' && read.apiKey[0] == '\0',
            "blank chip leaves the api target built-in");
 }
 
@@ -199,6 +202,43 @@ void testApiTargetCostsNothingUntilSet()
     std::strcpy(written.apiPath, "/astro/x");
     Settings::encode(written, image, sizeof(image));
     expect(image[5] == 13U, "a saved path alone adds one record");
+
+    std::strcpy(written.apiKey, "k123");
+    Settings::encode(written, image, sizeof(image));
+    expect(image[5] == 19U, "a saved key adds one record");
+}
+
+// Written before the key existed: no key record, so the key stays built-in.
+void testImageWithoutKeyRecordKeepsDefault()
+{
+    const uint8_t payload[] = {
+        static_cast<uint8_t>(Settings::Tag::ApiPath), 4U, '/', 'a', '/', 'b',
+    };
+    uint8_t image[Settings::kImageSize];
+    buildImage(image, payload, sizeof(payload));
+
+    Settings::Values read;
+    expectResult(Settings::decode(image, sizeof(image), read), Settings::DecodeResult::Ok,
+                 "image without a key record decodes");
+    expect(std::strcmp(read.apiPath, "/a/b") == 0, "its path survives");
+    expect(read.apiKey[0] == '\0', "and the key stays built-in");
+}
+
+// A path saved when the limit was 64 is dropped rather than cut short.
+void testOverlongPathFallsBackToBuiltIn()
+{
+    uint8_t payload[2U + 40U];
+    payload[0] = static_cast<uint8_t>(Settings::Tag::ApiPath);
+    payload[1] = 40U;
+    std::memset(&payload[2], 'p', 40U);
+    payload[2] = '/';
+    uint8_t image[Settings::kImageSize];
+    buildImage(image, payload, sizeof(payload));
+
+    Settings::Values read;
+    expectResult(Settings::decode(image, sizeof(image), read), Settings::DecodeResult::Ok,
+                 "image with a 40-byte path decodes");
+    expect(read.apiPath[0] == '\0', "a path over 32 bytes is dropped, not truncated");
 }
 
 void testTruncatedRecordIsRejected()
@@ -235,6 +275,7 @@ void testMaximumLengthFieldsFit()
     written.lowBrightness = true;
     std::memset(written.apiHost, 'h', Settings::kMaxApiHostLength);
     std::memset(written.apiPath, 'p', Settings::kMaxApiPathLength);
+    std::memset(written.apiKey, 'k', Settings::kMaxApiKeyLength);
     std::memset(written.wifiSsid, 'S', Settings::kMaxSsidLength);
     written.wifiSsid[Settings::kMaxSsidLength] = '\0';
     std::memset(written.wifiPassword, 'P', Settings::kMaxPasswordLength);
@@ -250,9 +291,10 @@ void testMaximumLengthFieldsFit()
     expect(std::strlen(read.wifiSsid) == Settings::kMaxSsidLength, "max ssid survives");
     expect(std::strlen(read.wifiPassword) == Settings::kMaxPasswordLength,
            "max password survives");
-    expect(image[5] == 246U, "worst case payload is 246 of 250 bytes");
+    expect(image[5] == 248U, "worst case payload is 248 of 250 bytes");
     expect(std::strlen(read.apiHost) == Settings::kMaxApiHostLength, "max api host survives");
     expect(std::strlen(read.apiPath) == Settings::kMaxApiPathLength, "max api path survives");
+    expect(std::strlen(read.apiKey) == Settings::kMaxApiKeyLength, "max api key survives");
     expect(read.lowBrightness, "worst case keeps low brightness");
 }
 
@@ -311,6 +353,8 @@ int main()
     testImageWithoutDisplayRecordKeepsDefault();
     testImageWrittenAt128BytesDecodes();
     testApiTargetCostsNothingUntilSet();
+    testImageWithoutKeyRecordKeepsDefault();
+    testOverlongPathFallsBackToBuiltIn();
     testTruncatedRecordIsRejected();
     testFutureVersionIsRejected();
     testMaximumLengthFieldsFit();

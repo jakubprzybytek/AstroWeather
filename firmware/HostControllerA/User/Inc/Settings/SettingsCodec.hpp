@@ -54,7 +54,8 @@ enum class Tag : uint8_t {
     WifiSsid = 0x10,      // 1..32 bytes, not NUL terminated
     WifiPassword = 0x11,  // 1..63 bytes, not NUL terminated
     ApiHost = 0x12,       // 1..64 bytes, not NUL terminated
-    ApiPath = 0x13,       // 1..64 bytes, not NUL terminated
+    ApiPath = 0x13,       // 1..32 bytes, not NUL terminated (1..64 before 2026-10)
+    ApiKey = 0x14,        // 1..32 bytes, not NUL terminated
     ClockFlags = 0x20,    // 1 byte: bit0 clock display enabled
     DisplayFlags = 0x21,  // 1 byte: bit0 low brightness
     End = 0xFF,           // an erased EEPROM reads 0xFF, so this terminates for free
@@ -64,7 +65,11 @@ constexpr std::size_t kMaxSsidLength = 32U;
 constexpr std::size_t kMaxPasswordLength = 63U;
 // The host is also bounded by the TLS SNI buffer (HTTP_SNI_MAX_SIZE, 64).
 constexpr std::size_t kMaxApiHostLength = 64U;
-constexpr std::size_t kMaxApiPathLength = 64U;
+// The path was 64 until the device key was added; 32 keeps the worst-case
+// image within the payload (see docs/Settings.md, Space budget).
+constexpr std::size_t kMaxApiPathLength = 32U;
+// The API's device key, sent as the `key` query parameter.
+constexpr std::size_t kMaxApiKeyLength = 32U;
 
 constexpr uint8_t kAdcFlagLog = 0x01U;
 constexpr uint8_t kAdcFlagDisplay = 0x02U;
@@ -87,6 +92,9 @@ struct Values {
     // APP_ST67_HTTP_HOST / APP_ST67_HTTP_PATH.
     char apiHost[kMaxApiHostLength + 1U] = {};
     char apiPath[kMaxApiPathLength + 1U] = {};
+    // Empty means "not saved": the fetch then uses the built-in
+    // APP_ST67_HTTP_KEY, and sends no key if that is empty too.
+    char apiKey[kMaxApiKeyLength + 1U] = {};
 };
 
 enum class DecodeResult : uint8_t {

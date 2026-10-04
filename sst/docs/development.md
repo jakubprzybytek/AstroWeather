@@ -41,10 +41,11 @@ npx sst secret set DeviceApiKey "$(node -e "console.log(require('crypto').random
 npx sst secret list --stage <stage>   # shows the current value
 ```
 
-The device uses it in its API path,
-`/device/astro/<configurationId>?key=<key>` (see the firmware's
-`docs/Development.md`). To rotate, set `old,new`, deploy, switch the device to
-the new key, then set `new` alone and deploy again.
+The device keeps it in its EEPROM, set on its USB console with
+`api key <key>`, and sends it as `?key=<key>` on
+`/device/astro/<configurationId>` (see the firmware's `docs/Console.md`). To
+rotate, set `old,new`, deploy, run `api key <new>` on the device, then set
+`new` alone and deploy again.
 
 ## Local Development
 

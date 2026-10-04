@@ -195,17 +195,18 @@ The firmware has no built-in WiFi credentials. They default to empty, are set
 from the console with `wifi set`, stored in the settings EEPROM, and read on
 every connect. See [WiFi.md](WiFi.md).
 
-The API host and path are set from the console with `api host` and `api path`
-and saved in the EEPROM. Their built-in fallbacks are compile-time values:
+The API host, path and device key are set from the console with `api host`,
+`api path` and `api key` and saved in the EEPROM. Their built-in fallbacks are compile-time values:
 `Appli/App/app_config.h` includes `Appli/App/app_credentials.h` when it exists
-and takes `APP_ST67_HTTP_HOST` and `APP_ST67_HTTP_PATH` from it. The file is
+and takes `APP_ST67_HTTP_HOST`, `APP_ST67_HTTP_PATH` and `APP_ST67_HTTP_KEY`
+from it. The file is
 git-ignored, so on a fresh checkout copy `Appli/App/app_credentials.h.template`
 to `app_credentials.h` and fill in the host and path; without it a board works
-only once `api host` and `api path` are set. The API needs the device key in
-the path, `/device/astro/wroclaw?key=<key>` (58 characters, within the 64
-allowed); the key is the stage's `DeviceApiKey` secret, see
-`sst/docs/development.md`. `api show` and the fetch log print the path, key
-included. The `APP_ST67_WIFI_SSID` and `APP_ST67_WIFI_PASSWORD` defines in
+only once `api host` and `api path` are set. The API wants the path
+`/device/astro/wroclaw` and the stage's `DeviceApiKey` secret (see
+`sst/docs/development.md`), which the fetch appends as `?key=<key>`. Prefer
+`api key <key>` on the console over `APP_ST67_HTTP_KEY`, so the key lives only
+in the board's EEPROM; `api show` and the fetch log show it only as `<set>`. The `APP_ST67_WIFI_SSID` and `APP_ST67_WIFI_PASSWORD` defines in
 the same file are no longer used by the firmware.
 
 After flashing a new board:

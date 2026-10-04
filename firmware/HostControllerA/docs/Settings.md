@@ -133,7 +133,8 @@ must match it.
 | `0x10` | `WifiSsid` | 1–32 | SSID bytes, not NUL terminated. |
 | `0x11` | `WifiPassword` | 1–63 | Passphrase bytes, not NUL terminated. |
 | `0x12` | `ApiHost` | 1–64 | API server host name, not NUL terminated. Absent: the built-in `APP_ST67_HTTP_HOST`. |
-| `0x13` | `ApiPath` | 1–64 | API path starting with `/`, not NUL terminated. Absent: the built-in `APP_ST67_HTTP_PATH`. |
+| `0x13` | `ApiPath` | 1–32 | API path starting with `/`, not NUL terminated. Absent: the built-in `APP_ST67_HTTP_PATH`. Up to 64 before 2026-10; a longer record is ignored on decode (built-in path) rather than cut short. |
+| `0x14` | `ApiKey` | 1–32 | API device key, letters, digits and `- _ . ~`, not NUL terminated; sent as `?key=`. Absent: the built-in `APP_ST67_HTTP_KEY`. |
 | `0x20` | `ClockFlags` | 1 | Bit 0 = clock shown on local numeric display 3. Remaining bits reserved, write 0. Written only when it differs from the default, so normally absent. |
 | `0x21` | `DisplayFlags` | 1 | Bit 0 = low brightness (`LOW_POWER_ENABLE` driven high); see [Display.md](Display.md#low-brightness). Remaining bits reserved, write 0. Written only when set. |
 | `0xFF` | *reserved* | — | End of records. Never allocate. |
@@ -263,8 +264,9 @@ plus two bytes of framing.
 | WiFi, typical (15-char SSID, 20-char password) | 39 |
 | WiFi, worst case (32 + 63) | 99 |
 | API host, only when saved (up to 64) | up to 66 |
-| API path, only when saved (up to 64) | up to 66 |
-| **Worst case total** | **246 of 250** |
+| API path, only when saved (up to 32) | up to 34 |
+| API key, only when saved (up to 32) | up to 34 |
+| **Worst case total** | **248 of 250** |
 
 A measured image on hardware with SSID `AstroNet` and a 13-character password
 occupied 34 bytes, when the image was 128 bytes. With no WiFi configured the image is
@@ -276,6 +278,15 @@ consuming 99 bytes, and the API target another 130.
 
 When adding a setting, check the worst case still fits, and prefer omitting a
 record over writing a default value.
+
+The API key (2026-10) did not fit beside a 64-character path: the worst case
+would have been 280. The path limit was cut to 32 instead, since the real
+path, `/device/astro/wroclaw`, has 21 characters. The other way out, for when
+the next setting does not fit either, is the upper 256 bytes of the 512-byte
+part, which the image leaves unused (see [Storage Medium](#storage-medium)):
+a payload over 255 bytes needs a wider `payloadLen`, which is a container
+change with a version bump and a decoder that still reads version 1 (see
+[When the version must change](#when-the-version-must-change)).
 
 ## Write Behaviour
 
@@ -313,8 +324,8 @@ The exact replies are in [Console.md](Console.md).
 | `time trim <ppm>` | Apply and save. HostController only. |
 | `display low on\|off` | Apply and save. HostController only. |
 | Switch 2 | Toggle low brightness and save. HostController only. |
-| `api host <host>`, `api path <path>` | Check and save; used from the next fetch. HostController only. |
-| `api default` | Drop the saved host and path and save. HostController only. |
+| `api host <host>`, `api path <path>`, `api key <key>` | Check and save; used from the next fetch. HostController only. |
+| `api default` | Drop the saved host, path and key and save. HostController only. |
 
 The raw image can be inspected with `eeprom dump` and `eeprom read`, which is
 the quickest way to confirm a new record encodes as intended. See
@@ -345,7 +356,9 @@ the payload, an unrecognised container version, worst-case field lengths with
 every optional record present, the empty-WiFi case, images written without the
 clock or display records, an image written when the region was 128 bytes, the
 API target costing nothing until set, and the one-record cost of clock trim,
-clock display off and low brightness.
+clock display off and low brightness, the key's one-record cost and its
+absence in an older image, and a 40-byte path from the 64-character era being
+dropped rather than truncated.
 
 The unknown-tag and absent-record cases are what pin down the compatibility
 rules. Do not delete them.

@@ -70,7 +70,15 @@ void applyRecord(uint8_t tag, const uint8_t* value, std::size_t length, Values& 
         copyString(values.apiHost, sizeof(values.apiHost), value, length);
         break;
     case static_cast<uint8_t>(Tag::ApiPath):
-        copyString(values.apiPath, sizeof(values.apiPath), value, length);
+        // A path saved when the limit was 64 may be longer than today's 32.
+        // Cut short it would name another path, so it is dropped instead and
+        // the built-in path applies.
+        if (length <= kMaxApiPathLength) {
+            copyString(values.apiPath, sizeof(values.apiPath), value, length);
+        }
+        break;
+    case static_cast<uint8_t>(Tag::ApiKey):
+        copyString(values.apiKey, sizeof(values.apiKey), value, length);
         break;
     default:
         // Unknown tag, so an older build can still read a chip written by a
@@ -166,6 +174,12 @@ std::size_t encode(const Values& values, uint8_t* image, std::size_t size)
     if (pathLength != 0U &&
         !appendRecord(payload, sizeof(payload), used, Tag::ApiPath,
                       reinterpret_cast<const uint8_t*>(values.apiPath), pathLength)) {
+        return 0U;
+    }
+    const std::size_t keyLength = boundedLength(values.apiKey, kMaxApiKeyLength);
+    if (keyLength != 0U &&
+        !appendRecord(payload, sizeof(payload), used, Tag::ApiKey,
+                      reinterpret_cast<const uint8_t*>(values.apiKey), keyLength)) {
         return 0U;
     }
 

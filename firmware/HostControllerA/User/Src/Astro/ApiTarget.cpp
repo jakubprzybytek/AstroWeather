@@ -27,19 +27,29 @@ const char* builtInApiPath()
     return APP_ST67_HTTP_PATH;
 }
 
+const char* builtInApiKey()
+{
+    return APP_ST67_HTTP_KEY;
+}
+
 ApiTarget resolveApiTarget(const Settings::Store* store)
 {
     ApiTarget target{};
     if (store != nullptr) {
-        store->copyApiTarget(target.host, sizeof(target.host), target.path, sizeof(target.path));
+        store->copyApiTarget(target.host, sizeof(target.host), target.path, sizeof(target.path),
+                             target.key, sizeof(target.key));
     }
     target.hostSaved = target.host[0] != '\0';
     target.pathSaved = target.path[0] != '\0';
+    target.keySaved = target.key[0] != '\0';
     if (!target.hostSaved) {
         copyBuiltIn(target.host, sizeof(target.host), builtInApiHost());
     }
     if (!target.pathSaved) {
         copyBuiltIn(target.path, sizeof(target.path), builtInApiPath());
+    }
+    if (!target.keySaved) {
+        copyBuiltIn(target.key, sizeof(target.key), builtInApiKey());
     }
     return target;
 }

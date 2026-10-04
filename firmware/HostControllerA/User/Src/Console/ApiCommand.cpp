@@ -27,6 +27,9 @@ void show(const Settings::Store* store)
     const HostController::ApiTarget target = HostController::resolveApiTarget(store);
     reply("OK api host=%s (%s)", target.host, target.hostSaved ? "saved" : "built-in");
     reply("OK api path=%s (%s)", target.path, target.pathSaved ? "saved" : "built-in");
+    // Never the key itself.
+    reply("OK api key=%s (%s)", target.key[0] != '\0' ? "<set>" : "<none>",
+          target.keySaved ? "saved" : "built-in");
 }
 
 bool save(Settings::Store& store)
@@ -78,6 +81,19 @@ void setPath(const char* path, Settings::Store& store)
     }
 }
 
+void setKey(const char* key, Settings::Store& store)
+{
+    if (!HostController::St67HttpRules::isValidKey(key, Settings::kMaxApiKeyLength)) {
+        reply("ERR api-key: must be 1-%u letters, digits or - _ . ~",
+              static_cast<unsigned>(Settings::kMaxApiKeyLength));
+        return;
+    }
+    store.setApiKey(key);
+    if (save(store)) {
+        reply("OK api-key=<set>");
+    }
+}
+
 } // namespace
 
 CommandResult handleApiCommand(const char* line, Settings::Store* store)
@@ -94,8 +110,10 @@ CommandResult handleApiCommand(const char* line, Settings::Store* store)
         reply("ERR settings-unavailable");
         return CommandResult::Ok;
     }
-    if (std::strcmp(line, "api host") == 0 || std::strcmp(line, "api path") == 0) {
-        reply("ERR api-%s: missing value. Usage: api host <host>, api path <path>", &line[4]);
+    if (std::strcmp(line, "api host") == 0 || std::strcmp(line, "api path") == 0 ||
+        std::strcmp(line, "api key") == 0) {
+        reply("ERR api-%s: missing value. Usage: api host <host>, api path <path>, api key <key>",
+              &line[4]);
         return CommandResult::Ok;
     }
     if (std::strncmp(line, "api host ", 9U) == 0) {
@@ -106,9 +124,14 @@ CommandResult handleApiCommand(const char* line, Settings::Store* store)
         setPath(&line[9], *store);
         return CommandResult::Ok;
     }
+    if (std::strncmp(line, "api key ", 8U) == 0) {
+        setKey(&line[8], *store);
+        return CommandResult::Ok;
+    }
     if (std::strcmp(line, "api default") == 0) {
         store->setApiHost("");
         store->setApiPath("");
+        store->setApiKey("");
         if (save(*store)) {
             reply("OK api-default");
             show(store);

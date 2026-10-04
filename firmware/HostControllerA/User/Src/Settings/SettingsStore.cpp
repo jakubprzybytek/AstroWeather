@@ -84,12 +84,19 @@ void Store::setApiPath(const char* path)
     copyBounded(values_.apiPath, sizeof(values_.apiPath), path);
 }
 
-void Store::copyApiTarget(char* host, std::size_t hostSize, char* path,
-                          std::size_t pathSize) const
+void Store::setApiKey(const char* key)
+{
+    MutexGuard guard(mutex_);
+    copyBounded(values_.apiKey, sizeof(values_.apiKey), key);
+}
+
+void Store::copyApiTarget(char* host, std::size_t hostSize, char* path, std::size_t pathSize,
+                          char* key, std::size_t keySize) const
 {
     MutexGuard guard(mutex_);
     copyBounded(host, hostSize, values_.apiHost);
     copyBounded(path, pathSize, values_.apiPath);
+    copyBounded(key, keySize, values_.apiKey);
 }
 
 void Store::setLowBrightness(bool enabled)

@@ -47,12 +47,13 @@ public:
     void setWifiCredentials(const char* ssid, const char* password);
     void copyWifiCredentials(char* ssid, std::size_t ssidSize, char* password,
                              std::size_t passwordSize) const;
-    // The API host and path are read by the WiFi task on every fetch, so they
-    // go through the lock too. An empty string means "not saved".
+    // The API host, path and key are read by the WiFi task on every fetch, so
+    // they go through the lock too. An empty string means "not saved".
     void setApiHost(const char* host);
     void setApiPath(const char* path);
-    void copyApiTarget(char* host, std::size_t hostSize, char* path,
-                       std::size_t pathSize) const;
+    void setApiKey(const char* key);
+    void copyApiTarget(char* host, std::size_t hostSize, char* path, std::size_t pathSize,
+                       char* key, std::size_t keySize) const;
     // Low brightness is changed by the console and by switch 2 in MainLoopTask,
     // so it is set under the lock like the credentials.
     void setLowBrightness(bool enabled);
