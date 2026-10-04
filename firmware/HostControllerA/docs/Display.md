@@ -336,14 +336,14 @@ The 35-byte logical payload is serialized in this order: numeric display 1, nume
 
 The host sends a board its attributes first, `0x02`, `0x03`, `0x04`, then its content, `0x01`, about 3.6 ms per message at 100 kHz. The Display Controller stages the attribute planes and applies them together with the next content, so content and attributes always change as one; staged attributes persist until the host replaces them, so a host that sends only content keeps the last attributes, and one that never sends any (or a Display Controller firmware from before the attributes, which drops the unknown commands) shows full brightness and no blinking. The Display Controller performs its own PCB-specific encoding. Unknown commands are counted and ignored. There is no application-level response or success message; normal I2C ACK/NACK behavior still applies.
 
-Each Display Controller has three address-programming pins, `ADDR_0` (PB10), `ADDR_1` (PB11) and `ADDR_2` (PB14), as named in `Core/Inc/main.h`. Each pin can be tied to ground, tied to VCC, or left floating, providing 27 possible ternary board IDs. The Display Controller derives its 7-bit I2C target address as `0x10 + board_id`, giving addresses `0x10` through `0x2A`.
+Each Display Controller has three address-programming pins, `ADDR_0` (PB10), `ADDR_1` (PB11) and `ADDR_2` (PB14), as named in `Core/Inc/main.h`. Each pin can be left floating (0), tied to ground (1) or tied to VCC (2), providing 27 possible ternary board IDs; a board with no straps fitted is board 0, `0x10`. The Display Controller derives its 7-bit I2C target address as `0x10 + board_id`, giving addresses `0x10` through `0x2A`.
 
 The Host Controller does not derive these addresses from its own pins. `AstroWeather.cpp` creates one buffer-backed Display Board per remote board at the fixed addresses `0x10` through `0x14`, and `Display::submit()` sends each logical buffer to its board's address.
 
 Address detection (`Display::detectBoardId()` in `DisplayAddress.cpp`) uses two reads for each pin:
 
 1. Configure the pin as a digital input with an internal pull-down and read it. HIGH means VCC, state 2.
-2. Otherwise switch to an internal pull-up and read again. LOW means a strong external ground, state 0; HIGH means floating, state 1.
+2. Otherwise switch to an internal pull-up and read again. HIGH means floating, state 0; LOW means a strong external ground, state 1.
 
 The pins are then left in analog mode, so a strap tied to VCC draws no pull current and an open one leaves no floating digital input, and `board_id = ADDR_0 + 3 × ADDR_1 + 9 × ADDR_2`.
 

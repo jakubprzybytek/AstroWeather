@@ -183,7 +183,7 @@ run reports every failing case instead of stopping at the first.
 | Suite | What it pins |
 | --- | --- |
 | `display_i2c_protocol_tests` | Serialize/deserialize round trip, 36-byte message, command `0x01`; null, wrong-size and wrong-command messages rejected without touching the destination; bits 21-23 masked |
-| `display_address_tests` | All 27 strap combinations (high = 2, floating = 1, low = 0), pins left analog without pull, `0x10 + id` and 0 for id 27 or more |
+| `display_address_tests` | All 27 strap combinations (high = 2, low = 1, floating = 0), pins left analog without pull, `0x10 + id` and 0 for id 27 or more |
 | `display_codec_tests` | Golden vectors from the wiring tables in [Display.md](Display.md): every segment of every digit, L1-L3, the 21 matrix columns, the matrix row order (bottom row first) |
 | `astro_data_parser_tests` | 95-character line limit, CRLF, blocks out of order or missing, truncated payload, `configurationId` of 20 and 21 characters, `protocol=2`, `?` rows and numerics |
 | `numeric_display_tests` | The fixed-point rules after the fix below |

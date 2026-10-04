@@ -1,6 +1,6 @@
 // Board address straps, read through the stub GPIO model. docs/Display.md
-// ("I2C Transport"): a pin tied to VCC is state 2, a floating pin state 1 and
-// a pin tied to ground state 0; board_id = ADDR_0 + 3 * ADDR_1 + 9 * ADDR_2
+// ("I2C Transport"): a pin tied to VCC is state 2, a pin tied to ground state 1
+// and a floating pin state 0; board_id = ADDR_0 + 3 * ADDR_1 + 9 * ADDR_2
 // and the address is 0x10 + board_id.
 
 #include <Display/DisplayAddress.hpp>
@@ -16,7 +16,7 @@ using Stub::Strap;
 using Test::expect;
 using Test::expectEqual;
 
-constexpr Strap kStraps[3] = {Strap::Low, Strap::Floating, Strap::High};
+constexpr Strap kStraps[3] = {Strap::Floating, Strap::Low, Strap::High};
 
 struct Pin {
     GPIO_TypeDef* port;
@@ -81,9 +81,9 @@ void testAllStrapCombinations()
 void testDocumentedExamples()
 {
     strap(0, 0, 0);
-    expectEqual(Display::detectBoardAddress(), 0x10U, "all grounded is 0x10");
+    expectEqual(Display::detectBoardAddress(), 0x10U, "all floating is 0x10");
     strap(1, 1, 1);
-    expectEqual(Display::detectBoardAddress(), 0x1DU, "all floating is 0x1D");
+    expectEqual(Display::detectBoardAddress(), 0x1DU, "all grounded is 0x1D");
     strap(2, 2, 2);
     expectEqual(Display::detectBoardAddress(), 0x2AU, "all high is 0x2A");
     strap(2, 0, 0);
@@ -109,7 +109,7 @@ void testOtherPins()
     Stub::setStrap(GPIOA, GPIO_PIN_1, Strap::Floating);
     Stub::setStrap(GPIOC, GPIO_PIN_15, Strap::Low);
     expectEqual(Display::detectBoardId(GPIOA, GPIO_PIN_0, GPIOA, GPIO_PIN_1, GPIOC, GPIO_PIN_15),
-                5U, "pins given by the caller");
+                11U, "pins given by the caller");
 }
 
 } // namespace

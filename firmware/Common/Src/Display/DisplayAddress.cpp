@@ -3,6 +3,8 @@
 namespace Display {
 namespace {
 
+// Floating is 0, tied to ground 1, tied to VCC 2, so a board with no straps
+// fitted is board 0 (0x10).
 uint8_t readPin(GPIO_TypeDef* port, uint16_t pin)
 {
     GPIO_InitTypeDef init{};
@@ -15,7 +17,7 @@ uint8_t readPin(GPIO_TypeDef* port, uint16_t pin)
     }
     init.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(port, &init);
-    return HAL_GPIO_ReadPin(port, pin) == GPIO_PIN_SET ? 1U : 0U;
+    return HAL_GPIO_ReadPin(port, pin) == GPIO_PIN_SET ? 0U : 1U;
 }
 
 } // namespace
