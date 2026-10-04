@@ -201,7 +201,11 @@ and saved in the EEPROM. Their built-in fallbacks are compile-time values:
 and takes `APP_ST67_HTTP_HOST` and `APP_ST67_HTTP_PATH` from it. The file is
 git-ignored, so on a fresh checkout copy `Appli/App/app_credentials.h.template`
 to `app_credentials.h` and fill in the host and path; without it a board works
-only once `api host` and `api path` are set. The `APP_ST67_WIFI_SSID` and `APP_ST67_WIFI_PASSWORD` defines in
+only once `api host` and `api path` are set. The API needs the device key in
+the path, `/device/astro/wroclaw?key=<key>` (58 characters, within the 64
+allowed); the key is the stage's `DeviceApiKey` secret, see
+`sst/docs/development.md`. `api show` and the fetch log print the path, key
+included. The `APP_ST67_WIFI_SSID` and `APP_ST67_WIFI_PASSWORD` defines in
 the same file are no longer used by the firmware.
 
 After flashing a new board:

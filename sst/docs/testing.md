@@ -128,19 +128,26 @@ SST_STAGE=int npm run test:integration
 
 The suite covers:
 
-- `GET /astro/krakow` returns `200`, `text/plain`, protocol 1, a `time` header
-  within the Krakow UTC offset of the test machine's clock, and six well-formed
-  display blocks;
+- `GET /device/astro/krakow` with the stage's device key (the first entry of
+  `DeviceApiKey`, read in `globalSetup.ts`) returns `200`, `text/plain`,
+  protocol 3, a `time` header within the Krakow UTC offset of the test
+  machine's clock, and six well-formed display blocks;
 - an unknown configuration returns `404` with the versioned error body;
 - a missing path parameter is not `200`;
-- `GET /configurations` returns the configuration list.
+- the device route answers `401` without a key and `403` with a wrong one;
+- the web UI's routes (`/configurations`, `/astro/krakow`) answer `401`
+  without a token and with one that is not a JWT. The suite has no Cognito
+  user, so the signed-in path is checked by hand in the web UI.
+
+Requests that hit the stage's one-request-per-second throttle (`429`) are
+retried a few times.
 
 The tests call the public API hostname over HTTPS, so they exercise its
 certificate too. They do not check that plain HTTP is refused. After
 infrastructure changes, check the hostname by hand:
 
 ```bash
-curl -si https://api.<stage>.astroweather.albedoonline.com/astro/krakow
+curl -si "https://api.<stage>.astroweather.albedoonline.com/device/astro/krakow?key=<key>"
 curl -si --max-time 10 http://api.<stage>.astroweather.albedoonline.com/configurations
 ```
 

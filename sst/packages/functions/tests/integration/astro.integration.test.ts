@@ -6,9 +6,9 @@ const deviceUrl = (path: string) => `${BASE_URL}/device${path}?key=${encodeURICo
 
 // The stage allows one request per second, so a test that follows another
 // closely may be throttled; retry those few times.
-async function get(url: string): Promise<Response> {
+async function get(url: string, init?: RequestInit): Promise<Response> {
   for (let attempt = 0; ; attempt += 1) {
-    const response = await fetch(url);
+    const response = await fetch(url, init);
     if (response.status !== 429 || attempt === 3) return response;
     await new Promise((resolve) => setTimeout(resolve, 1100));
   }
@@ -87,15 +87,18 @@ describe("GET /device/astro/{configurationId}", () => {
   });
 });
 
-describe("GET /configurations", () => {
-  test("returns public configuration metadata", async () => {
-    const response = await get(`${BASE_URL}/configurations`);
+// The web UI's routes need a Cognito access token; these tests have none, so
+// they check only that the routes are closed without one.
+describe("routes for signed-in users", () => {
+  test.each(["/configurations", "/astro/krakow"])("GET %s rejects a request without a token", async (path) => {
+    const response = await get(`${BASE_URL}${path}`);
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toContain("application/json");
-    expect(await response.json()).toEqual([
-      { id: "wroclaw", label: "Wrocław" },
-      { id: "krakow", label: "Kraków" }
-    ]);
+    expect(response.status).toBe(401);
+  });
+
+  test("rejects a token that is not a valid JWT", async () => {
+    const response = await get(`${BASE_URL}/configurations`, { headers: { authorization: "Bearer not-a-jwt" } });
+
+    expect(response.status).toBe(401);
   });
 });

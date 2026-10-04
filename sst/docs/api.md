@@ -36,10 +36,17 @@ through local noon on September 18.
 GET /astro/{configurationId}
 ```
 
-This is the only main forecast endpoint. It is served on the public API
-hostname over both HTTP and HTTPS without redirects; see the API edge section
-in [architecture.md](architecture.md) for the security constraints of plain
-HTTP.
+This is the main forecast endpoint, for signed-in web users. The device
+calls the same handler as
+
+```http
+GET /device/astro/{configurationId}?key=<device key>
+```
+
+Both are served over HTTPS only. See
+[Access control](architecture.md#access-control) for the credentials each
+needs; without one the API answers `401` (no credential) or `403` (wrong
+device key) instead of the payload.
 
 ### Demo configuration `test`
 
@@ -281,7 +288,8 @@ The aurora row uses:
 
 ## Clients
 
-- **Embedded device**: parses the line protocol as described in
+- **Embedded device**: calls `/device/astro/{configurationId}` with its key
+  and parses the line protocol as described in
   [api-payload.md](api-payload.md).
 - **Web UI**: a protocol inspection tool. It shows the HTTP status, content
   type, and response body verbatim, and deliberately does not parse the line

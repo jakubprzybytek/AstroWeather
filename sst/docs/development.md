@@ -31,6 +31,21 @@ domain, DynamoDB table, ingestion schedules, and web site.
 Stages other than `prod` are removed completely by `npm run remove`,
 including the stored forecast data.
 
+### Device key
+
+Each stage needs the `DeviceApiKey` secret before its first deploy, or the
+deploy fails. Generate a random key and set it:
+
+```bash
+npx sst secret set DeviceApiKey "$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))")" --stage <stage>
+npx sst secret list --stage <stage>   # shows the current value
+```
+
+The device uses it in its API path,
+`/device/astro/<configurationId>?key=<key>` (see the firmware's
+`docs/Development.md`). To rotate, set `old,new`, deploy, switch the device to
+the new key, then set `new` alone and deploy again.
+
 ## Local Development
 
 ```bash

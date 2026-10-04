@@ -2,6 +2,15 @@
 
 const hostedZoneId = "Z041419132FCBY6ZLLXL2";
 
+// The shared Albedo user pool, created and managed outside this app; the web
+// UI signs in through its own app client (public, SRP, no secret). Anyone may
+// register; the API only requires a signed-in user.
+const userPool = {
+  region: "eu-west-1",
+  id: "eu-west-1_IVai0KEAA",
+  webClientId: "2i29cn3m973qqh3re94fj7oejr"
+};
+
 function route53Dns() {
   const dns = sst.aws.dns();
 
@@ -98,6 +107,8 @@ export default $config({
       },
       cors: {
         allowMethods: ["GET", "POST"],
+        // Listed by name: a "*" never covers Authorization.
+        allowHeaders: ["authorization", "content-type"],
         allowOrigins: [
           `https://${domain.web}`,
           "http://localhost:5173",
@@ -121,11 +132,20 @@ export default $config({
       }
     });
 
-    api.route("GET /configurations", "packages/functions/src/configurations-handler.handler");
+    const userAuthorizer = api.addAuthorizer({
+      name: "Cognito",
+      jwt: {
+        issuer: `https://cognito-idp.${userPool.region}.amazonaws.com/${userPool.id}`,
+        audiences: [userPool.webClientId]
+      }
+    });
+    const userAuth = { auth: { jwt: { authorizer: userAuthorizer.id } } };
+
+    api.route("GET /configurations", "packages/functions/src/configurations-handler.handler", userAuth);
     api.route("GET /astro/{configurationId}", {
       handler: "packages/functions/src/astro.handler",
       link: [forecastData]
-    });
+    }, userAuth);
     // The device's copy of the forecast route; the ST67 module cannot send
     // headers, so its key travels in the `key` query parameter.
     api.route("GET /device/astro/{configurationId}", {
@@ -134,11 +154,11 @@ export default $config({
     }, {
       auth: { lambda: deviceAuthorizer.id }
     });
-    api.route("POST /tools/clearoutside", "packages/functions/src/clearoutside.handler");
-    api.route("POST /tools/gfz-hp60", "packages/functions/src/tools/gfz-hp60.handler");
-    api.route("POST /tools/noaa-kp", "packages/functions/src/tools/noaa-kp.handler");
-    api.route("POST /tools/noaa-outlook", "packages/functions/src/tools/noaa-outlook.handler");
-    api.route("POST /tools/ovation", "packages/functions/src/tools/ovation.handler");
+    api.route("POST /tools/clearoutside", "packages/functions/src/clearoutside.handler", userAuth);
+    api.route("POST /tools/gfz-hp60", "packages/functions/src/tools/gfz-hp60.handler", userAuth);
+    api.route("POST /tools/noaa-kp", "packages/functions/src/tools/noaa-kp.handler", userAuth);
+    api.route("POST /tools/noaa-outlook", "packages/functions/src/tools/noaa-outlook.handler", userAuth);
+    api.route("POST /tools/ovation", "packages/functions/src/tools/ovation.handler", userAuth);
 
     new sst.aws.CronV2("ClearOutsideIngestion", {
       // 00:00, 06:00, 12:00 and 18:00 local. The HostController refreshes at
@@ -190,7 +210,9 @@ export default $config({
         output: "dist"
       },
       environment: {
-        VITE_API_URL: `https://${domain.api}`
+        VITE_API_URL: `https://${domain.api}`,
+        VITE_USER_POOL_ID: userPool.id,
+        VITE_USER_POOL_CLIENT_ID: userPool.webClientId
       }
     });
 

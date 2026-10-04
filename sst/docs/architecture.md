@@ -16,6 +16,9 @@ to call a separate endpoint for each data source.
   - **Output**: `text/plain; charset=utf-8` version 1 payload containing six fixed
     display blocks with astronomical and weather fields. See [api.md](api.md)
     and [api-payload.md](api-payload.md).
+- **Endpoint**: `GET /device/astro/{configurationId}?key=<device key>`
+  - The same handler and payload as `GET /astro/{configurationId}`, for the
+    embedded device (see [Access control](#access-control)).
 - **Endpoint**: `POST /tools/clearoutside`
   - **Output**: JSON with normalized hourly Clearoutside nights, used by the web
     UI's helper tool (see [Web UI](#web-ui)).
@@ -25,6 +28,35 @@ to call a separate endpoint for each data source.
     at the source's own granularity, used by the web UI's helper tools (see
     [Web UI](#web-ui)).
 - **Throttling**: burst of one request and a steady rate of one request per second.
+
+#### Access control
+
+The API is not public data for anyone who finds the hostname; every route
+needs one of two credentials. This keeps it from being obviously open rather
+than locking it down: anyone may create an account.
+
+| Routes | Client | Credential | Checked by |
+|---|---|---|---|
+| `GET /configurations`, `GET /astro/{configurationId}`, `POST /tools/*` | Web UI | `Authorization: Bearer <Cognito access token>` | API Gateway JWT authorizer `Cognito` |
+| `GET /device/astro/{configurationId}` | HostController | `key` query parameter | Lambda authorizer `DeviceKey` (`auth/device-key.ts`) |
+
+- **Users** sign in to the shared Albedo user pool `eu-west-1_IVai0KEAA`
+  (`AlbedoUserPool`), which this app does not create or manage. The web UI
+  uses its own app client, `AstroWeatherWeb` (`2i29cn3m973qqh3re94fj7oejr`):
+  public, no secret, SRP and refresh-token flows only. The pool allows
+  self-registration, so any confirmed user is accepted; there is no group
+  check. The JWT authorizer accepts tokens issued by the pool for that client.
+- **The device** cannot add HTTP headers (the ST67 T01 driver builds the
+  request from fixed templates), so its key travels in the query string. Over
+  HTTPS the query string is encrypted, and SST's access log records
+  `$context.path`, which excludes it. API Gateway rejects a request without
+  `key` with `401` before calling the authorizer; a wrong key gets `403`.
+  Decisions are cached for five minutes per key.
+- **The key** is the SST secret `DeviceApiKey`, set per stage. It may hold
+  several comma-separated keys: add the new key, switch the device, then
+  remove the old one.
+- CORS lists `authorization` and `content-type` by name, because a `*` in
+  `Access-Control-Allow-Headers` never covers `Authorization`.
 
 ### 2. Lambda Functions
 - **Forecast handler** (`packages/functions/src/astro.ts`): a thin adapter that
@@ -273,7 +305,12 @@ changes or breaks.
 
 The React/TypeScript web UI lives in `packages/web` and is hosted by an SST
 `StaticSite` component backed by S3 and CloudFront. At build time, SST injects
-the HTTPS API URL as `VITE_API_URL`. The main view calls
+the HTTPS API URL as `VITE_API_URL` and the user pool and app client IDs as
+`VITE_USER_POOL_ID` and `VITE_USER_POOL_CLIENT_ID`. The app is wrapped in
+Amplify's `Authenticator`, which handles sign-in, account creation with an
+emailed confirmation code, and password reset; every API call carries the
+signed-in user's access token (see [Access control](#access-control)). The
+main view calls
 `GET /astro/{configurationId}` and shows the HTTP status, content type, and
 response body verbatim; it deliberately does not parse the line protocol.
 

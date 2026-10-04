@@ -50,7 +50,8 @@ describe("AstroWeather app", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/astro/krakow")
+      expect.stringContaining("/astro/krakow"),
+      expect.objectContaining({ headers: { authorization: "Bearer test-token" } })
     ));
     const responseTitle = await screen.findByText("API response");
     expect(responseTitle.parentElement?.querySelector("pre")?.textContent)
@@ -74,7 +75,8 @@ describe("AstroWeather app", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/astro/wroclaw")
+      expect.stringContaining("/astro/wroclaw"),
+      expect.objectContaining({ headers: { authorization: "Bearer test-token" } })
     ));
   });
 
