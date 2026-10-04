@@ -1,27 +1,26 @@
 # ST67 HTTPS Implementation Plan
 
-**Status: Route B spike step 1 passed, 2026-10-04.** The host runs T01 against
-`W6X_Net` with HTTPS on by default (`APP_ST67_HTTP_USE_TLS`), the module
-carries `mission_t01_v2.0.106` with a LittleFS holding only Amazon Root CA 1,
-and the first fetch from `https://api.int.astroweather.albedoonline.com`
-completed with a verified-chain configuration (HTTP 200, 1906 bytes, CRC OK).
-The wrong-CA, hostname-mismatch, untrusted-root and self-signed cases all
-fail closed in the handshake ([Bench record](#bench-record-2026-10-04-route-b)),
-so Route B is adopted; 100 persistent HTTPS cycles ran with a flat heap and
-the module restarted from power-down afterwards. Still open: the
-expired-certificate case (left as an outstanding issue) and the Route B
-write-up of sections 4 to 8. The Wi-Fi stack
-as built is described in [WiFi.md](WiFi.md), including the three driver
-faults found on the way.
+**Status: implemented with Route B (TLS in the module, T01), on `main` since
+2026-10-04.** The host runs T01 against `W6X_Net` with HTTPS on by default,
+the module carries `mission_t01_v2.0.106` with a LittleFS holding only
+Amazon Root CA 1, and fetches from `https://api.int.astroweather.albedoonline.com`
+succeed with the module enforcing chain and hostname verification. The
+phases as built are sections 4 to 8, the bench evidence is the
+[bench record](#bench-record-2026-10-04-route-b), and section 11 lists what
+is still open: the expired-certificate case, the transport fault cases, an
+alternating failure batch, the fetch-task stack high-water mark and a fake
+socket layer for native tests of `HttpClient::get()`. The Wi-Fi stack as
+built is described in [WiFi.md](WiFi.md).
 
 There are two ways to get TLS on this board, and the first decision is which
 one to take; see [Two routes](#2-two-routes). Route A keeps the current T02
 architecture and runs mbedTLS on the STM32. Route B switches the module to
 ST's T01 architecture, where the module runs TCP/IP and TLS itself. As of
-2026-10-02 Route B is the preferred candidate and is to be tried first; the
-T02 choice was never backed by a requirement (see [History](#history-of-the-architecture-choice)).
-Sections 4 to 8 describe Route A in detail; section 3 lists the decisions both
-routes need and section 2b outlines Route B.
+2026-10-02 Route B was the preferred candidate, to be tried first; the T02
+choice was never backed by a requirement (see [History](#history-of-the-architecture-choice)).
+Route B passed its spike and was adopted on 2026-10-04. Sections 4 to 8
+describe it as built; section 3 lists the decisions both routes need; the
+Route A phases are kept as [Appendix A](#appendix-a-route-a-phases-mbedtls-on-the-host-t02-not-taken).
 
 ## 1. Goal
 
@@ -78,8 +77,9 @@ accepts, so the 1.2 handshake and cipher choice are a bench item.
    and an expired certificate (a local test server is enough) and record what
    the module rejects. Record `heapFree`/`heapMin` and the image size.
 2. If the module verifies the chain and hostname and fails closed, adopt
-   Route B and write its plan (section 2b) in full; Route A sections remain as
-   the fallback.
+   Route B and write its plan in full; the Route A phases remain as the
+   fallback. **Outcome, 2026-10-04:** adopted; sections 4 to 8 are the Route B
+   phases and Appendix A holds Route A.
 3. If the module does not verify, or cannot talk to CloudFront, fall back to
    Route A with the decisions in section 3.
 
@@ -152,10 +152,13 @@ must be measured, not inferred from a successful link.
 
 ## 2b. Route B Outline (TLS in the Module, T01)
 
-To be expanded into phases once the spike in [Decision order](#decision-order)
-passes. Sections [Spike preconditions](#spike-preconditions) and
+The outline written before the spike, kept for the reasoning; the phases as
+built are sections 4 to 8, and where they differ they win (the fetch kept
+`HttpClient.cpp`'s parser over a `W6X_Net` socket, and the CA is uploaded by
+the driver into the module's LittleFS). Sections
+[Spike preconditions](#spike-preconditions) and
 [What the T01 driver does](#what-the-t01-driver-does) record what was checked
-on 2026-10-03; the shape of the implementation is:
+on 2026-10-03; the shape of the implementation was:
 
 1. **Module and CubeMX.** Flash the T01 mission image. In CubeMX switch the
    X-CUBE-ST67W61 *ST67 Architecture* to T01 and untick LwIP; `ST67_ARCH`
@@ -178,7 +181,7 @@ on 2026-10-03; the shape of the implementation is:
    (see [RTC.md](RTC.md)) and the generated SNTP client stays off.
 6. **Failure mapping and tests.** Map `W6X_Status_t`/HTTP result codes to the
    existing fetch results; the HTTP parser tests apply only if the parser is
-   kept. Bench validation reuses section 8's cases, with the certificate
+   kept. Bench validation reuses the section 8 cases, with the certificate
    failure cases being the ones that establish what the module verifies.
 
 ### Spike preconditions
@@ -326,157 +329,146 @@ measuring its flash/RAM cost. Require SNI and hostname verification using
 the resolved API host (`ApiTarget::host`: the saved `api host`, or
 `APP_ST67_HTTP_HOST` as the fallback); ALPN should advertise only `http/1.1`.
 
-## 4. Phase 1: Enable mbedTLS Through CubeMX
+## 4. Phase 1: Module Image and CubeMX (Route B) — done
 
-This phase is a configuration handoff because middleware selection is
-CubeMX-owned.
+1. **Module image.** Program `st67w611m_mission_t01_v2.0.106.bin` through
+   `firmware/Bypass` with the project's flash configuration, which writes a
+   LittleFS holding only the trust anchor:
 
-1. In STM32CubeMX, under Software Packs > X-CUBE-ST67W61, tick
-   **Security > mbedTLS** (3.6.4); it is only selectable with LwIP and T02.
-2. Select only required client features: TLS client, X.509 parsing and
-   verification, PEM only if certificates are not compiled as DER, SHA-256,
-   the endpoint's key/signature algorithms, SNI, and optional maximum fragment
-   length support.
-3. Disable server mode, DTLS, legacy protocol versions, unused ciphers,
-   filesystem support, and debug tracing in production.
-4. Regenerate the project.
-5. Verify that generated CMake contains mbedTLS sources, include paths,
-   libraries, and `MBEDTLS_CONFIG_FILE`, and that generated configuration
-   changes are confined to expected files and USER sections.
-6. Build both firmware variants before application changes. This isolates
-   middleware-integration failures from HTTPS-client failures.
-7. Record flash, `.data`, and `.bss` deltas from the plain-HTTP baseline
-   (2026-10-02: Debug text 391 496 B, Release text 197 640 B, `.bss` 138 412 B
-   in Debug). Expect the `-O0` Debug build to need mbedTLS compiled at `-Os`.
-8. Set `MBEDTLS_SSL_IN_CONTENT_LEN`/`MBEDTLS_SSL_OUT_CONTENT_LEN` below the
-   16 KiB defaults from the start; the server's certificate message is about
-   4 KiB and CloudFront is not guaranteed to honour the maximum-fragment-length
-   extension, so the inbound size must be found by test, not set to the
-   response limit.
+   ```bash
+   cd firmware/Bypass
+   ./tools/Build-LittleFS.sh
+   ./tools/Query-ST67.sh --port COMx          # non-destructive identity check
+   ./tools/Program-ST67.sh --port COMx --profile MissionT01 \
+       --config-path tools/astroweather_t01_flash_prog_cfg.ini --force
+   ```
 
-If the generated middleware cannot fit the image or conflicts with the package
-version, stop and resolve that constraint rather than manually copying an
-untracked mbedTLS build into generated CMake.
+   The vendor LittleFS (31 sample files) must not be used: the driver lists
+   the module's file system before every certificate upload and times out on
+   it ([What the T01 driver does](#what-the-t01-driver-does)). The
+   certificate in `Bypass/tools/littlefs/Certificates/lfs/` must stay
+   byte-identical to `User/Src/WiFi/TrustedCa.cpp`.
+2. **CubeMX.** X-CUBE-ST67W61 1.3.0, *ST67 Architecture* T01, LwIP unticked,
+   regenerated; `ST67_ARCH=W6X_ARCH_T01`. `LWIP/` and the LwIP middleware
+   sources are removed. `w61_driver_config.h` keeps its `USER CODE EC`
+   overrides (task priorities 46/47, SPI stack 1536); `W61_AT_LOG_ENABLE`
+   stays 0 in the repository.
+3. **Size.** Debug `.bss` 138 412 → 90 264 B with the switch, 83 808 B after
+   the heap reduction in phase 5; Release text 110 152 B.
 
-## 5. Phase 2: Add a User-Owned TLS Transport
+Host and module change together: `W6X_Init()` refuses a module running the
+other architecture, so a T02 host stops at `w6x-init` (`DriverFailure`)
+against a T01 module and vice versa. Rolling back means
+`Program-ST67.sh --profile MissionT02` and a host from before this work.
 
-Keep HTTP parsing independent from the byte transport.
+## 5. Phase 2: Network Session and HTTPS Client — done
 
-1. Refactor `User/Src/WiFi/HttpClient.cpp` behind a small internal transport
-   contract with `connect`, `writeAll`, `read`, `close`, and error reporting.
-   Preserve the public fetch/result behavior during this step.
-2. Keep the current LwIP socket implementation as `PlainTcpTransport`.
-3. Add a User-owned `TlsTransport` under `User/Inc/WiFi` and
-   `User/Src/WiFi` using the CubeMX-provided mbedTLS APIs.
-4. Give each request its own `mbedtls_ssl_context`. A shared immutable or
-   serialized TLS configuration/CA chain may be considered only after ownership
-   and cleanup are proven. Do not use file-static per-connection pointers.
-5. Bind mbedTLS BIO callbacks to the request's LwIP socket. Translate socket
-   timeout, retry, peer-close, and reset conditions into distinct transport
-   results.
-6. Configure client mode, SNI, expected hostname, CA chain, ALPN `http/1.1`,
-   required certificate verification, and the approved time/entropy sources.
-7. Drive `mbedtls_ssl_handshake`, `mbedtls_ssl_write`,
-   `mbedtls_ssl_read`, and `mbedtls_ssl_close_notify` with bounded loops. Every
-   loop must check both the operation timeout and one request-wide deadline.
-8. Centralize cleanup so partially initialized certificates, DRBG/entropy,
-   config, SSL context, and socket are released exactly once in reverse order.
-9. Preserve the existing bounded HTTP parser above both transports. A TLS
-   record boundary must have no effect on HTTP header/body parsing.
+**Session** (`St67NetworkSession`): `W6X_Init()`, `W6X_RegisterAppCb()` with
+Wi-Fi, **net** and error callbacks, `W6X_WiFi_Init()`, `W6X_Net_Init()`. The
+net callback is mandatory: without it `W6X_Net_Init()` fails and its own error
+path asserts in `vQueueDelete`. After `W6X_WiFi_Connect()` the station may
+already report `GOT_IP`; both `CONNECTED` and `GOT_IP` are accepted, then
+`waitForDhcp()` waits for `GOT_IP` (event, plus a 100 ms state poll) up to
+`APP_ST67_DHCP_TIMEOUT_MS`. `stop()` deinitialises Net, WiFi and W6X in that
+order.
 
-Prefer static or reusable allocation where mbedTLS permits it. If dynamic
-allocation remains necessary, record peak block sizes and prove that alternating
-success/failure requests do not fragment the FreeRTOS heap.
+**DNS** (`St67HttpFetcher`): `W6X_Net_ResolveHostAddress()` in the module.
+The host name from `resolveApiTarget()` is kept for `Host`, SNI and the
+module's name check; the address is never used for verification.
 
-## 6. Phase 3: Endpoint and Result Integration
+**HTTP client** (`HttpClient::get()`): the driver's `W6X_HTTP_Client_Request()`
+is not used (it ignores `timeout` and `max_response_len`, accepts only 200,
+does not check `Content-Type` and runs a task per request). Instead the
+existing bounded parser (`HttpResponseParser`) runs over a `W6X_Net` socket:
 
-1. Add an explicit transport selection to non-secret configuration; do not
-   infer security solely from port number. Keep port independently configurable
-   and default HTTPS to 443.
-2. Extend the `HttpClient_Get` request contract to receive transport, trust
-   material, and the total deadline without exposing mbedTLS types to
-   `St67HttpFetcher`.
-3. Continue resolving the API host (`resolveApiTarget()`) through LwIP DNS and pass the original
-   hostname separately for the HTTP `Host` header, SNI, and certificate hostname
-   verification. Never verify against the resolved IP address.
-4. Add TLS-specific fetch results or detail codes for configuration, entropy,
-   time, handshake, untrusted CA, hostname mismatch, certificate validity,
-   record I/O, and close failures. Preserve the first authoritative failure.
-5. Log only stage, mbedTLS error code/string, elapsed time, and verification
-   flags. Do not log credentials, certificate contents, private keys, or response
-   payloads.
-6. Keep one active request at a time through `St67HttpFetchTask`. A failed HTTPS
-   request must still disconnect cleanly and permit the next request without a
-   host reset.
-7. Update `app_credentials.h.template` with empty endpoint values only. Put the
-   selected CA in a separate non-secret source/header, not in the credentials
-   file.
+1. `W6X_Net_Socket(AF_INET, SOCK_STREAM, IPPROTO_TLS_1_2)`, or `IPPROTO_TCP`
+   when built with `APP_ST67_HTTP_USE_TLS=0`; `SO_RCVTIMEO`/`SO_SNDTIMEO` of
+   `APP_ST67_HTTP_IO_TIMEOUT_MS`.
+2. `W6X_Net_TLS_Credential_AddByContent()` with the anchor, under the
+   socket's number as tag; `TLS_SEC_TAG_LIST`, `TLS_HOSTNAME` (SNI) and
+   `TLS_ALPN_LIST` `http/1.1`. With a CA set the driver sends
+   `AT+CIPSSLCCONF` auth mode 2, server authentication.
+3. `W6X_Net_Connect()` does TCP and the handshake. The request-wide deadline
+   `APP_ST67_HTTP_TOTAL_TIMEOUT_MS` (15 s) starts here and is checked before
+   every read.
+4. One `GET` with `Connection: close`; headers into a 2 KiB buffer, body
+   handed to the fetcher's callback with the 4096-byte limit and CRC.
+5. Socket closed and the credential tag released on every path; the result
+   callback runs exactly once.
 
-## 7. Phase 4: Automated Tests
+The fetch task stack is 4096 B (2560 B overflowed with the driver's AT trace
+on).
 
-Refactor only enough pure logic from `HttpClient.cpp` to make it host-testable,
-then add focused native tests.
+## 6. Phase 3: Trust Material, Configuration and Failure Reporting — done
 
-### HTTP-over-transport tests
+- **Trust anchor:** Amazon Root CA 1 as PEM in `TrustedCa.cpp`
+  (`kAnchorName`, `kAnchorPem`); the chain observed on CloudFront is in
+  [Two routes](#2-two-routes). The module keeps the file in its LittleFS; the
+  driver compares it with the host's copy before each request and rewrites it
+  when it differs (once per boot in practice, see the bench record).
+  Rotation: add the new root to `TrustedCa.cpp` and to
+  `Bypass/tools/littlefs/`; the host build is what matters, since the driver
+  uploads a changed file by itself, and the module LittleFS only needs
+  rebuilding to keep its listing short.
+- **Bench anchor:** `cmake -DAPP_ST67_TLS_BENCH_ANCHOR_ISRG=ON` trusts ISRG
+  Root X1 for the badssl.com cases. Off by default; the fetch log line ends
+  in `ca=<anchor>` so a bench image is recognisable. No build has a
+  verification-off switch.
+- **Configuration** (`app_config.h`): `APP_ST67_HTTP_USE_TLS` (1),
+  `APP_ST67_HTTPS_PORT` (443), `APP_ST67_HTTP_PORT` (80, plain bench build
+  only), `APP_ST67_HTTP_IO_TIMEOUT_MS` (5 s), `APP_ST67_HTTP_TOTAL_TIMEOUT_MS`
+  (15 s). `APP_ST67_DNS_TIMEOUT_MS` is no longer used.
+- **Failures:** every HTTP or TLS failure fails the `fetch` stage, reported
+  to clients as `HttpFailure`; `net-init` joins `w6x-init` and `wifi-init` as
+  `DriverFailure`. The log line
+  `ST67 https failed: <step> status=<http> bytes=<n> elapsed=<ms> w6x=<status> in <driver function>`
+  names the step: `socket`, `tls-setup` (credential upload, SNI, ALPN),
+  `connect` (TCP or a refused handshake), `send`, `response`, `timeout`.
+  The module gives no reason for a refused handshake, so a wrong CA, a wrong
+  name and an unreachable server all read as `connect`.
+- **Time:** the policy as built relies on chain and hostname verification,
+  which the module enforces. Whether it also checks validity dates is not
+  established (no SNTP is configured; see the bench record). The host RTC is
+  still set from the API's `time` record and plays no part in TLS.
+- **Logging:** no certificate contents, payloads or credentials are logged.
+  The driver's AT trace (`W61_AT_LOG_ENABLE`) does log the Wi-Fi password and
+  is for the bench only ([WiFi.md](WiFi.md#driver-at-trace)).
 
-Run the same parser suite against fragmented fake transport reads:
+## 7. Phase 4: Automated Tests — partly done
 
-- header split at every byte position, including `\r\n\r\n` across reads;
-- body bytes arriving in the same read as the final header bytes;
-- exact-limit and oversized headers and bodies;
-- valid, duplicate/conflicting, malformed, and truncated `Content-Length`;
-- close-delimited response;
-- short writes and repeated reads;
-- timeout/error at connect, write, header, body, and close;
-- exactly one completion notification and cleanup on every path.
+Native tests (`ctest`, 15 suites) cover the transport-independent parts:
+`HttpResponseParser` (header split points, limits, `Content-Length` cases),
+the host/path and `Content-Type` rules, the connect diagnosis, and the
+stage-to-status mapping including `net-init`.
 
-### TLS policy tests
+Not covered natively, and left to the bench: `HttpClient::get()` itself (its
+socket calls are the driver's), the total deadline, and every TLS policy
+question, which the module answers. Open: a fake `W6X_Net` socket layer to run
+`HttpClient::get()` against fragmented reads, timeouts and early closes, which
+would also pin the deadline and the exactly-once result callback.
 
-Where the selected mbedTLS build supports host tests, use deterministic local
-certificates and a local TLS server to cover:
+## 8. Phase 5: Bench Validation — done except where marked
 
-- valid chain and matching hostname;
-- unknown CA;
-- hostname mismatch;
-- expired and not-yet-valid certificates;
-- missing or invalid trusted time;
-- truncated handshake and peer reset;
-- TLS records split independently of HTTP boundaries;
-- deadline expiry during handshake and body transfer.
+Run on board 1 on 2026-10-04; results in the
+[bench record](#bench-record-2026-10-04-route-b) below, procedures in
+[Testing.md](Testing.md#bench-tests) and the `wifi stress` command
+([Console.md](Console.md#wifi)). `tools/console_capture.ps1` holds one
+console session per board reset, which the development PC requires.
 
-No test-only insecure verification switch may be reachable in production
-configuration.
+| Step | Status |
+| --- | --- |
+| Debug and Release build, native tests, `git diff --check` | done |
+| Size against the plain-HTTP baseline | done (phase 1) |
+| One HTTPS fetch: DNS, TLS, status, type, length, CRC, disconnect, recovery | done |
+| Handshake and request time, `heapFree`/`heapMin`, task count | done; stack high-water of `St67HttpFetch` at 4096 B **not yet read** (`stats on`) |
+| Certificate failure cases fail closed, next request succeeds | done for wrong CA, hostname mismatch, untrusted root, self-signed, other root; **expired certificate outstanding** |
+| Delayed, truncated, oversized and reset responses within their deadlines | **not run**; one natural `connect` failure recovered in the stress run |
+| 100 persistent HTTPS cycles | done twice (100/100 at 40 000 B heap, 99/100 at 32 000 B) |
+| Alternating success/failure batch | **not run** as a batch; failure cases were interleaved with successes by hand |
+| Concurrent USB log traffic | **not run** |
 
-## 8. Phase 5: Firmware and Bench Validation
-
-Use a controlled HTTPS endpoint whose CA, hostname, response size, content type,
-and failure modes are known.
-
-1. Build `Debug` and `Release`; run native tests and `git diff --check`.
-2. Compare ELF/map flash, `.data`, and `.bss` with the recorded plain-HTTP
-   baseline.
-3. Run one successful HTTPS GET and confirm DNS, TCP, SNI, chain validation,
-   hostname validation, HTTP status/type, body length, CRC, disconnect, and
-   recovery.
-4. Record handshake time, total request time, `heapFree`, `heapMin`, task count,
-   pbuf/socket state, and stack high-water marks. Exercise the deepest TLS error
-   path before reducing any stack.
-5. Run each certificate failure case and verify fail-closed behavior followed
-   by a successful request.
-6. Run delayed handshake/header/body, truncated response, oversized response,
-   and connection-reset cases. All waits must finish within their documented
-   deadlines.
-7. Run 100 persistent HTTPS cycles with stable heap, tasks, pbufs, sockets, and
-   stack margins.
-8. Run an alternating success/failure batch and repeated maximum-size responses
-   to expose cleanup errors and allocator fragmentation.
-9. Repeat with concurrent USB debug traffic and verify that logging pressure
-   does not alter request correctness.
-
-Keep at least 8 KiB minimum-ever free FreeRTOS heap as the existing floor, and
-set a larger TLS-specific margin before release based on measured worst-case
-error paths. If TLS cannot maintain a defensible margin, reduce measured static
-consumers first; do not weaken verification or silently increase buffers.
+Heap floor: 8 KiB minimum-ever free. Measured `heapMin` 16 072 to 16 368 B
+with the heap at 32 000 B, so the margin is about 8 KiB above the floor.
 
 ### Bench record, 2026-10-04 (Route B)
 
@@ -522,29 +514,28 @@ stored certificate's size rounded up to 256 bytes (1208 as 1280), so the
 driver's size comparison fails and it rewrites the file once per boot, about
 3 s; within a boot the size matches and the content is compared instead.
 
-## 9. Expected File Changes
+## 9. File Changes (Route B, as built)
 
-| File or area | Planned change |
+| File or area | Change |
 | --- | --- |
-| `HostControllerA.ioc` | Route A: tick Security > mbedTLS. Route B: ST67 Architecture T01, LwIP removed |
-| Generated CMake/middleware configuration | Regenerated mbedTLS sources, includes, and config; no manual edits outside USER sections |
-| `Appli/App/app_config.h` | Transport selection, HTTPS port, handshake/total deadlines, and TLS limits |
-| `Appli/App/app_credentials.h.template` | Empty host/path values only |
-| `User/Inc/WiFi/HttpClient.hpp` | Transport-neutral request options and result contract |
-| `User/Src/WiFi/HttpClient.cpp` | Route A: shared bounded HTTP request/response logic over a transport. Route B: rewritten against `W6X_HTTP_*` types or removed, as the generated `LWIP/App/http_client.h` it depends on goes away |
-| `User/Inc/WiFi/TlsTransport.hpp` | User-owned TLS transport boundary |
-| `User/Src/WiFi/TlsTransport.cpp` | Per-request mbedTLS setup, verified handshake, I/O, deadlines, cleanup |
-| `User/Inc/WiFi/TrustedCa.hpp` and corresponding source | Const DER trust anchor(s) and documented rotation metadata |
-| `User/Src/WiFi/St67HttpFetcher.cpp` | Select transport, pass hostname/trust policy, map TLS failures |
-| `tests/` | Transport-independent HTTP parser tests and TLS policy tests where feasible |
-| `docs/Firmware-RAM-Usage.md` | Post-mbedTLS link and runtime measurements |
-
-Names may be adjusted to existing conventions during implementation, but TLS
-must remain User-owned and generated files must remain regenerable.
+| `HostControllerA.ioc`, generated CMake | ST67 Architecture T01, LwIP removed; FreeRTOS heap 32 000 B |
+| `LWIP/`, `Middlewares/Third_Party/LwIP`, `SICS_Network_LwIP` | removed |
+| `Appli/App/app_config.h` | `APP_ST67_HTTP_USE_TLS`, `APP_ST67_HTTPS_PORT`, `APP_ST67_TLS_BENCH_ANCHOR_ISRG` |
+| `CMakeLists.txt` | `APP_ST67_TLS_BENCH_ANCHOR_ISRG` option |
+| `User/Inc/WiFi/HttpClient.hpp`, `User/Src/WiFi/HttpClient.cpp` | `HttpClient::get()` over a `W6X_Net` socket, own request/result types and result codes |
+| `User/Inc/WiFi/TrustedCa.hpp`, `User/Src/WiFi/TrustedCa.cpp` | trust anchor PEM, bench anchor |
+| `User/Src/WiFi/St67HttpFetcher.cpp`, `User/Inc/WiFi/St67Runtime.hpp` | module DNS, TLS request, failure log line |
+| `User/Src/WiFi/St67NetworkSession.cpp`, `St67NetworkAdapter.*` | `W6X_Net_Init`, net callback, `GOT_IP`, station state only |
+| `User/Src/WiFi/St67HttpFetchTask.cpp` | stack 4096 B |
+| `User/Src/WiFi/St67FetchStatusMap.cpp`, `tests/` | `net-init` stage |
+| `User/Src/Console/*` | `wifi stress`; https in `status`, `api` and help |
+| `firmware/Bypass/tools/` | `Build-LittleFS.sh`, `astroweather_t01_flash_prog_cfg.ini`, the anchor PEM |
+| `tools/console_capture.ps1` | bench console capture |
+| `docs/` | WiFi, Architecture, RAM, CubeMX compliance, RTC, Testing, Development, Console |
 
 ## 10. Validation Commands
 
-After CubeMX regeneration and after each implementation increment:
+After a CubeMX regeneration and after each change:
 
 ```bash
 cmake --preset Debug && cmake --build --preset Debug
@@ -556,36 +547,188 @@ git diff --check
 ```
 
 Use the bundled Cube CMake in place of `cmake` where it is not on `PATH`; see
-[Development.md](Development.md). The native-test build directory is set by the
-`NativeTests` preset in `CMakePresets.json`.
-Bench results should identify firmware build, endpoint certificate generation,
-cycle count, first failure, timings, bytes/CRC, memory minima, task/stack counts,
-and debug transport counters without recording secrets or payload data.
+[Development.md](Development.md). A Debug tree configured for the bench
+anchor stays so until reconfigured with `-DAPP_ST67_TLS_BENCH_ANCHOR_ISRG=OFF`.
+On the bench: `wifi test` for one fetch, `wifi stress` for 100 cycles, and the
+certificate cases in [Testing.md](Testing.md#bench-tests). Bench results
+should identify firmware build, module image, endpoint, cycle count, first
+failure, timings, bytes/CRC and heap minima, without secrets or payloads.
 
 ## 11. Exit Criteria
 
-HTTPS support is complete only when:
+| Criterion | State |
+| --- | --- |
+| TLS configuration owned by CubeMX and the module, surviving regeneration | met: T01 selected in the `.ioc`, no generated file edited outside USER sections |
+| Production endpoint succeeds with required chain and hostname verification | met |
+| Time and entropy policies implemented and documented | entropy: the module's; time: chain and hostname only, date check **open** |
+| Plain HTTP and HTTPS share the same bounded, tested parser | met |
+| Connect, handshake, send, receive, total request and cleanup bounded | met (driver timeouts plus the 15 s total deadline) |
+| Certificate and transport failures fail closed and the next request recovers without reset | certificate cases met except expiry; transport fault cases **not run** |
+| 100 persistent cycles and failure cycles show no resource trend | persistent: met twice; a failed connect retains 32 B and a `stop()` about 250 B, recorded; alternating batch **not run** |
+| Worst-case flash, static RAM, heap and stack keep approved margins | flash, RAM and heap met; fetch-task stack high-water **not read** |
+| Debug and Release HostController plus Debug DisplayController build | met |
+| No secret, private key, payload or insecure verification mode committed or logged | met; the AT trace that logs the Wi-Fi password is off in the repository |
 
-- mbedTLS is enabled through the CubeMX-owned configuration and survives
-  regeneration;
-- the production endpoint succeeds with required CA-chain and hostname
-  verification;
-- trusted time and cryptographic entropy policies are implemented and
-  documented;
-- plain HTTP and HTTPS share the same bounded, tested response parser;
-- connect, handshake, send, receive, total request, and cleanup are bounded;
-- all certificate and transport failure cases fail closed and the next request
-  recovers without reset;
-- 100 persistent HTTPS cycles and alternating failure cycles show no resource
-  trend or callback-after-free;
-- worst-case flash, static RAM, heap, and stack measurements retain approved
-  margins;
-- Debug and Release HostController plus Debug DisplayController builds pass;
-- no secret, private key, payload, or insecure verification mode is committed
-  or logged.
+HTTPS is in use on `main` since 2026-10-04 with the items marked open above
+outstanding. Do not ship a build with certificate verification disabled, on
+either route.
 
-If these gates cannot be met on STM32G0B1 with Route A, document the measured
-limiting resource and take Route B; the trust model, fail-closed behaviour and
-resource-stability gates apply to Route B unchanged, with "mbedTLS" read as
-"the module's TLS". Do not ship HTTPS with optional/disabled certificate
-validation on either route.
+## Appendix A. Route A Phases (mbedTLS on the Host, T02), Not Taken
+
+Kept as the fallback should the module's TLS ever prove inadequate, for
+example after a CloudFront policy change it cannot negotiate. Written before
+Route B was tried; the section 3 decisions on certificate time and entropy
+apply here, and the board would first have to return to T02 (module image
+and CubeMX).
+
+### A.1 Phase 1: Enable mbedTLS Through CubeMX
+
+This phase is a configuration handoff because middleware selection is
+CubeMX-owned.
+
+1. In STM32CubeMX, under Software Packs > X-CUBE-ST67W61, tick
+   **Security > mbedTLS** (3.6.4); it is only selectable with LwIP and T02.
+2. Select only required client features: TLS client, X.509 parsing and
+   verification, PEM only if certificates are not compiled as DER, SHA-256,
+   the endpoint's key/signature algorithms, SNI, and optional maximum fragment
+   length support.
+3. Disable server mode, DTLS, legacy protocol versions, unused ciphers,
+   filesystem support, and debug tracing in production.
+4. Regenerate the project.
+5. Verify that generated CMake contains mbedTLS sources, include paths,
+   libraries, and `MBEDTLS_CONFIG_FILE`, and that generated configuration
+   changes are confined to expected files and USER sections.
+6. Build both firmware variants before application changes. This isolates
+   middleware-integration failures from HTTPS-client failures.
+7. Record flash, `.data`, and `.bss` deltas from the plain-HTTP baseline
+   (2026-10-02: Debug text 391 496 B, Release text 197 640 B, `.bss` 138 412 B
+   in Debug). Expect the `-O0` Debug build to need mbedTLS compiled at `-Os`.
+8. Set `MBEDTLS_SSL_IN_CONTENT_LEN`/`MBEDTLS_SSL_OUT_CONTENT_LEN` below the
+   16 KiB defaults from the start; the server's certificate message is about
+   4 KiB and CloudFront is not guaranteed to honour the maximum-fragment-length
+   extension, so the inbound size must be found by test, not set to the
+   response limit.
+
+If the generated middleware cannot fit the image or conflicts with the package
+version, stop and resolve that constraint rather than manually copying an
+untracked mbedTLS build into generated CMake.
+
+### A.2 Phase 2: Add a User-Owned TLS Transport
+
+Keep HTTP parsing independent from the byte transport.
+
+1. Refactor `User/Src/WiFi/HttpClient.cpp` behind a small internal transport
+   contract with `connect`, `writeAll`, `read`, `close`, and error reporting.
+   Preserve the public fetch/result behavior during this step.
+2. Keep the current LwIP socket implementation as `PlainTcpTransport`.
+3. Add a User-owned `TlsTransport` under `User/Inc/WiFi` and
+   `User/Src/WiFi` using the CubeMX-provided mbedTLS APIs.
+4. Give each request its own `mbedtls_ssl_context`. A shared immutable or
+   serialized TLS configuration/CA chain may be considered only after ownership
+   and cleanup are proven. Do not use file-static per-connection pointers.
+5. Bind mbedTLS BIO callbacks to the request's LwIP socket. Translate socket
+   timeout, retry, peer-close, and reset conditions into distinct transport
+   results.
+6. Configure client mode, SNI, expected hostname, CA chain, ALPN `http/1.1`,
+   required certificate verification, and the approved time/entropy sources.
+7. Drive `mbedtls_ssl_handshake`, `mbedtls_ssl_write`,
+   `mbedtls_ssl_read`, and `mbedtls_ssl_close_notify` with bounded loops. Every
+   loop must check both the operation timeout and one request-wide deadline.
+8. Centralize cleanup so partially initialized certificates, DRBG/entropy,
+   config, SSL context, and socket are released exactly once in reverse order.
+9. Preserve the existing bounded HTTP parser above both transports. A TLS
+   record boundary must have no effect on HTTP header/body parsing.
+
+Prefer static or reusable allocation where mbedTLS permits it. If dynamic
+allocation remains necessary, record peak block sizes and prove that alternating
+success/failure requests do not fragment the FreeRTOS heap.
+
+### A.3 Phase 3: Endpoint and Result Integration
+
+1. Add an explicit transport selection to non-secret configuration; do not
+   infer security solely from port number. Keep port independently configurable
+   and default HTTPS to 443.
+2. Extend the `HttpClient_Get` request contract to receive transport, trust
+   material, and the total deadline without exposing mbedTLS types to
+   `St67HttpFetcher`.
+3. Continue resolving the API host (`resolveApiTarget()`) through LwIP DNS and pass the original
+   hostname separately for the HTTP `Host` header, SNI, and certificate hostname
+   verification. Never verify against the resolved IP address.
+4. Add TLS-specific fetch results or detail codes for configuration, entropy,
+   time, handshake, untrusted CA, hostname mismatch, certificate validity,
+   record I/O, and close failures. Preserve the first authoritative failure.
+5. Log only stage, mbedTLS error code/string, elapsed time, and verification
+   flags. Do not log credentials, certificate contents, private keys, or response
+   payloads.
+6. Keep one active request at a time through `St67HttpFetchTask`. A failed HTTPS
+   request must still disconnect cleanly and permit the next request without a
+   host reset.
+7. Update `app_credentials.h.template` with empty endpoint values only. Put the
+   selected CA in a separate non-secret source/header, not in the credentials
+   file.
+
+### A.4 Phase 4: Automated Tests
+
+Refactor only enough pure logic from `HttpClient.cpp` to make it host-testable,
+then add focused native tests.
+
+#### HTTP-over-transport tests
+
+Run the same parser suite against fragmented fake transport reads:
+
+- header split at every byte position, including `\r\n\r\n` across reads;
+- body bytes arriving in the same read as the final header bytes;
+- exact-limit and oversized headers and bodies;
+- valid, duplicate/conflicting, malformed, and truncated `Content-Length`;
+- close-delimited response;
+- short writes and repeated reads;
+- timeout/error at connect, write, header, body, and close;
+- exactly one completion notification and cleanup on every path.
+
+#### TLS policy tests
+
+Where the selected mbedTLS build supports host tests, use deterministic local
+certificates and a local TLS server to cover:
+
+- valid chain and matching hostname;
+- unknown CA;
+- hostname mismatch;
+- expired and not-yet-valid certificates;
+- missing or invalid trusted time;
+- truncated handshake and peer reset;
+- TLS records split independently of HTTP boundaries;
+- deadline expiry during handshake and body transfer.
+
+No test-only insecure verification switch may be reachable in production
+configuration.
+
+### A.5 Phase 5: Firmware and Bench Validation
+
+Use a controlled HTTPS endpoint whose CA, hostname, response size, content type,
+and failure modes are known.
+
+1. Build `Debug` and `Release`; run native tests and `git diff --check`.
+2. Compare ELF/map flash, `.data`, and `.bss` with the recorded plain-HTTP
+   baseline.
+3. Run one successful HTTPS GET and confirm DNS, TCP, SNI, chain validation,
+   hostname validation, HTTP status/type, body length, CRC, disconnect, and
+   recovery.
+4. Record handshake time, total request time, `heapFree`, `heapMin`, task count,
+   pbuf/socket state, and stack high-water marks. Exercise the deepest TLS error
+   path before reducing any stack.
+5. Run each certificate failure case and verify fail-closed behavior followed
+   by a successful request.
+6. Run delayed handshake/header/body, truncated response, oversized response,
+   and connection-reset cases. All waits must finish within their documented
+   deadlines.
+7. Run 100 persistent HTTPS cycles with stable heap, tasks, pbufs, sockets, and
+   stack margins.
+8. Run an alternating success/failure batch and repeated maximum-size responses
+   to expose cleanup errors and allocator fragmentation.
+9. Repeat with concurrent USB debug traffic and verify that logging pressure
+   does not alter request correctness.
+
+Keep at least 8 KiB minimum-ever free FreeRTOS heap as the existing floor, and
+set a larger TLS-specific margin before release based on measured worst-case
+error paths. If TLS cannot maintain a defensible margin, reduce measured static
+consumers first; do not weaken verification or silently increase buffers.

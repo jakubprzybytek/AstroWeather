@@ -76,7 +76,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | Wi-Fi connection (ST67W611M1): join, DHCP, failure diagnosis | ✅ Done | Credentials are set with `wifi set` and saved to the EEPROM | [WiFi.md](docs/WiFi.md) |
 | Fetch data over HTTP | ✅ Done | Plain HTTP on port 80 only | [WiFi.md](docs/WiFi.md) |
 | Server host and path from the console | ✅ Done | `api host`, `api path`, saved; the built-in values from `app_credentials.h` are the fallback | [WiFi.md](docs/WiFi.md#server) |
-| Fetch data over HTTPS | 🟡 In progress | Host switched to T01 (TLS in the module) and rewritten against `W6X_Net`; builds, not yet on the bench. mbedTLS on the host is the fallback | [HTTPS plan](docs/ST67_HTTPS_Implementation_Plan.md) |
+| Fetch data over HTTPS | ✅ Done | TLS in the ST67 module (T01); chain and hostname verified by the module; 199/200 stress cycles. Open: expiry check, transport fault cases | [HTTPS plan](docs/ST67_HTTPS_Implementation_Plan.md) |
 | Module power saving between fetches | 🔴 Not started | The module stays up between fetches | [WiFi.md](docs/WiFi.md#open-items) |
 | **Astro data** | | | |
 | Payload parser (protocol 1, 6 blocks) | ✅ Done | Unit tested | [AstroRefresh.md](docs/AstroRefresh.md) |
