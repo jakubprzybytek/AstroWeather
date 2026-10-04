@@ -1,14 +1,26 @@
 import { describe, test, expect, inject } from "vitest";
 
 const BASE_URL = inject("apiUrl");
+const DEVICE_KEY = inject("deviceKey");
+const deviceUrl = (path: string) => `${BASE_URL}/device${path}?key=${encodeURIComponent(DEVICE_KEY)}`;
+
+// The stage allows one request per second, so a test that follows another
+// closely may be throttled; retry those few times.
+async function get(url: string): Promise<Response> {
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetch(url);
+    if (response.status !== 429 || attempt === 3) return response;
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+  }
+}
 const displayKeys = [
   "display", "board", "nightId", "numeric_0", "numeric_1",
   "matrix_0", "matrix_1", "matrix_2", "matrix_3", "matrix_4", "numeric_2", "numeric_3"
 ];
 
-describe("GET /astro/{configurationId}", () => {
+describe("GET /device/astro/{configurationId}", () => {
   test("returns the six-display text protocol for a known configuration", async () => {
-    const response = await fetch(`${BASE_URL}/astro/krakow`);
+    const response = await get(deviceUrl("/astro/krakow"));
     const body = await response.text();
     const lines = body.split("\n");
 
@@ -49,7 +61,7 @@ describe("GET /astro/{configurationId}", () => {
   });
 
   test("returns the versioned error payload for an unknown configuration", async () => {
-    const response = await fetch(`${BASE_URL}/astro/unknown-place`);
+    const response = await get(deviceUrl("/astro/unknown-place"));
 
     expect(response.status).toBe(404);
     expect(response.headers.get("content-type")).toContain("text/plain");
@@ -57,15 +69,27 @@ describe("GET /astro/{configurationId}", () => {
   });
 
   test("returns non-200 when configurationId path parameter is missing", async () => {
-    const response = await fetch(`${BASE_URL}/astro/`);
+    const response = await get(deviceUrl("/astro/"));
 
     expect(response.status).not.toBe(200);
+  });
+
+  test("rejects a request without a key", async () => {
+    const response = await get(`${BASE_URL}/device/astro/krakow`);
+
+    expect(response.status).toBe(401);
+  });
+
+  test("rejects a wrong key", async () => {
+    const response = await get(`${BASE_URL}/device/astro/krakow?key=not-the-key`);
+
+    expect(response.status).toBe(403);
   });
 });
 
 describe("GET /configurations", () => {
   test("returns public configuration metadata", async () => {
-    const response = await fetch(`${BASE_URL}/configurations`);
+    const response = await get(`${BASE_URL}/configurations`);
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/json");

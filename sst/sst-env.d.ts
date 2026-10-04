@@ -14,13 +14,16 @@ declare module "sst" {
       "type": "sst.aws.StaticSite"
       "url": string
     }
+    "DeviceApiKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "ForecastData": {
       "name": string
       "type": "sst.aws.Dynamo"
     }
   }
 }
-/// <reference path="sst-env.d.ts" />
 
 import "sst"
 export {}

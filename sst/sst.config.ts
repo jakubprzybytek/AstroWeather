@@ -106,10 +106,33 @@ export default $config({
       }
     });
 
+    // Comma-separated, so a new key can be added before the device switches.
+    const deviceApiKey = new sst.Secret("DeviceApiKey");
+    const deviceAuthorizer = api.addAuthorizer({
+      name: "DeviceKey",
+      lambda: {
+        function: {
+          handler: "packages/functions/src/auth/device-key.handler",
+          link: [deviceApiKey]
+        },
+        identitySources: ["$request.querystring.key"],
+        response: "simple",
+        ttl: "300 seconds"
+      }
+    });
+
     api.route("GET /configurations", "packages/functions/src/configurations-handler.handler");
     api.route("GET /astro/{configurationId}", {
       handler: "packages/functions/src/astro.handler",
       link: [forecastData]
+    });
+    // The device's copy of the forecast route; the ST67 module cannot send
+    // headers, so its key travels in the `key` query parameter.
+    api.route("GET /device/astro/{configurationId}", {
+      handler: "packages/functions/src/astro.handler",
+      link: [forecastData]
+    }, {
+      auth: { lambda: deviceAuthorizer.id }
     });
     api.route("POST /tools/clearoutside", "packages/functions/src/clearoutside.handler");
     api.route("POST /tools/gfz-hp60", "packages/functions/src/tools/gfz-hp60.handler");
