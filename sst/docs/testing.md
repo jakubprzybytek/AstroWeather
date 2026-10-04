@@ -136,15 +136,16 @@ The suite covers:
 - `GET /configurations` returns the configuration list.
 
 Because the tests call the generated API Gateway URL, they do not exercise the
-public CloudFront hostname, its certificate, or plain-HTTP access. Check those
-manually after infrastructure changes, with redirects disabled:
+public API hostname or its certificate. Check those manually after
+infrastructure changes:
 
 ```bash
-curl -si http://api.<stage>.astroweather.albedoonline.com/configurations
 curl -si https://api.<stage>.astroweather.albedoonline.com/astro/krakow
+curl -si --max-time 10 http://api.<stage>.astroweather.albedoonline.com/configurations
 ```
 
-Both should return the final API response with no `Location` header.
+The first should return the API response. The second should fail to connect
+(time out or be refused): the API is HTTPS only.
 
 ### Live Clear Outside scrape
 

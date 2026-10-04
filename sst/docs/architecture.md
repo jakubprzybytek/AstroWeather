@@ -46,44 +46,35 @@ to call a separate endpoint for each data source.
   **aurora jobs** (`jobs/aurora-forecast.ts`, `jobs/aurora-nowcast.ts`),
   described in [Write path](#write-path-independent-cadence-per-source).
 
-### 3. API edge (CloudFront, HTTP and HTTPS)
+### 3. API edge (API Gateway custom domain, HTTPS only)
 
-The public API hostname points at a CloudFront distribution rather than directly
-at API Gateway, so the API is reachable over both `http://` and `https://`
-without redirects. This supports constrained clients, such as the embedded
-device, that cannot use TLS.
+The public API hostname is an API Gateway custom domain (regional endpoint)
+mapped to the HTTP API. API Gateway listens only on port 443, so `http://`
+requests are not answered at all; there is no redirect.
 
 ```text
-HTTP or HTTPS client
+HTTPS client
   |
   v
-CloudFront (public API hostname, viewer protocol policy allow-all)
-  |
-  | HTTPS only
-  v
-API Gateway generated execute-api endpoint
+API Gateway custom domain (public API hostname, TLS_1_2 security policy)
   |
   v
 Route Lambdas
 ```
 
-- The distribution uses the managed `CachingDisabled` cache policy and the
-  `AllViewerExceptHostHeader` origin request policy, so every request, method,
-  query string, and body reaches API Gateway, which still owns routing, CORS,
-  and throttling.
-- The CloudFront certificate is issued by ACM in `us-east-1` and validated
-  through Route 53; `A` and `AAAA` alias records point the API hostname at the
-  distribution.
-- The web UI always calls the API over HTTPS (`VITE_API_URL` uses `https://`),
-  and CORS allows only the HTTPS web origin plus local Vite origins.
+- SST's `ApiGatewayV2` `domain` option creates the ACM certificate in the app's
+  region, validates it through Route 53, and adds the `A` and `AAAA` alias
+  records, all through the `route53Dns()` adapter in `sst.config.ts`.
+- The certificate is ACM RSA 2048 and chains to Amazon Root CA 1, the trust
+  anchor the HostController loads into the ST67 module.
+- The generated `execute-api` URL stays reachable and serves the same routes.
+- The web UI calls the API through `VITE_API_URL`, and CORS allows only the
+  HTTPS web origin plus local Vite origins.
 
-**Security constraints.** Plain HTTP exposes request paths, query strings,
-bodies, and responses to interception and modification. It is accepted only as
-compatibility behavior for public, non-sensitive forecast data. Do not add
-credentials, cookies, tokens, API keys, or sensitive parameters to the API
-while HTTP is allowed. Any future authenticated or sensitive route must be
-HTTPS-only, for example on a separate hostname whose CloudFront behavior uses
-`redirect-to-https`. HSTS is intentionally not enabled.
+Until October 2026 the hostname pointed at a CloudFront distribution with viewer
+protocol policy `allow-all`, so a device without TLS could use plain HTTP. The
+HostController now verifies the server over HTTPS, so the distribution was
+removed.
 
 ### 4. Configuration and location
 
@@ -261,16 +252,15 @@ changes or breaks.
 
 ## Technical Stack
 - **Infrastructure as Code**: SST v4 (`sst.config.ts`), with Pulumi AWS
-  resources for the API CloudFront distribution and DNS records
+  resources for the Route 53 records
 - **Runtime**: Node.js / TypeScript
 - **Libraries**: `suncalc`, `node-html-parser`, AWS SDK v3 DynamoDB clients
 - **Web UI**: React, Vite, React-Bootstrap
 - **Cloud Provider**: AWS
 
 ## Data Flow
-1. Client calls `GET /astro/krakow` over HTTP or HTTPS.
-2. CloudFront forwards the request over HTTPS to API Gateway, which triggers the
-   forecast Lambda.
+1. Client calls `GET /astro/krakow` over HTTPS.
+2. API Gateway triggers the forecast Lambda.
 3. The Lambda resolves the `krakow` configuration and its location.
 4. The Lambda calculates astronomy and queries the stored weather items for the
    six requested nights.
@@ -290,9 +280,8 @@ available at `https://astroweather.albedoonline.com`, with the API at
 `https://api.astroweather.albedoonline.com`. Other stages use the stage name as
 the first label, for example `https://int.astroweather.albedoonline.com` and
 `https://api.int.astroweather.albedoonline.com`. SST manages the web
-certificate and DNS records; the API certificate, CloudFront distribution, and
-aliases are defined explicitly in `sst.config.ts` (see
-[API edge](#3-api-edge-cloudfront-http-and-https)). All records live in the
+and API certificates and DNS records (see
+[API edge](#3-api-edge-api-gateway-custom-domain-https-only)). All records live in the
 `albedoonline.com` hosted zone. The API allows the matching web origin plus the
 local Vite development origins.
 
@@ -329,5 +318,5 @@ sst/
 │   └── tests/integration/
 ├── packages/web/         # Vite + React UI
 ├── docs/                 # Architecture, API, development, and testing documentation
-└── sst.config.ts         # API, CloudFront, DynamoDB, schedule, and StaticSite
+└── sst.config.ts         # API, DynamoDB, schedules, and StaticSite
 ```

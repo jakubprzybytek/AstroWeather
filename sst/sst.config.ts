@@ -84,6 +84,10 @@ export default $config({
     });
 
     const api = new sst.aws.ApiGatewayV2("AstroApi", {
+      domain: {
+        name: domain.api,
+        dns: route53Dns()
+      },
       transform: {
         stage: {
           defaultRouteSettings: {

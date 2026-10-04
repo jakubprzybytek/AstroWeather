@@ -19,8 +19,8 @@ All commands run from the `sst/` directory unless stated otherwise.
 
 ## Stages
 
-Every SST stage is a separate copy of the whole app: API, CloudFront
-distribution, DynamoDB table, ingestion schedule, and web site.
+Every SST stage is a separate copy of the whole app: API and its custom
+domain, DynamoDB table, ingestion schedules, and web site.
 
 | Stage | Web | API | Purpose |
 |---|---|---|---|
@@ -60,7 +60,7 @@ outputs:
 
 | Output | Meaning |
 |---|---|
-| `apiUrl` | Public API hostname, served by CloudFront over HTTP and HTTPS |
+| `apiUrl` | Public API hostname, an API Gateway custom domain served over HTTPS only |
 | `siteUrl` | Web UI |
 | `forecastDataTableName` | DynamoDB table used by the ingestion job and forecast API |
 | `AstroApi` | Generated API Gateway URL, used by the integration tests |
@@ -74,7 +74,7 @@ UI change are always released at the same time.
 2. Deploy to `int`: `npm run deploy -- --stage int`.
 3. Run the integration suite against `int` (see below) and spot-check the
    public hostname, for example
-   `curl -si http://api.int.astroweather.albedoonline.com/astro/krakow`.
+   `curl -si https://api.int.astroweather.albedoonline.com/astro/krakow`.
 4. Deploy to `prod` and repeat the checks against its hostname.
 
 ### Testing a deployed stage
