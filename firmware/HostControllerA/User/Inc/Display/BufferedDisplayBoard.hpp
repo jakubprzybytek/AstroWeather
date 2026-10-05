@@ -30,7 +30,16 @@ private:
     // How often to restate that a board is still unreachable (tick rate is 1 kHz).
     static constexpr uint32_t kReportIntervalMs = 30000U;
 
-    void report(HAL_StatusTypeDef status);
+    // A board that still answers its address after a failed submit gets the
+    // whole submit again, up to this many times in all, kRetryDelayMs apart.
+    // An absent board fails the probe and is not retried.
+    static constexpr uint8_t kSubmitAttempts = 3U;
+    static constexpr uint32_t kRetryDelayMs = 5U;
+
+    // One attempt: the attributes, then the content. HAL_OK, or the first
+    // failure with its HAL error bits in `errorCode`.
+    HAL_StatusTypeDef send(uint32_t& errorCode);
+    void report(HAL_StatusTypeDef status, uint32_t errorCode, uint8_t attempts);
 
     Device::I2cBus& bus_;
     uint16_t address_;

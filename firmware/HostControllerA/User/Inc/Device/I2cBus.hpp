@@ -29,8 +29,11 @@ class I2cBus
 public:
     explicit I2cBus(I2C_HandleTypeDef& handle) : handle_(handle) {}
 
+    // `errorCode`, if given, gets the HAL error bits (HAL_I2C_ERROR_*) of this
+    // transfer, read under the lock: a failed transfer is HAL_ERROR whether
+    // it was a NACK, a bus error or the timeout.
     HAL_StatusTypeDef transmit(uint16_t deviceAddress, const uint8_t* data, uint16_t size,
-                               uint32_t timeoutMs);
+                               uint32_t timeoutMs, uint32_t* errorCode = nullptr);
     HAL_StatusTypeDef memRead(uint16_t deviceAddress, uint16_t memAddress, uint8_t* data,
                               uint16_t size, uint32_t timeoutMs);
     HAL_StatusTypeDef memWrite(uint16_t deviceAddress, uint16_t memAddress, const uint8_t* data,

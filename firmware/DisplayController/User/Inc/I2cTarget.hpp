@@ -15,6 +15,14 @@
 //
 // One instance, for hi2c1; the HAL callbacks are routed to it. Every
 // transaction addressed to this board, read or write, pulses LED_2.
+//
+// I2C1's interrupt has priority 1, above the refresh timer, DMA and EXTI
+// (3). The HAL sets CR2.NACK when it handles a transfer's STOP, and software
+// cannot clear that bit: only an address match, a STOP or a sent NACK does.
+// Handled late - after the host's next address had already matched, because
+// a ~170 us refresh interrupt held it off - the NACK stayed set and the board
+// refused the next message's second byte; the host saw error 0x4 about one
+// refresh in seven (2026-10-05, traced on the board).
 class I2cTarget {
 public:
     // As long as the host's pulse for one USB CDC transfer.

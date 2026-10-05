@@ -27,8 +27,9 @@ bool I2cTarget::begin(uint16_t address)
 {
     address_ = address;
     // HAL_I2C_Init() on an initialised handle only rewrites the registers:
-    // it disables the peripheral, sets OAR1 and re-enables it, keeping the
-    // analog filter CubeMX configured.
+    // it disables the peripheral, sets OAR1 and re-enables it. It rewrites
+    // CR1 too, which leaves the analog filter on (its default) and the
+    // digital filter off, as CubeMX configures them.
     handle_.Init.OwnAddress1 = static_cast<uint32_t>(address) << 1U;
     if (HAL_I2C_Init(&handle_) != HAL_OK) {
         return false;
@@ -97,6 +98,9 @@ void I2cTarget::onReceiveComplete()
 
 void I2cTarget::onListenComplete()
 {
+    if (__HAL_I2C_GET_FLAG(&handle_, I2C_FLAG_ADDR) != RESET) {
+        ++g_displayStats.stopWithAddrPending;
+    }
     finishReceive();
     rearm();
 }
@@ -106,7 +110,9 @@ void I2cTarget::onError()
     // A NACK ends every read by the host and every write shorter than a
     // message, including the host's address-only probe; only other errors
     // are counted.
-    if ((HAL_I2C_GetError(&handle_) & ~HAL_I2C_ERROR_AF) != 0U) {
+    const uint32_t error = HAL_I2C_GetError(&handle_);
+    g_displayStats.lastI2cError = error;
+    if ((error & ~HAL_I2C_ERROR_AF) != 0U) {
         ++g_displayStats.i2cErrors;
     }
     finishReceive();

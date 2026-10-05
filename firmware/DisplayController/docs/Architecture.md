@@ -140,10 +140,23 @@ also recovers from a bus error the HAL left in the ready state. Listening is
 never started without a strap address, so a board cannot answer on another
 board's address.
 
+The I2C interrupt has priority 1, above the refresh timer, DMA and EXTI (3).
+At 3, shared with the refresh interrupt (about 170 us), it could reach a
+message's STOP only after the host's next address had matched (the host
+starts the next message about 100 us after a STOP). The HAL sets `CR2.NACK`
+when it handles a STOP, and software cannot clear that bit, only an address
+match, a STOP or a sent NACK can; the late NACK then stayed set and the board
+refused the next message's second byte. The host saw error `0x4` about one
+refresh in seven and its retry covered it (see its
+[Display.md](../../HostControllerA/docs/Display.md#i2c-transport)). Traced
+on the board on 2026-10-05: every failure was a short write of exactly one
+byte, after a STOP handled late (`stopWithAddrPending`), with no bus error. A digital noise filter (15 clocks)
+made no difference.
+
 ## Diagnostics
 
 Until the board has a console, its counters are read over SWD. They are in
-`g_displayStats` (`User/Inc/Stats.hpp`), a C-linkage struct of fifteen 32-bit
+`g_displayStats` (`User/Inc/Stats.hpp`), a C-linkage struct of seventeen 32-bit
 fields:
 
 | Field | Counts |
@@ -163,10 +176,12 @@ fields:
 | `lateShifts` | Refresh interrupts that found the previous pass's shift still running |
 | `lateInterrupts` | Refresh interrupts later than the pass they start, which was restarted |
 | `maxInterruptMicros` | Longest refresh interrupt, in microseconds |
+| `lastI2cError` | HAL error bits (`HAL_I2C_ERROR_*`) at the last error callback, NACK (`0x4`) included; a short write or a probe ends in one |
+| `stopWithAddrPending` | Transfers whose STOP was handled after the host's next address had matched: the I2C interrupt ran late. Should stay 0 |
 
 ```bash
 arm-none-eabi-nm build/Debug/DisplayController.elf | grep g_displayStats
-STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x3C
+STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x44
 ```
 
 `mode=HOTPLUG` attaches without resetting the board.

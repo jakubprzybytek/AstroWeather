@@ -7,7 +7,7 @@
 // demangling:
 //
 //   arm-none-eabi-nm build/Debug/DisplayController.elf | grep g_displayStats
-//   STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x3C
+//   STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x44
 //
 // Each field has a single writer (the I2C interrupt or the DisplayApp task), so
 // no locking is needed.
@@ -29,6 +29,11 @@ struct DisplayControllerStats {
     uint32_t lateShifts;          // refresh interrupts later than a whole pass
     uint32_t lateInterrupts;      // refresh interrupts later than the pass they start
     uint32_t maxInterruptMicros;  // longest refresh interrupt
+    uint32_t lastI2cError;        // HAL error bits at the last error callback, NACK included
+    // A transfer's STOP handled after the host's next address had matched:
+    // the I2C interrupt ran late, the race behind the 2026-10-05 NACKs (see
+    // I2cTarget.hpp). Should stay 0.
+    uint32_t stopWithAddrPending;
 };
 
 extern volatile DisplayControllerStats g_displayStats;
