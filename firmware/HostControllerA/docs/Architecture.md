@@ -44,27 +44,35 @@ create their FreeRTOS mutexes from static storage at that point.
 `activityLed()` `PulseLed` on `LED_2`, then, in order:
 
 1. `LogService` `init()` (creates the log queue) and `start()`.
-2. `settingsStore.load()` reads the EEPROM; the outcome, not the values, is
+2. `Display::detectBoardAddress()` reads the host's `ADDR_0`..`ADDR_2` straps,
+   as a display board does, and `display.setLocalAddress()` takes the result
+   before anything submits: it decides which forecast block the local board
+   shows and which remote address is skipped (see
+   [AstroRefresh.md](AstroRefresh.md#display-mapping)). The address is logged,
+   with a warning if it is outside `0x10`–`0x15`, but USB CDC has not
+   enumerated yet, so the line is normally lost (the warning is also kept in
+   `errors`); `status` shows the address as `host` on the `remote` line.
+3. `settingsStore.load()` reads the EEPROM; the outcome, not the values, is
    logged. This works before the scheduler because EEPROM reads take no
    `osDelay` and the bus mutex is uncontended.
-3. `CurrentSenseTask`: logging and display flags from settings, the display,
+4. `CurrentSenseTask`: logging and display flags from settings, the display,
    then `start()`.
-4. `ConsoleService`: `init(&display)`, EEPROM and settings pointers, `start()`.
-5. `LowBrightness::set()` applies the saved low brightness to `PB8`, before the
+5. `ConsoleService`: `init(&display)`, EEPROM and settings pointers, `start()`.
+6. `LowBrightness::set()` applies the saved low brightness to `PB8`, before the
    displays light up.
-6. The local board gets the "no data" state (`Display::noDataState()`, see
+7. The local board gets the "no data" state (`Display::noDataState()`, see
    [Display.md](Display.md#no-data)), then `localBoard.start()` enables the SCT
    outputs and starts TIM2, whose interrupt refreshes the board from then on.
-7. `ClockTask`: display flag and trim from settings (an error is logged if the
+8. `ClockTask`: display flag and trim from settings (an error is logged if the
    trim is rejected), the display, `start()`.
-8. `SetSt67CredentialSource(&settingsStore)`, then `StartSt67HttpFetchTask()`.
+9. `SetSt67CredentialSource(&settingsStore)`, then `StartSt67HttpFetchTask()`.
    The credential source must be set first, since the fetch task reads the
    credentials on every connect.
-9. `AstroDataRefreshTask`: `init(&display)` restores the last successful
-   refresh time from backup register DR1 when the RTC is set, then `start()`.
-10. `MainLoopTask`: `init(activityLed(), &settingsStore)` (switch 2 saves low
+10. `AstroDataRefreshTask`: `init(&display)` restores the last successful
+    refresh time from backup register DR1 when the RTC is set, then `start()`.
+11. `MainLoopTask`: `init(activityLed(), &settingsStore)` (switch 2 saves low
     brightness), `start()`.
-11. `SwitchInput::attach()` routes the `SWITCH_1`/`SWITCH_2` EXTI interrupts to
+12. `SwitchInput::attach()` routes the `SWITCH_1`/`SWITCH_2` EXTI interrupts to
     `MainLoopTask` as thread flags.
 
 `defaultTask` initialises the USB device (`MX_USB_Device_Init()`) once the
