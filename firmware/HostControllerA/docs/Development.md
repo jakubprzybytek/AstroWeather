@@ -223,9 +223,11 @@ in the EEPROM across power cycles.
 
 ### COM port disappears or will not open
 
-The STM32 USB CDC port intermittently stops working, most often after a flash
-or a reset. Since late September 2026 the likely cause is on the Windows side;
-see [Why it happens](#why-it-happens). Typical symptoms:
+Until 2026-10-05 the STM32 USB CDC port intermittently stopped working, most
+often after a flash or a reset. The cause was in the firmware, the USB
+interrupt's priority, and is fixed; see [Why it happened](#why-it-happened).
+What follows describes the symptoms and the recovery steps as they were, in
+case a port is left in a failed state or the problem returns. Typical symptoms:
 
 - `python tools/astro_console.py list` still lists the port, but opening it
   fails with `could not open port 'COM4': FileNotFoundError(2, ...)`.
@@ -407,30 +409,59 @@ VID/PID (`IgnoreHWSerNum04835740` under
 `HKLM\SYSTEM\CurrentControlSet\Control\UsbFlags`), which pins the COM number
 to the hub port instead. Neither has been needed so far.
 
-#### Why it happens
+#### Why it happened
 
-Investigated on 2026-09-30 with a temporary trace in `usbd_conf.c` that logged
-every setup request, completed transfer, stall, bus reset and suspend with a
-timestamp in a RAM ring buffer, read over SWD after a failure.
+**Cause, found and fixed on 2026-10-05: the USB interrupt was serviced too
+late.** While an EP0 receive interrupt (`CTR_RX`) is still unserviced, the
+STM32 USB peripheral does not answer a new SETUP packet: it stays silent, as
+if the packet had been corrupted, so that the pending notification is not
+lost (reference manual, control transfers). The host retries a SETUP three
+times in quick succession and then fails the request. The USB interrupt had
+priority 3, like every other interrupt, so it queued behind the display
+refresh interrupt (about 170 us, 1000 times a second), and a USB interrupt
+itself takes 100-290 us in the Debug build. When Windows sent a request right
+after the previous one's status stage, the board sometimes missed all three
+tries.
 
-**Most likely: Windows' USB serial driver.** In the failing boots traced, the
-board answered every request Windows sent, including the complete
-configuration descriptor. Windows then stopped: no `SET_CONFIGURATION`, no
-further requests, and the port was suspended a few milliseconds later.
-`C:\Windows\INF\setupapi.dev.log` shows `usbser.sys` failing to start within
-11 ms (`CM_PROB_FAILED_START`, problem status `0xc0000001`). In a successful
-boot, the next requests at that point are the configuration descriptor with
-wLength 265, `SET_CONFIGURATION 1` and the CDC line-coding requests.
+What Windows did next depended on which request it was:
 
-The workstation runs Windows 11 25H2 build 26200.9457, the September 2026
-security update (KB5124008) plus its out-of-band fix (KB5129195). That update
-is known to make other USB class drivers fail with Code 10: Microsoft lists
-USB Audio Class 1.0 devices, and CDC-NCM network adapters fail on this same
-build with stricter descriptor validation blamed. The USB serial driver is
-not on Microsoft's list, and the board has not been tried on another computer,
-so this is not confirmed. The problem was first written up here on
-2026-09-20, a week after the update was installed. Trying the board on Linux
-or on a Windows machine without the September update would settle it.
+- **A CDC request while opening the port** (`SET_LINE_CODING`,
+  `SET_CONTROL_LINE_STATE`): `SetCommState` failed and the open returned
+  error 31, "A device attached to the system is not functioning", with the
+  device node still healthy. The next open usually worked.
+- **A request during enumeration** (`SET_CONFIGURATION`, a string
+  descriptor): the driver failed to start (`CM_PROB_FAILED_START`, Code 10),
+  or Windows gave up on the serial number and created a node named after the
+  hub port, with a new COM number. This is what the 2026-09-30 trace showed
+  ("Windows then stopped: no `SET_CONFIGURATION`") and was read then as a
+  Windows driver fault.
+
+Measured with a scripted loop (open, read 0.3 s, close, 0.3 s pause) and a
+RAM trace of every control request, read over SWD: at priority 3, 4 of 64 and
+11 of 200 opens failed, each time with the board having answered everything
+it saw and the failing request absent from its trace, no bus errors
+(`ISTR.ERR` never set). With the USB interrupt at priority 1
+(`NVIC.USB_UCPD1_2_IRQn` in the `.ioc`, `HAL_PCD_MspInit()` in
+`usbd_conf.c`): 0 of 300 and 0 of 200 opens failed, and 10 resets in a row
+all re-enumerated under the serial number as `COM4` and opened within 1.5 s.
+
+The display refresh pays a little: under that 200-open storm it logged 24
+late shifts and 22 late interrupts (`status`, `display` line) against 11 and
+16 at priority 3, and its longest interrupt read 940 us because USB
+interrupts now nest inside it. A minute of ordinary console use and an astro
+refresh added none.
+
+The suspicion of the September 2026 Windows update (KB5124008) is withdrawn:
+it was never confirmed, and the failures stopped with this change on the same
+PC and driver (`usbser.sys` 10.0.26100.9278). Device nodes Windows created
+during the bad period (`COM5`-`COM9`) remain until removed with `pnputil`.
+
+Checked on the way and harmless: `usbd_conf.h` has `USBD_LPM_ENABLED 1`
+(CubeMX's default) while the hardware side has `lpm_enable = DISABLE` and
+`usbd_desc.c` provides no BOS descriptor. The library then answers a BOS
+request with a stall, which is right for a device whose descriptor says USB
+2.00, and Windows does not ask for one. Link power management itself is off
+and not wanted on this board.
 
 **Fixed: the USB clock was out of tolerance.** USB runs from HSI48, which
 full-speed USB needs within 0.25 %. The firmware did not enable the clock
@@ -439,7 +470,7 @@ enabled, it settled at `TRIM` 58 instead of the default 64, which puts the
 untrimmed clock about 0.8 % fast. The CRS is now enabled in CubeMX (RCC, CRS
 SYNC source USB), which generates its setup in `SystemClock_Config()`,
 synchronised to the host's start-of-frame packets. This alone did not stop the
-failures.
+failures, which had the cause above.
 
 The CRS should start from `TRIM` 64: the G0's field is 7 bits and 64 is its
 reset value and midpoint (`RCC_CRS_HSI48CALIBRATION_DEFAULT`). CubeMX shows
@@ -458,11 +489,9 @@ STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 0x40006C00 4
 `0x00003A60` means counting and auto-trim are on (bits 5 and 6) with `TRIM`
 at `0x3A`; `0x00004000` means the CRS is off.
 
-**Possible, not established: bad packets from the board.** Two early failures
-looked different: Windows abandoned the serial-number string read (and named
-the node after the hub port instead, see above), and one descriptor request
-never completed. The trace cannot tell whether a packet was corrupted on the
-board or refused by the PC.
+**Explained by the cause above:** two early failures in which Windows
+abandoned the serial-number string read (and named the node after the hub
+port instead, see above) and one descriptor request never completed.
 
 **Ruled out:**
 

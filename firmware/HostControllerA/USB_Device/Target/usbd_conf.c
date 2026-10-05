@@ -100,9 +100,15 @@ void HAL_PCD_MspInit(PCD_HandleTypeDef* pcdHandle)
     }
 
     /* Peripheral interrupt init */
-    HAL_NVIC_SetPriority(USB_UCPD1_2_IRQn, 3, 0);
+    HAL_NVIC_SetPriority(USB_UCPD1_2_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(USB_UCPD1_2_IRQn);
   /* USER CODE BEGIN USB_DRD_FS_MspInit 1 */
+    /* The USB interrupt has priority 1 (NVIC settings in the .ioc), above the
+       display refresh timer and the rest (3). While an EP0 receive interrupt
+       is unserviced the peripheral does not answer a new SETUP; at priority 3
+       the ~170 us refresh interrupt could hold it off past the host's three
+       retries, and Windows then failed the request: error 31 on opening the
+       port, or a failed enumeration. See docs/Development.md. */
 
   /* USER CODE END USB_DRD_FS_MspInit 1 */
   }
