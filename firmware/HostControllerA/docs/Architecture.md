@@ -110,8 +110,8 @@ others hold a reference to it.
 | `i2c1Bus` | `Device::I2cBus` | `hi2c1`, with a mutex per transfer |
 | `localSct` | `SCT2xxx` | `hspi3`, `SCT_ENABLE`, `SCT_LATCH` |
 | `localBoard` | `Display::PcbDisplayBoard` | `localSct`, `htim2`, `DISPLAY_1_EN`..`DISPLAY_5_EN`; is also the `DisplayRefresh` task |
-| `remoteBoard1`..`remoteBoard5` | `Display::BufferedDisplayBoard` | `i2c1Bus` at 7-bit addresses `0x10`..`0x14` |
-| `display` | `Display::Display` | `localBoard` plus the five remote boards |
+| `remoteBoard10`..`remoteBoard15` | `Display::BufferedDisplayBoard` | `i2c1Bus` at 7-bit addresses `0x10`..`0x15`, one per forecast block; the one at the host's own address is unused |
+| `display` | `Display::Display` | `localBoard` plus the six remote boards; `AstroWeather_Init()` sets the host's address from its straps (`setLocalAddress()`) |
 | `settingsEeprom` | `Device::Eeprom24AA04` | `i2c1Bus`, address `0x50` |
 | `settingsStore` | `Settings::Store` | `settingsEeprom` and the in-RAM `Values` |
 | `activityLed()` | `PulseLed` (`../Common/Src/Debug/PulseLed.cpp`) | `LED_2`: a 250 ms pulse for switch 1, 50 ms for switch 2 (`MainLoopTask`), and 20 ms for every USB CDC transfer in either direction (`CDC_Receive_FS` in the USB interrupt, `CDC_Transmit_FS` after a successful send). The pin is set at once and a static FreeRTOS one-shot timer clears it, so a pulse never blocks and works from an interrupt; overlapping pulses merge. |
@@ -234,7 +234,7 @@ From `Core/Inc/main.h` and `HostControllerA.ioc`.
 | GPIO | `PB6` `SCT_LATCH`, `PB7` `SCT_ENABLE` | SCT latch and output enable |
 | GPIO | `PD3`, `PA15`, `PD1`, `PD2`, `PD0` = `DISPLAY_1_EN`..`DISPLAY_5_EN` | Multiplex selects |
 | TIM2, 16 MHz / 16000 / 4 | none | 250 Hz multiplex tick, interrupt |
-| I2C1 | `PA9` SCL, `PA10` SDA | 24AA04 EEPROM (`0x50`) and remote boards (`0x10`..`0x14`) |
+| I2C1 | `PA9` SCL, `PA10` SDA | 24AA04 EEPROM (`0x50`) and remote boards (`0x10`..`0x15`) |
 | ADC1, 16x oversampling | `PB2` `CURRENT_SENSE` (IN10), plus the internal temperature sensor and VREFINT | Current, temperature and VDDA; DMA1 channel 3 |
 | RTC | none (LSI) | Calendar and backup registers |
 | USB FS device, CDC | `PA11` DM, `PA12` DP | Console |

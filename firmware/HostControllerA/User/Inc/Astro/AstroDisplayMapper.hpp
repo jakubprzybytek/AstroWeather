@@ -9,13 +9,15 @@
 // in the native tests; AstroDataRefreshTask fills the Display's boards with it
 // and then submits them. See docs/AstroRefresh.md#display-mapping.
 //
-// Block 0 goes to the local board, blocks 1-5 to remote slots 0-4. Each numeric
+// Block n goes to the board at I2C address 0x10 + n (Display/BoardChain.hpp),
+// which is the local board when that is the host's own address. Each numeric
 // is drawn as its payload value says: a time as HH:MM (the payload's numerics
 // 0-1), a value in whole units (numerics 2-3), and a `?` as the "unavailable"
 // pattern, the decimal point on all four digits; the numerics' attributes are
 // reset to plain (full, no blink). All five matrix rows come from the payload
 // with their levels and blinking. Row 4, the aurora, is also where the local
-// board shows the refresh progress bar; a published refresh overwrites the bar.
+// board shows the refresh progress bar; a published refresh overwrites the bar
+// when the local board has a block.
 namespace AstroDisplayMapper {
 
 constexpr uint8_t kPayloadMatrixRows = 5U;
@@ -53,22 +55,15 @@ void mapBoard(const HostController::AstroBoardData& data, bool localBoard, Board
     }
 }
 
-// Boards: anything with local() and remote(slot) returning boards as above,
-// such as Display::Display. Only fills the boards; the caller submits them.
+// Boards: anything with isLocal(position) and board(position) returning boards
+// as above, such as Display::Display. Only fills the boards; the caller submits
+// them.
 template <typename Boards>
 void mapAll(const HostController::AstroData& data, Boards& boards)
 {
-    for (uint8_t boardIndex = 0U; boardIndex < data.boards.size(); ++boardIndex)
+    for (uint8_t block = 0U; block < data.boards.size(); ++block)
     {
-        if (boardIndex == 0U)
-        {
-            mapBoard(data.boards[boardIndex], true, boards.local());
-        }
-        else
-        {
-            mapBoard(data.boards[boardIndex], false,
-                     boards.remote(static_cast<uint8_t>(boardIndex - 1U)));
-        }
+        mapBoard(data.boards[block], boards.isLocal(block), boards.board(block));
     }
 }
 

@@ -355,7 +355,7 @@ aurora     last fetched by the server: GFZ 0 h 09 min ago, NOAA Kp 0 h 09 min ag
 schedule   every 6 h from 00:10; next 12:10; last ok 2026-09-23 10:10
 api        https://api.example.com/device/astro/wroclaw (built-in)
 display    normal brightness; 3078 frames, 0 late shifts, 0 late interrupts, refresh interrupt up to 170 us
-remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
+remote     0x10 host 0x11 no 0x12 no 0x13 no 0x14 no 0x15 no
 ```
 
 | Line | Content and alternative forms |
@@ -373,7 +373,7 @@ remote     0x10 no 0x11 no 0x12 no 0x13 no 0x14 no
 | `schedule` **HC** | The next slot and the last success. `next` reads `once the clock is set` before the time is known; after failures it reads `retry <n> in <s> s`, `retry <n> now` or `no WiFi credentials, then <HH:MM>`. `last ok` reads `none since power-up` until a refresh succeeds. See [AstroRefresh.md](AstroRefresh.md). |
 | `api` **HC** | The URL the next fetch uses, `(saved)` if `api host` or `api path` is saved, else `(built-in)`. See [api](#api). |
 | `display` | `normal brightness` or `low brightness`, the state in use; it normally matches `low brightness` in the `settings` line, since both controls save (see [display low](#display)). Then the local board's refresh, since boot: frames shown (50 a second), refresh interrupts that came later than a whole pass (`late shifts`) or than the pass they start (`late interrupts`), and the longest refresh interrupt. See [Display.md](Display.md#refresh-operation). |
-| `remote` | Each remote display board, probed now on I2C: `yes` if it answered. `no display boards in this variant` without a display. |
+| `remote` | The chain addresses `0x10`–`0x15`, one per forecast block ([AstroRefresh.md](AstroRefresh.md#display-mapping)): `host` at the host's own strap address, otherwise the remote board there, probed now on I2C, `yes` if it answered. A host strapped outside the chain gets `; host 0x16 has no block` (its address) at the end. `no display boards in this variant` without a display. |
 
 WiFi has no link state of its own, so the `astro` line is the evidence that the
 network path works.

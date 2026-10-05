@@ -241,12 +241,25 @@ The firmware follows `api-payload.md` except in these details:
 ## Display Mapping
 
 `AstroDisplayMapper::mapAll()` fills the boards and `publishDisplay()` then
-submits them. Block *n* of the payload goes to one board:
+submits them. Block *n* of the payload goes to the board at I2C address
+`0x10 + n` (`Display/BoardChain.hpp`), whichever board that is:
 
-| Block | Board | I2C address |
-| --- | --- | --- |
-| `display=0` | Local board | — |
-| `display=1` … `display=5` | `display.remote(0)` … `display.remote(4)` | `0x10` … `0x14` |
+| Block | I2C address |
+| --- | --- |
+| `display=0` | `0x10` |
+| `display=1` | `0x11` |
+| … | … |
+| `display=5` | `0x15` |
+
+The host reads its own address from its `ADDR_0`..`ADDR_2` straps at boot, the
+same way a display board does (`Display::detectBoardAddress()`), and logs
+`Display address 0x10: forecast block 0`. Its own display shows the block at
+that address and the remote board object at that address is never used; the
+other five blocks go over I2C. A host with no straps fitted is `0x10`, so it
+shows tonight, but only because of its address. A host strapped outside
+`0x10`–`0x15` shows no block (logged as a warning, and `status` says so): all
+six go to remote boards, and its progress bar is cleared when a refresh is
+published.
 
 On each board:
 
@@ -275,7 +288,8 @@ the display keeps whatever it showed.
 ### Local numerics 2 and 3
 
 On the local board, numeric 2 and numeric 3 have other owners, and both are on
-by default:
+by default. "Block 0" below is the host's block with no straps fitted; with
+other straps it is the block at the host's address:
 
 - **Numeric 2 shows the current sense reading** while `adc display` is on
   (default on). It is rewritten ten times a second, so block 0's maximum

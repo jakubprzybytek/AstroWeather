@@ -6,7 +6,8 @@ void Display::submit()
 {
     MutexGuard guard(submitMutex_);
     local_.submit();
-    for (DisplayBoard* board : remote_) {
+    for (uint8_t position = 0U; position < kChainLength; ++position) {
+        DisplayBoard* board = remoteBoard(position);
         if (board != nullptr) {
             board->submit();
         }

@@ -312,8 +312,14 @@ bool AstroDataRefreshTask::publishDisplay(const AstroData& data)
         return false;
     }
     // Row 4 is the aurora on every board, so on the local board it replaces
-    // the progress bar at once; there is no success hold.
+    // the progress bar at once; there is no success hold. A host with no
+    // block (address outside the chain) has no aurora to draw: the bar is
+    // cleared instead.
     indicator_.cancel();
+    if (!display_->localInChain())
+    {
+        clearIndicator();
+    }
     AstroDisplayMapper::mapAll(data, *display_);
     display_->submit();
     shownRow_ = kNoRowShown;

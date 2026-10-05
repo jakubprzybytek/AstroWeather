@@ -11,7 +11,9 @@ shows it on seven-segment and dot-matrix LED displays.
   server (`../../sst`), sending the device key saved with `api key`. A slot missed while the board was off or offline is caught
   up once, and failures are retried with a growing delay.
 - It checks the payload's CRC, parses it, and shows it on its own LED board and
-  on up to five remote display boards reached over I2C (addresses `0x10`–`0x14`).
+  on up to five remote display boards reached over I2C. Night *n* of the
+  forecast goes to the board at address `0x10 + n`; every board, the host
+  included, reads its address from its straps.
 - It keeps the date and time in the RTC, which runs from the internal LSI
   oscillator. Each board's LSI error is measured once and stored as a trim, and
   every successful fetch steps the clock to the server's time and logs the drift.

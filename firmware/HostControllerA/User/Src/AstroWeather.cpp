@@ -10,6 +10,7 @@
 #include <Device/I2cBus.hpp>
 #include <Device/SCT2xxx.hpp>
 #include <Display/BufferedDisplayBoard.hpp>
+#include <Display/DisplayAddress.hpp>
 #include <Display/Display.hpp>
 #include <Display/LowBrightness.hpp>
 #include <Display/PcbDisplayBoard.hpp>
@@ -44,15 +45,19 @@ Display::PcbDisplayBoard localBoard(
     {DISPLAY_1_EN_Pin, DISPLAY_2_EN_Pin, DISPLAY_3_EN_Pin, DISPLAY_4_EN_Pin,
      DISPLAY_5_EN_Pin});
 
-Display::BufferedDisplayBoard remoteBoard1(i2c1Bus, 0x10U);
-Display::BufferedDisplayBoard remoteBoard2(i2c1Bus, 0x11U);
-Display::BufferedDisplayBoard remoteBoard3(i2c1Bus, 0x12U);
-Display::BufferedDisplayBoard remoteBoard4(i2c1Bus, 0x13U);
-Display::BufferedDisplayBoard remoteBoard5(i2c1Bus, 0x14U);
+// One remote board per forecast block, 0x10 to 0x15 (Display/BoardChain.hpp).
+// The one at the host's own address is never used: the local board shows that
+// block instead.
+Display::BufferedDisplayBoard remoteBoard10(i2c1Bus, 0x10U);
+Display::BufferedDisplayBoard remoteBoard11(i2c1Bus, 0x11U);
+Display::BufferedDisplayBoard remoteBoard12(i2c1Bus, 0x12U);
+Display::BufferedDisplayBoard remoteBoard13(i2c1Bus, 0x13U);
+Display::BufferedDisplayBoard remoteBoard14(i2c1Bus, 0x14U);
+Display::BufferedDisplayBoard remoteBoard15(i2c1Bus, 0x15U);
 
-Display::Display display(localBoard, {&remoteBoard1, &remoteBoard2,
-                                      &remoteBoard3, &remoteBoard4,
-                                      &remoteBoard5});
+Display::Display display(localBoard, {&remoteBoard10, &remoteBoard11,
+                                      &remoteBoard12, &remoteBoard13,
+                                      &remoteBoard14, &remoteBoard15});
 
 Device::Eeprom24AA04 settingsEeprom(i2c1Bus);
 
@@ -68,6 +73,20 @@ void AstroWeather_Init() {
 
   LogService::instance().init();
   LogService::instance().start();
+
+  // The host's place in the chain comes from its straps, as on a display
+  // board; before anything submits, so no frame goes to its own address.
+  display.setLocalAddress(Display::detectBoardAddress());
+  if (display.localInChain()) {
+    LogService::instance().logf(LogService::Level::Info,
+                                "Display address 0x%02X: forecast block %u",
+                                static_cast<unsigned>(display.localAddress()),
+                                static_cast<unsigned>(Display::chainPosition(display.localAddress())));
+  } else {
+    LogService::instance().logf(LogService::Level::Warn,
+                                "Display address 0x%02X is outside 0x10-0x15: no forecast block",
+                                static_cast<unsigned>(display.localAddress()));
+  }
 
   // Runs before osKernelStart(); reads take no osDelay and the bus mutex is
   // uncontended here, so this does not block. Log the outcome rather than the

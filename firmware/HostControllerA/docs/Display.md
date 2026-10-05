@@ -338,7 +338,7 @@ The host sends a board its attributes first, `0x02`, `0x03`, `0x04`, then its co
 
 Each Display Controller has three address-programming pins, `ADDR_0` (PB10), `ADDR_1` (PB11) and `ADDR_2` (PB14), as named in `Core/Inc/main.h`. Each pin can be left floating (0), tied to ground (1) or tied to VCC (2), providing 27 possible ternary board IDs; a board with no straps fitted is board 0, `0x10`. The Display Controller derives its 7-bit I2C target address as `0x10 + board_id`, giving addresses `0x10` through `0x2A`.
 
-The Host Controller does not derive these addresses from its own pins. `AstroWeather.cpp` creates one buffer-backed Display Board per remote board at the fixed addresses `0x10` through `0x14`, and `Display::submit()` sends each logical buffer to its board's address.
+The Host Controller has the same three straps and reads its own address the same way at boot. Its address decides which forecast block its own display shows: block *n* goes to the board at `0x10 + n`, so with no straps fitted the host is `0x10` and shows block 0. `AstroWeather.cpp` creates one buffer-backed Display Board for each of `0x10` through `0x15`; `Display` uses the local board in place of the one at the host's own address, and `Display::submit()` sends each other logical buffer to its board's address. See [AstroRefresh.md](AstroRefresh.md#display-mapping).
 
 Address detection (`Display::detectBoardId()` in `DisplayAddress.cpp`) uses two reads for each pin:
 
@@ -402,7 +402,7 @@ The net is bussed to every board, so the Display Controller's CubeMX configurati
 `AstroWeather.cpp` creates:
 
 - The local PCB-backed Display Board, refreshed from TIM2's interrupt with SPI3 DMA.
-- Five buffer-backed boards at I2C addresses `0x10` through `0x14`, on the shared `Device::I2cBus`.
+- Buffer-backed boards at I2C addresses `0x10` through `0x15`, on the shared `Device::I2cBus`, except the host's own address, which is the local board.
 - The top-level `Display` containing the local board and the five remote boards.
 
 Clients call `Display::submit()` after they have finished updating the boards. Setters are intentionally unsynchronized, so independent clients may overwrite pending fields; the last update to each field wins. `submit()` serializes the hardware transfer sequence, submits the local content and attributes to the PCB-backed board for encoding, then sends each remote board its three attribute planes and its content at its configured I2C address.

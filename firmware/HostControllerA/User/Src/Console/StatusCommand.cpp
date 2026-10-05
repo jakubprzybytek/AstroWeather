@@ -270,17 +270,29 @@ void reportRemoteBoards(Display::Display* display)
     }
     // Probed now rather than taken from the last refresh, so a board plugged in
     // or removed since shows up correctly.
-    char text[112];
+    // The host's own address reads "host"; one outside the chain is added at
+    // the end, as it has no block.
+    char text[144];
     int used = std::snprintf(text, sizeof(text), "remote    ");
-    for (uint8_t slot = 0U; slot < Display::Display::kRemoteSlots; ++slot) {
-        Display::DisplayBoard* board = display->remoteSlot(slot);
-        if (board == nullptr || used < 0 || static_cast<std::size_t>(used) >= sizeof(text)) {
-            continue;
+    for (uint8_t position = 0U; position < Display::kChainLength; ++position) {
+        if (used < 0 || static_cast<std::size_t>(used) >= sizeof(text)) {
+            break;
         }
-        const bool present = board->present();
+        const char* state = "host";
+        if (!display->isLocal(position)) {
+            Display::DisplayBoard* board = display->remoteBoard(position);
+            if (board == nullptr) {
+                continue;
+            }
+            state = board->present() ? "yes" : "no";
+        }
         used += std::snprintf(&text[used], sizeof(text) - static_cast<std::size_t>(used),
-                              " 0x%02X %s", static_cast<unsigned>(board->address()),
-                              present ? "yes" : "no");
+                              " 0x%02X %s", static_cast<unsigned>(Display::chainAddress(position)),
+                              state);
+    }
+    if (!display->localInChain() && used >= 0 && static_cast<std::size_t>(used) < sizeof(text)) {
+        std::snprintf(&text[used], sizeof(text) - static_cast<std::size_t>(used),
+                      "; host 0x%02X has no block", static_cast<unsigned>(display->localAddress()));
     }
     LogService::instance().sendLine(text);
 }

@@ -1,5 +1,6 @@
 #include <Astro/AstroDisplayMapper.hpp>
 #include <Astro/AstroDataParser.hpp>
+#include <Display/BoardChain.hpp>
 
 #include <Expect.hpp>
 
@@ -17,14 +18,20 @@ using Test::expectEqual;
 
 namespace {
 
-// Stands in for Display::Display: a local board and five remote slots.
+// Stands in for Display::Display: a local board at chain position
+// localPosition (Display::kNotInChain for none) and a remote board for every
+// position, the one at the local position left unused.
 struct FakeBoards
 {
+    uint8_t localPosition = 0U;
     DisplayBoardState localBoard{};
-    std::array<DisplayBoardState, 5> remoteBoards{};
+    std::array<DisplayBoardState, Display::kChainLength> remoteBoards{};
 
-    DisplayBoardState& local() { return localBoard; }
-    DisplayBoardState& remote(uint8_t index) { return remoteBoards[index]; }
+    bool isLocal(uint8_t position) const { return position == localPosition; }
+    DisplayBoardState& board(uint8_t position)
+    {
+        return isLocal(position) ? localBoard : remoteBoards[position];
+    }
 };
 
 bool sameSegments(const NumericSegments& actual, const NumericSegments& expected)
@@ -219,12 +226,20 @@ void expectBoard(const DisplayBoardState& board, uint8_t block, const char* case
     }
 }
 
-void testAllBlocks()
+AstroData sixBlocks()
 {
     AstroData data{};
     for (uint8_t block = 0U; block < 6U; ++block) {
         data.boards[block] = blockData(block);
     }
+    return data;
+}
+
+// The default host, no straps: 0x10 shows block 0 and the remote boards at
+// 0x11-0x15 blocks 1-5. The remote board at 0x10 is not touched.
+void testAllBlocks()
+{
+    const AstroData data = sixBlocks();
     FakeBoards boards{};
     boards.localBoard.state().matrix[4] = 0x000007U;
     for (auto& remote : boards.remoteBoards) {
@@ -233,13 +248,63 @@ void testAllBlocks()
 
     AstroDisplayMapper::mapAll(data, boards);
 
-    expectBoard(boards.localBoard, 0U, "block 0 on the local board");
-    const char* remoteCases[5] = {"block 1 on remote 0", "block 2 on remote 1",
-                                  "block 3 on remote 2", "block 4 on remote 3",
-                                  "block 5 on remote 4"};
-    for (uint8_t slot = 0U; slot < 5U; ++slot) {
-        expectBoard(boards.remoteBoards[slot], static_cast<uint8_t>(slot + 1U), remoteCases[slot]);
+    expectBoard(boards.localBoard, 0U, "block 0 on the host at 0x10");
+    expectEqual(boards.remoteBoards[0].state().matrix[4], 0x1FFFFFU,
+                "no block for a remote at the host's address");
+    const char* remoteCases[5] = {"block 1 on 0x11", "block 2 on 0x12", "block 3 on 0x13",
+                                  "block 4 on 0x14", "block 5 on 0x15"};
+    for (uint8_t position = 1U; position < 6U; ++position) {
+        expectBoard(boards.remoteBoards[position], position, remoteCases[position - 1U]);
     }
+}
+
+// A host strapped as 0x12 shows block 2; 0x10 and 0x11 are remote boards.
+void testHostInMiddleOfChain()
+{
+    const AstroData data = sixBlocks();
+    FakeBoards boards{};
+    boards.localPosition = 2U;
+    boards.remoteBoards[2].state().matrix[4] = 0x1FFFFFU;
+
+    AstroDisplayMapper::mapAll(data, boards);
+
+    expectBoard(boards.localBoard, 2U, "block 2 on the host at 0x12");
+    expectEqual(boards.remoteBoards[2].state().matrix[4], 0x1FFFFFU,
+                "the remote at 0x12 is left alone");
+    const char* remoteCases[6] = {"block 0 on 0x10", "block 1 on 0x11", "",
+                                  "block 3 on 0x13", "block 4 on 0x14", "block 5 on 0x15"};
+    for (uint8_t position = 0U; position < 6U; ++position) {
+        if (position != 2U) {
+            expectBoard(boards.remoteBoards[position], position, remoteCases[position]);
+        }
+    }
+}
+
+// A host outside 0x10-0x15 has no block; all six go to remote boards.
+void testHostOutsideChain()
+{
+    const AstroData data = sixBlocks();
+    FakeBoards boards{};
+    boards.localPosition = Display::kNotInChain;
+    boards.localBoard.state().matrix[0] = 0x123456U;
+
+    AstroDisplayMapper::mapAll(data, boards);
+
+    expectEqual(boards.localBoard.state().matrix[0], 0x123456U, "host outside the chain untouched");
+    for (uint8_t position = 0U; position < 6U; ++position) {
+        expectBoard(boards.remoteBoards[position], position, "every block on a remote board");
+    }
+}
+
+void testChainAddresses()
+{
+    expectEqual(Display::chainAddress(0U), 0x10U, "position 0 is 0x10");
+    expectEqual(Display::chainAddress(5U), 0x15U, "position 5 is 0x15");
+    expectEqual(Display::chainPosition(0x10U), 0U, "0x10 is position 0");
+    expectEqual(Display::chainPosition(0x15U), 5U, "0x15 is position 5");
+    expectEqual(Display::chainPosition(0x0FU), Display::kNotInChain, "0x0F has no block");
+    expectEqual(Display::chainPosition(0x16U), Display::kNotInChain, "0x16 has no block");
+    expectEqual(Display::chainPosition(0U), Display::kNotInChain, "no address has no block");
 }
 
 // Parser and mapper together, from payload characters to board bits.
@@ -271,15 +336,12 @@ void testParsedPayload()
     AstroDisplayMapper::mapAll(data, boards);
 
     for (uint8_t board = 0U; board < 6U; ++board) {
-        const auto& state = (board == 0U) ? boards.localBoard.state()
-                                          : boards.remoteBoards[board - 1U].state();
+        const auto& state = boards.board(board).state();
         expectEqual(state.matrix[0], 1UL << board, "parsed block marker on its board");
         expectEqual(state.matrix[1], 0U, "parsed whole-row ? is all off");
         // "3?1" then off, "2" at the end: columns 0, 2 and 20 lit.
         expectEqual(state.matrix[2], 0x100005U, "parsed 3 ? 1 ... 2 row");
-        const Display::BoardAttributes& attributes =
-            (board == 0U) ? boards.localBoard.attributes()
-                          : boards.remoteBoards[board - 1U].attributes();
+        const Display::BoardAttributes& attributes = boards.board(board).attributes();
         expectEqual(attributes.matrixLevel(2, 0), 3U, "parsed level 3");
         expectEqual(attributes.matrixLevel(2, 2), 1U, "parsed level 1");
         expectEqual(attributes.matrixLevel(2, 20), 2U, "parsed level 2");
@@ -308,6 +370,9 @@ int main()
     testNumericAttributesReset();
     testAuroraRowReplacesProgressBar();
     testAllBlocks();
+    testHostInMiddleOfChain();
+    testHostOutsideChain();
+    testChainAddresses();
     testParsedPayload();
     return Test::finish("AstroDisplayMapper");
 }
