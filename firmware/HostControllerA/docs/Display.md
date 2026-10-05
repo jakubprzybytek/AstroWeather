@@ -207,7 +207,7 @@ The hour's leading zero is blank; the minutes always have two digits. For exampl
 
 Every board starts in it:
 
-- The host's local board shows it from boot until the first astro refresh. The current readout (numeric display 2) and the clock (display 3) take over their displays straight away, so in practice displays 0 and 1 and the matrix show it until the first refresh.
+- The host's local board shows it after its boot screens (the slot test and its address, as on a Display Controller; `Display::runBootScreens()` from `MainLoopTask`) until the first astro refresh. The current readout (numeric display 2) and the clock (display 3) take over their displays straight away, so in practice displays 0 and 1 and the matrix show it until the first refresh.
 - A Display Controller shows it after its boot screens until the first frame from the host, and again when no frame has arrived for 7 hours. The host sends to the remote boards only on an astro refresh or a `display` command, so the timeout is just over the 6-hour refresh interval; one missed refresh is enough to show it. See [DisplayController Architecture](../../DisplayController/docs/Architecture.md#screens).
 
 If a setter receives an invalid value, it stores the error pattern: segment D enabled in each of the four digit slots and the indicator slot blank.
@@ -413,7 +413,7 @@ Remote boards are refreshed by `Display::submit()` only, which only astro refres
 
 ### Display Controller
 
-The separate [DisplayController](../../DisplayController/README.md) project creates one PCB-backed board on SPI1 and TIM6, reads its address from the straps, and listens on I2C1 at that address. Each 36-byte message is received in interrupts and queued (four deep); its `DisplayApp` task feeds them to `FrameAssembler`, which stages the attribute planes and applies them with the content, and shows the result. Anything else is counted and dropped. It also shows boot screens (all segments, then its address), the "no data" state, and test screens on its switches, all plain: full brightness, no blinking. Built and unit tested; the attribute messages and the interrupt-driven refresh have not yet been run on a display board. See its [Architecture.md](../../DisplayController/docs/Architecture.md).
+The separate [DisplayController](../../DisplayController/README.md) project creates one PCB-backed board on SPI1 and TIM6, reads its address from the straps, and listens on I2C1 at that address. Each 36-byte message is received in interrupts and queued (four deep); its `DisplayApp` task feeds them to `FrameAssembler`, which stages the attribute planes and applies them with the content, and shows the result. Anything else is counted and dropped. It also shows boot screens (the slot test, then its address, shared with the host's local board), the "no data" state, and test screens on its switches, all plain: full brightness, no blinking. Built and unit tested; the attribute messages and the interrupt-driven refresh have not yet been run on a display board. See its [Architecture.md](../../DisplayController/docs/Architecture.md).
 
 ## Tests
 

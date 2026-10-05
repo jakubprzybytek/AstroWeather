@@ -9,6 +9,7 @@
 #include <Device/Eeprom24AA04.hpp>
 #include <Device/I2cBus.hpp>
 #include <Device/SCT2xxx.hpp>
+#include <Display/BootScreens.hpp>
 #include <Display/BufferedDisplayBoard.hpp>
 #include <Display/DisplayAddress.hpp>
 #include <Display/Display.hpp>
@@ -110,9 +111,12 @@ void AstroWeather_Init() {
   // Before the displays light up, so a saved low brightness applies from the first frame.
   LowBrightness::set(settingsStore.values().lowBrightness);
   // "No data" until the first astro refresh; the clock and the current
-  // readout then take over their own numeric displays.
+  // readout then take over their own numeric displays. It shows once
+  // MainLoopTask has run the boot screens; the first slot-test frame is
+  // latched before the refresh starts, rather than whatever the drivers held
+  // at reset.
   localBoard.setState(Display::noDataState());
-  localBoard.submit();
+  localBoard.show(Display::slotTestState(0U), Display::BoardAttributes{});
   localBoard.start();
   ClockTask::instance().setDisplayEnabled(settingsStore.values().clockDisplayEnabled);
   if (!ClockTask::instance().setTrim(settingsStore.values().clockTrimPpm)) {
@@ -127,7 +131,7 @@ void AstroWeather_Init() {
   HostController::StartSt67HttpFetchTask();
   HostController::AstroDataRefreshTask::instance().init(&display);
   HostController::AstroDataRefreshTask::instance().start();
-  MainLoopTask::instance().init(activityLed(), &settingsStore);
+  MainLoopTask::instance().init(activityLed(), &settingsStore, &display);
   MainLoopTask::instance().start();
   Utils::SwitchInput::instance().attach(
       MainLoopTask::instance().getHandle(), MainLoopTask::kEventSwitch1,

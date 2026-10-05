@@ -33,8 +33,6 @@ protected:
 private:
     enum class Screen : uint8_t { Data, AllSegments, Identify, Address };
 
-    static constexpr uint32_t kSelfTestMs = 1000U;
-    static constexpr uint32_t kBootAddressMs = 2000U;
     static constexpr uint32_t kAddressScreenMs = 3000U;
     static constexpr uint32_t kTestScreenMs = 60000U;
     static constexpr uint32_t kPollMs = 1000U;

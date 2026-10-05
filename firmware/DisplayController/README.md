@@ -28,8 +28,8 @@ Status: ✅ done · 🔵 built, not yet run on a board · 🔴 not started.
 | **Display** | | | |
 | Drive the local LED board (5-slot multiplex, 250 Hz) | 🔵 Built | `PcbDisplayBoard` on SPI1 and TIM6 | [Display.md](../HostControllerA/docs/Display.md#refresh-operation) |
 | Safe power-up: outputs blanked, all slots off | ✅ Done | `SCT_ENABLE` and the slot selects start high (CubeMX) | [Display.md](../HostControllerA/docs/Display.md#refresh-operation) |
-| Boot self-test: every segment, indicator and dot for 1 s | 🔵 Built | Shows dead segments without the host | [Architecture.md](docs/Architecture.md#screens) |
-| Board address at boot: `Ad12` for 0x12, for 2 s | 🔵 Built | Checks the straps in place | [Architecture.md](docs/Architecture.md#screens) |
+| Boot slot test: each `DISPLAYx_EN` slot on its own, everything it drives, 200 ms each (1 s) | 🔵 Built | Shows dead segments and dead slot switches without the host; shared with the host (`Display::showBootScreens()`) | [Architecture.md](docs/Architecture.md#screens) |
+| Board address at boot: `Ad12` for 0x12 on numeric display 1, for 2 s | 🔵 Built | Checks the straps in place | [Architecture.md](docs/Architecture.md#screens) |
 | "No data" state: segment G on the last digit of every numeric display, matrix blank | 🔵 Built | Shared (`Display::noDataState()`); after the boot screens until the first frame. The host shows it too (verified on the host board) | [Display.md](../HostControllerA/docs/Display.md#no-data) |
 | Back to "no data" after 7 h without a frame | 🔵 Built | Just over the host's 6-hour refresh interval, since the host sends only on a refresh or a `display` command | [Display.md](../HostControllerA/docs/Display.md#no-data) |
 | **I2C link to the host** | | | |
@@ -64,7 +64,7 @@ shared code compiles unchanged.
 | TIM6, 16 MHz / 16000 / 4 | none | 250 Hz multiplex tick, interrupt (the G070 has no TIM2) |
 | I2C1, target, interrupt | `PA9` SCL, `PA10` SDA | Messages from the host, at `0x10` + the strap ID |
 | GPIO inputs, pull-down at reset | `PB10`, `PB11`, `PB14` = `ADDR_0`..`ADDR_2` | Board address straps; analog once read |
-| GPIO EXTI, falling edge | `PB12` `SWITCH_1`, `PB13` `SWITCH_2` | Switches, for `Utils::SwitchInput` |
+| GPIO EXTI, falling edge, internal pull-up | `PB12` `SWITCH_1`, `PB13` `SWITCH_2` | Switches, for `Utils::SwitchInput`. The buttons and their pull-ups are optional on a display board; without the internal pull-up the inputs floated, and noise at boot read as a switch 2 press that held the address screen for 3 s more (seen 2026-10-05) |
 | GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat, I2C traffic |
 | Analog | `PB8` `LOW_POWER_ENABLE` | Bussed net driven by the host; never driven here ([Hardware review](../../KiCad/Hardware_Review.md) M-4) |
 | SWD | `PA13`, `PA14` | Debug |

@@ -61,8 +61,11 @@ create their FreeRTOS mutexes from static storage at that point.
 6. `LowBrightness::set()` applies the saved low brightness to `PB8`, before the
    displays light up.
 7. The local board gets the "no data" state (`Display::noDataState()`, see
-   [Display.md](Display.md#no-data)), then `localBoard.start()` enables the SCT
-   outputs and starts TIM2, whose interrupt refreshes the board from then on.
+   [Display.md](Display.md#no-data)) but does not show it yet: the first
+   slot-test frame (`Display::slotTestState(0)`) is shown instead, then
+   `localBoard.start()` enables the SCT outputs and starts TIM2, whose
+   interrupt refreshes the board from then on. `Display` holds back every
+   local submit until `MainLoopTask` has run the boot screens.
 8. `ClockTask`: display flag and trim from settings (an error is logged if the
    trim is rejected), the display, `start()`.
 9. `SetSt67CredentialSource(&settingsStore)`, then `StartSt67HttpFetchTask()`.
@@ -70,13 +73,20 @@ create their FreeRTOS mutexes from static storage at that point.
    credentials on every connect.
 10. `AstroDataRefreshTask`: `init(&display)` restores the last successful
     refresh time from backup register DR1 when the RTC is set, then `start()`.
-11. `MainLoopTask`: `init(activityLed(), &settingsStore)` (switch 2 saves low
-    brightness), `start()`.
+11. `MainLoopTask`: `init(activityLed(), &settingsStore, &display)` (switch 2
+    saves low brightness), `start()`. Its first act once the scheduler runs is
+    `display.runBootScreens()`: each `DISPLAYx_EN` slot lit on its own for
+    200 ms, then `AdNN` (the host's strap address) on numeric display 1 for
+    2 s, then the local board's own state, which clients have kept writing
+    meanwhile. See [DisplayController Architecture](../../DisplayController/docs/Architecture.md#screens).
 12. `SwitchInput::attach()` routes the `SWITCH_1`/`SWITCH_2` EXTI interrupts to
     `MainLoopTask` as thread flags.
 
 `defaultTask` initialises the USB device (`MX_USB_Device_Init()`) once the
-scheduler runs and then only sleeps.
+scheduler runs and then ends itself (`osThreadExit()` in the `USER CODE 5`
+section): USB runs from its interrupt, and the idle task returns the stack to
+the heap. CubeMX does not allow removing the task, so this keeps it from ever
+waking again.
 
 ## Shared Code
 
@@ -150,11 +160,11 @@ DMA, so its timing depends on interrupt latency only; see
 | --- | --- | --- | ---: | --- | --- |
 | `Modem_Process` | ST67 driver `w61_at_common.c` | 47 | 2048 | heap | AT response and event handling |
 | `spi_xfer_engine` | ST67 driver `spi_iface.c` | 46 | 1536 | heap | SPI1 transfers to the module |
-| `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | heap | Starts USB, then idles |
+| `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | heap | Starts USB, then exits (stack freed) |
 | `LogService` | `Debug/LogService.cpp` | Normal (24) | 1536 | static | Drains the log queue to USB CDC; `stats` output |
 | `ConsoleService` | `Console/ConsoleService.cpp` | Normal (24) | 2048 | static | Assembles and runs console commands |
 | `AstroDataRefresh` | `Astro/AstroDataRefreshTask.cpp` | Normal (24) | 3072 | static | Refresh pipeline, 6-hourly schedule, progress bar |
-| `MainLoopTask` | `MainLoopTask.cpp` | Normal (24) | 1536 | static | Switch presses: switch 1 requests a refresh, switch 2 toggles low brightness and saves it |
+| `MainLoopTask` | `MainLoopTask.cpp` | Normal (24) | 2048 | static | Boot screens on the local board (about 3 s, 944 B of stack at peak), then switch presses: switch 1 requests a refresh, switch 2 toggles low brightness and saves it |
 | `CurrentSense` | `Sensors/CurrentSenseTask.cpp` | BelowNormal (16) | 2048 | static | ADC every 100 ms, idle while `adc display` and `adc log` are both off |
 | `Clock` | `Clock/ClockTask.cpp` | BelowNormal (16) | 1024 | static | RTC, `HH:MM` on display 3 |
 | `St67HttpFetch` | `WiFi/St67HttpFetchTask.cpp` | BelowNormal (16) | 4096 | static | Owns the ST67 session and the HTTPS fetch |
@@ -273,7 +283,7 @@ Both survive a reset and are lost with power, like the calendar.
 
 FreeRTOS uses `heap_4.c` with `configTOTAL_HEAP_SIZE` of 32000 bytes (40000
 until 2026-10-04, reduced after measuring a 15.9 KB peak under T01). The heap
-holds `defaultTask`, the two middleware tasks, the CMSIS objects created
+holds `defaultTask` until it exits after starting USB, the two middleware tasks, the CMSIS objects created
 without static memory, and the ST67 driver's allocations, including the HTTP
 client's per-request buffers; application tasks and their stacks are static. See
 [Firmware-RAM-Usage.md](Firmware-RAM-Usage.md) for the breakdown and

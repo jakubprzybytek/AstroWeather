@@ -1,5 +1,6 @@
 #include <DisplayApp.hpp>
 
+#include <Display/BootScreens.hpp>
 #include <Screens.hpp>
 #include <Stats.hpp>
 
@@ -10,14 +11,10 @@ DisplayApp::DisplayApp(Display::DisplayBoard& board, I2cTarget& link)
 
 void DisplayApp::run()
 {
-    // Boot: every segment (spot dead ones), then this board's address. Frames
-    // and switch presses arriving meanwhile stay pending in the thread flags.
-    board_.setState(DisplayController::allSegmentsState());
-    board_.submit();
-    osDelay(kSelfTestMs);
-    board_.setState(DisplayController::addressState(link_.address()));
-    board_.submit();
-    osDelay(kBootAddressMs);
+    // Boot: each slot lit on its own (spot a dead segment or slot switch),
+    // then this board's address. Frames and switch presses arriving meanwhile
+    // stay pending in the thread flags.
+    Display::showBootScreens(board_, link_.address());
     show();
 
     for (;;) {
@@ -132,7 +129,7 @@ void DisplayApp::show()
         board_.setState(DisplayController::identifyState());
         break;
     case Screen::Address:
-        board_.setState(DisplayController::addressState(link_.address()));
+        board_.setState(Display::addressState(link_.address()));
         break;
     case Screen::Data:
     default:

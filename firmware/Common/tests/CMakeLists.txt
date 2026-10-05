@@ -34,6 +34,11 @@ add_native_test(display_i2c_protocol_tests
     SOURCES DisplayI2cProtocolTests.cpp
     SUT Src/Display/DisplayI2cProtocol.cpp Src/Display/DisplayTypes.cpp
 )
+add_native_test(boot_screens_tests
+    SOURCES BootScreensTests.cpp
+    SUT Src/Display/BootScreens.cpp Src/Display/DisplayTypes.cpp
+    STUBS
+)
 add_native_test(display_address_tests
     SOURCES DisplayAddressTests.cpp
     SUT Src/Display/DisplayAddress.cpp

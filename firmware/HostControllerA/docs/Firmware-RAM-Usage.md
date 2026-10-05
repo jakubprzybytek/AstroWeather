@@ -75,7 +75,7 @@ From `arm-none-eabi-nm -S --size-sort` on the same ELF:
 | `ConsoleService` object | 4000 | 2048-byte stack, 8-entry command queue of 128-byte lines, 256-byte RX ring; `User/Inc/Console/ConsoleService.hpp` |
 | USB CDC buffers | 4096 | `UserRxBufferFS` and `UserTxBufferFS`, 2048 bytes each |
 | `CurrentSenseTask` object | 2480 | 2048-byte stack |
-| `MainLoopTask` object | 1960 | 1536-byte stack |
+| `MainLoopTask` object | 2472 | 2048-byte stack |
 | `settingsStore` (`Settings::Store`) | 840 | `Values` (including the 65-byte API host and path), two 256-byte working images for `load()`/`save()`, the mutex; `User/Inc/Settings/SettingsStore.hpp` |
 | `localBoard` (`PcbDisplayBoard`) | ~800 | Content and attributes, two 280-byte sets of prepared pass frames, the sequencer; no task since the refresh moved into TIM2's interrupt |
 | `ClockTask` object | 1600 | 1024-byte stack |
@@ -135,7 +135,7 @@ Application tasks, with static stacks inside their objects:
 | `CurrentSense` | 2048 | BelowNormal | `CurrentSenseTask.hpp` |
 | `ConsoleService` | 2048 | Normal | `ConsoleService.hpp` |
 | `LogService` | 1536 | Normal | `LogService.hpp` |
-| `MainLoopTask` | 1536 | Normal | `MainLoopTask.hpp` |
+| `MainLoopTask` | 2048 | Normal | `MainLoopTask.hpp`; the boot screens encode frames on it, 944 used at peak |
 | `Clock` | 1024 | BelowNormal | `ClockTask.hpp` |
 | `Led1` | 768 | Low | `BlinkingLed.hpp`, in `User/Src/AstroWeather.cpp` |
 
@@ -144,7 +144,7 @@ noted:
 
 | Task | Stack | Source |
 | --- | ---: | --- |
-| `defaultTask` | 512 | `Core/Src/main.c`, `128 * 4` |
+| `defaultTask` | 512 | `Core/Src/main.c`, `128 * 4`; freed when it exits after starting USB |
 | FreeRTOS idle | 512 | static, see above |
 | FreeRTOS timer | 1024 | static, see above |
 | LwIP `tcpip_thread` | 4096 | `TCPIP_THREAD_STACKSIZE` in `LWIP/Target/lwipopts.h` |

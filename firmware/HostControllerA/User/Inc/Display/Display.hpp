@@ -51,11 +51,20 @@ public:
     // cost an I2C transfer to every remote board.
     void submitLocal();
 
+    // The boot screens on the local board (Display/BootScreens.hpp), about
+    // 3 s, then its own state. Until this returns, submit() and submitLocal()
+    // leave the local board out: clients keep writing its state, which shows
+    // when the boot screens end. Call once, from a task.
+    void runBootScreens();
+
 private:
     DisplayBoard& local_;
     std::array<DisplayBoard*, kChainLength> remote_;
     uint16_t localAddress_ = kChainFirstAddress;
     uint8_t localPosition_ = 0U;
+    // Set from construction, so nothing reaches the local board before the
+    // boot screens have run; guarded by submitMutex_.
+    bool bootScreens_ = true;
     Mutex submitMutex_;
 };
 

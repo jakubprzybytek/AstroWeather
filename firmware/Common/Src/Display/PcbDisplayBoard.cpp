@@ -64,13 +64,18 @@ void PcbDisplayBoard::start()
 
 void PcbDisplayBoard::submit()
 {
+    show(state_, attributes_);
+}
+
+void PcbDisplayBoard::show(const LogicalBoardState& state, const BoardAttributes& attributes)
+{
     MutexGuard guard(submitMutex_);
     // While pendingSwap_ is clear the interrupt leaves back_ alone, so the
     // encode cannot be swapped in half-done. A submission still waiting to
     // be shown is simply overwritten by this newer one.
     pendingSwap_ = false;
     PassFrames* const target = back_;
-    encodePasses(state_, attributes_, *target);
+    encodePasses(state, attributes, *target);
     pendingSwap_ = true;
 }
 

@@ -22,13 +22,13 @@ scheduler starts:
 
 1. Starts the `Led1` heartbeat and creates the `activityLed()` timer for
    `LED_2`.
-2. Loads the all-segments self-test into the board and starts the refresh
+2. Shows the first slot-test frame (`Display::slotTestState(0)`) and starts the refresh
    (`PcbDisplayBoard::start()`: enables the SCT outputs and starts TIM6, whose
    interrupt then multiplexes the board with SPI1 DMA transfers, no task
    involved; see the host's
    [Display.md](../../HostControllerA/docs/Display.md#refresh-operation)).
-   The self-test is prepared first, so the first frames latched are the
-   self-test, not whatever the drivers held at reset.
+   The test frame is prepared first, so the first frames latched are the
+   test, not whatever the drivers held at reset.
 3. Starts the `DisplayApp` task and routes the switches to it
    (`Utils::SwitchInput`).
 4. Reads the address straps (`Display::detectBoardAddress()`), stores the
@@ -41,20 +41,23 @@ peripheral with the real address, a few milliseconds later. A host write to
 `0x10` in that window would be acknowledged and then held; the host gives up
 after its 50 ms timeout.
 
-Then `DisplayApp` shows, in order: the self-test for 1 s, the board's address
-for 2 s, and then the host's data, or "no data" if none has arrived yet.
+Then `DisplayApp` runs the boot screens shared with the host
+(`Display::showBootScreens()` in `../Common/Src/Display/BootScreens.cpp`): the
+slot test, each of the five `DISPLAYx_EN` slots lit on its own for 200 ms (1 s
+in all), then the board's address for 2 s. After that it shows the host's
+data, or "no data" if none has arrived yet.
 
 ## Tasks
 
 | Task | Owner | Priority | Stack (bytes) | Does |
 | --- | --- | --- | ---: | --- |
 | `DisplayApp` | `User/Src/DisplayApp.cpp` | Normal (24) | 2048 (peaks at ~1056 on the board) | Chooses what is shown: boot screens, data with its attributes, "no data", test screens |
-| `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | Idles |
+| `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | Exits at once (`osThreadExit()`); CubeMX does not allow removing it. It used to wake every tick |
 | `Led1` | `Debug::BlinkingLed` (Common) | Low (8) | 768 | Heartbeat on `LED_1`, 20 ms every 2 s |
 
 `DisplayApp` and `Led1` are `Task<N>` objects with static stacks, and
 `Utils::Mutex` uses static storage, so the 3072-byte FreeRTOS heap holds only
-`defaultTask`. The display refresh runs from TIM6's interrupt, not a task. `configCHECK_FOR_STACK_OVERFLOW` is 2; see
+`defaultTask`, and only until it exits, just after the scheduler starts. The display refresh runs from TIM6's interrupt, not a task. `configCHECK_FOR_STACK_OVERFLOW` is 2; see
 [Diagnostics](#diagnostics).
 
 `DisplayApp` waits on three thread flags, with a 1 s timeout for its periodic
@@ -73,12 +76,14 @@ stopped.
 ## Screens
 
 `DisplayApp` shows one of these at a time; the contents come from
-`User/Src/Screens.cpp` and `Display::noDataState()`:
+`User/Src/Screens.cpp`, `../Common/Src/Display/BootScreens.cpp` and
+`Display::noDataState()`:
 
 | Screen | Contents | Shown |
 | --- | --- | --- |
-| All segments | Every digit segment with its dot, L1-L3, every matrix dot | 1 s at boot; switch 1 |
-| Address | `Ad12` (for 0x12) on every numeric display, matrix blank; `Ad--` if the straps gave no address | 2 s at boot; 3 s on switch 2 |
+| Slot test | One `DISPLAYx_EN` slot at a time, everything it drives: digit *n* of every numeric display with its dot (slot 5: L1-L3) and the matrix row it drives (row 4 - *n*). A dead slot switch shows as a step with nothing lit | At boot, 200 ms per slot, 1 s in all |
+| All segments | Every digit segment with its dot, L1-L3, every matrix dot | Switch 1 |
+| Address | `Ad12` (for 0x12) on numeric display 1, everything else blank; `Ad--` if the straps gave no address | 2 s at boot, after the slot test; 3 s on switch 2 |
 | Identify | Numeric display *n* (0-3) shows *n* + 1 on all four digits (`1111` to `4444`); matrix row *r* lights its first *r* + 1 columns, so the top row has one dot | Switch 1, after all segments |
 | Data | The last content from the host, with the blink and level attributes it sent | After a frame arrives, until it goes stale |
 | No data | Segment G on the last digit of every numeric display (`   -`), everything else off, matrix blank | Before the first frame, and after 7 h without one |

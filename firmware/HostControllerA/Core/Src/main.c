@@ -774,11 +774,10 @@ void StartDefaultTask(void *argument)
   /* init code for USB_Device */
   MX_USB_Device_Init();
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-  for(;;) 
-  {
-    osDelay(1000);
-  }
+  /* CubeMX will not drop this task, so it ends itself once USB is started:
+     USB runs from its interrupt, and the idle task frees this stack. It never
+     runs again. */
+  osThreadExit();
   /* USER CODE END 5 */
 }
 

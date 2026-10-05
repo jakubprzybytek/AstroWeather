@@ -20,6 +20,10 @@ public:
     const BoardAttributes& attributes() const { return attributes_; }
     void setAttributes(const BoardAttributes& attributes) { attributes_ = attributes; }
     virtual void submit() = 0;
+    // Shows `state` with `attributes` at once, leaving the board's own state
+    // and attributes alone, so the next submit() brings them back. For the
+    // boot screens; a board that only forwards over I2C ignores it.
+    virtual void show(const LogicalBoardState&, const BoardAttributes&) {}
 
     // For status reporting. Remote boards sit on I2C and may be absent, so they
     // answer whether they respond right now; the local board is wired directly,

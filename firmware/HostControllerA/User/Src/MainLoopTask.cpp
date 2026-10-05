@@ -1,6 +1,7 @@
 #include <MainLoopTask.hpp>
 
 #include <Astro/AstroDataRefreshTask.hpp>
+#include <Display/Display.hpp>
 #include <Display/LowBrightness.hpp>
 #include <Debug/LogService.hpp>
 #include <Settings/SettingsStore.hpp>
@@ -13,18 +14,25 @@ MainLoopTask& MainLoopTask::instance()
 }
 
 MainLoopTask::MainLoopTask()
-    : Task<1536>("MainLoopTask", osPriorityNormal)
+    : Task<2048>("MainLoopTask", osPriorityNormal)
 {
 }
 
-void MainLoopTask::init(PulseLed& led, Settings::Store* settings)
+void MainLoopTask::init(PulseLed& led, Settings::Store* settings, Display::Display* display)
 {
     led_ = &led;
     settings_ = settings;
+    display_ = display;
 }
 
 void MainLoopTask::run()
 {
+    // First, the local board's boot screens (about 3 s). Switch presses
+    // meanwhile stay pending in the thread flags.
+    if (display_ != nullptr)
+    {
+        display_->runBootScreens();
+    }
     for (;;)
     {
         const uint32_t flags = osThreadFlagsWait(kEventSwitch1 | kEventSwitch2,

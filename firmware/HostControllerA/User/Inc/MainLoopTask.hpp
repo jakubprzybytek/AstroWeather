@@ -10,7 +10,14 @@ namespace Settings {
 class Store;
 }
 
-class MainLoopTask : public Task<1536>
+namespace Display {
+class Display;
+}
+
+// 2048 B: the boot screens encode frames on this stack (show() ->
+// encodePasses(), about 1 KB on the DisplayController with the context switch
+// frame).
+class MainLoopTask : public Task<2048>
 {
 public:
     static MainLoopTask& instance();
@@ -19,7 +26,8 @@ public:
     static constexpr uint32_t kEventSwitch2 = 1U << 1;
 
     // `settings` may be null; switch 2 then changes brightness without saving it.
-    void init(PulseLed& led, Settings::Store* settings);
+    // `display` may be null; the boot screens are then skipped.
+    void init(PulseLed& led, Settings::Store* settings, Display::Display* display);
 
 protected:
     void run() override;
@@ -29,4 +37,5 @@ private:
 
     PulseLed* led_ = nullptr;
     Settings::Store* settings_ = nullptr;
+    Display::Display* display_ = nullptr;
 };

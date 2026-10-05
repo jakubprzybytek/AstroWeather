@@ -3,11 +3,11 @@
 #include <Debug/BlinkingLed.hpp>
 #include <Debug/PulseLed.hpp>
 #include <Device/SCT2xxx.hpp>
+#include <Display/BootScreens.hpp>
 #include <Display/DisplayAddress.hpp>
 #include <Display/PcbDisplayBoard.hpp>
 #include <DisplayApp.hpp>
 #include <I2cTarget.hpp>
-#include <Screens.hpp>
 #include <Stats.hpp>
 #include <Utils/SwitchInput.hpp>
 
@@ -44,10 +44,10 @@ void DisplayController_Init() {
   // LED_2: every I2C transaction; before listening starts.
   activityLed().init();
 
-  // Prepare the self-test before the refresh starts, so the first frames
-  // latched are the self-test rather than whatever the drivers held at reset.
-  board.setState(DisplayController::allSegmentsState());
-  board.submit();
+  // Prepare the first slot-test frame before the refresh starts, so the
+  // first frames latched are the test rather than whatever the drivers held
+  // at reset. DisplayApp runs the rest of the boot screens.
+  board.show(Display::slotTestState(0U), Display::BoardAttributes{});
   board.start();
 
   app.start();

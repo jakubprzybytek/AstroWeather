@@ -27,6 +27,7 @@ public:
 
     void start();
     void submit() override;
+    void show(const LogicalBoardState& state, const BoardAttributes& attributes) override;
 
     bool setPassPercent(const std::array<uint8_t, kPassCount>& percent) override;
     bool refreshStats(RefreshStats& stats) const override;

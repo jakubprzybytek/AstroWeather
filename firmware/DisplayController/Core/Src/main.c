@@ -394,7 +394,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pins : SWITCH_1_Pin SWITCH_2_Pin */
   GPIO_InitStruct.Pin = SWITCH_1_Pin|SWITCH_2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : DISPLAY_2_EN_Pin */
@@ -458,11 +458,9 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, signed char *pcTaskName)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+  /* CubeMX will not drop this task and it has nothing to do, so it ends at
+     once rather than waking every tick; the idle task frees its stack. */
+  osThreadExit();
   /* USER CODE END 5 */
 }
 
