@@ -28,7 +28,7 @@ const char* const kIndex[] = {
     "  status            firmware, uptime, memory, EEPROM, WiFi, astro, boards",
     "  stats on|off      memory, stack and log statistics every 5 s (off at boot)",
     "  errors [clear]    the last 16 warnings and errors, kept over resets",
-    "  display ...       numbers, times and matrix rows on this board",
+    "  display ...       numbers, times and matrix rows on this or a remote board",
     "  astro refresh     fetch the sky forecast and publish it to all boards",
     "  astro test        fetch the server's demo forecast once, every variant",
     "  api ...           show or set the server host, path and key (saved)",
@@ -54,6 +54,8 @@ const char* const kStats[] = {
 };
 
 const char* const kDisplay[] = {
+    "display [<board>] show|row|blink|level|test|clear ...   <board>: 0x10-0x15 or all,",
+    "    none for this one; kept until the next astro refresh. e.g. 'display 0x12 test'",
     "display show <n> <value>     numeric n (0-3): a number with up to 3 decimals,",
     "    a time HH:MM, ? (the unavailable pattern) or blank. e.g. 'display show 0 12.34'",
     "display row <r> <cells>      matrix row r (0-4, 0 at the top), one character per",
@@ -62,12 +64,10 @@ const char* const kDisplay[] = {
     "display level <n> <0-3>            brightness of display n; 3 is full",
     "display test                       everything lit, each level steady and blinking",
     "display clear                      everything off, no blink, full level",
-    "display passes [<a> <b> <c> <d>]   show or set the pass lengths behind the levels,",
-    "    percent of a slot summing to 100; default 12 31 27 30",
+    "display passes [<a> <b> <c> <d>]   this board only: show or set the pass lengths",
+    "    behind the levels, percent of a slot summing to 100; default 12 31 27 30",
     "display low [on|off]               low brightness on every board; saved, and",
     "    switch 2 toggles it. 'display low' shows the state in use and the saved one.",
-    "0x10-0x15 or 'all' after 'display' picks another board or every one, e.g. 'display",
-    "    0x12 test'; kept until the next astro refresh. Not for 'passes' or 'low'.",
 };
 
 const char* const kApi[] = {
