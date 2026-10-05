@@ -60,14 +60,14 @@ const char* const kDisplay[] = {
     "    column as the payload: 0-3 level, a-c level 1-3 blinking, * as c, . or ? off",
     "display blink <n> off|colon|all    blink nothing, the colon, or all of display n",
     "display level <n> <0-3>            brightness of display n; 3 is full",
-    "display test                       everything lit: levels 0-3 across the matrix",
-    "    and the digits, each level also blinking",
+    "display test                       everything lit, each level steady and blinking",
     "display clear                      everything off, no blink, full level",
     "display passes [<a> <b> <c> <d>]   show or set the pass lengths behind the levels,",
     "    percent of a slot summing to 100; default 12 31 27 30",
     "display low [on|off]               low brightness on every board; saved, and",
     "    switch 2 toggles it. 'display low' shows the state in use and the saved one.",
-    "All but 'low' change this board only; 'astro refresh' redraws every board.",
+    "0x10-0x15 or 'all' after 'display' picks another board or every one, e.g. 'display",
+    "    0x12 test'; kept until the next astro refresh. Not for 'passes' or 'low'.",
 };
 
 const char* const kApi[] = {

@@ -17,6 +17,7 @@ public:
     // Probes the bus now, independent of the last submit(): a board that has
     // not been refreshed since boot would otherwise look reachable.
     bool present() override;
+    bool lastSubmitOk() const override { return online(); }
     HAL_StatusTypeDef lastStatus() const { return lastStatus_; }
     bool online() const { return lastStatus_ == HAL_OK; }
 

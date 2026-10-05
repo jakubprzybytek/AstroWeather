@@ -30,6 +30,9 @@ public:
     // has no bus address, and is always present.
     virtual bool present() { return true; }
     virtual uint16_t address() const { return 0U; }
+    // Whether the last submit() reached the board. Always true for the local
+    // board; a remote one that did not take it is false until one does.
+    virtual bool lastSubmitOk() const { return true; }
 
     // Counters of a board that refreshes LEDs itself; false for one that only
     // forwards its state over I2C.

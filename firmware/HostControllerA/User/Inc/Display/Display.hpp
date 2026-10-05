@@ -50,6 +50,10 @@ public:
     // frequent local-only changes, such as refresh progress, that should not
     // cost an I2C transfer to every remote board.
     void submitLocal();
+    // Refreshes only the remote board at chain position `position`, under the
+    // same lock as submit(). For the console's per-board commands. False for
+    // a position with no remote board, or a board that did not take it.
+    bool submitRemote(uint8_t position);
 
     // The boot screens on the local board (Display/BootScreens.hpp), about
     // 3 s, then its own state. Until this returns, submit() and submitLocal()

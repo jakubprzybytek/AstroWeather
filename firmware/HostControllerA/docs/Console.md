@@ -314,6 +314,7 @@ failures into these replies:
 | `ERR settings-unavailable` | No settings store, or the EEPROM write failed. A failed write is also logged as `[ERR] Settings save failed status=<n>`. |
 | `ERR eeprom-unavailable` | No EEPROM in this variant, or the chip did not answer. |
 | `ERR display-unavailable` | No display in this variant. |
+| `ERR display-unreachable 0x1x`, `ERR unsupported-remote` | See [display](#display). |
 | `ERR astro-refresh-busy`, `ERR astro-refresh-unavailable` | See [astro](#astro). |
 
 Some handlers, `help`, `settings` and `wifi` among them, send their own more
@@ -589,8 +590,23 @@ display board that is present; see [Settings.md](Settings.md#storage-medium).
 
 ### display
 
-All but `display low` drive the local board only, through
-`Display::submitLocal()`; `astro refresh` redraws every board. The content,
+`show`, `row`, `blink`, `level`, `test` and `clear` take an optional board
+between `display` and the subcommand:
+
+- none: the local board, through `Display::submitLocal()`;
+- `0x10`–`0x15`: the board at that address, as `status` and the
+  `DisplayBoard 0x1x unreachable` warnings name it, through
+  `Display::submitRemote()`. The host's own address is the local board; any
+  other address is `ERR invalid-argument`;
+- `all`: every board, the local one included.
+
+For example `display 0x12 test`, `display 0x14 show 1 12.3`,
+`display all clear`. The command changes the host's buffered copy of a remote
+board and sends that board its whole state, so the rest of its forecast stays.
+The next `astro refresh` (or scheduled one) redraws every board and replaces
+it. `passes` is the local board's only: the I2C messages carry no pass table,
+so with a remote target or `all` it replies `ERR unsupported-remote`.
+`display low` drives every board already and takes no target. The content,
 blink and level model is in [Display.md](Display.md#public-interface).
 
 | Command | Effect |
@@ -600,16 +616,21 @@ blink and level model is in [Display.md](Display.md#public-interface).
 | `display blink <n> off\|colon\|all` | Nothing, the colon (L1 and L2), or every segment of display `n` blinks. |
 | `display level <n> <0-3>` | Brightness level of display `n`, all segments; 3 is full. |
 | `display test` | Every element lit: the levels run 0 to 3 along the matrix columns and along the sixteen digits, and every level also blinks next to the same level steady. On the numerics, each digit's decimal point blinks at the digit's level and the colons blink at level 3. On the matrix, rows 0, 2 and 4 are steady, row 1 blinks throughout, and row 3 blinks in the odd columns (1, 3, 5, ...), counting from 1. To judge the levels and blinking by eye. |
-| `display clear` | Everything on the local board off, nothing blinking, every level full. |
+| `display clear` | Everything on the board off, nothing blinking, every level full. |
 | `display passes [<a> <b> <c> <d>]` | Shows the pass lengths behind the levels, as `OK display passes=12/31/27/30`, or sets them: percent of a slot, summing to 100. Takes effect at once; not saved. For tuning by eye; see [Display.md](Display.md#blink-and-brightness-levels). |
 | `display low on\|off` **HC** | Low brightness on every board: drives `LOW_POWER_ENABLE`. Saved, and applied at boot. Replies `OK display-low=on` or `OK display-low=off`. |
 | `display low` **HC** | `OK display-low=<in use> saved=<saved>`, e.g. `OK display-low=on saved=on`. Switch 2 also saves, so the two differ only if a save failed, which logs `Settings save failed`. |
 
-The other commands reply `OK display`. Out-of-range values, a bad cell or an
-unknown `display` subcommand get `ERR invalid-argument`. Display 2 is also
+The other commands reply `OK display` with no target, `OK display 0x12` with
+one, and `OK display all` for every board. A remote board that does not take
+the update after the usual three attempts gets `ERR display-unreachable 0x12`,
+or, with `all`, a list after the reply: `OK display all; unreachable 0x13 0x14`.
+Its buffer keeps the change either way. Out-of-range values, a bad cell, a bad
+target or an unknown `display` subcommand get `ERR invalid-argument`; with
+`all`, a bad argument changes no board. On the local board, display 2 is also
 driven by the current readout and display 3 by the clock, and the bottom
 matrix row by refresh progress, so a manual setting there may soon be
-overwritten.
+overwritten. Nothing but a refresh writes a remote board.
 
 ## Security
 

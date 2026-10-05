@@ -62,16 +62,83 @@ bool parseIndex(const char* text, unsigned int limit, uint8_t& index)
     return true;
 }
 
-// Splits "display <sub> <a> <b> ..." into up to four arguments after the
-// subcommand. Returns the argument count.
-uint8_t splitArguments(const char* line, char (&sub)[16], char (&args)[4][32])
+// Splits "display [<target>] <sub> <a> <b> ..." into the target ("0x12" or
+// "all"; empty when the line has none), the subcommand and up to four
+// arguments after it. Returns the argument count.
+uint8_t splitArguments(const char* line, char (&target)[8], char (&sub)[16], char (&args)[4][32])
 {
+    std::memset(target, 0, sizeof(target));
     std::memset(sub, 0, sizeof(sub));
     std::memset(args, 0, sizeof(args));
-    return static_cast<uint8_t>(
-        std::sscanf(line, "display %15s %31s %31s %31s %31s", sub, args[0], args[1], args[2],
-                    args[3]) -
-        1);
+    const char* rest = line + 8U;  // after "display "
+    while (*rest == ' ') {
+        ++rest;
+    }
+    const std::size_t length = std::strcspn(rest, " ");
+    if (std::strncmp(rest, "0x", 2U) == 0 || (length == 3U && std::strncmp(rest, "all", 3U) == 0)) {
+        // Too long for any address: kept as one that names no board.
+        std::memcpy(target, rest, length < sizeof(target) ? length : 2U);
+        rest += length;
+    }
+    const int found =
+        std::sscanf(rest, "%15s %31s %31s %31s %31s", sub, args[0], args[1], args[2], args[3]);
+    return static_cast<uint8_t>(found > 0 ? found - 1 : 0);
+}
+
+// A board a command acts on: the local board, or the remote one at chain
+// position `position`.
+struct Target {
+    Display::DisplayBoard* board;
+    uint16_t address;
+    uint8_t position;
+    bool local;
+};
+using Targets = std::array<Target, Display::kChainLength + 1U>;
+
+Target localTarget(Display::Display& display)
+{
+    return Target{&display.local(), display.localAddress(), Display::kNotInChain, true};
+}
+
+// The boards `target` names: none is the local board, "0x1N" the board at
+// that address (the local one at the host's own address), "all" every board,
+// the local one included. Returns the count, 0 for a target naming no board.
+uint8_t resolveTargets(Display::Display& display, const char* target, Targets& targets)
+{
+    if (*target == '\0') {
+        targets[0] = localTarget(display);
+        return 1U;
+    }
+    if (std::strcmp(target, "all") == 0) {
+        uint8_t count = 0U;
+        for (uint8_t position = 0U; position < Display::kChainLength; ++position) {
+            if (display.isLocal(position)) {
+                targets[count++] = localTarget(display);
+            } else if (Display::DisplayBoard* board = display.remoteBoard(position)) {
+                targets[count++] = Target{board, Display::chainAddress(position), position, false};
+            }
+        }
+        if (!display.localInChain()) {
+            targets[count++] = localTarget(display);
+        }
+        return count;
+    }
+    unsigned int address = 0U;
+    char extra = '\0';
+    if (std::sscanf(target, "0x%x%c", &address, &extra) != 1 || address > 0x7FU) {
+        return 0U;
+    }
+    if (address == display.localAddress()) {
+        targets[0] = localTarget(display);
+        return 1U;
+    }
+    const uint8_t position = Display::chainPosition(static_cast<uint16_t>(address));
+    Display::DisplayBoard* board = display.remoteBoard(position);
+    if (board == nullptr) {
+        return 0U;
+    }
+    targets[0] = Target{board, static_cast<uint16_t>(address), position, false};
+    return 1U;
 }
 
 CommandResult show(Display::DisplayBoard& board, const char* index, const char* value)
@@ -237,25 +304,11 @@ CommandResult passes(Display::DisplayBoard& board, uint8_t argumentCount, char (
     return CommandResult::Ok;
 }
 
-} // namespace
-
-CommandResult handleDisplayCommand(const char* line, Display::Display* display)
+// Applies one content, blink or level subcommand to `board`'s buffered state.
+CommandResult apply(Display::DisplayBoard& board, const char* sub, uint8_t count,
+                    char (&args)[4][32])
 {
-    if (std::strncmp(line, "display ", 8U) != 0) {
-        return CommandResult::NotHandled;
-    }
-    char sub[16];
-    char args[4][32];
-    const uint8_t count = splitArguments(line, sub, args);
-    if (display == nullptr) {
-        return CommandResult::Unavailable;
-    }
-    Display::DisplayBoard& board = display->local();
-
     CommandResult result = CommandResult::InvalidArgument;
-    if (std::strcmp(sub, "passes") == 0) {
-        return passes(board, count, args);  // replies itself
-    }
     if (std::strcmp(sub, "show") == 0 && count == 2U) {
         result = show(board, args[0], args[1]);
     } else if (std::strcmp(sub, "row") == 0 && count == 2U) {
@@ -271,11 +324,77 @@ CommandResult handleDisplayCommand(const char* line, Display::Display* display)
         clear(board);
         result = CommandResult::Ok;
     }
-    if (result != CommandResult::Ok) {
-        return result;
+    return result;
+}
+
+} // namespace
+
+CommandResult handleDisplayCommand(const char* line, Display::Display* display)
+{
+    if (std::strncmp(line, "display ", 8U) != 0) {
+        return CommandResult::NotHandled;
     }
-    display->submitLocal();
-    LogService::instance().sendLine("OK display");
+    char target[8];
+    char sub[16];
+    char args[4][32];
+    const uint8_t count = splitArguments(line, target, sub, args);
+    if (display == nullptr) {
+        return CommandResult::Unavailable;
+    }
+    Targets targets{};
+    const uint8_t targetCount = resolveTargets(*display, target, targets);
+    if (targetCount == 0U) {
+        return CommandResult::InvalidArgument;
+    }
+
+    if (std::strcmp(sub, "passes") == 0) {
+        // The I2C protocol has no message for the pass table.
+        if (targetCount != 1U || !targets[0].local) {
+            LogService::instance().sendLine("ERR unsupported-remote");
+            return CommandResult::Ok;
+        }
+        return passes(*targets[0].board, count, args);  // replies itself
+    }
+    // A bad argument fails on the first board, before any board is changed.
+    for (uint8_t i = 0U; i < targetCount; ++i) {
+        const CommandResult result = apply(*targets[i].board, sub, count, args);
+        if (result != CommandResult::Ok) {
+            return result;
+        }
+    }
+
+    if (target[0] == '\0') {
+        display->submitLocal();
+        LogService::instance().sendLine("OK display");
+        return CommandResult::Ok;
+    }
+    // A board that does not take it keeps the change in its buffer, which the
+    // next astro refresh sends with the forecast over it.
+    char unreachable[6U * Display::kChainLength + 1U] = {};
+    std::size_t used = 0U;
+    for (uint8_t i = 0U; i < targetCount; ++i) {
+        bool reached = true;
+        if (targets[i].local) {
+            display->submitLocal();
+        } else {
+            reached = display->submitRemote(targets[i].position);
+        }
+        if (!reached && used < sizeof(unreachable)) {
+            used += static_cast<std::size_t>(
+                std::snprintf(&unreachable[used], sizeof(unreachable) - used, " 0x%02X",
+                              static_cast<unsigned>(targets[i].address)));
+        }
+    }
+    char message[64];
+    if (std::strcmp(target, "all") == 0) {
+        std::snprintf(message, sizeof(message), "OK display all%s%s",
+                      used > 0U ? "; unreachable" : "", unreachable);
+    } else {
+        std::snprintf(message, sizeof(message), "%s 0x%02X",
+                      used > 0U ? "ERR display-unreachable" : "OK display",
+                      static_cast<unsigned>(targets[0].address));
+    }
+    LogService::instance().sendLine(message);
     return CommandResult::Ok;
 }
 

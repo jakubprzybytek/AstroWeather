@@ -26,6 +26,17 @@ void Display::submitLocal()
     }
 }
 
+bool Display::submitRemote(uint8_t position)
+{
+    DisplayBoard* board = remoteBoard(position);
+    if (board == nullptr) {
+        return false;
+    }
+    MutexGuard guard(submitMutex_);
+    board->submit();
+    return board->lastSubmitOk();
+}
+
 void Display::runBootScreens()
 {
     showBootScreens(local_, localAddress_);
