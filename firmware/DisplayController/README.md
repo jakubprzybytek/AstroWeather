@@ -109,8 +109,8 @@ Hardware: [KiCad/Docs](../../KiCad/Docs/README.md).
 - Not yet checked on the board: rejecting unknown commands and short writes,
   recovery from bus errors, the 7-hour "no data" timeout and the switch test
   screens.
-- The timeline sync locks within a burst on the bench but drifts 76-81 ms out
-  over the 5-minute gap, so the board asks for a burst about every 6 minutes
+- The timeline sync is bench-checked over two 5-minute syncs only (7.6 and
+  -2.0 ms); a day-long run is still to do
   ([Architecture.md](Docs/Architecture.md#open-items)).
 - No console: the counters are read over SWD until the USART2 console exists.
 - The FreeRTOS heap (3072 B) could shrink, since only `defaultTask` uses it

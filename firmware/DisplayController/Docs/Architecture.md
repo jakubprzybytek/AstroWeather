@@ -208,12 +208,9 @@ current pass.
 - Not yet checked on the board: rejecting unknown commands and short writes,
   recovery from bus errors, the 7-hour "no data" timeout and the switch test
   screens.
-- The timeline sync does not yet hold across the 5-minute gap. On board
-  `0x11` (bench, 2026-10-06) it jumps onto the host's timeline, steps HSITRIM
-  64 to 65 and locks within a burst, but the 5-minute syncs found it 76 and
-  81 ms out, so it asks for a new burst about every 6 minutes. The rates
-  measured over the burst's 20-30 s intervals were 40-160 ppm off the
-  5-minute ones, and the trend term carried that error on. Whether that is
-  timestamp error or the two HSI clocks wandering needs measuring
+- The timeline sync is checked on board `0x11` over two 5-minute syncs only
+  (bench, 2026-10-06): it jumps onto the host's timeline, steps HSITRIM 64 to
+  65, locks within the burst, and the 5-minute syncs found it 7.6 and -2.0 ms
+  out. A longer run, over a day's temperature, is still to do
   ([Display.md](../../Docs/Display.md#accuracy)).
 - Console over USART2 (`PA2`/`PA3`); see the [README](../README.md#features).

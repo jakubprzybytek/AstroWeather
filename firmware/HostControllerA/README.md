@@ -130,9 +130,8 @@ Firmware, with details in each document's open items:
 - Astro refresh: stale data after a failed noon refresh, low-power wake
   ([AstroRefresh.md](Docs/AstroRefresh.md#open-items)).
 - Clock: automatic trim ([RTC.md](Docs/RTC.md#open-items)).
-- Display timeline sync: locks within a burst on the bench, but the boards
-  drift 76-81 ms apart over the 5-minute gap, so a board asks for a burst
-  about every 6 minutes
+- Display timeline sync: bench-checked over two 5-minute syncs only (7.6 and
+  -2.0 ms); a day-long run is still to do
   ([DisplayController open items](../DisplayController/Docs/Architecture.md#open-items)).
 - Settings: a torn write is detected but not recovered, credentials are stored
   in the clear, unknown tags are not preserved
