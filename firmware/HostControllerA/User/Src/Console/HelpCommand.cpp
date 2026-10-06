@@ -63,7 +63,7 @@ const Command kStatus[] = {
 
 const Command kStats[] = {
     {"stats on|off", "memory, stack and log counters every 5 s",
-     "Once at once, then every 5 s whatever else is logged. Not saved.\n"
+     "Once now, then every 5 s whatever else is logged. Not saved.\n"
      "[STATS] sent      log lines transmitted\n"
      "        dropped   lines lost because the log queue was full\n"
      "        busyDrop  lines lost because USB stayed busy or no host was open\n"
