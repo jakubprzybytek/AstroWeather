@@ -36,12 +36,14 @@ void showSync()
     const DisplaySyncTask::Status status = DisplaySyncTask::instance().status();
     const uint32_t now = osKernelGetTickCount();
     char message[160];
+    char last[16] = "never";
+    if (status.sent != 0U) {
+        std::snprintf(last, sizeof(last), "%lus-ago",
+                      static_cast<unsigned long>((now - status.lastSentTick) / 1000U));
+    }
     int used = std::snprintf(
-        message, sizeof(message), "OK time-sync sent=%lu answered=%lu last=%s%lu%s next=%lus %s",
-        static_cast<unsigned long>(status.sent), static_cast<unsigned long>(status.answered),
-        (status.sent == 0U) ? "never" : "",
-        (status.sent == 0U) ? 0UL : static_cast<unsigned long>((now - status.lastSentTick) / 1000U),
-        (status.sent == 0U) ? "" : "s-ago",
+        message, sizeof(message), "OK time-sync sent=%lu answered=%lu last=%s next=%lus %s",
+        static_cast<unsigned long>(status.sent), static_cast<unsigned long>(status.answered), last,
         static_cast<unsigned long>((status.untilNextMs + 999U) / 1000U),
         status.inBurst ? "burst" : "every-300s");
     for (uint8_t position = 0; position < Display::kChainLength; ++position) {

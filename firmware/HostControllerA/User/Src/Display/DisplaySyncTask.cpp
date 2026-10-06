@@ -17,7 +17,7 @@ DisplaySyncTask& DisplaySyncTask::instance()
 
 // Above the normal tasks, so a due sync is not held up behind a busy one;
 // it runs for a few milliseconds a minute.
-DisplaySyncTask::DisplaySyncTask() : Task<1024>("DisplaySync", osPriorityAboveNormal)
+DisplaySyncTask::DisplaySyncTask() : Task<2048>("DisplaySync", osPriorityAboveNormal)
 {
 }
 

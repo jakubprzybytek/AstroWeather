@@ -17,7 +17,10 @@
 //
 // The host's own refresh is the reference and is never corrected. With no
 // board present the broadcast goes unanswered (a NACK); that is not an error.
-class DisplaySyncTask : public Task<1024> {
+//
+// 2048 B: a burst's log line goes through LogService::logf() and vsnprintf,
+// which overflowed 1024 (bench, 2026-10-06).
+class DisplaySyncTask : public Task<2048> {
 public:
     static DisplaySyncTask& instance();
 

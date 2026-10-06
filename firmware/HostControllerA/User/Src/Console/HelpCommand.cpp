@@ -213,8 +213,9 @@ const Command kSettings[] = {
      "'boot-load=' reported an error, or after 'eeprom erase'."},
     {"settings defaults", "reset every setting and save",
      "adc log off, adc display on, time display on, normal brightness, no clock\n"
-     "trim, no WiFi, built-in api. Running tasks keep their behaviour until the\n"
-     "next boot, except the api target, which the next fetch reads."},
+     "trim, HSI trim 64, no WiFi, built-in api. Running tasks keep their\n"
+     "behaviour until the next boot, except the api target, which the next\n"
+     "fetch reads."},
 };
 
 const Command kWifi[] = {
