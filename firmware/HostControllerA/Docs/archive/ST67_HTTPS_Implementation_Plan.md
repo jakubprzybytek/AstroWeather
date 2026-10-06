@@ -1,5 +1,7 @@
 # ST67 HTTPS Implementation Plan
 
+> Archived 2026-10-06. Current state: [WiFi.md](../WiFi.md).
+
 **Status: implemented with Route B (TLS in the module, T01), on `main` since
 2026-10-04.** The host runs T01 against `W6X_Net` with HTTPS on by default,
 the module carries `mission_t01_v2.0.106` with a LittleFS holding only

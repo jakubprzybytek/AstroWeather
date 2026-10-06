@@ -6,7 +6,7 @@
 #   Bypass-specific wrapper around the vendor QConn_Flash_Cmd tool used to
 #   program the ST67W611M NCP module through the STM32G0B0 Bypass firmware's
 #   USB CDC <-> USART2 transparent transport, while the ST67 is held in its
-#   ROM bootloader (see docs/ST67_Bootloader_Mode_Implementation_Plan.md).
+#   ROM bootloader (see Docs/archive/ST67_Bootloader_Mode_Implementation_Plan.md).
 #
 #   It resolves the vendor QConn_Flash_Cmd executable, the selected flash
 #   configuration (.ini) and every image it references, generates a temporary

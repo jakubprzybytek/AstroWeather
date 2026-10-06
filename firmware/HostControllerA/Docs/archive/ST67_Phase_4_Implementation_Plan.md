@@ -1,5 +1,7 @@
 # ST67W611M1 Phase 4 Host HTTP Fetch Plan
 
+> Archived 2026-10-06. Current state: [WiFi.md](../WiFi.md).
+
 ## 1. Objective
 
 Extend the proven Phase 3 station lifecycle with one bounded host-side fetch:

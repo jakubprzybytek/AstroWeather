@@ -1,5 +1,7 @@
 # Astro Data Refresh and Main Loop Refactor Plan
 
+> Archived 2026-10-06. Current state: [AstroRefresh.md](../AstroRefresh.md).
+
 ## 1. Goal
 
 Refactor the HostController so that:

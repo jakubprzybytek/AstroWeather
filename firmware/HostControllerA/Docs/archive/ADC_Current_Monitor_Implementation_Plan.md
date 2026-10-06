@@ -1,5 +1,7 @@
 # ADC Current Monitor Implementation Plan
 
+> Archived 2026-10-06. Current state: [CurrentSense.md](../CurrentSense.md).
+
 ## Goal
 
 Read the INA180A2 current-sense output on `ADC1_IN10` / `PB2` every 100 ms and publish the measured current through `DebugService`.

@@ -1,4 +1,4 @@
-> Archived. Current state: [CurrentSense.md](../CurrentSense.md).
+> Archived 2026-10-06. Current state: [CurrentSense.md](../CurrentSense.md).
 
 # ADC Current Monitor Troubleshooting Summary
 

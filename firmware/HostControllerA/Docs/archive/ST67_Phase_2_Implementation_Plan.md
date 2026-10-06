@@ -1,5 +1,7 @@
 # ST67W611M1 Phase 2 Official Driver Smoke-Test Plan
 
+> Archived 2026-10-06. Current state: [WiFi.md](../WiFi.md).
+
 ## 1. Objective
 
 Replace the manual raw-SPI probe runtime path with the smallest official

@@ -1,5 +1,7 @@
 # ST67W611M1 Daily Fetch Feasibility and Implementation Plan
 
+> Archived 2026-10-06. Current state: [WiFi.md](../WiFi.md).
+
 ## 1. Purpose and scope
 
 The target behavior is:

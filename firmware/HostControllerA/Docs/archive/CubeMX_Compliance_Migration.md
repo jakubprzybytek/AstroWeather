@@ -1,5 +1,7 @@
 # CubeMX Compliance Migration Plan
 
+> Archived 2026-10-06. Current state: [Development.md](../../../Docs/Development.md#cubemx-compliance).
+
 ## Goal
 
 Restore the customized HostController behavior after fresh STM32CubeMX generation while respecting CubeMX ownership rules.
@@ -258,7 +260,7 @@ Definitions on the top-level CMake target do **not** reach the driver: it is com
 
 At their default priorities the two driver tasks pre-empted the display multiplexing task, holding a slot for up to 14 ms instead of 4 ms during WiFi activity, which was visible as the whole display flashing during a refresh. Measured by timing slot switches in the display task: the longest gap fell from 14 ms with four late switches to 8 ms with one per refresh, with WiFi fetches still succeeding. The remaining short stall happens during connect and was not traced.
 
-That stall was LwIP's `netif` task, which the driver creates at `NETIF_TASK_PRIORITY` 50, above the display's 48. The value is a plain `#define` in the generated `LWIP/App/lwip_netif.h`, outside any USER CODE block and without an `#ifndef` guard, so it cannot be overridden in a way that survives regeneration. `DisplayRefresh` was raised to `osPriorityRealtime7` (55) instead, above every driver task. Measured with the display's gray-level test on 2026-09-26: the display task's longest wait during an astro refresh fell from 4.5-5.4 ms, every one caught with `netif` running, to under 1 ms. The refresh has since moved into the TIM2 interrupt altogether, so no task priority is involved any more; see [Display.md](../Display.md#refresh-operation).
+That stall was LwIP's `netif` task, which the driver creates at `NETIF_TASK_PRIORITY` 50, above the display's 48. The value is a plain `#define` in the generated `LWIP/App/lwip_netif.h`, outside any USER CODE block and without an `#ifndef` guard, so it cannot be overridden in a way that survives regeneration. `DisplayRefresh` was raised to `osPriorityRealtime7` (55) instead, above every driver task. Measured with the display's gray-level test on 2026-09-26: the display task's longest wait during an astro refresh fell from 4.5-5.4 ms, every one caught with `netif` running, to under 1 ms. The refresh has since moved into the TIM2 interrupt altogether, so no task priority is involved any more; see [Display.md](../../../Docs/Display.md#refresh-operation).
 
 ## Linker script: retained RAM
 
@@ -271,7 +273,7 @@ build still links, with `.noinit` placed in `RAM` and cleared at startup).
 
 ## Display refresh timer and DMA
 
-Set in CubeMX on 2026-09-27 for the interrupt-driven refresh with brightness levels ([Display.md](../Display.md#refresh-operation)):
+Set in CubeMX on 2026-09-27 for the interrupt-driven refresh with brightness levels ([Display.md](../../../Docs/Display.md#refresh-operation)):
 
 | Setting | Host (`HostControllerA.ioc`) | DisplayController (`DisplayController.ioc`) |
 | --- | --- | --- |

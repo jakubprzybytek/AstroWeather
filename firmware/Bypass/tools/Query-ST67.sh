@@ -5,7 +5,7 @@
 # Purpose:
 #   Non-destructive ST67W611M identification/lock-state query through the
 #   STM32G0B0 Bypass USB CDC <-> USART2 <-> ST67 ROM bootloader transport
-#   (Stage E of docs/ST67_Bootloader_Mode_Implementation_Plan.md). This only
+#   (Stage E of Docs/archive/ST67_Bootloader_Mode_Implementation_Plan.md). This only
 #   reads the efuse/chip-info region (0x000-0x1FF); it never erases, writes,
 #   or flashes anything, so it never needs a --force confirmation. Use this
 #   to confirm the Bypass firmware and transport work before ever running

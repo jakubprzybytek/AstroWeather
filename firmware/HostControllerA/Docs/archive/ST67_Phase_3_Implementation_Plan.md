@@ -1,5 +1,7 @@
 # ST67W611M1 Phase 3 Connect, Stress, and Shutdown Plan
 
+> Archived 2026-10-06. Current state: [WiFi.md](../WiFi.md).
+
 ## 1. Current status summary
 
 ### Completed

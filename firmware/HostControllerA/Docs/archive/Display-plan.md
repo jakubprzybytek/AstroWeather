@@ -1,5 +1,7 @@
 # Display Implementation Plan
 
+> Archived 2026-10-06. Current state: [Display.md](../../../Docs/Display.md).
+
 This plan implements the behavior defined in [Display.md](../Display.md). Display code must remain under `User` so STM32CubeMX regeneration does not overwrite it.
 
 ## Current Baseline

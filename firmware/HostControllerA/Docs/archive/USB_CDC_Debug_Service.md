@@ -1,5 +1,7 @@
 # USB CDC Debug Service
 
+> Archived 2026-10-06. Current state: [Console.md](../Console.md).
+
 ## Purpose and Scope
 
 The HostController firmware exposes a USB CDC virtual COM port for diagnostic logging and a line-oriented host healthcheck. `DebugService` owns the application-facing CDC behavior: it serializes transmit requests, accepts logs from application tasks, and converts received USB bytes into echo responses.

@@ -1,5 +1,7 @@
 # Talking to the Device over COM Port
 
+> Archived 2026-10-06. Current state: [Development.md](../../../Docs/Development.md#connecting-over-usb-cdc).
+
 ## Purpose
 
 Notes on how to observe device log/telemetry output and send interactive commands to a running HostController board over its USB CDC virtual COM port (e.g. `COM5` on Windows). See [USB_CDC_Debug_Service.md](USB_CDC_Debug_Service.md) for the underlying protocol implemented by `DebugService` and `ConsoleService`.

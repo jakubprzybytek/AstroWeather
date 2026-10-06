@@ -8,7 +8,7 @@
 #   Reads real, already-flashed application code back over the bridge to
 #   prove it can move firmware-sized binary data reliably (a stronger,
 #   real-hardware complement to Stage D of
-#   docs/ST67_Bootloader_Mode_Implementation_Plan.md). This only reads
+#   Docs/archive/ST67_Bootloader_Mode_Implementation_Plan.md). This only reads
 #   flash; it never erases or writes, so it never needs --force.
 #
 # Usage:
