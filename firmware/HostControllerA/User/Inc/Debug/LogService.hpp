@@ -45,7 +45,7 @@ protected:
 private:
     LogService();
 
-    static constexpr uint32_t kMaxLogMessageLen = 200;
+    static constexpr uint32_t kMaxLogMessageLen = 256;
     static constexpr uint32_t kLogQueueDepth    = 16;
     static constexpr uint32_t kTxRetryWindowMs  = 40;
     static constexpr uint32_t kTxRetryDelayMs   = 5;

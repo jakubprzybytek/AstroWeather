@@ -21,8 +21,8 @@
 // is overwritten and counted as dropped, so an ongoing problem is kept.
 namespace ErrorLog {
 
-constexpr uint8_t kCapacity = 16U;
-constexpr std::size_t kTextSize = 102U;  // message text, NUL included
+constexpr uint8_t kCapacity = 24U;
+constexpr std::size_t kTextSize = 160U;  // message text, NUL included
 
 enum class Level : uint8_t { Warning = 1U, Error = 2U };
 
@@ -67,7 +67,7 @@ struct Storage
 };
 
 constexpr uint32_t kMagic = 0x4552524CU;  // "ERRL"
-constexpr uint32_t kVersion = 3U;
+constexpr uint32_t kVersion = 4U;
 
 // A 16-bit hash of the text as it would be stored (truncated to
 // kTextSize - 1). Cheap to compare; the text is compared only on a match.

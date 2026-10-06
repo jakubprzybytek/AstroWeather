@@ -120,7 +120,7 @@ void testOngoingProblemKept()
     expect(found, "a problem that keeps recurring is not pushed out");
     expectEqual(log.count(), ErrorLog::kCapacity, "full");
     expectEqual(std::string(log.newest()->text), std::string("one-off 39"), "newest is the last logged");
-    expectEqual(log.dropped(), 25U, "41 distinct entries, 16 kept");
+    expectEqual(log.dropped(), 41U - ErrorLog::kCapacity, "41 distinct entries, kCapacity kept");
 }
 
 void testCapAndDropped()
@@ -134,7 +134,8 @@ void testCapAndDropped()
     expectEqual(log.count(), ErrorLog::kCapacity, "capped at capacity");
     expectEqual(log.dropped(), 3U, "oldest three dropped");
     expectEqual(std::string(log.entry(0).text), std::string("error 3"), "oldest kept is the fourth");
-    expectEqual(std::string(log.newest()->text), std::string("error 18"), "newest");
+    expectEqual(std::string(log.newest()->text), "error " + std::to_string(ErrorLog::kCapacity + 2U),
+                "newest");
 
     log.clear();
     expectEqual(log.count(), 0U, "cleared");

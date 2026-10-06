@@ -1,8 +1,7 @@
 #include <Console/ErrorsCommand.hpp>
 
+#include <Console/PacedOutput.hpp>
 #include <Debug/LogService.hpp>
-
-#include "cmsis_os2.h"
 
 #include <cstdio>
 #include <cstring>
@@ -10,22 +9,12 @@
 namespace Console {
 namespace {
 
-// A consistent copy to read while other tasks keep logging. Static, not on
-// the console task's stack: it is about 2 KB. Console task only.
+// A consistent copy to read while other tasks keep logging, and the line
+// being formatted. Static, not on the console task's stack: the copy is over
+// 4 KB and a line up to a log line long. Console task only.
 ErrorLog::Storage snapshot;
-
-// The log queue holds 16 lines and the full list is up to 18; a short pause
-// every few lines lets LogService drain it, so none is dropped.
-constexpr uint8_t kLinesPerBurst = 8U;
-constexpr uint32_t kBurstPauseMs = 30U;
-
-void send(const char* line, uint8_t& sent)
-{
-    LogService::instance().sendLine(line);
-    if (++sent % kLinesPerBurst == 0U) {
-        osDelay(kBurstPauseMs);
-    }
-}
+char text[256];
+char entryText[256];
 
 } // namespace
 
@@ -43,15 +32,14 @@ CommandResult handleErrorsCommand(const char* line)
 
     LogService::instance().errorLogSnapshot(snapshot);
     const ErrorLog::Log log(snapshot);
-    char text[200];
-    uint8_t sent = 0U;
+    PacedOutput out;
     std::snprintf(text, sizeof(text), "OK errors %u of %u kept, %lu older dropped, boot %lu",
                   static_cast<unsigned>(log.count()), static_cast<unsigned>(ErrorLog::kCapacity),
                   static_cast<unsigned long>(log.dropped()), static_cast<unsigned long>(log.boot()));
-    send(text, sent);
+    out.line(text);
     for (uint8_t i = 0U; i < log.count(); ++i) {
         log.format(log.entry(i), text, sizeof(text));
-        send(text, sent);
+        out.line(text);
     }
     return CommandResult::Ok;
 }
@@ -64,11 +52,9 @@ void sendErrorLogSummary()
     if (newest == nullptr) {
         return;
     }
-    char entry[128];
-    log.format(*newest, entry, sizeof(entry));
-    char text[200];
-    std::snprintf(text, sizeof(text), "%u warnings/errors kept ('errors' lists them); newest: %s",
-                  static_cast<unsigned>(log.count()), entry);
+    log.format(*newest, entryText, sizeof(entryText));
+    std::snprintf(text, sizeof(text), "%u warnings/errors kept ('errors' lists them); newest: %.196s",
+                  static_cast<unsigned>(log.count()), entryText);
     LogService::instance().sendLine(text);
 }
 

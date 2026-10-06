@@ -153,7 +153,7 @@ message is truncated to 95 characters. Driver messages usually end in their own
 priority, started first in the HostController's `AstroWeather_Init()`.
 
 Producers call `log()`, `logf()` or `sendLine()` from task context. The call
-formats the prefix and message into a 200-byte record, puts it on a static
+formats the prefix and message into a 256-byte record, puts it on a static
 16-entry CMSIS queue without blocking, and wakes the task. If the queue is full,
 the oldest record is discarded to make room; each lost record counts as
 `dropped`. The calls are not ISR-safe.
@@ -171,8 +171,10 @@ accepted record can still be lost here.
 
 The console and log tasks have the same priority, so a command's whole reply is
 normally queued before any of it is sent. A reply of more than 16 lines would
-push its own first lines out. `help` groups and `status` are kept under 16
-lines by `static_assert`s and comments in `HelpCommand.cpp` and
+push its own first lines out. `help` and `errors` send through
+`Console::PacedOutput` (`User/Src/Console/PacedOutput.cpp`), which pauses
+30 ms after every 8 lines so the log task can drain the queue; `help all`,
+over 200 lines, arrives whole. `status` is kept under 16 lines by a comment in
 `StatusCommand.cpp`. `eeprom dump` prints 32 lines and relies on the log task
 getting time between the I2C reads; a `dropped` count that rises during a dump
 means lines were lost.
@@ -188,7 +190,7 @@ queue.
 [0:00:06:40] [STATS] sent=412 dropped=0 busyDrop=37
 [0:00:06:40] [MEM] heapFree=24752 heapMin=19352
 [0:00:06:40] [STACK] name=LogService configured=1536 remaining=652
-[0:00:06:40] [STACK] name=ConsoleService configured=2048 remaining=1180
+[0:00:06:40] [STACK] name=ConsoleService configured=2304 remaining=1180
 ...
 ```
 
@@ -214,9 +216,9 @@ includes the ST67 WiFi driver's own errors, which arrive through
 [welcome message](#welcome-message), so a problem that happened while no
 terminal was open, or before USB enumerated at boot, is still visible.
 
-- **16 entries, ordered by latest occurrence.** The list runs from the entry
+- **24 entries, ordered by latest occurrence.** The list runs from the entry
   quiet longest to the latest problem, which is also the "newest" the welcome
-  message shows. When all 16 are used, the entry quiet longest is overwritten
+  message shows. When all 24 are used, the entry quiet longest is overwritten
   and counted as dropped, so a problem that keeps recurring is not pushed out
   by one-off ones.
 - **Repeats are one entry.** A message identical to one already kept, at the
@@ -231,26 +233,28 @@ terminal was open, or before USB enumerated at boot, is still visible.
   logged before the clock is set, only merges within its own boot; each entry
   records the boot of its latest occurrence for that. The log therefore does
   not show that a merged problem spanned a reset.
-- **Order without copying.** The 120-byte entries stay in their slots; a
-  16-byte `order` list gives the slots by latest occurrence, so moving an
-  entry to the end shifts at most 15 bytes with interrupts masked, not up to
-  1.8 KB of entries.
+- **Order without copying.** The 180-byte entries stay in their slots; a
+  24-byte `order` list gives the slots by latest occurrence, so moving an
+  entry to the end shifts at most 23 bytes with interrupts masked, not up to
+  4.3 KB of entries.
 - **Timestamps.** The local date and time when the clock is set, read from
   the RTC registers directly (`ClockTask::wallSecondsNow()`), without the RTC
   mutex, so a task that logs while holding it cannot deadlock. Until the clock
   is set, which after a power-up is the first astro refresh, entries carry
   uptime instead, marked `(previous boot)` or `(<n> boots ago)` when listed
   after a reset.
-- **Text.** Up to 101 characters of the message; longer ones are cut.
+- **Text.** Up to 159 characters of the message; longer ones are cut. That
+  keeps every warning and error whole except the longest ST67 statistics,
+  such as `ST67 batch-final ...`.
 - **Kept over a reset, a crash and reflashing, not a power loss.** The log
-  lives in a 2 KB RAM region that the startup code neither initialises nor
-  clears (`.noinit`, the last 2 KB of RAM, set up in `STM32G0B1xx_FLASH.ld`),
+  lives in a 5 KB RAM region that the startup code neither initialises nor
+  clears (`.noinit`, the last 5 KB of RAM, set up in `STM32G0B1xx_FLASH.ld`),
   at the same address in every build. At boot, `ErrorLog::Log::begin()` keeps
   it if its magic word and check word match and every entry is consistent,
   otherwise starts empty, and counts the boot. After a power loss the region
   is random and fails the check. A change to the entry layout must bump
   `ErrorLog::kVersion`, so an older layout is discarded rather than misread.
-- **Cost.** Recording masks interrupts for the copy of about a hundred bytes
+- **Cost.** Recording masks interrupts for the copy of one entry, under 200 bytes
   (the hash is computed before), so it is safe from any task or interrupt.
   Messages logged before `LogService::init()` are not recorded.
 
@@ -258,7 +262,7 @@ Only the HostController has the log.
 
 ## Console Service
 
-`ConsoleService` (`User/Src/Console/ConsoleService.cpp`) is a `Task<2048>` at
+`ConsoleService` (`User/Src/Console/ConsoleService.cpp`) is a `Task<2304>` at
 normal priority.
 
 ### Receive path
@@ -322,20 +326,25 @@ specific `ERR` lines instead.
 
 ## Command Reference
 
-Commands marked **HC** exist only in the HostController build. `help` and
-`help <group>` list the same commands on the device.
+Commands marked **HC** exist only in the HostController build. `help` lists
+the same commands on the device.
 
 ### help
 
 | Command | Reply |
 | --- | --- |
-| `help` | `OK help`, then an index of the commands and the group names. |
-| `help <group>` | `OK help <group>`, then details and examples for that group. |
-| `help <unknown>` | `ERR unknown help group '<name>'; Groups: stats, display, astro, api, time, adc, settings, wifi, eeprom` |
+| `help` | `OK help`, then every command's usage and one-line summary, by group. |
+| `help <group>` | `OK help <group>`, then the group's commands, each with its summary, details and examples, then the group's notes. |
+| `help <group> <command>` | `OK help <group> <command>`, then that command alone, e.g. `help display show` or `help time display`. The words must start the command's usage. |
+| `help all` | `OK help all`, then every group in full, about 220 lines. |
+| `help <unknown>` | `ERR unknown help group '<name>'; groups: status, stats, errors, display, astro, api, time, adc, settings, wifi, eeprom` |
+| `help <group> <unknown>` | `ERR no help for '<group> <words>'; 'help <group>' lists its commands` |
 
-The groups are `stats`, `display`, `astro` (HC), `api` (HC), `time` (HC), `adc`,
-`settings`, `wifi` and `eeprom`. Help is split into groups to keep each reply
-under the 16-line log queue.
+The groups are `status`, `stats`, `errors` (HC), `display`, `astro` (HC),
+`api` (HC), `time` (HC), `adc`, `settings`, `wifi` and `eeprom`.
+`HelpCommand.cpp` holds the text as one table entry per command (usage,
+summary, details) and per group (title, notes), so the index and the details
+come from the same place. Replies are paced; see [Burst size](#burst-size).
 
 ### status
 
@@ -395,12 +404,12 @@ resets.
 
 | Command | Reply |
 | --- | --- |
-| `errors` | `OK errors <n> of 16 kept, <d> older dropped, boot <b>`, then one line per entry, ordered by latest occurrence: the one quiet longest first, the latest problem last. |
+| `errors` | `OK errors <n> of 24 kept, <d> older dropped, boot <b>`, then one line per entry, ordered by latest occurrence: the one quiet longest first, the latest problem last. |
 | `errors clear` | `OK errors cleared`. Empties the log and the dropped count; the boot count stays. |
 | `errors <anything else>` | `ERR invalid-argument` |
 
 ```text
-OK errors 3 of 16 kept, 0 older dropped, boot 6
+OK errors 3 of 24 kept, 0 older dropped, boot 6
 E up 0d 00:00:42 (previous boot): CurrentSense ADC conversion failed
 W 2026-09-27 12:19:50: DisplayBoard 0x10 unreachable status=1
 E 2026-09-27 13:30:02 4x, first 2026-09-27 12:20:31: AstroDataRefresh fetch status=...
@@ -412,9 +421,9 @@ without the log line's own `[uptime] [LEVEL]` prefix. An uptime stamp from an
 earlier boot is marked `(previous boot)` or `(<n> boots ago)`. A repeat moves its entry
 to the end, so the list reads in order of each entry's latest occurrence: the
 last line is always the latest problem, and in the example the `fetch` error
-last happened after the other two although it first happened between them. The list is sent in
-bursts of 8 lines with a 30 ms pause, so up to 17 lines fit through the
-16-line log queue.
+last happened after the other two although it first happened between them. The list is sent
+through `PacedOutput` ([Burst size](#burst-size)), so all 25 lines fit through
+the 16-line log queue.
 
 ### astro
 
@@ -638,8 +647,7 @@ The WiFi password is stored in the EEPROM in the clear.
 
 - `wifi set` is **not** echoed. The console does not echo input, and the reply
   and connection test log only the SSID. The driver's AT command log, which
-  would contain the password, is compiled out. `help wifi` on current firmware
-  still says the line is echoed; that text is out of date.
+  would contain the password, is compiled out.
 - `settings show` and `status` never print the password. `api show`,
   `settings show` and the fetch log never print the API key either; the key
   is in the EEPROM in the clear as well, and the typed `api key` line passes
@@ -664,7 +672,7 @@ and `ERR settings-unavailable` replies for a start without those devices.
 
 | Resource | Limit | Where |
 | --- | ---: | --- |
-| Console task stack | 2048 bytes | `ConsoleService.hpp` |
+| Console task stack | 2304 bytes | `ConsoleService.hpp` |
 | RX ring | 256 bytes | `kRxRingSize` |
 | Command line | 127 characters | `kMaxLineLength` = 128 |
 | Command queue | 8 lines | `kCommandQueueDepth` |
@@ -672,7 +680,8 @@ and `ERR settings-unavailable` replies for a start without those devices.
 | Console reply | 127 characters | `ConsoleService::reply()` buffer |
 | Log task stack | 1536 bytes | `LogService.hpp` |
 | Log queue | 16 records | `kLogQueueDepth` |
-| Log record | 199 characters, prefix included | `kMaxLogMessageLen` = 200 |
+| Log record | 255 characters, prefix included | `kMaxLogMessageLen` = 256 |
+| Error log | 24 entries of up to 159 characters | `ErrorLog::kCapacity`, `kTextSize` = 160 |
 | ST67 driver message | 95 characters | `vLoggingPrintf()` buffer |
 | CDC busy retry | every 5 ms, for up to 40 ms | `kTxRetryDelayMs`, `kTxRetryWindowMs` |
 | Statistics period | 5 s, while `stats on` | `kStatsPeriodMs` |

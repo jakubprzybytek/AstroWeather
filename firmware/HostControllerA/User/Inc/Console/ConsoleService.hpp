@@ -16,7 +16,7 @@ namespace Settings {
 class Store;
 }
 
-class ConsoleService : public Task<2048>
+class ConsoleService : public Task<2304>
 {
 public:
     static ConsoleService& instance();

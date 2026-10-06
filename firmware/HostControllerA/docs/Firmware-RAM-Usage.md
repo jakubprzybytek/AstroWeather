@@ -47,10 +47,14 @@ from GNU Tools for STM32 14.3.1:
 | **Remaining** | **12512** |
 | Static RAM usage | about **91.5%** |
 
-Since 2026-09-27 the last 2 KiB of RAM are a separate `NOINIT` region for the
-error log (`ErrorLog::Storage`, 2004 bytes), not cleared at startup so the log
-survives a reset; see [Console.md](Console.md#error-log). The link-time report
-then shows `RAM` out of 142 KiB and `NOINIT` separately.
+Since 2026-09-27 the top of RAM is a separate `NOINIT` region for the
+error log, not cleared at startup so the log survives a reset; see
+[Console.md](Console.md#error-log). It was 2 KiB for 16 entries of 102-byte
+text; since 2026-10-06 it is 5 KiB, `ErrorLog::Storage` being 4364 bytes for
+24 entries of 160-byte text, and `RAM` 139 KiB. The link-time report shows
+`RAM` and `NOINIT` separately. `errors` reads a copy of the log, a second
+4364 bytes in `.bss` (`ErrorsCommand.cpp`). On 2026-10-06 the link reported
+`RAM` 91216 bytes of 139 KiB (64.1%).
 
 The previous measurement, on 2026-08-30 from `build/Debug/`,
 was 131564 bytes of `.data + .bss` and 14352 bytes remaining. On 2026-09-23
@@ -69,10 +73,10 @@ From `arm-none-eabi-nm -S --size-sort` on the same ELF:
 | --- | ---: | --- |
 | FreeRTOS heap (`ucHeap`) | 40000 | `configTOTAL_HEAP_SIZE` in `Core/Inc/FreeRTOSConfig.h` |
 | LwIP heap (`ram_heap`) | 33551 | `MEM_SIZE` calculated in `LWIP/Target/lwipopts.h` |
-| `AstroDataRefreshTask` object | 7712 | 3072-byte stack, 4096-byte response buffer and state; `User/Inc/Astro/AstroDataRefreshTask.hpp` |
+| `AstroDataRefreshTask` object | 8040 | 3328-byte stack, 4096-byte response buffer and state; `User/Inc/Astro/AstroDataRefreshTask.hpp` |
 | `St67HttpFetchTask` object | 7336 | 2560-byte stack and `St67Runtime`, including its own 4096-byte `httpPayload`, and the fetcher's `ApiTarget`; `User/Src/WiFi/St67HttpFetchTask.cpp` |
-| `LogService` object | 5504 | 1536-byte stack and a 16-entry queue of 201-byte events; `User/Inc/Debug/LogService.hpp` |
-| `ConsoleService` object | 4000 | 2048-byte stack, 8-entry command queue of 128-byte lines, 256-byte RX ring; `User/Inc/Console/ConsoleService.hpp` |
+| `LogService` object | 6464 | 1536-byte stack and a 16-entry queue of 257-byte events; `User/Inc/Debug/LogService.hpp` |
+| `ConsoleService` object | 4256 | 2304-byte stack, 8-entry command queue of 128-byte lines, 256-byte RX ring; `User/Inc/Console/ConsoleService.hpp` |
 | USB CDC buffers | 4096 | `UserRxBufferFS` and `UserTxBufferFS`, 2048 bytes each |
 | `CurrentSenseTask` object | 2480 | 2048-byte stack |
 | `MainLoopTask` object | 2472 | 2048-byte stack |
@@ -130,10 +134,10 @@ Application tasks, with static stacks inside their objects:
 
 | Task (name in `[STACK]`) | Stack | Priority | Source |
 | --- | ---: | --- | --- |
-| `AstroDataRefresh` | 3072 | Normal | `AstroDataRefreshTask.hpp`; 2048 overflowed once the clock sync ran on it, 760 left at the deepest path |
+| `AstroDataRefresh` | 3328 | Normal | `AstroDataRefreshTask.hpp`; 2048 overflowed once the clock sync ran on it; at 3072, 224 were left, raised when log lines grew to 256 bytes |
 | `St67HttpFetch` | 2560 | BelowNormal | `User/Src/WiFi/St67HttpFetchTask.cpp` |
 | `CurrentSense` | 2048 | BelowNormal | `CurrentSenseTask.hpp` |
-| `ConsoleService` | 2048 | Normal | `ConsoleService.hpp` |
+| `ConsoleService` | 2304 | Normal | `ConsoleService.hpp`; at 2048, `status` left 288, raised when log lines grew to 256 bytes |
 | `LogService` | 1536 | Normal | `LogService.hpp` |
 | `MainLoopTask` | 2048 | Normal | `MainLoopTask.hpp`; the boot screens encode frames on it, 944 used at peak |
 | `Clock` | 1024 | BelowNormal | `ClockTask.hpp` |

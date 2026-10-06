@@ -7,6 +7,7 @@
 #include "main.h"
 
 #include <cstdarg>
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 
@@ -85,7 +86,7 @@ void LogService::keepProblem(Level level, const char* message)
     const ErrorLog::Stamp stamp = stampNow();
     const uint16_t hash = ErrorLog::textHash(message);
     // Masked rather than a scheduler critical section, so this is also safe
-    // from an interrupt. It copies about a hundred bytes.
+    // from an interrupt. It copies up to one entry, under 200 bytes.
     const UBaseType_t mask = taskENTER_CRITICAL_FROM_ISR();
     errorLog_.record(level == Level::Error ? ErrorLog::Level::Error : ErrorLog::Level::Warning,
                      message, hash, stamp);
@@ -94,9 +95,18 @@ void LogService::keepProblem(Level level, const char* message)
 
 void LogService::errorLogSnapshot(ErrorLog::Storage& copy) const
 {
-    const UBaseType_t mask = taskENTER_CRITICAL_FROM_ISR();
-    copy = errorLogStorage;
+    // The header and order, then one entry at a time: the whole log is over
+    // 4 KB, too long to keep the USB and display refresh interrupts masked.
+    // Each entry is consistent; one recorded in between shows in its new
+    // state, or not at all if it took a new slot.
+    UBaseType_t mask = taskENTER_CRITICAL_FROM_ISR();
+    std::memcpy(&copy, &errorLogStorage, offsetof(ErrorLog::Storage, entries));
     taskEXIT_CRITICAL_FROM_ISR(mask);
+    for (uint8_t i = 0U; i < ErrorLog::kCapacity; ++i) {
+        mask = taskENTER_CRITICAL_FROM_ISR();
+        copy.entries[i] = errorLogStorage.entries[i];
+        taskEXIT_CRITICAL_FROM_ISR(mask);
+    }
 }
 
 void LogService::clearErrorLog()

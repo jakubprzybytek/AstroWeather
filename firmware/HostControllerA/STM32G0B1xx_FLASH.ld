@@ -55,11 +55,11 @@ ENTRY(Reset_Handler)
 /* Specify the memory areas */
 MEMORY
 {
-RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 142K
-/* USER: retained RAM for the error log (.noinit): the last 2K, outside RAM so
+RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 139K
+/* USER: retained RAM for the error log (.noinit): the last 5K, outside RAM so
    its address is the same in every build and the startup code never clears
    it. See docs/Console.md#error-log and docs/CubeMXCompliance.md. */
-NOINIT (rw)    : ORIGIN = 0x20023800, LENGTH = 2K
+NOINIT (rw)    : ORIGIN = 0x20022C00, LENGTH = 5K
 FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 512K
 }
 

@@ -262,8 +262,8 @@ That stall was LwIP's `netif` task, which the driver creates at `NETIF_TASK_PRIO
 
 ## Linker script: retained RAM
 
-`STM32G0B1xx_FLASH.ld` has a user change: the `RAM` region is 142 KiB, and the
-last 2 KiB are a `NOINIT` region holding the `.noinit` section, for the error
+`STM32G0B1xx_FLASH.ld` has a user change: the `RAM` region is 139 KiB, and the
+last 5 KiB are a `NOINIT` region holding the `.noinit` section, for the error
 log that survives a reset ([Console.md](Console.md#error-log)). Both changes are
 marked `USER`. CubeMX regenerates the linker script only when asked to; if it
 ever does, re-apply them, or the log silently stops surviving resets (the
