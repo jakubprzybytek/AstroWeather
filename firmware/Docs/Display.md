@@ -450,7 +450,7 @@ to correct and set the rate.
 | --- | --- |
 | The first sync, or an error larger than 50 ms plus 2.5 % of the time since the previous sync (more than drift can explain: the host rebooted) | Jump: renumber the frames by the nearest whole number of frames, and slew out the rest, at most half a frame |
 | Otherwise | Correct the phase by the error. If at least 5 s have passed since the previous sync, measure the rate: the drift is the error less what the servo still had to correct at the stamp, and the average rate over the interval is the servo's rate less the drift divided by the interval |
-| This and the previous measured interval each at least 20 s | Add a trend: `(average - previous average) × interval × 2 / (interval + previous interval)`, clamped to ±500 ppm, so a clock drifting with temperature is followed rather than trailed by half an interval |
+| This and the previous measured interval each at least 2 minutes (never a burst's) | Add a trend: `(average - previous average) × interval × 2 / (interval + previous interval)`, clamped to ±500 ppm, so a clock drifting with temperature is followed rather than trailed by half an interval |
 | The new rate more than 2000 ppm out | Suggest HSITRIM steps, rounded at 3300 ppm a step (0.33 %, measured on a G070 on 2026-10-05); slow wants a higher trim |
 
 The servo's rate is the average plus the trend. `locked()` is true once a sync
@@ -475,14 +475,16 @@ by frame on the real schedule. The worst offset after settling:
 | Board clock | HSITRIM steps | Worst offset |
 | --- | ---: | ---: |
 | -4800 ppm, the bench boards of 2026-10-05, with a real step of 0.338 % | 1 | about 1 us |
-| -10000 ppm (1 %) | 3 | under 0.3 ms |
-| -2500 ppm, drifting +400 ppm an hour | 1 | about 3.7 ms including the first 5-minute interval, about 1.5 ms once the trend is known |
-| +1500 ppm, drifting -400 ppm an hour | 0 | about 4.6 ms including the first interval |
+| -10000 ppm (1 %) | 3 | about 1 us |
+| -2500 ppm, drifting +400 ppm an hour | 1 | about 10 ms at the end of the first 5-minute interval, before there is a trend; about 1.5 ms once it is known |
+| +1500 ppm, drifting -400 ppm an hour | 0 | about 10 ms in the first interval, likewise |
 
 Once the trend is known, what remains is the bow of a constant rate against a
 clock drifting at *k* ppm per unit time over an interval *I*, about
 *k*·*I*²/8: 1.25 ms for 400 ppm an hour and 5 minutes. Against 20 ms frames
-and a 1 s blink phase, a few milliseconds are not visible.
+and a 1 s blink phase, a few milliseconds are not visible. The first interval
+after a burst has no trend yet, since a burst's intervals are too short to
+give one; a board that ends it more than 10 ms out asks for another burst.
 
 ### Trimming the host's HSI
 

@@ -108,6 +108,25 @@ void testRateAndHsiSuggestion()
     expectEqual(soon.phaseMicros, 400, "phase still corrected");
 }
 
+// A burst's 20-30 s intervals give noisy rates: they set the rate but never
+// a trend. Two 5-minute intervals do.
+void testTrendOnlyFromLongIntervals()
+{
+    Display::TimelineSync sync;
+    sync.onSync(0, 0, 0, 0);
+    // 30 s at -1000 ppm, then 30 s at -1150 ppm: 30 ms and 34.5 ms behind.
+    auto decision = sync.onSync(30000000, 30000000 - 30000, 0, 0);
+    expectEqual(decision.ratePpm, -1000, "first interval's rate");
+    decision = sync.onSync(60000000, 60000000 - 4500, 0, -1000);
+    expectEqual(decision.ratePpm, -1150, "30 s intervals: the rate, no trend");
+
+    // Two 5-minute intervals, the second 100 ppm slower: trend -100 more.
+    decision = sync.onSync(360000000, 360000000, 0, -1150);
+    expectEqual(decision.ratePpm, -1150, "steady over 5 min");
+    decision = sync.onSync(660000000, 660000000 - 30000, 0, -1150);
+    expectEqual(decision.ratePpm, -1350, "5-minute intervals carry the trend");
+}
+
 void testLaterJump()
 {
     Display::TimelineSync sync;
@@ -251,13 +270,14 @@ void testSimulatedTemperatureDrift()
 {
     // The bench saw the display's HSI move ~400 ppm in an hour.
     const SimulationResult result = simulate(-2500.0, 400.0, 3380.0, 120.0, 90.0, 123456.0);
-    expect(result.worstMicros < 10000.0, "within 10 ms between 5 min syncs");
+    // The first 5-minute interval after the burst has no trend yet: ~10 ms.
+    expect(result.worstMicros < 12000.0, "within 12 ms between 5 min syncs");
     // Once two 5-minute rates give the trend, only the bow of a constant rate
     // against a drifting clock is left: 400 ppm/h * (5 min)^2 / 8, 1.25 ms.
     const SimulationResult steady = simulate(-2500.0, 400.0, 3380.0, 120.0, 900.0, 123456.0);
     expect(steady.worstMicros < 2000.0, "within 2 ms once the trend is known");
     const SimulationResult falling = simulate(1500.0, -400.0, 3380.0, 120.0, 90.0, 9999.0);
-    expect(falling.worstMicros < 10000.0, "falling too");
+    expect(falling.worstMicros < 12000.0, "falling too");
     expectEqual(falling.steps, 0, "1500 ppm needs no HSITRIM step");
 }
 
@@ -286,6 +306,7 @@ int main()
     testServoSlew();
     testFirstSyncJumps();
     testRateAndHsiSuggestion();
+    testTrendOnlyFromLongIntervals();
     testLaterJump();
     testAllowedSteps();
     testHeartbeat();

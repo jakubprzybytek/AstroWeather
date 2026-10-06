@@ -21,8 +21,10 @@ namespace Display {
 //   board follows the host's clock and the next sync finds little to fix.
 // - That rate is the average over the last interval, which lags a clock
 //   drifting with temperature by half an interval. So when two measured
-//   intervals in a row are each 20 s or more, the change between their rates
-//   is carried on over the next interval (at most 500 ppm). At 400 ppm an
+//   intervals in a row are each 2 minutes or more, the change between their
+//   rates is carried on over the next interval (at most 500 ppm). Shorter
+//   intervals, a burst's, give rates too noisy to extrapolate: on the bench
+//   they were 40-160 ppm off the 5-minute ones (2026-10-06). At 400 ppm an
 //   hour, the 2026-10-05 bench drift, a 5-minute interval ends about 10 ms
 //   out without it; with it, about 1.5 ms at most, mid-interval, where a
 //   constant rate bows away from the drifting clock.
@@ -45,7 +47,7 @@ public:
     static constexpr int32_t kHsiStepPpm = 3300;
     static constexpr int32_t kHsiStepAbovePpm = 2000;
     static constexpr int32_t kMaxRatePpm = 20000;
-    static constexpr int64_t kMinTrendIntervalMicros = 20000000;
+    static constexpr int64_t kMinTrendIntervalMicros = 120000000;
     static constexpr int64_t kMaxTrendPpm = 500;
 
     struct Decision {
