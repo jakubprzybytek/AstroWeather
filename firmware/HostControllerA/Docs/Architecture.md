@@ -16,7 +16,7 @@ code lives under `User/` and, for the parts shared with the DisplayController
 firmware, under `../Common/` (see [Shared Code](#shared-code)); CubeMX owns
 `Core/`, `Drivers/`, `Middlewares/`,
 `USB_Device/` and `ST67W6X_Network_Driver/`, and application changes
-there stay inside `USER CODE` sections (see [CubeMXCompliance.md](CubeMXCompliance.md)).
+there stay inside `USER CODE` sections (see [CubeMXCompliance.md](archive/CubeMX_Compliance_Migration.md)).
 
 ## Boot Sequence
 
@@ -78,7 +78,7 @@ create their FreeRTOS mutexes from static storage at that point.
     `display.runBootScreens()`: each `DISPLAYx_EN` slot lit on its own for
     200 ms, then `AdNN` (the host's strap address) on numeric display 1 for
     2 s, then the local board's own state, which clients have kept writing
-    meanwhile. See [DisplayController Architecture](../../DisplayController/docs/Architecture.md#screens).
+    meanwhile. See [DisplayController Architecture](../../DisplayController/Docs/Architecture.md#screens).
 12. `SwitchInput::attach()` routes the `SWITCH_1`/`SWITCH_2` EXTI interrupts to
     `MainLoopTask` as thread flags.
 
@@ -299,7 +299,7 @@ watchdog, so it stays that way until reset.
 
 The native suites in `tests/` build with the `NativeTests` preset
 (`BUILD_NATIVE_TESTS=ON`) and run under CTest; see
-[Development.md](Development.md). Decisions are kept out of the tasks: parsing,
+[Development.md](../../Docs/Development.md). Decisions are kept out of the tasks: parsing,
 mapping and timing logic lives in small hardware-free units (for example
 `AstroDisplayMapper`, `AstroProgressBar`, `HttpResponseParser`,
 `St67ConnectDiagnosis`), and the tasks only do the I/O around them. Code that

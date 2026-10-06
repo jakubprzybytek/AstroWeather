@@ -275,7 +275,7 @@ source files ad hoc.
 ## Verification Commands
 
 From Git Bash, with the toolchain on `PATH` (see
-[Development.md](Development.md)):
+[Development.md](../../Docs/Development.md)):
 
 ```bash
 arm-none-eabi-size -A -d build/<preset>/HostControllerA.elf

@@ -1,6 +1,6 @@
 # Development Workflow
 
-This document is the practical build, flash, debug, and device-communication guide for HostControllerA. It is written so that a developer or AI agent can build the firmware, program the board, reach the USB console, and collect evidence that a change works. The console itself, its output format and every command are described in [Console.md](Console.md).
+This document is the practical build, flash, debug, and device-communication guide for HostControllerA. It is written so that a developer or AI agent can build the firmware, program the board, reach the USB console, and collect evidence that a change works. The console itself, its output format and every command are described in [Console.md](../HostControllerA/Docs/Console.md).
 
 ## Prerequisites
 
@@ -90,9 +90,9 @@ A successful build should leave the ELF present and print the flash/RAM usage su
 The remote display boards run the separate `../DisplayController` project: an
 STM32G070 with its own CubeMX configuration, the same `Debug` and `Release`
 presets, and `build/Debug/DisplayController.elf` as its artifact (see its
-[README](../../DisplayController/README.md)). Code used by both images lives in
+[README](../DisplayController/README.md)). Code used by both images lives in
 `../Common` and is compiled into each project, so a change there should be
-built in both; see [Architecture.md](Architecture.md#shared-code).
+built in both; see [Architecture.md](../HostControllerA/Docs/Architecture.md#shared-code).
 
 ### Native tests
 
@@ -110,7 +110,7 @@ ctest --test-dir build/native-tests-local --output-on-failure
 All suites registered in `tests/CMakeLists.txt` should pass. The shared code
 has its own suites in `../Common`, run with the same three commands from that
 directory. The list of suites, the coverage preset, the HAL/RTOS stubs and how
-to add a test are in [Testing.md](Testing.md).
+to add a test are in [Testing.md](../HostControllerA/Docs/Testing.md).
 
 If `ctest` is unavailable, run an executable directly, for example:
 
@@ -175,7 +175,7 @@ SWD connection.
 ## Communicate with the Device
 
 The HostController firmware exposes a USB CDC virtual COM port carrying the log
-and the command console. [Console.md](Console.md) covers connecting, the
+and the command console. [Console.md](../HostControllerA/Docs/Console.md) covers connecting, the
 `tools/astro_console.py` client, the output format and the full command
 reference. In short:
 
@@ -193,7 +193,7 @@ reference. In short:
 
 The firmware has no built-in WiFi credentials. They default to empty, are set
 from the console with `wifi set`, stored in the settings EEPROM, and read on
-every connect. See [WiFi.md](WiFi.md).
+every connect. See [WiFi.md](../HostControllerA/Docs/WiFi.md).
 
 The API host, path and device key are set from the console with `api host`,
 `api path` and `api key` and saved in the EEPROM. Their built-in fallbacks are compile-time values:
@@ -218,7 +218,7 @@ status
 ```
 
 `wifi set` saves and immediately runs a connection test. `time trim` applies
-this board's measured LSI error; see [RTC.md](RTC.md#trimming). Both are kept
+this board's measured LSI error; see [RTC.md](../HostControllerA/Docs/RTC.md#trimming). Both are kept
 in the EEPROM across power cycles.
 
 ### COM port disappears or will not open
@@ -331,7 +331,7 @@ In order of escalation:
    2026-09-22 to be the only thing that worked, after the three steps above had
    all failed and the device sat in `CM_PROB_FAILED_POST_START`. This
    re-enumerates the board on another host controller. It also cuts power, so
-   the RTC loses the time; see [RTC.md](RTC.md#reset-and-power-loss).
+   the RTC loses the time; see [RTC.md](../HostControllerA/Docs/RTC.md#reset-and-power-loss).
 
 5. **Remove the device node** and let Windows create it again, from an
    *elevated* prompt:
@@ -564,4 +564,4 @@ capture is the minimum meaningful validation.
 
 If a WiFi fetch fails with `[ERR] sem_if_ready not received`, the ST67 module
 did not signal ready when the driver started. That is a module or SPI transport
-problem, separate from the console path; see [WiFi.md](WiFi.md).
+problem, separate from the console path; see [WiFi.md](../HostControllerA/Docs/WiFi.md).

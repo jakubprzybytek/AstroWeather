@@ -17,4 +17,4 @@ how the firmware works now, read the current document listed next to each one.
 | [ADC_Current_Monitor_Implementation_Plan.md](ADC_Current_Monitor_Implementation_Plan.md) | [CurrentSense.md](../CurrentSense.md) |
 | [ADC_Current_Monitor_Troubleshooting.md](ADC_Current_Monitor_Troubleshooting.md) | [CurrentSense.md](../CurrentSense.md) |
 | [USB_CDC_Debug_Service.md](USB_CDC_Debug_Service.md) | [Console.md](../Console.md) |
-| [Serial_COM_Communication.md](Serial_COM_Communication.md) | [Console.md](../Console.md), [Development.md](../Development.md) |
+| [Serial_COM_Communication.md](Serial_COM_Communication.md) | [Console.md](../Console.md), [Development.md](../../../Docs/Development.md) |

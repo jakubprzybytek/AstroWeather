@@ -8,7 +8,7 @@ inside the module, and the STM32 drives them through the driver's `W6X_Net_*`
 socket API. The two talk over SPI1 with DMA, paced by the module's `ST67_RDY`
 line. Until 2026-10-03 the module ran the T02 firmware with LwIP on the STM32;
 the switch is recorded in
-[ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md).
+[ST67_HTTPS_Implementation_Plan.md](archive/ST67_HTTPS_Implementation_Plan.md).
 
 One task, `St67HttpFetchTask`, owns the module. Every fetch joins the network,
 waits for the module's DHCP, downloads one HTTPS response into the caller's
@@ -33,8 +33,8 @@ is not part of the shared `../Common` code.
 This document replaces the ST67 phase plans, now in
 [archive](archive/ST67_Daily_Fetch_Implementation_Plan.md). The HTTPS work,
 including the T02 to T01 switch and its bench plan, is in
-[ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md). Rules
-for generated code are in [CubeMXCompliance.md](CubeMXCompliance.md).
+[ST67_HTTPS_Implementation_Plan.md](archive/ST67_HTTPS_Implementation_Plan.md). Rules
+for generated code are in [CubeMXCompliance.md](archive/CubeMX_Compliance_Migration.md).
 
 ## Architecture
 
@@ -89,7 +89,7 @@ slot for up to 14 ms during WiFi activity, which flashed the whole display, so
 they are overridden to 46 and 47. The overrides must live in the `USER CODE
 BEGIN EC` block of `w61_driver_config.h`: definitions on the CMake target never
 reach the driver, which is compiled in the generated `STM32_Drivers` library.
-See [CubeMXCompliance.md](CubeMXCompliance.md#st67-driver-task-settings).
+See [CubeMXCompliance.md](archive/CubeMX_Compliance_Migration.md#st67-driver-task-settings).
 
 The generated `netif` task ran at 50, a value that could not be overridden (see
 CubeMXCompliance.md). At 50 it held the display off for up to 5.4 ms during a
@@ -357,7 +357,7 @@ The `api host` and `api path` commands apply the same rules before saving.
 
 HTTPS by default, with TLS in the module; plain HTTP is a build option for the
 bench (`APP_ST67_HTTP_USE_TLS=0`). The design, its history and the bench plan
-are in [ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md).
+are in [ST67_HTTPS_Implementation_Plan.md](archive/ST67_HTTPS_Implementation_Plan.md).
 
 1. **DNS.** `W6X_Net_ResolveHostAddress()`: the module's resolver, synchronous,
    bounded by the driver's own timeout (`APP_ST67_DNS_TIMEOUT_MS` is not
@@ -534,7 +534,7 @@ the customized LwIP teardown, since removed.
 | 2 Official driver | 2026-08-21 | `W6X_Init`, WiFi and LwIP init and a scan (20 APs) passed; a HardFault in the scan was fixed by raising the SPI engine stack from 768 to 1536 B. [Phase 2](archive/ST67_Phase_2_Implementation_Plan.md) |
 | 3 Join/DHCP/disconnect | 2026-08-22..23 | 100/100 persistent cycles, heap flat at 23 984 B, min 21 552 B. 20/20 cold restarts passed but free heap fell from 33 896 to 27 864 B: not resource-stable. Wrong password, no credentials and AP-off all failed cleanly and recovered. [Phase 3](archive/ST67_Phase_3_Implementation_Plan.md) |
 | 4 HTTP fetch | 2026-08-23..24 | First GET: HTTP 200, 83 B. 100/100 `HttpPersistentStress` cycles, heap flat, min 14 680 B. The client-owned buffer hand-off (`FetchSt67Data`) validated, CRC matched. [Phase 4](archive/ST67_Phase_4_Implementation_Plan.md) |
-| CubeMX regeneration | 2026-08-26 | With the User-owned `HttpClient`, adapter and RDY bridge: smoke test, 100/100 persistent and 100/100 HTTP persistent cycles, min heap 18 944 B, `St67HttpFetch` 840 B stack left. [CubeMXCompliance.md](CubeMXCompliance.md) |
+| CubeMX regeneration | 2026-08-26 | With the User-owned `HttpClient`, adapter and RDY bridge: smoke test, 100/100 persistent and 100/100 HTTP persistent cycles, min heap 18 944 B, `St67HttpFetch` 840 B stack left. [CubeMXCompliance.md](archive/CubeMX_Compliance_Migration.md) |
 | Driver priorities | 2026-09-21 | Longest display slot gap during WiFi fell from 14 ms to 8 ms with fetches still succeeding. |
 | Connect diagnosis | 2026-09-21 | A wrong WPA2 password reported reason 7 and was classified `WrongPassword`. |
 | T01 and HTTPS | 2026-10-03..04 | Host rewritten against `W6X_Net`; `.bss` 91 808 B against 138 412 B under T02. Module programmed with `mission_t01_v2.0.106` through `firmware/Bypass`. Three faults found and fixed on the bench: `W6X_Net_Init()` asserting without a registered net callback; the station reporting `GOT_IP` straight after the join; the driver's file listing of ST's 31 sample certificates overrunning its 2 s timeout before every certificate upload (fixed by programming a LittleFS image holding only Amazon Root CA 1, `Bypass/tools/Build-LittleFS.sh`). The driver's AT trace also overflowed the 2560 B fetch stack, now 4096 B. **First HTTPS fetch passed**: DNS 0.3 s, certificate upload 3 s (first time only), TLS handshake with CloudFront about 1 s, HTTP 200, 1906 bytes, CRC valid, parse OK; `heapMin` 24 368 B. Certificate cases on a bench build trusting ISRG Root X1 (`-DAPP_ST67_TLS_BENCH_ANCHOR_ISRG=ON`, badssl.com hosts): wrong CA, hostname mismatch, untrusted root, self-signed and an ISRG Root X2 chain all refused in the handshake; `sha256`/`rsa2048.badssl.com` completed with HTTP 200. `wifi stress`: **100/100 HTTPS cycles** in 21.5 min, free heap 29 384 B after every cycle, `heapMin` 24 368 B throughout, 13 tasks; after `stop()` 38 840 B free and a `wifi test` restarted the module and fetched. Repeated with the heap at 32 000 B: 99/100 (one transient connect failure, recovered), `heapMin` 16 336 B. Details in the plan's bench record. The date check is left open. |
@@ -552,7 +552,7 @@ the customized LwIP teardown, since removed.
   the T01 image through `firmware/Bypass`, then the plan's spike run
   (good CA, wrong CA, hostname mismatch, expired certificate, heap and size
   readings, 100 cycles). See
-  [ST67_HTTPS_Implementation_Plan.md](ST67_HTTPS_Implementation_Plan.md).
+  [ST67_HTTPS_Implementation_Plan.md](archive/ST67_HTTPS_Implementation_Plan.md).
 - **Cold restart.** Full shutdown and restart lost about 6 KB of heap over 20
   cycles in Phase 3 under T02. The cause was not found. `stop()` now
   deinitializes Net, WiFi and W6X; one restart after a stress batch worked

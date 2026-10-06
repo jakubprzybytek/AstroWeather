@@ -3,7 +3,7 @@
 How the display board firmware is put together. The display itself (content
 types, PCB mapping, multiplexing) and the I2C message format are shared with
 the host and described in
-[HostControllerA/docs/Display.md](../../HostControllerA/docs/Display.md); pins
+[HostControllerA/docs/Display.md](../../HostControllerA/Docs/Display.md); pins
 and peripherals are in the [README](../README.md#hardware).
 
 None of this has run on a display board yet: it compiles, and the screens and
@@ -26,7 +26,7 @@ scheduler starts:
    (`PcbDisplayBoard::start()`: enables the SCT outputs and starts TIM6, whose
    interrupt then multiplexes the board with SPI1 DMA transfers, no task
    involved; see the host's
-   [Display.md](../../HostControllerA/docs/Display.md#refresh-operation)).
+   [Display.md](../../HostControllerA/Docs/Display.md#refresh-operation)).
    The test frame is prepared first, so the first frames latched are the
    test, not whatever the drivers held at reset.
 3. Starts the `DisplayApp` task and routes the switches to it
@@ -131,7 +131,7 @@ change as one. Staged attributes persist until the host replaces them, so a
 host that sends only content keeps the last attributes, and one that never
 sends any gets full brightness and no blinking. Nothing is decoded in the
 interrupt. The message format is in the host's
-[Display.md](../../HostControllerA/docs/Display.md#i2c-transport).
+[Display.md](../../HostControllerA/Docs/Display.md#i2c-transport).
 
 The HAL NACKs the byte after the 36th; a host that sends more gets an error on
 its side. Listening is restarted after every error, and the task checks every
@@ -148,7 +148,7 @@ when it handles a STOP, and software cannot clear that bit, only an address
 match, a STOP or a sent NACK can; the late NACK then stayed set and the board
 refused the next message's second byte. The host saw error `0x4` about one
 refresh in seven and its retry covered it (see its
-[Display.md](../../HostControllerA/docs/Display.md#i2c-transport)). Traced
+[Display.md](../../HostControllerA/Docs/Display.md#i2c-transport)). Traced
 on the board on 2026-10-05: every failure was a short write of exactly one
 byte, after a STOP handled late (`stopWithAddrPending`), with no bus error. A digital noise filter (15 clocks)
 made no difference.

@@ -21,7 +21,7 @@ weather supplier ──> sst API (AWS) ──HTTP──> host board ──I2C─
 | [`firmware/DisplayController/`](firmware/DisplayController/) | Firmware for the remote display boards (STM32G070): local display and the I2C link to the host; not yet run on a board | [README](firmware/DisplayController/README.md) |
 | [`firmware/Common/`](firmware/Common/) | Code compiled into both firmware images: display encoding and multiplexing, the SCT2xxx driver, the I2C message, task helpers, and their native tests | [README](firmware/Common/README.md) |
 | [`firmware/Bypass/`](firmware/Bypass/) | Bench firmware for a separate STM32G0B0 board: a USB-to-UART bridge for talking to and flashing the ST67W611M Wi-Fi module | [README](firmware/Bypass/README.md) |
-| [`KiCad/`](KiCad/) | Schematic and PCB of the board. One design is populated as the host or as a display board | [hardware review](KiCad/Hardware_Review.md) |
+| [`KiCad/`](KiCad/) | Schematic and PCB of the board. One design is populated as the host or as a display board | [hardware review](KiCad/Docs/Hardware_Review.md) |
 
 ## Documentation
 
@@ -37,20 +37,20 @@ weather supplier ──> sst API (AWS) ──HTTP──> host board ──I2C─
 **Firmware (`firmware/HostControllerA/`)**
 
 - [README](firmware/HostControllerA/README.md): what the firmware does, a feature status table, quick start, and the list of its documents
-- [Development.md](firmware/HostControllerA/docs/Development.md): build, flash, debug and the USB console
-- [Console.md](firmware/HostControllerA/docs/Console.md): every console command, including Wi-Fi and server settings
+- [Development.md](firmware/Docs/Development.md): build, flash, debug and the USB console
+- [Console.md](firmware/HostControllerA/Docs/Console.md): every console command, including Wi-Fi and server settings
 
 **Firmware (`firmware/DisplayController/`, `firmware/Common/`)**
 
 - [DisplayController README](firmware/DisplayController/README.md): the display board firmware, its feature status table, pins and build
-- [Architecture.md](firmware/DisplayController/docs/Architecture.md): boot, tasks, screens, the I2C target and the SWD diagnostics
+- [Architecture.md](firmware/DisplayController/Docs/Architecture.md): boot, tasks, screens, the I2C target and the SWD diagnostics
 - [Common README](firmware/Common/README.md): the code shared by both firmware images and its native tests
 
 **Hardware (`KiCad/`)**
 
-- [Hardware_Review.md](KiCad/Hardware_Review.md): design review, open issues, and measured current draw
-- [Display-Issues.md](firmware/HostControllerA/docs/Display-Issues.md): hardware problems seen on the LED displays, such as the prototype's matrix column faults around `U505`
-- [Display_Board_Purchasing.md](firmware/HostControllerA/docs/Display_Board_Purchasing.md) and [Display_Board_BOM.csv](firmware/HostControllerA/docs/Display_Board_BOM.csv): parts for the display boards
+- [Hardware_Review.md](KiCad/Docs/Hardware_Review.md): design review, open issues, and measured current draw
+- [Display-Issues.md](KiCad/Docs/Display-Issues.md): hardware problems seen on the LED displays, such as the prototype's matrix column faults around `U505`
+- [Display_Board_Purchasing.md](KiCad/Docs/Display_Board_Purchasing.md) and [Display_Board_BOM.csv](KiCad/Docs/Display_Board_BOM.csv): parts for the display boards
 
 ## Status
 
@@ -62,12 +62,12 @@ weather supplier ──> sst API (AWS) ──HTTP──> host board ──I2C─
   run on hardware. See the feature table in the
   [firmware README](firmware/HostControllerA/README.md#features).
 - The prototype host board carries hand rework for hardware issues that are not
-  yet in the design files. See [Hardware_Review.md](KiCad/Hardware_Review.md#issues-sorted-by-severity).
+  yet in the design files. See [Hardware_Review.md](KiCad/Docs/Hardware_Review.md#issues-sorted-by-severity).
 
 ## Getting started
 
 - **Server:** [sst/docs/development.md](sst/docs/development.md).
 - **Firmware:** the [quick start](firmware/HostControllerA/README.md#quick-start)
-  in the firmware README, then [Development.md](firmware/HostControllerA/docs/Development.md)
+  in the firmware README, then [Development.md](firmware/Docs/Development.md)
   to build and flash. The board is pointed at the server with the `api` and
   `wifi` console commands.

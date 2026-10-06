@@ -10,7 +10,7 @@ phases as built are sections 4 to 8, the bench evidence is the
 is still open: the expired-certificate case, the transport fault cases, an
 alternating failure batch, the fetch-task stack high-water mark and a fake
 socket layer for native tests of `HttpClient::get()`. The Wi-Fi stack as
-built is described in [WiFi.md](WiFi.md).
+built is described in [WiFi.md](../WiFi.md).
 
 There are two ways to get TLS on this board, and the first decision is which
 one to take; see [Two routes](#2-two-routes). Route A keeps the current T02
@@ -116,7 +116,7 @@ Relevant ownership boundaries are:
   request write, bounded response parsing, and cleanup.
 - `Appli/App/app_config.h`: non-secret limits and endpoint defaults.
 - `Appli/App/app_credentials.h.template`: built-in fallback host and path. Wi-Fi
-  credentials are stored in the EEPROM with `wifi set`; see [Settings.md](Settings.md).
+  credentials are stored in the EEPROM with `wifi set`; see [Settings.md](../Settings.md).
 
 The build selects `ST67_ARCH=W6X_ARCH_T02`. Consequently, TLS runs on the
 STM32 host above LwIP; the ST67 HTTP/network offload APIs are not the transport
@@ -178,7 +178,7 @@ on 2026-10-03; the shape of the implementation was:
    the certificate is public data. No host LittleFS is needed for a single CA.
 5. **Time.** The module checks validity dates against its own SNTP time, if it
    checks them at all. The host RTC continues to be set from the `time` record
-   (see [RTC.md](RTC.md)) and the generated SNTP client stays off.
+   (see [RTC.md](../RTC.md)) and the generated SNTP client stays off.
 6. **Failure mapping and tests.** Map `W6X_Status_t`/HTTP result codes to the
    existing fetch results; the HTTP parser tests apply only if the parser is
    kept. Bench validation reuses the section 8 cases, with the certificate
@@ -269,7 +269,7 @@ mTLS is out of scope.
 
 The RTC is enabled, clocked from the LSI and trimmed per board. It is set
 from the `time` record of each successful astro API response; see
-[RTC.md](RTC.md). The generated SNTP client (`LWIP/App/sntp.c`) is not
+[RTC.md](../RTC.md). The generated SNTP client (`LWIP/App/sntp.c`) is not
 started and must stay off, as it would also write the RTC. This changes the
 certificate-time problem but does not solve it:
 
@@ -432,7 +432,7 @@ on).
   still set from the API's `time` record and plays no part in TLS.
 - **Logging:** no certificate contents, payloads or credentials are logged.
   The driver's AT trace (`W61_AT_LOG_ENABLE`) does log the Wi-Fi password and
-  is for the bench only ([WiFi.md](WiFi.md#driver-at-trace)).
+  is for the bench only ([WiFi.md](../WiFi.md#driver-at-trace)).
 
 ## 7. Phase 4: Automated Tests — partly done
 
@@ -451,8 +451,8 @@ would also pin the deadline and the exactly-once result callback.
 
 Run on board 1 on 2026-10-04; results in the
 [bench record](#bench-record-2026-10-04-route-b) below, procedures in
-[Testing.md](Testing.md#bench-tests) and the `wifi stress` command
-([Console.md](Console.md#wifi)). `tools/console_capture.ps1` holds one
+[Testing.md](../Testing.md#bench-tests) and the `wifi stress` command
+([Console.md](../Console.md#wifi)). `tools/console_capture.ps1` holds one
 console session per board reset, which the development PC requires.
 
 | Step | Status |
@@ -547,10 +547,10 @@ git diff --check
 ```
 
 Use the bundled Cube CMake in place of `cmake` where it is not on `PATH`; see
-[Development.md](Development.md). A Debug tree configured for the bench
+[Development.md](../../../Docs/Development.md). A Debug tree configured for the bench
 anchor stays so until reconfigured with `-DAPP_ST67_TLS_BENCH_ANCHOR_ISRG=OFF`.
 On the bench: `wifi test` for one fetch, `wifi stress` for 100 cycles, and the
-certificate cases in [Testing.md](Testing.md#bench-tests). Bench results
+certificate cases in [Testing.md](../Testing.md#bench-tests). Bench results
 should identify firmware build, module image, endpoint, cycle count, first
 failure, timings, bytes/CRC and heap minima, without secrets or payloads.
 

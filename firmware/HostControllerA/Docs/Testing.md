@@ -15,7 +15,7 @@ the log, the test links a stand-in instead of the real thing.
 ## Running the Tests
 
 Build and run all suites with the `NativeTests` preset (MSYS2 UCRT64 compiler,
-see [Development.md](Development.md#native-tests)):
+see [Development.md](../../Docs/Development.md#native-tests)):
 
 ```bash
 cmake --preset NativeTests
@@ -254,7 +254,7 @@ Not worth unit testing: the real Wi-Fi session, `LogService` over USB,
 `PcbDisplayBoard` multiplexing timing and RTC register access. A scripted
 smoke test on `tools/astro_console.py capture` (boot, `status`,
 `astro refresh`, check the success lines) and the ADC known-voltage test from
-the [hardware review](../../../KiCad/Hardware_Review.md) cover them.
+the [hardware review](../../../KiCad/Docs/Hardware_Review.md) cover them.
 
 **HTTPS certificate cases** (plan section 8, run 2026-10-04) need no test
 server and no module reflash. Build with

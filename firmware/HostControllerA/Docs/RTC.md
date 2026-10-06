@@ -60,7 +60,7 @@ The generated `MX_RTC_Init()` sets the time to 00:00:00, 1 September of year
 0, on every boot. The `USER CODE BEGIN Check_RTC_BKUP` section in `main.c` returns
 before that when the time has been set; `RTC_TIME_SET_MARKER` in `main.h`
 defines the marker. That is the only change to generated code; see
-[CubeMXCompliance.md](CubeMXCompliance.md) and the next section.
+[CubeMXCompliance.md](archive/CubeMX_Compliance_Migration.md) and the next section.
 
 ## Software
 

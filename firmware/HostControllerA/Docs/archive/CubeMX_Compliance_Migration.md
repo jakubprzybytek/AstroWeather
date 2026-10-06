@@ -11,7 +11,7 @@ The governing rule is:
 - Generated and vendor files must not be modified elsewhere.
 - The migration compared the tree against two local snapshots, `External/Clean` (freshly generated) and `External/Customized` (the previous customized tree). They were never committed and are not in the repository.
 
-The current ST67 Wi-Fi design that resulted from this migration is described in [WiFi.md](WiFi.md).
+The current ST67 Wi-Fi design that resulted from this migration is described in [WiFi.md](../WiFi.md).
 
 The first milestone is a compiling, operational baseline. Memory-leak investigation and cold-restart optimization are intentionally deferred.
 
@@ -217,7 +217,7 @@ The configured build toolchain is GNU Arm Embedded with the Ninja generator. The
 - Ninja: `C:\Users\<user>\AppData\Local\stm32cube\bundles\ninja\1.13.2+st.1\bin\ninja.exe`
 - GNU Arm: `C:\Users\<user>\AppData\Local\stm32cube\bundles\gnu-tools-for-stm32\14.3.1+st.2\bin\arm-none-eabi-gcc.exe`
 
-See [Development.md](Development.md#prerequisites) for putting them on `PATH` or using the bundled Cube CMake.
+See [Development.md](../../../Docs/Development.md#prerequisites) for putting them on `PATH` or using the bundled Cube CMake.
 
 Build a preset with:
 
@@ -238,7 +238,7 @@ Do not make cold-restart heap stability a release gate until a compliant teardow
 
 ## Risks and Decisions
 
-- The full-shutdown lifecycle, the default before the migration, is incompatible with the smallest safe migration path. Resolved: the default is now `APP_ST67_LIFECYCLE_HTTP_PERSISTENT_STRESS`, and client fetches always use the persistent lifecycle whatever the mode; see [WiFi.md](WiFi.md#lifecycle).
+- The full-shutdown lifecycle, the default before the migration, is incompatible with the smallest safe migration path. Resolved: the default is now `APP_ST67_LIFECYCLE_HTTP_PERSISTENT_STRESS`, and client fetches always use the persistent lifecycle whatever the mode; see [WiFi.md](../WiFi.md#lifecycle).
 - The generated HTTP client does not provide the customized ownership and cancellation contract required by the current User code.
 - The existing build artifacts may contain a stale compile database; a fresh CMake build is required for trustworthy diagnostics.
 - The STM32Cube toolchain is now available on `PATH`; fresh builds should be used to replace stale build-artifact diagnostics.
@@ -258,20 +258,20 @@ Definitions on the top-level CMake target do **not** reach the driver: it is com
 
 At their default priorities the two driver tasks pre-empted the display multiplexing task, holding a slot for up to 14 ms instead of 4 ms during WiFi activity, which was visible as the whole display flashing during a refresh. Measured by timing slot switches in the display task: the longest gap fell from 14 ms with four late switches to 8 ms with one per refresh, with WiFi fetches still succeeding. The remaining short stall happens during connect and was not traced.
 
-That stall was LwIP's `netif` task, which the driver creates at `NETIF_TASK_PRIORITY` 50, above the display's 48. The value is a plain `#define` in the generated `LWIP/App/lwip_netif.h`, outside any USER CODE block and without an `#ifndef` guard, so it cannot be overridden in a way that survives regeneration. `DisplayRefresh` was raised to `osPriorityRealtime7` (55) instead, above every driver task. Measured with the display's gray-level test on 2026-09-26: the display task's longest wait during an astro refresh fell from 4.5-5.4 ms, every one caught with `netif` running, to under 1 ms. The refresh has since moved into the TIM2 interrupt altogether, so no task priority is involved any more; see [Display.md](Display.md#refresh-operation).
+That stall was LwIP's `netif` task, which the driver creates at `NETIF_TASK_PRIORITY` 50, above the display's 48. The value is a plain `#define` in the generated `LWIP/App/lwip_netif.h`, outside any USER CODE block and without an `#ifndef` guard, so it cannot be overridden in a way that survives regeneration. `DisplayRefresh` was raised to `osPriorityRealtime7` (55) instead, above every driver task. Measured with the display's gray-level test on 2026-09-26: the display task's longest wait during an astro refresh fell from 4.5-5.4 ms, every one caught with `netif` running, to under 1 ms. The refresh has since moved into the TIM2 interrupt altogether, so no task priority is involved any more; see [Display.md](../Display.md#refresh-operation).
 
 ## Linker script: retained RAM
 
 `STM32G0B1xx_FLASH.ld` has a user change: the `RAM` region is 139 KiB, and the
 last 5 KiB are a `NOINIT` region holding the `.noinit` section, for the error
-log that survives a reset ([Console.md](Console.md#error-log)). Both changes are
+log that survives a reset ([Console.md](../Console.md#error-log)). Both changes are
 marked `USER`. CubeMX regenerates the linker script only when asked to; if it
 ever does, re-apply them, or the log silently stops surviving resets (the
 build still links, with `.noinit` placed in `RAM` and cleared at startup).
 
 ## Display refresh timer and DMA
 
-Set in CubeMX on 2026-09-27 for the interrupt-driven refresh with brightness levels ([Display.md](Display.md#refresh-operation)):
+Set in CubeMX on 2026-09-27 for the interrupt-driven refresh with brightness levels ([Display.md](../Display.md#refresh-operation)):
 
 | Setting | Host (`HostControllerA.ioc`) | DisplayController (`DisplayController.ioc`) |
 | --- | --- | --- |

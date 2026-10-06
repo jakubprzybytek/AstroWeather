@@ -18,7 +18,7 @@ The measurement works on the prototype host board, which has a hand rework:
 `VREF+` (U302 pin 5) is tied to GND in the schematic and PCB, and has been
 rewired to VDD on the board. Boards built from the current design files need
 the same rework until the schematic and PCB are fixed (issue C-1 in
-[Hardware_Review.md](../../../KiCad/Hardware_Review.md)). See
+[Hardware_Review.md](../../../KiCad/Docs/Hardware_Review.md)). See
 [Troubleshooting history](#troubleshooting-history).
 
 ## Signal Chain
@@ -44,7 +44,7 @@ protection or transient detection.
 
 The firmware reads `PB2` (pin 21). The KiCad schematic routes
 `CURRENT_SENSE_FLTR` to `PC6` (pin 30) instead; see
-[USB_PD_Feasibility.md](USB_PD_Feasibility.md). During bring-up `PC6` was
+[USB_PD_Feasibility.md](../../../KiCad/Docs/archive/USB_PD_Feasibility.md). During bring-up `PC6` was
 found physically connected to `PB2` on the board in use, so both pins see the
 filtered signal. `PC6` (and `PC7`, `VOLTAGE_SENS_FLTR`) are configured as
 analog inputs with no pull, which keeps them high impedance.
@@ -75,7 +75,7 @@ temperature sensor's minimum. One conversion takes 173 ADC cycles, about
 22 µs, so a full oversampled three-channel sequence takes about 1 ms.
 
 Changes belong in the `.ioc`, followed by regeneration; see
-[CubeMXCompliance.md](CubeMXCompliance.md).
+[CubeMXCompliance.md](archive/CubeMX_Compliance_Migration.md).
 
 ## Software
 
@@ -198,7 +198,7 @@ result, VREFINT and temperature included, was meaningless. Rewiring pin 5 to
 VDD on the prototype fixed it; current sensing now works with the shipped
 three-channel, oversampled configuration. The schematic and PCB still carry
 the fault (issue C-1 in
-[Hardware_Review.md](../../../KiCad/Hardware_Review.md)). The rest of this
+[Hardware_Review.md](../../../KiCad/Docs/Hardware_Review.md)). The rest of this
 section is kept for reference.
 
 ### Symptom

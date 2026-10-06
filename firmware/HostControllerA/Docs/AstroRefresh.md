@@ -438,7 +438,7 @@ The exact text of each is in [Console.md](Console.md).
 
 ## Tests
 
-Native tests, run with the other suites; see [Development.md](Development.md).
+Native tests, run with the other suites; see [Development.md](../../Docs/Development.md).
 
 - `tests/AstroDataParserTests.cpp`: a valid six-block payload, time and matrix
   unavailable values, every matrix cell kind and its planes, the rejected

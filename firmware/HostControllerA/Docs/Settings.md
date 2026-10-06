@@ -104,7 +104,7 @@ It covers `version`, `payloadLen` and the payload, that is bytes `0x04` through
 `0x05 + payloadLen`. It does **not** cover the magic or the padding.
 
 Implemented in software rather than using the STM32 CRC peripheral, so that the
-feature needs no `.ioc` change. See [CubeMXCompliance.md](CubeMXCompliance.md).
+feature needs no `.ioc` change. See [CubeMXCompliance.md](archive/CubeMX_Compliance_Migration.md).
 
 ### Payload records
 

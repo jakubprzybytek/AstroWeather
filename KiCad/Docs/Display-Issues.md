@@ -2,7 +2,7 @@
 
 Hardware problems found on the LED displays, with what has been measured, the
 likely causes and what is still to check. The design-level issues are in
-[Hardware_Review.md](../../../KiCad/Hardware_Review.md); this page collects
+[Hardware_Review.md](Hardware_Review.md); this page collects
 what shows on the displays.
 
 | Issue | Board | Status |
@@ -27,7 +27,7 @@ Faults on the prototype host board's dot matrix, all traced to the area around
 | 2026-10-01, after that | Column 1 lit again, its brightness sometimes changes | Not measured again yet. |
 
 The console was unavailable during these observations (the USB port problem in
-[Development.md](Development.md#com-port-disappears-or-will-not-open)), so
+[Development.md](../../firmware/Docs/Development.md#com-port-disappears-or-will-not-open)), so
 none of the checks with `display` commands below have been run yet.
 
 ### How the Drivers Are Wired
@@ -66,7 +66,7 @@ leak from column 1 to it holds the column's cathodes low whatever the data
 says. Through 200 Ω that is roughly (3.7 V − about 2 V LED drop) / 200 Ω ≈
 8 mA in every row slot. The SCT gives a full-brightness pixel about the same
 (3.7–7.5 mA peak by the estimate in
-[Hardware_Review.md](../../../KiCad/Hardware_Review.md)), so the column lights
+[Hardware_Review.md](Hardware_Review.md)), so the column lights
 at full brightness, in all five rows, as soon as the board multiplexes. The
 current is not regulated by the SCT and flows through PB6. A leak whose
 resistance changes, with temperature or humidity for example, would explain
@@ -152,7 +152,7 @@ temporary blackout.
 ## Other Known Issues
 
 Both are described in full in
-[Hardware_Review.md](../../../KiCad/Hardware_Review.md).
+[Hardware_Review.md](Hardware_Review.md).
 
 - **Off digits and matrix rows can glow (H-3).** The slot P-FETs (`Q501`–`Q505`)
   cannot be fully turned off: their gates are driven from 3.3 V while their

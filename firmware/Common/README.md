@@ -16,9 +16,9 @@ display boards on an STM32G070.
 | `tests/` | Native unit tests for the above, and the pieces both projects' own tests reuse: the HAL and RTOS stubs (`stubs/`), `Expect.hpp` (`support/`), `add_native_test()` (`NativeTest.cmake`) and a stand-in `main.h` (`board/`) |
 
 The display code is described in
-[HostControllerA/docs/Display.md](../HostControllerA/docs/Display.md), the
+[HostControllerA/docs/Display.md](../HostControllerA/Docs/Display.md), the
 tasks and mutexes in
-[Architecture.md](../HostControllerA/docs/Architecture.md#shared-code).
+[Architecture.md](../HostControllerA/Docs/Architecture.md#shared-code).
 
 ## How It Is Built
 
@@ -51,4 +51,4 @@ ctest --test-dir build/native-tests-local --output-on-failure
 `NativeTests-Coverage` adds `--coverage` for `gcovr`. The GitHub Actions
 workflow `firmware-native-tests.yml` runs these suites and the host's on every
 push. How to write a test, the stubs and the coverage table are in
-[HostControllerA/docs/Testing.md](../HostControllerA/docs/Testing.md).
+[HostControllerA/docs/Testing.md](../HostControllerA/Docs/Testing.md).

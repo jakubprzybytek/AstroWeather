@@ -14,7 +14,7 @@ Both are HostController features. The DisplayController project has no USB and
 no console yet; see [DisplayController](#displaycontroller).
 
 For building and flashing, and for recovering a COM port that has vanished, see
-[Development.md](Development.md).
+[Development.md](../../Docs/Development.md).
 
 ## Connecting
 
@@ -31,7 +31,7 @@ STLink Virtual COM Port*, which carries no firmware output. Use the first one.
 - Only one program can hold the port at a time. Close Serial Monitor, HTerm or
   `astro_console.py` before opening it elsewhere, and before flashing.
 - If the port is listed but will not open, or has disappeared, see
-  [COM port disappears or will not open](Development.md#com-port-disappears-or-will-not-open).
+  [COM port disappears or will not open](../../Docs/Development.md#com-port-disappears-or-will-not-open).
 
 ### Welcome message
 
@@ -664,7 +664,7 @@ console has no authentication.
 The DisplayController is a separate project (`../DisplayController`) on an
 STM32G070, which has no USB, and it does not build the console or the log. A
 console over USART2 is planned; see
-[Display_Board_Purchasing.md](Display_Board_Purchasing.md#console-over-uart).
+[Display_Board_Purchasing.md](../../../KiCad/Docs/Display_Board_Purchasing.md#console-over-uart).
 `ConsoleService` keeps its `ERR display-unavailable`, `ERR eeprom-unavailable`
 and `ERR settings-unavailable` replies for a start without those devices.
 

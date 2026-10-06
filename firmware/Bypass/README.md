@@ -21,9 +21,9 @@ It supports two purposes:
 The STM32 firmware never parses or interprets the ST67 protocol in either
 mode; it only applies the correct GPIO strap sequence and moves bytes.
 
-See [docs/ST67_Bootloader_Mode_Implementation_Plan.md](docs/ST67_Bootloader_Mode_Implementation_Plan.md)
+See [docs/ST67_Bootloader_Mode_Implementation_Plan.md](Docs/ST67_Bootloader_Mode_Implementation_Plan.md)
 for the full design rationale and validation plan, and
-[docs/ST67_Bypass_Maintainer_Notes.md](docs/ST67_Bypass_Maintainer_Notes.md)
+[docs/ST67_Bypass_Maintainer_Notes.md](Docs/ST67_Bypass_Maintainer_Notes.md)
 for architecture details, known tooling quirks, and validation history useful
 for future maintenance.
 
@@ -130,7 +130,7 @@ flashing the STM32 itself.
    ./tools/Dump-ST67-Flash.sh --port COM4 --length 0x400000
    ```
 
-   See [docs/ST67_Bypass_Maintainer_Notes.md](docs/ST67_Bypass_Maintainer_Notes.md)
+   See [docs/ST67_Bypass_Maintainer_Notes.md](Docs/ST67_Bypass_Maintainer_Notes.md)
    for the verified flash map and how to match a dump against a vendor image.
 
 None of the host scripts ever invoke STM32CubeProgrammer or select a NUCLEO
