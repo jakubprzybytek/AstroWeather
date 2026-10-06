@@ -50,7 +50,8 @@ constexpr uint8_t kContainerVersion = 1U;
 // enum, and update the registry there to match.
 enum class Tag : uint8_t {
     AdcFlags = 0x01,      // 1 byte: bit0 log enabled, bit1 display enabled
-    ClockTrim = 0x02,     // 4 bytes: signed LSI error in ppm, big endian
+    ClockTrim = 0x02,     // 4 bytes: signed LSI error in ppm, big endian; then
+                          // optionally 1: HSITRIM 0-127 (from 2026-10)
     WifiSsid = 0x10,      // 1..32 bytes, not NUL terminated
     WifiPassword = 0x11,  // 1..63 bytes, not NUL terminated
     ApiHost = 0x12,       // 1..64 bytes, not NUL terminated
@@ -78,6 +79,9 @@ constexpr uint8_t kClockFlagDisplay = 0x01U;
 
 constexpr uint8_t kDisplayFlagLowBrightness = 0x01U;
 
+constexpr uint8_t kDefaultHsiTrim = 64U;
+constexpr uint8_t kMaxHsiTrim = 127U;
+
 // Defaults here are the values the firmware uses when nothing is stored, and
 // must match the task defaults they are applied to.
 struct Values {
@@ -86,6 +90,8 @@ struct Values {
     bool clockDisplayEnabled = true;
     bool lowBrightness = false;
     int32_t clockTrimPpm = 0;
+    // HSITRIM applied at boot; 64 is the chip's own default.
+    uint8_t hsiTrim = 64U;
     char wifiSsid[kMaxSsidLength + 1U] = {};
     char wifiPassword[kMaxPasswordLength + 1U] = {};
     // Empty means "not saved": the fetch then uses the built-in

@@ -18,6 +18,29 @@ constexpr uint8_t kSetLevel0Command = 0x03U;   // BoardAttributes::level0
 constexpr uint8_t kSetLevel1Command = 0x04U;   // BoardAttributes::level1
 
 constexpr uint8_t kAttributeMessageCount = 3;
+
+// The host's timeline position, sent to the general-call address 0x00 so
+// every board takes it at the same instant (see Display/Timeline.hpp): the
+// command, the frame (32 bits) and the microseconds into it (16 bits), both
+// little-endian. Not a 36-byte message: a board takes it only on the general
+// call, never on its own address.
+constexpr uint8_t kSyncCommand = 0x05U;
+constexpr uint16_t kGeneralCallAddress = 0x00U;
+constexpr std::size_t kSyncMessageSize = 7U;
+using SyncMessage = std::array<uint8_t, kSyncMessageSize>;
+
+// From the host's stamp to the board's receive-complete interrupt: START,
+// the address and seven bytes at 100 kHz, plus the HAL's setup.
+constexpr uint32_t kSyncTransferMicros = 750U;
+
+// A board's answer to a one-byte read: whether it wants a burst of syncs
+// (TimelineSync::locked()). A board without sync answers 0x00.
+constexpr uint8_t kSyncStatusLocked = 0xA1U;
+constexpr uint8_t kSyncStatusWanted = 0xA0U;
+
+void serializeSync(uint32_t frame, uint16_t micros, SyncMessage& message);
+// False, and both outputs untouched, unless it is a whole sync message.
+bool deserializeSync(const uint8_t* data, std::size_t size, uint32_t& frame, uint16_t& micros);
 using AttributeMessages = std::array<I2cMessage, kAttributeMessageCount>;
 
 void serializeI2c(const LogicalBoardState& state, I2cMessage& message);

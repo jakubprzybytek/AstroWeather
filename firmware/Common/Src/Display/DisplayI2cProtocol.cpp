@@ -113,4 +113,28 @@ LogicalBoardState* attributePlane(BoardAttributes& attributes, uint8_t command)
     }
 }
 
+void serializeSync(uint32_t frame, uint16_t micros, SyncMessage& message)
+{
+    message[0] = kSyncCommand;
+    for (uint8_t index = 0; index < 4U; ++index) {
+        message[1U + index] = static_cast<uint8_t>(frame >> (8U * index));
+    }
+    message[5] = static_cast<uint8_t>(micros);
+    message[6] = static_cast<uint8_t>(micros >> 8U);
+}
+
+bool deserializeSync(const uint8_t* data, std::size_t size, uint32_t& frame, uint16_t& micros)
+{
+    if (data == nullptr || size != kSyncMessageSize || data[0] != kSyncCommand) {
+        return false;
+    }
+    uint32_t decodedFrame = 0U;
+    for (uint8_t index = 0; index < 4U; ++index) {
+        decodedFrame |= static_cast<uint32_t>(data[1U + index]) << (8U * index);
+    }
+    frame = decodedFrame;
+    micros = static_cast<uint16_t>(data[5] | (static_cast<uint16_t>(data[6]) << 8U));
+    return true;
+}
+
 } // namespace Display

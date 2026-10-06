@@ -4,8 +4,8 @@
 #include <Screens.hpp>
 #include <Stats.hpp>
 
-DisplayApp::DisplayApp(Display::DisplayBoard& board, I2cTarget& link)
-    : Task<2048>("DisplayApp", osPriorityNormal), board_(board), link_(link)
+DisplayApp::DisplayApp(Display::DisplayBoard& board, I2cTarget& link, TimelineFollower& timeline)
+    : Task<2048>("DisplayApp", osPriorityNormal), board_(board), link_(link), timeline_(timeline)
 {
 }
 
@@ -18,12 +18,18 @@ void DisplayApp::run()
     show();
 
     for (;;) {
-        const uint32_t flags = osThreadFlagsWait(kFlagFrame | kFlagSwitch1 | kFlagSwitch2,
-                                                 osFlagsWaitAny, kPollMs);
+        const uint32_t flags = osThreadFlagsWait(
+            kFlagFrame | kFlagSwitch1 | kFlagSwitch2 | kFlagSync, osFlagsWaitAny, kPollMs);
         const uint32_t now = osKernelGetTickCount();
         bool changed = false;
 
         if ((flags & osFlagsError) == 0U) {
+            if ((flags & kFlagSync) != 0U) {
+                I2cTarget::Sync sync{};
+                if (link_.takeSync(sync)) {
+                    timeline_.onSync(sync);
+                }
+            }
             if ((flags & kFlagFrame) != 0U) {
                 changed = receiveFrames(now) || changed;
             }

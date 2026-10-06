@@ -7,7 +7,7 @@
 // demangling:
 //
 //   arm-none-eabi-nm build/Debug/DisplayController.elf | grep g_displayStats
-//   STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x44
+//   STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x70
 //
 // Each field has a single writer (the I2C interrupt or the DisplayApp task), so
 // no locking is needed.
@@ -34,6 +34,19 @@ struct DisplayControllerStats {
     // the I2C interrupt ran late, the race behind the 2026-10-05 NACKs (see
     // I2cTarget.hpp). Should stay 0.
     uint32_t stopWithAddrPending;
+    // The host's timeline sync (TimelineFollower). Signed values are stored
+    // as two's complement.
+    uint32_t syncsReceived;    // sync broadcasts stamped (interrupt)
+    uint32_t syncsShort;       // general-call writes that ended early
+    uint32_t syncsRejected;    // sync broadcasts that did not decode
+    uint32_t syncsApplied;     // syncs decided on
+    uint32_t syncJumps;        // of those, jumps: the first, or one 50 ms out
+    uint32_t syncLocked;       // 1 when the board tells the host it needs no burst
+    uint32_t syncErrorMicros;  // host minus board at the last sync, signed
+    uint32_t syncDriftMicros;  // unexpected drift over the last measured interval, signed
+    uint32_t syncRatePpm;      // the servo's rate: this clock against the host's, signed
+    uint32_t hsiTrim;          // RCC_ICSCR.HSITRIM now
+    uint32_t hsiChanges;       // HSITRIM steps taken
 };
 
 extern volatile DisplayControllerStats g_displayStats;

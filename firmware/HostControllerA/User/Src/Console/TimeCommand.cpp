@@ -3,7 +3,13 @@
 #include <Debug/LogService.hpp>
 #include <Clock/CalendarDate.hpp>
 #include <Clock/ClockTask.hpp>
+#include <Device/HsiTrim.hpp>
+#include <Display/BoardChain.hpp>
+#include <Display/DisplayI2cProtocol.hpp>
+#include <Display/DisplaySyncTask.hpp>
 #include <Settings/SettingsStore.hpp>
+
+#include "cmsis_os2.h"
 
 #include <cstdio>
 #include <cstring>
@@ -21,6 +27,35 @@ void persist(Settings::Store* store)
         LogService::instance().logf(LogService::Level::Error, "Settings save failed status=%u",
                                     static_cast<unsigned>(status));
     }
+}
+
+// 'time sync': the broadcasts so far, the next, and each board's answer to
+// the last poll.
+void showSync()
+{
+    const DisplaySyncTask::Status status = DisplaySyncTask::instance().status();
+    const uint32_t now = osKernelGetTickCount();
+    char message[160];
+    int used = std::snprintf(
+        message, sizeof(message), "OK time-sync sent=%lu answered=%lu last=%s%lu%s next=%lus %s",
+        static_cast<unsigned long>(status.sent), static_cast<unsigned long>(status.answered),
+        (status.sent == 0U) ? "never" : "",
+        (status.sent == 0U) ? 0UL : static_cast<unsigned long>((now - status.lastSentTick) / 1000U),
+        (status.sent == 0U) ? "" : "s-ago",
+        static_cast<unsigned long>((status.untilNextMs + 999U) / 1000U),
+        status.inBurst ? "burst" : "every-300s");
+    for (uint8_t position = 0; position < Display::kChainLength; ++position) {
+        const uint8_t answer = status.boardStatus[position];
+        if (answer == 0U || used < 0 || static_cast<std::size_t>(used) >= sizeof(message)) {
+            continue;
+        }
+        used += std::snprintf(&message[used], sizeof(message) - static_cast<std::size_t>(used),
+                              " 0x%02X=%s", static_cast<unsigned>(Display::chainAddress(position)),
+                              (answer == Display::kSyncStatusLocked) ? "locked"
+                              : (answer == Display::kSyncStatusWanted) ? "wants-sync"
+                                                                       : "?");
+    }
+    LogService::instance().sendLine(message);
 }
 
 } // namespace
@@ -66,6 +101,42 @@ CommandResult handleTimeCommand(const char* line, Settings::Store* store)
                       static_cast<unsigned long>(trim.asynchPrediv),
                       static_cast<unsigned long>(trim.synchPrediv),
                       static_cast<unsigned long>(trim.minusPulses));
+        LogService::instance().sendLine(message);
+        return CommandResult::Ok;
+    }
+
+    if (std::strcmp(line, "time sync") == 0) {
+        showSync();
+        return CommandResult::Ok;
+    }
+    if (std::strcmp(line, "time sync now") == 0) {
+        DisplaySyncTask::instance().requestBurst();
+        LogService::instance().sendLine("OK time-sync=burst");
+        return CommandResult::Ok;
+    }
+
+    unsigned hsi = 0U;
+    const bool hsiShow = std::strcmp(line, "time hsi") == 0;
+    if (hsiShow || std::sscanf(line, "time hsi %u%c", &hsi, &extra) == 1) {
+        if (!hsiShow) {
+            if (hsi > HsiTrim::kMax || !HsiTrim::set(static_cast<uint8_t>(hsi))) {
+                return CommandResult::InvalidArgument;
+            }
+            if (store != nullptr) {
+                store->values().hsiTrim = static_cast<uint8_t>(hsi);
+                persist(store);
+            }
+        }
+        if (store != nullptr) {
+            std::snprintf(message, sizeof(message), "OK time-hsi=%u cal=0x%02X saved=%u",
+                          static_cast<unsigned>(HsiTrim::trim()),
+                          static_cast<unsigned>(HsiTrim::calibration()),
+                          static_cast<unsigned>(store->values().hsiTrim));
+        } else {
+            std::snprintf(message, sizeof(message), "OK time-hsi=%u cal=0x%02X",
+                          static_cast<unsigned>(HsiTrim::trim()),
+                          static_cast<unsigned>(HsiTrim::calibration()));
+        }
         LogService::instance().sendLine(message);
         return CommandResult::Ok;
     }

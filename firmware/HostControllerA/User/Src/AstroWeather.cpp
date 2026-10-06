@@ -3,15 +3,16 @@
 #include <Astro/AstroDataRefreshTask.hpp>
 #include <Clock/ClockTask.hpp>
 #include <Console/ConsoleService.hpp>
-#include <Debug/BlinkingLed.hpp>
 #include <Debug/LogService.hpp>
 #include <Debug/PulseLed.hpp>
+#include <Device/HsiTrim.hpp>
 #include <Device/Eeprom24AA04.hpp>
 #include <Device/I2cBus.hpp>
 #include <Device/SCT2xxx.hpp>
 #include <Display/BootScreens.hpp>
 #include <Display/BufferedDisplayBoard.hpp>
 #include <Display/DisplayAddress.hpp>
+#include <Display/DisplaySyncTask.hpp>
 #include <Display/Display.hpp>
 #include <Display/LowBrightness.hpp>
 #include <Display/PcbDisplayBoard.hpp>
@@ -28,9 +29,6 @@
 extern SPI_HandleTypeDef hspi3;
 extern I2C_HandleTypeDef hi2c1;
 extern TIM_HandleTypeDef htim2;
-
-static BlinkingLed led1(LED_1_GPIO_Port, LED_1_Pin, BlinkingLed::kHeartbeatOnMs,
-                        BlinkingLed::kHeartbeatOffMs, "Led1");
 
 // Declared before its clients: within a translation unit static objects are
 // constructed in declaration order, and the boards below hold a reference to it.
@@ -68,7 +66,8 @@ Settings::Store settingsStore(settingsEeprom);
 // Runs from main() before osKernelStart(), so nothing here may block on the
 // scheduler; the tasks started below only run once it is up.
 void AstroWeather_Init() {
-  led1.start();
+  // LED_1 is the heartbeat, driven by localBoard's refresh interrupt on the
+  // timeline the display boards follow (Display/Timeline.hpp).
   // LED2: switch presses and USB CDC traffic; before the USB device starts.
   activityLed().init();
 
@@ -100,6 +99,14 @@ void AstroWeather_Init() {
           : ((loaded == Settings::LoadResult::ReadFailed) ? "read-failed" : "defaulted"),
       Settings::Store::describe(settingsStore.lastDecode()));
 
+  // The HSI trim measured on the bench ('time hsi'); before the refresh
+  // starts, so the host's timeline runs at the trimmed rate from frame 1.
+  if (settingsStore.values().hsiTrim != HsiTrim::kDefault) {
+    HsiTrim::set(settingsStore.values().hsiTrim);
+    LogService::instance().logf(LogService::Level::Info, "HSI trim %u",
+                                static_cast<unsigned>(settingsStore.values().hsiTrim));
+  }
+
   CurrentSenseTask::instance().setLoggingEnabled(settingsStore.values().adcLogEnabled);
   CurrentSenseTask::instance().setDisplayEnabled(settingsStore.values().adcDisplayEnabled);
   CurrentSenseTask::instance().setDisplay(&display);
@@ -125,6 +132,9 @@ void AstroWeather_Init() {
   }
   ClockTask::instance().setDisplay(&display);
   ClockTask::instance().start();
+  // After localBoard.start(): the sync carries its refresh timeline.
+  DisplaySyncTask::instance().init(&i2c1Bus, &display);
+  DisplaySyncTask::instance().start();
 
   // Before the fetch task starts: it reads the credentials on every connect.
   HostController::SetSt67CredentialSource(&settingsStore);

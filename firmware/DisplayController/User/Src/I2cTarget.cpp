@@ -1,6 +1,7 @@
 #include <I2cTarget.hpp>
 
 #include <Debug/PulseLed.hpp>
+#include <Display/PcbDisplayBoard.hpp>
 #include <Stats.hpp>
 
 #include "FreeRTOS.h"
@@ -17,10 +18,11 @@ I2cTarget::I2cTarget(I2C_HandleTypeDef& handle) : handle_(handle)
     instance = this;
 }
 
-void I2cTarget::setRecipient(osThreadId_t recipient, uint32_t flag)
+void I2cTarget::setRecipient(osThreadId_t recipient, uint32_t flag, uint32_t syncFlag)
 {
     recipient_ = recipient;
     flag_ = flag;
+    syncFlag_ = syncFlag;
 }
 
 bool I2cTarget::begin(uint16_t address)
@@ -31,6 +33,9 @@ bool I2cTarget::begin(uint16_t address)
     // CR1 too, which leaves the analog filter on (its default) and the
     // digital filter off, as CubeMX configures them.
     handle_.Init.OwnAddress1 = static_cast<uint32_t>(address) << 1U;
+    // The host's timeline sync comes to the general-call address. Set here
+    // rather than in CubeMX, which keeps it disabled.
+    handle_.Init.GeneralCallMode = I2C_GENERALCALL_ENABLE;
     if (HAL_I2C_Init(&handle_) != HAL_OK) {
         return false;
     }
@@ -63,23 +68,59 @@ bool I2cTarget::takeMessage(Display::I2cMessage& message)
     return ready;
 }
 
-void I2cTarget::onAddress(uint8_t direction)
+bool I2cTarget::takeSync(Sync& sync)
 {
-    activityLed().pulse(kActivityPulseMs);
+    taskENTER_CRITICAL();
+    const bool ready = syncReady_;
+    if (ready) {
+        sync = sync_;
+        syncReady_ = false;
+    }
+    taskEXIT_CRITICAL();
+    return ready;
+}
+
+void I2cTarget::onAddress(uint8_t direction, uint16_t matchCode)
+{
     finishReceive();
+    if (matchCode == Display::kGeneralCallAddress) {
+        // The sync broadcast; a general-call read is not a thing.
+        receivingSync_ = true;
+        HAL_I2C_Slave_Seq_Receive_IT(&handle_, syncBuffer_.data(),
+                                     static_cast<uint16_t>(syncBuffer_.size()),
+                                     I2C_FIRST_AND_LAST_FRAME);
+        return;
+    }
     if (direction == I2C_DIRECTION_TRANSMIT) {
+        activityLed().pulse(kActivityPulseMs);
         // The host writes: receive one whole message.
         receiving_ = true;
         HAL_I2C_Slave_Seq_Receive_IT(&handle_, receiveBuffer_.data(),
                                      static_cast<uint16_t>(receiveBuffer_.size()),
                                      I2C_FIRST_AND_LAST_FRAME);
     } else {
+        readReply_ = status_;
         HAL_I2C_Slave_Seq_Transmit_IT(&handle_, &readReply_, 1U, I2C_FIRST_AND_LAST_FRAME);
     }
 }
 
 void I2cTarget::onReceiveComplete()
 {
+    if (receivingSync_) {
+        // Stamp first: the sync is only as good as this instant.
+        receivingSync_ = false;
+        Display::TimelineStamp stamp{};
+        if (Display::PcbDisplayBoard::stampNow(stamp)) {
+            sync_.message = syncBuffer_;
+            sync_.stamp = stamp;
+            syncReady_ = true;
+            ++g_displayStats.syncsReceived;
+            if (recipient_ != nullptr) {
+                osThreadFlagsSet(recipient_, syncFlag_);
+            }
+        }
+        return;
+    }
     receiving_ = false;
     // Interrupt context: the task's takeMessage() runs under a critical
     // section, so head_ and count_ are consistent here.
@@ -123,6 +164,10 @@ void I2cTarget::onError()
 // buffer pointer got (the error path clears XferCount but not pBuffPtr).
 void I2cTarget::finishReceive()
 {
+    if (receivingSync_) {
+        receivingSync_ = false;
+        ++g_displayStats.syncsShort;
+    }
     if (!receiving_) {
         return;
     }
@@ -144,9 +189,8 @@ void I2cTarget::rearm()
 extern "C" void HAL_I2C_AddrCallback(I2C_HandleTypeDef* hi2c, uint8_t TransferDirection,
                                      uint16_t AddrMatchCode)
 {
-    (void)AddrMatchCode;
     if (instance != nullptr && hi2c == &instance->handle()) {
-        instance->onAddress(TransferDirection);
+        instance->onAddress(TransferDirection, AddrMatchCode);
     }
 }
 

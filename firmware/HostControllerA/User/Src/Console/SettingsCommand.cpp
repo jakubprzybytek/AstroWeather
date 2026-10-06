@@ -41,11 +41,12 @@ void showSettings(const Settings::Store& store)
 
     std::snprintf(message, sizeof(message),
                   "OK settings adc-log=%s adc-display=%s time-display=%s time-trim=%+ldppm "
-                  "display-low=%s",
+                  "time-hsi=%u display-low=%s",
                   values.adcLogEnabled ? "on" : "off",
                   values.adcDisplayEnabled ? "on" : "off",
                   values.clockDisplayEnabled ? "on" : "off",
                   static_cast<long>(values.clockTrimPpm),
+                  static_cast<unsigned>(values.hsiTrim),
                   values.lowBrightness ? "on" : "off");
     LogService::instance().sendLine(message);
 

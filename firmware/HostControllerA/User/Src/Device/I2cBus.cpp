@@ -15,6 +15,14 @@ HAL_StatusTypeDef I2cBus::transmit(uint16_t deviceAddress, const uint8_t* data, 
     return status;
 }
 
+HAL_StatusTypeDef I2cBus::receive(uint16_t deviceAddress, uint8_t* data, uint16_t size,
+                                  uint32_t timeoutMs)
+{
+    MutexGuard guard(mutex_);
+    return HAL_I2C_Master_Receive(&handle_, static_cast<uint16_t>(deviceAddress << 1U), data, size,
+                                  timeoutMs);
+}
+
 HAL_StatusTypeDef I2cBus::memRead(uint16_t deviceAddress, uint16_t memAddress, uint8_t* data,
                                   uint16_t size, uint32_t timeoutMs)
 {

@@ -200,10 +200,33 @@ void testAttributePlane()
     expect(Display::attributePlane(attributes, 0x05U) == nullptr, "unknown is not an attribute");
 }
 
+void testSyncMessage()
+{
+    Display::SyncMessage message{};
+    Display::serializeSync(0x12345678U, 19999U, message);
+    expectEqual(message[0], Display::kSyncCommand, "sync command first");
+    expectEqual(message[1], static_cast<uint8_t>(0x78U), "frame little-endian");
+    expectEqual(message[4], static_cast<uint8_t>(0x12U), "frame high byte");
+    uint32_t frame = 0U;
+    uint16_t micros = 0U;
+    expect(Display::deserializeSync(message.data(), message.size(), frame, micros), "round trip");
+    expectEqual(frame, 0x12345678U, "frame back");
+    expectEqual(micros, static_cast<uint16_t>(19999U), "micros back");
+
+    frame = 7U;
+    expect(!Display::deserializeSync(message.data(), message.size() - 1U, frame, micros),
+           "short message rejected");
+    message[0] = Display::kSetDisplayCommand;
+    expect(!Display::deserializeSync(message.data(), message.size(), frame, micros),
+           "wrong command rejected");
+    expectEqual(frame, 7U, "rejected leaves the output");
+}
+
 } // namespace
 
 int main()
 {
+    testSyncMessage();
     testMessageSize();
     testSerializeLayout();
     testSerializeMasksUnusedMatrixBits();

@@ -2,6 +2,7 @@
 
 #include <Expect.hpp>
 
+#include <array>
 #include <string>
 
 // The order, lengths and boundaries of the passes the refresh interrupt
@@ -117,6 +118,36 @@ void testBlinkPhases()
     expectEqual(half, 25U, "1 Hz blink at 50 Hz");
 }
 
+// A frame adjustment shared out over the five slots' first passes, and
+// renumbering the frames moves the blink phase with them.
+void testFrameAdjust()
+{
+    Display::RefreshSequencer sequencer;
+    sequencer.setFrameAdjust(-23);
+    int64_t total = 0;
+    std::array<int32_t, Display::kSlotCount> perSlot{};
+    for (uint32_t i = 0; i < kStepsPerFrame; ++i) {
+        const Display::RefreshSequencer::Step step = sequencer.next();
+        total += step.micros;
+        if (step.firstInSlot) {
+            perSlot[step.slot] = static_cast<int32_t>(step.micros) -
+                                 static_cast<int32_t>(sequencer.passMicros()[step.pass]);
+        } else {
+            expectEqual(step.micros, sequencer.passMicros()[step.pass], "later passes unchanged");
+        }
+    }
+    expectEqual(total, static_cast<int64_t>(20000 - 23), "frame shortened by the adjustment");
+    expect(perSlot[0] == -5 && perSlot[2] == -5 && perSlot[3] == -4 && perSlot[4] == -4,
+           "split -5 -5 -5 -4 -4");
+
+    sequencer.setFrameAdjust(0);
+    const uint32_t before = sequencer.frames();
+    sequencer.addFrames(25);
+    expectEqual(sequencer.frames(), before + 25U, "renumbered forwards");
+    sequencer.addFrames(-30);
+    expectEqual(sequencer.frames(), before - 5U, "and back");
+}
+
 } // namespace
 
 int main()
@@ -126,5 +157,6 @@ int main()
     testFrameSequence();
     testPeekDoesNotAdvance();
     testBlinkPhases();
+    testFrameAdjust();
     return Test::finish("RefreshSequencer");
 }

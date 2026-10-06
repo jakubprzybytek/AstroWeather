@@ -271,6 +271,7 @@ void testMaximumLengthFieldsFit()
     Settings::Values written;
     // Every optional record present, so this is the true worst case.
     written.clockTrimPpm = 18372;
+    written.hsiTrim = 63U;
     written.clockDisplayEnabled = false;
     written.lowBrightness = true;
     std::memset(written.apiHost, 'h', Settings::kMaxApiHostLength);
@@ -291,7 +292,8 @@ void testMaximumLengthFieldsFit()
     expect(std::strlen(read.wifiSsid) == Settings::kMaxSsidLength, "max ssid survives");
     expect(std::strlen(read.wifiPassword) == Settings::kMaxPasswordLength,
            "max password survives");
-    expect(image[5] == 248U, "worst case payload is 248 of 250 bytes");
+    expect(image[5] == 249U, "worst case payload is 249 of 250 bytes");
+    expect(read.hsiTrim == 63U, "worst case keeps the HSI trim");
     expect(std::strlen(read.apiHost) == Settings::kMaxApiHostLength, "max api host survives");
     expect(std::strlen(read.apiPath) == Settings::kMaxApiPathLength, "max api path survives");
     expect(std::strlen(read.apiKey) == Settings::kMaxApiKeyLength, "max api key survives");
@@ -317,6 +319,40 @@ void testClockTrimCostsOneRecord()
     Settings::Values read;
     Settings::decode(image, sizeof(image), read);
     expect(read.clockTrimPpm == 18372, "positive clock trim survives");
+}
+
+// The HSI trim is a fifth byte of the clock trim record, so it costs one
+// byte, and an older build that reads four still gets the LSI trim.
+void testHsiTrimRidesInClockTrimRecord()
+{
+    Settings::Values written;
+    written.hsiTrim = 66U;
+    uint8_t image[Settings::kImageSize] = {};
+    Settings::encode(written, image, sizeof(image));
+    expect(image[5] == 10U, "HSI trim alone: a 7-byte clock trim record");
+
+    Settings::Values read;
+    Settings::decode(image, sizeof(image), read);
+    expect(read.hsiTrim == 66U, "HSI trim survives");
+    expect(read.clockTrimPpm == 0, "with no LSI trim");
+
+    written.clockTrimPpm = -500;
+    written.hsiTrim = Settings::kDefaultHsiTrim;
+    Settings::encode(written, image, sizeof(image));
+    expect(image[5] == 9U, "default HSI trim adds nothing");
+    Settings::Values defaults;
+    Settings::decode(image, sizeof(image), defaults);
+    expect(defaults.hsiTrim == Settings::kDefaultHsiTrim, "absent HSI trim is the default");
+
+    // A trim byte beyond 127 is ignored rather than applied.
+    const uint8_t payload[] = {static_cast<uint8_t>(Settings::Tag::ClockTrim), 5U, 0, 0, 0, 0,
+                               200U};
+    uint8_t built[Settings::kImageSize] = {};
+    buildImage(built, payload, sizeof(payload));
+    Settings::Values bad;
+    expectResult(Settings::decode(built, sizeof(built), bad), Settings::DecodeResult::Ok,
+                 "out-of-range trim still decodes");
+    expect(bad.hsiTrim == Settings::kDefaultHsiTrim, "out-of-range trim ignored");
 }
 
 void testClockDisplayOffCostsOneRecord()
@@ -361,6 +397,7 @@ int main()
     testUnconfiguredWifiCostsNothing();
     testClockDisplayOffCostsOneRecord();
     testClockTrimCostsOneRecord();
+    testHsiTrimRidesInClockTrimRecord();
     testLowBrightnessCostsOneRecord();
 
     return Test::finish("SettingsCodec");

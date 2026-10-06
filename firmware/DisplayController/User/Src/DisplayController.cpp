@@ -1,6 +1,5 @@
 #include <DisplayController.hpp>
 
-#include <Debug/BlinkingLed.hpp>
 #include <Debug/PulseLed.hpp>
 #include <Device/SCT2xxx.hpp>
 #include <Display/BootScreens.hpp>
@@ -9,6 +8,7 @@
 #include <DisplayApp.hpp>
 #include <I2cTarget.hpp>
 #include <Stats.hpp>
+#include <TimelineFollower.hpp>
 #include <Utils/SwitchInput.hpp>
 
 #include "main.h"
@@ -18,10 +18,6 @@ extern I2C_HandleTypeDef hi2c1;
 extern TIM_HandleTypeDef htim6;
 
 volatile DisplayControllerStats g_displayStats = {};
-
-// Heartbeat on LED_1, at the same rate as the host (Common BlinkingLed).
-static BlinkingLed led1(LED_1_GPIO_Port, LED_1_Pin, BlinkingLed::kHeartbeatOnMs,
-                        BlinkingLed::kHeartbeatOffMs, "Led1");
 
 static SCT2xxx sct(&hspi1, SCT_ENABLE_GPIO_Port, SCT_ENABLE_Pin,
                    SCT_LATCH_GPIO_Port, SCT_LATCH_Pin);
@@ -35,13 +31,16 @@ static Display::PcbDisplayBoard board(
 
 static I2cTarget link(hi2c1);
 
-static DisplayApp app(board, link);
+static TimelineFollower timeline(board, link);
+
+static DisplayApp app(board, link, timeline);
 
 // Runs from main() before osKernelStart(); the tasks started here only run
 // once the scheduler is up.
 void DisplayController_Init() {
-  led1.start();
-  // LED_2: every I2C transaction; before listening starts.
+  // LED_1 is the heartbeat, driven by the refresh interrupt on the
+  // timeline it shares with the host (Display/Timeline.hpp).
+  // LED_2: every write addressed to this board; before listening starts.
   activityLed().init();
 
   // Prepare the first slot-test frame before the refresh starts, so the
@@ -58,7 +57,8 @@ void DisplayController_Init() {
   // this board never answers on another board's address.
   const uint16_t address = Display::detectBoardAddress();
   g_displayStats.address = address;
-  link.setRecipient(app.getHandle(), DisplayApp::kFlagFrame);
+  timeline.init();
+  link.setRecipient(app.getHandle(), DisplayApp::kFlagFrame, DisplayApp::kFlagSync);
   if (address != 0U) {
     link.begin(address);
   }

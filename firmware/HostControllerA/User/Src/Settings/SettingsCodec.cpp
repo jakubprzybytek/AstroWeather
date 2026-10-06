@@ -49,6 +49,10 @@ void applyRecord(uint8_t tag, const uint8_t* value, std::size_t length, Values& 
                 (static_cast<uint32_t>(value[0]) << 24U) | (static_cast<uint32_t>(value[1]) << 16U) |
                 (static_cast<uint32_t>(value[2]) << 8U) | static_cast<uint32_t>(value[3]));
         }
+        // The HSI trim rides in the same record, so it costs one byte, not three.
+        if (length >= 5U && value[4] <= kMaxHsiTrim) {
+            values.hsiTrim = value[4];
+        }
         break;
     case static_cast<uint8_t>(Tag::ClockFlags):
         if (length >= 1U) {
@@ -123,13 +127,17 @@ std::size_t encode(const Values& values, uint8_t* image, std::size_t size)
 
     // The clock records are written only when they differ from the default,
     // so an untouched clock costs no space.
-    if (values.clockTrimPpm != 0) {
+    // The HSI trim is a fifth byte, written only when it is not the default;
+    // an older build reads the first four.
+    const bool hsiTrimSet = values.hsiTrim != kDefaultHsiTrim;
+    if (values.clockTrimPpm != 0 || hsiTrimSet) {
         const uint32_t trim = static_cast<uint32_t>(values.clockTrimPpm);
-        const uint8_t bytes[4] = {
+        const uint8_t bytes[5] = {
             static_cast<uint8_t>(trim >> 24U), static_cast<uint8_t>(trim >> 16U),
-            static_cast<uint8_t>(trim >> 8U), static_cast<uint8_t>(trim),
+            static_cast<uint8_t>(trim >> 8U), static_cast<uint8_t>(trim), values.hsiTrim,
         };
-        if (!appendRecord(payload, sizeof(payload), used, Tag::ClockTrim, bytes, sizeof(bytes))) {
+        if (!appendRecord(payload, sizeof(payload), used, Tag::ClockTrim, bytes,
+                          hsiTrimSet ? 5U : 4U)) {
             return 0U;
         }
     }

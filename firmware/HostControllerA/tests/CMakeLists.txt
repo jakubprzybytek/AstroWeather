@@ -46,6 +46,11 @@ add_native_test(clock_sync_tests
     SOURCES ClockSyncTests.cpp
 )
 
+# Display sync
+add_native_test(sync_schedule_tests
+    SOURCES SyncScheduleTests.cpp
+)
+
 # Astro refresh
 add_native_test(refresh_schedule_tests
     SOURCES RefreshScheduleTests.cpp

@@ -4,6 +4,7 @@
 #include <FrameAssembler.hpp>
 #include <I2cTarget.hpp>
 #include <NoDataTimer.hpp>
+#include <TimelineFollower.hpp>
 #include <Utils/Task.hpp>
 
 #include <cstdint>
@@ -19,13 +20,14 @@ public:
     static constexpr uint32_t kFlagFrame = 1U << 0;
     static constexpr uint32_t kFlagSwitch1 = 1U << 1;
     static constexpr uint32_t kFlagSwitch2 = 1U << 2;
+    static constexpr uint32_t kFlagSync = 1U << 3;
 
     // Longer than the host's 6-hour refresh interval: the host sends nothing
     // between refreshes, so a shorter timeout would show "no data" most of
     // the day.
     static constexpr uint32_t kNoDataTimeoutMs = 7UL * 60UL * 60UL * 1000UL;
 
-    DisplayApp(Display::DisplayBoard& board, I2cTarget& link);
+    DisplayApp(Display::DisplayBoard& board, I2cTarget& link, TimelineFollower& timeline);
 
 protected:
     void run() override;
@@ -45,6 +47,7 @@ private:
 
     Display::DisplayBoard& board_;
     I2cTarget& link_;
+    TimelineFollower& timeline_;
     DisplayController::NoDataTimer noData_{kNoDataTimeoutMs};
     DisplayController::FrameAssembler frames_;
     Screen screen_ = Screen::Data;

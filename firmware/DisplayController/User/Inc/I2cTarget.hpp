@@ -1,6 +1,8 @@
 #pragma once
 
+#include <Display/DisplayI2cProtocol.hpp>
 #include <Display/DisplayTypes.hpp>
+#include <Display/Timeline.hpp>
 
 #include "cmsis_os2.h"
 #include "main.h"
@@ -13,8 +15,15 @@
 // through a thread flag. The message format is Display::deserializeI2c();
 // see firmware/Docs/I2C.md.
 //
-// One instance, for hi2c1; the HAL callbacks are routed to it. Every
-// transaction addressed to this board, read or write, pulses LED_2.
+// It also answers the general-call address 0x00, where the host broadcasts
+// its timeline sync (Display::kSyncCommand): the receive-complete interrupt
+// stamps the board's own timeline at once, and the task gets the message and
+// the stamp through a second thread flag. A one-byte read answers the sync
+// status the task sets (Display::kSyncStatusLocked or ...Wanted).
+//
+// One instance, for hi2c1; the HAL callbacks are routed to it. Every write
+// addressed to this board pulses LED_2; the sync broadcast and the host's
+// status reads do not, so LED_2 still shows the data traffic.
 //
 // I2C1's interrupt has priority 1, above the refresh timer, DMA and EXTI
 // (3). The HAL sets CR2.NACK when it handles a transfer's STOP, and software
@@ -30,9 +39,9 @@ public:
 
     explicit I2cTarget(I2C_HandleTypeDef& handle);
 
-    // Thread and flag to signal when a complete message has arrived. Set
-    // before begin().
-    void setRecipient(osThreadId_t recipient, uint32_t flag);
+    // Thread and flags to signal when a complete message, or a sync, has
+    // arrived. Set before begin().
+    void setRecipient(osThreadId_t recipient, uint32_t flag, uint32_t syncFlag);
 
     // Re-initialises the peripheral with this 7-bit own address and starts
     // listening. Until this runs, CubeMX's placeholder address 0x10 is set
@@ -50,11 +59,23 @@ public:
     static constexpr uint8_t kQueueDepth = 4U;
     bool takeMessage(Display::I2cMessage& message);
 
+    // The latest sync from the host, with the board's timeline when it
+    // arrived; false if none since the last call. A newer sync replaces one
+    // not yet taken.
+    struct Sync {
+        Display::SyncMessage message;
+        Display::TimelineStamp stamp;
+    };
+    bool takeSync(Sync& sync);
+
+    // The answer to the host's one-byte read.
+    void setStatus(uint8_t status) { status_ = status; }
+
     uint16_t address() const { return address_; }
     I2C_HandleTypeDef& handle() { return handle_; }
 
     // Interrupt context, from the HAL callbacks.
-    void onAddress(uint8_t direction);
+    void onAddress(uint8_t direction, uint16_t matchCode);
     void onReceiveComplete();
     void onListenComplete();
     void onError();
@@ -67,6 +88,7 @@ private:
     uint16_t address_ = 0U;
     osThreadId_t recipient_ = nullptr;
     uint32_t flag_ = 0U;
+    uint32_t syncFlag_ = 0U;
 
     Display::I2cMessage receiveBuffer_{};
     // Ring of complete messages: head_ is the oldest, count_ how many.
@@ -74,7 +96,14 @@ private:
     volatile uint8_t head_ = 0U;
     volatile uint8_t count_ = 0U;
     volatile bool receiving_ = false;
-    // Answer to a read from the host, which the protocol does not use; kept
-    // so a read does not hang the bus.
+
+    Display::SyncMessage syncBuffer_{};
+    Sync sync_{};
+    volatile bool syncReady_ = false;
+    volatile bool receivingSync_ = false;
+
+    // Answer to a read from the host; set by the task, copied into readReply_
+    // as the read starts.
+    volatile uint8_t status_ = Display::kSyncStatusWanted;
     uint8_t readReply_ = 0U;
 };

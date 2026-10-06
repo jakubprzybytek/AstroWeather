@@ -1,5 +1,7 @@
 #include <Display/PcbDisplayBoard.hpp>
 
+#include <Utils/MicroClock.hpp>
+
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -59,6 +61,10 @@ void PcbDisplayBoard::start()
     // they had, with every slot switch off.
     __HAL_TIM_SET_AUTORELOAD(&timer_, sequencer_.peek().micros - 1U);
     __HAL_TIM_SET_COUNTER(&timer_, 0U);
+    // Frame 0 lasts until the first interrupt.
+    records_[0] = {0U, Utils::microsNow(), kFrameMicros, 0U, 0};
+    activeRecord_ = 0U;
+    started_ = true;
     HAL_TIM_Base_Start_IT(&timer_);
 }
 
@@ -86,6 +92,31 @@ bool PcbDisplayBoard::setPassPercent(const std::array<uint8_t, kPassCount>& perc
     const bool accepted = sequencer_.setPassPercent(percent);
     taskEXIT_CRITICAL();
     return accepted;
+}
+
+bool PcbDisplayBoard::stampNow(TimelineStamp& stamp)
+{
+    PcbDisplayBoard* const board = activeBoard_;
+    if (board == nullptr || !board->started_) {
+        return false;
+    }
+    const uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    stamp = board->records_[board->activeRecord_];
+    stamp.now = Utils::microsNow();
+    __set_PRIMASK(primask);
+    return true;
+}
+
+void PcbDisplayBoard::applySync(int32_t jumpFrames, int32_t phaseMicros, int32_t pendingAtStamp,
+                                int32_t ratePpm)
+{
+    taskENTER_CRITICAL();
+    sequencer_.addFrames(jumpFrames);
+    const int32_t correctedSince = pendingAtStamp - servo_.pending();
+    servo_.setPending(phaseMicros - correctedSince);
+    servo_.setRatePpm(ratePpm);
+    taskEXIT_CRITICAL();
 }
 
 bool PcbDisplayBoard::refreshStats(RefreshStats& stats) const
@@ -119,7 +150,11 @@ void PcbDisplayBoard::switchSlot(uint8_t slot)
 void PcbDisplayBoard::onPass()
 {
     const uint32_t entered = SysTick->VAL;
-    const RefreshSequencer::Step now = sequencer_.next();
+    RefreshSequencer::Step now = sequencer_.next();
+    if (now.firstInFrame) {
+        startFrame();
+        now = sequencer_.current();
+    }
 
     // 1. Show the pass that starts now: its data was shifted in during the
     //    pass that just ended. If that shift is somehow still running, the
@@ -164,6 +199,24 @@ void PcbDisplayBoard::onPass()
     if (micros > maxInterruptMicros_) {
         maxInterruptMicros_ = micros;
     }
+}
+
+// A frame starts: its length, LED_1 and the record stampNow() reads.
+void PcbDisplayBoard::startFrame()
+{
+    const int32_t adjust = servo_.nextFrame();
+    sequencer_.setFrameAdjust(adjust);
+    const uint32_t frame = sequencer_.frames();
+    HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin,
+                      heartbeatLit(frame) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+
+    // The counter has run since the update that started the frame.
+    const uint32_t sinceStart = __HAL_TIM_GET_COUNTER(&timer_);
+    const uint8_t spare = static_cast<uint8_t>(activeRecord_ ^ 1U);
+    records_[spare] = {frame, Utils::microsNow() - sinceStart,
+                       static_cast<uint32_t>(static_cast<int32_t>(kFrameMicros) + adjust), 0U,
+                       servo_.pending()};
+    activeRecord_ = spare;
 }
 
 } // namespace Display

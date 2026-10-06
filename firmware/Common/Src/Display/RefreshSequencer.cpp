@@ -69,12 +69,34 @@ RefreshSequencer::State RefreshSequencer::advance(State state)
     return state;
 }
 
+void RefreshSequencer::addFrames(int32_t delta)
+{
+    state_.frames = static_cast<uint32_t>(static_cast<int64_t>(state_.frames) + delta);
+}
+
+// The slot's share of the frame adjustment: an equal part each, and what
+// does not divide evenly to the first slots, a microsecond each.
+int32_t RefreshSequencer::slotAdjust(uint8_t slot) const
+{
+    const int32_t slots = static_cast<int32_t>(kSlotCount);
+    const int32_t share = frameAdjust_ / slots;
+    const int32_t remainder = frameAdjust_ - share * slots;
+    if (slot < (remainder < 0 ? -remainder : remainder)) {
+        return share + (remainder < 0 ? -1 : 1);
+    }
+    return share;
+}
+
 RefreshSequencer::Step RefreshSequencer::stepFor(const State& state) const
 {
     Step step{};
     step.slot = state.slot;
     step.pass = order_[state.position];
     step.micros = passMicros_[step.pass];
+    if (state.position == 0U) {
+        step.micros = static_cast<uint32_t>(static_cast<int32_t>(step.micros) +
+                                            slotAdjust(state.slot));
+    }
     // Frames 1..25 are the on phase, 26..50 the off phase, and so on.
     step.blinkPhase =
         (state.frames != 0U && (((state.frames - 1U) / kBlinkHalfPeriodFrames) & 1U) != 0U)
