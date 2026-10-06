@@ -19,20 +19,22 @@ The first display board runs this firmware on the host's bus at `0x11`.
 `DisplayController_Init()` (`User/Src/DisplayController.cpp`), before the
 scheduler starts:
 
-1. Starts the `Led1` heartbeat and creates the `activityLed()` timer for
-   `LED_2`.
+1. Creates the `activityLed()` timer for `LED_2`.
 2. Shows the first slot-test frame (`Display::slotTestState(0)`) and starts the refresh
    (`PcbDisplayBoard::start()`: enables the SCT outputs and starts TIM6, whose
    interrupt then multiplexes the board with SPI1 DMA transfers, no task
-   involved; see
+   involved, keeps the board's refresh timeline and drives the `LED_1`
+   heartbeat; see
    [Display.md](../../Docs/Display.md#refresh-operation)).
    The test frame is prepared first, so the first frames latched are the
    test, not whatever the drivers held at reset.
 3. Starts the `DisplayApp` task and routes the switches to it
    (`Utils::SwitchInput`).
-4. Reads the address straps (`Display::detectBoardAddress()`), stores the
-   address in `g_displayStats.address`, and starts the I2C target on it
-   (`I2cTarget::begin()`).
+4. Reads the address straps (`Display::detectBoardAddress()`) and stores the
+   address in `g_displayStats.address`; `TimelineFollower::init()` notes the
+   boot HSITRIM and sets the status byte to "wants syncs"; then the I2C target
+   starts on the address (`I2cTarget::begin()`, which also enables the general
+   call for the host's timeline sync).
 
 CubeMX enables I2C1 with a placeholder own address, `0x10`, in
 `MX_I2C1_Init()`. Nothing services it until step 4 re-initialises the
@@ -50,16 +52,19 @@ data, or "no data" if none has arrived yet.
 
 | Task | Owner | Priority | Stack (bytes) | Does |
 | --- | --- | --- | ---: | --- |
-| `DisplayApp` | `User/Src/DisplayApp.cpp` | Normal (24) | 2048 (peaks at ~1056 on the board) | Chooses what is shown: boot screens, data with its attributes, "no data", test screens |
+| `DisplayApp` | `User/Src/DisplayApp.cpp` | Normal (24) | 2048 (peaks at ~1056 on the board) | Chooses what is shown: boot screens, data with its attributes, "no data", test screens; applies the host's timeline syncs (`TimelineFollower`) |
 | `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | Exits at once (`osThreadExit()`); CubeMX does not allow removing it |
-| `Led1` | `Debug::BlinkingLed` (Common) | Low (8) | 768 | Heartbeat on `LED_1`, 20 ms every 2 s |
 
-`DisplayApp` and `Led1` are `Task<N>` objects with static stacks, and
+The `LED_1` heartbeat, 20 ms every 2 s, is not a task: the refresh interrupt
+writes it at each frame start, in step with the host's
+([Display.md](../../Docs/Display.md#the-timeline-on-every-board)).
+
+`DisplayApp` is a `Task<N>` object with a static stack, and
 `Utils::Mutex` uses static storage, so the 3072-byte FreeRTOS heap holds only
 `defaultTask`, and only until it exits, just after the scheduler starts. The display refresh runs from TIM6's interrupt, not a task. `configCHECK_FOR_STACK_OVERFLOW` is 2; see
 [Diagnostics](#diagnostics).
 
-`DisplayApp` waits on three thread flags, with a 1 s timeout for its periodic
+`DisplayApp` waits on four thread flags, with a 1 s timeout for its periodic
 checks:
 
 | Flag | Set by | Meaning |
@@ -67,6 +72,7 @@ checks:
 | `kFlagFrame` | `I2cTarget`, from the I2C interrupt | One or more complete 36-byte messages are waiting |
 | `kFlagSwitch1` | `SwitchInput`, from the EXTI interrupt | Switch 1 pressed |
 | `kFlagSwitch2` | `SwitchInput` | Switch 2 pressed |
+| `kFlagSync` | `I2cTarget`, from the I2C interrupt | A timeline sync from the host has arrived, stamped; `TimelineFollower::onSync()` applies it ([Display.md](../../Docs/Display.md#following-the-host)) |
 
 Every second it also checks whether the data has gone stale, closes a test
 screen that has been up too long, and restarts I2C listening if it has
@@ -91,10 +97,10 @@ The test screens and "no data" are plain: full brightness, nothing blinking.
 Switch 1 steps through all segments, identify, and back to the data; each test
 screen closes by itself after 60 s. A frame that arrives while a test or
 address screen is up is kept and shown when it closes. `LED_2` flashes for
-20 ms on every I2C transaction addressed to the board (frames, attributes,
-the host's probes and reads), from the address-match interrupt
-(`I2cTarget::onAddress()`) through the shared `PulseLed`; transactions
-closer together than that merge into one flash.
+20 ms on every write addressed to the board (frames, attributes, the host's
+probes), from the address-match interrupt (`I2cTarget::onAddress()`) through
+the shared `PulseLed`; writes closer together than that merge into one flash.
+The host's sync broadcasts and status reads do not flash it.
 
 The stale-data timeout is 7 hours (`DisplayApp::kNoDataTimeoutMs`), just over
 the host's 6-hour refresh interval: the host sends to the remote boards only on
@@ -109,9 +115,12 @@ kernel tick.
 with the HAL's interrupt-driven sequential listen API, queues each 36-byte
 message (four deep) and wakes `DisplayApp`, which decodes it with
 `FrameAssembler`: attribute planes are staged and applied with the next
-content. Listening starts only once the address is known and is checked every
-second. The protocol, both sides of the link and why the I2C interrupt runs at
-priority 1 are in [I2C.md](../../Docs/I2C.md#display-board-side).
+content. It also takes the host's timeline sync on the general-call address,
+stamping the board's timeline in the receive-complete interrupt, and answers
+a one-byte read with the sync status `TimelineFollower` sets. Listening starts
+only once the address is known and is checked every second. The protocol,
+both sides of the link and why the I2C interrupt runs at priority 1 are in
+[I2C.md](../../Docs/I2C.md#display-board-side).
 
 ## Interrupt Priorities
 
@@ -133,8 +142,8 @@ so a level-3 handler waits for the refresh interrupt to finish.
 ## Diagnostics
 
 Until the board has a console, its counters are read over SWD. They are in
-`g_displayStats` (`User/Inc/Stats.hpp`), a C-linkage struct of seventeen 32-bit
-fields:
+`g_displayStats` (`User/Inc/Stats.hpp`), a C-linkage struct of 28 32-bit
+fields, 0x70 bytes. Signed values are stored as two's complement:
 
 | Field | Counts |
 | --- | --- |
@@ -155,10 +164,21 @@ fields:
 | `maxInterruptMicros` | Longest refresh interrupt, in microseconds |
 | `lastI2cError` | HAL error bits (`HAL_I2C_ERROR_*`) at the last error callback, NACK (`0x4`) included; a short write or a probe ends in one |
 | `stopWithAddrPending` | Transfers whose STOP was handled after the host's next address had matched: the I2C interrupt ran late. Should stay 0 |
+| `syncsReceived` | Sync broadcasts received and stamped, in the interrupt |
+| `syncsShort` | General-call writes that ended before 7 bytes |
+| `syncsRejected` | Sync broadcasts that did not decode |
+| `syncsApplied` | Syncs decided on by `TimelineFollower` |
+| `syncJumps` | Of those, jumps: the first sync, or one more than 50 ms plus 2.5 % of the interval out |
+| `syncLocked` | 1 while the board tells the host it needs no burst |
+| `syncErrorMicros` | Host minus board at the last sync, before any jump, signed |
+| `syncDriftMicros` | Drift over the last interval long enough to measure the rate, signed |
+| `syncRatePpm` | The servo's rate, this board's clock against the host's, signed |
+| `hsiTrim` | `RCC_ICSCR.HSITRIM` now |
+| `hsiChanges` | HSITRIM steps taken |
 
 ```bash
 arm-none-eabi-nm build/Debug/DisplayController.elf | grep g_displayStats
-STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x44
+STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x70
 ```
 
 `mode=HOTPLUG` attaches without resetting the board.
@@ -174,17 +194,26 @@ current pass.
 | --- | --- |
 | `User/Src/DisplayController.cpp` | The static objects and `DisplayController_Init()` |
 | `User/Src/DisplayApp.cpp` | The `DisplayApp` task |
-| `User/Src/I2cTarget.cpp` | The I2C target, its message queue and the HAL I2C callbacks |
+| `User/Src/I2cTarget.cpp` | The I2C target, its message queue, the sync buffer and the HAL I2C callbacks |
+| `User/Src/TimelineFollower.cpp` | Applies the host's timeline syncs and moves HSITRIM |
 | `User/Src/FrameAssembler.cpp` | Staging of the attribute messages and their application with the content |
 | `User/Src/Screens.cpp` | Self-test, identify and address screens |
 | `User/Inc/NoDataTimer.hpp` | Stale-data timeout on the wrapping tick |
 | `User/Inc/Stats.hpp` | `g_displayStats` |
 | `tests/ScreensTests.cpp`, `tests/NoDataTimerTests.cpp`, `tests/FrameAssemblerTests.cpp` | Native tests |
-| `../Common` | Display types, attributes and encoding, the pass sequencing, `PcbDisplayBoard`, `SCT2xxx`, the I2C messages, the address straps, tasks and mutexes; see [firmware/Docs](../../Docs/) |
+| `../Common` | Display types, attributes and encoding, the pass sequencing, `PcbDisplayBoard`, the timeline and its sync decisions, `SCT2xxx`, `HsiTrim`, the I2C messages, the address straps, tasks and mutexes; see [firmware/Docs](../../Docs/) |
 
 ## Open Items
 
 - Not yet checked on the board: rejecting unknown commands and short writes,
   recovery from bus errors, the 7-hour "no data" timeout and the switch test
   screens.
+- The timeline sync does not yet hold across the 5-minute gap. On board
+  `0x11` (bench, 2026-10-06) it jumps onto the host's timeline, steps HSITRIM
+  64 to 65 and locks within a burst, but the 5-minute syncs found it 76 and
+  81 ms out, so it asks for a new burst about every 6 minutes. The rates
+  measured over the burst's 20-30 s intervals were 40-160 ppm off the
+  5-minute ones, and the trend term carried that error on. Whether that is
+  timestamp error or the two HSI clocks wandering needs measuring
+  ([Display.md](../../Docs/Display.md#accuracy)).
 - Console over USART2 (`PA2`/`PA3`); see the [README](../README.md#features).

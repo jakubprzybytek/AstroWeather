@@ -16,8 +16,8 @@ the log, the test links a stand-in instead of the real thing.
 
 | Project | Suites | What they cover |
 | --- | ---: | --- |
-| `Common` | 9 | The shared display code, the I2C message, the address straps, `Crc32`; listed [below](#common-suites) |
-| `HostControllerA` | 15 | Parser, mapper, progress bar, schedule, clock, settings codec, HTTP and Wi-Fi rules, error log; see the host's [Testing.md](../HostControllerA/Docs/Testing.md#coverage-by-module) |
+| `Common` | 10 | The shared display code, the timeline sync, the I2C message, the address straps, `Crc32`; listed [below](#common-suites) |
+| `HostControllerA` | 16 | Parser, mapper, progress bar, schedule, clock, display sync schedule, settings codec, HTTP and Wi-Fi rules, error log; see the host's [Testing.md](../HostControllerA/Docs/Testing.md#coverage-by-module) |
 | `DisplayController` | 3 | `FrameAssembler` (staging of the attribute messages), the screens, the stale-data timeout |
 
 ### Common suites
@@ -28,14 +28,16 @@ the log, the test links a stand-in instead of the real thing.
 | `display_attributes_tests` | Attribute defaults, the blink and level setters with their masks, clamping and out-of-range indices, the plane operations keeping bits 21-23 zero |
 | `display_codec_tests` | Golden vectors from the wiring tables in [Display.md](Display.md#pcb-encoding): every segment of every digit on its bit, byte and slot, the indicators, the 21 matrix columns and bits 21-23, the order of the matrix rows in the frame |
 | `display_passes_tests` | The pass table's invariants (sums to 100, the level percentages, the matrix's 70 %), which elements each pass and blink phase show, and that `encodePasses()` is `encodePcb()` of exactly those |
-| `refresh_sequencer_tests` | Pass lengths from the table and their validation, the longest-first order, slot and frame boundaries, `peek()`, the blink phase per frame |
-| `display_i2c_protocol_tests` | The 36-byte layout, the round trip, masking of bits 21-23, rejection of short, long and null messages and unknown commands without touching the destination |
+| `refresh_sequencer_tests` | Pass lengths from the table and their validation, the longest-first order, slot and frame boundaries, `peek()`, the blink phase per frame, the frame adjustment's split over the slots, renumbering the frames |
+| `timeline_sync_tests` | `TimelineServo`'s rate and slew, `TimelineSync`'s jump, rate, trend and HSITRIM decisions, `HsiTrim::allowedSteps()`, the heartbeat frame, `positionMicros()`, and a simulated board against the host's sync schedule ([Display.md](Display.md#accuracy)) |
+| `display_i2c_protocol_tests` | The 36-byte layout, the round trip, masking of bits 21-23, rejection of short, long and null messages and unknown commands without touching the destination; the sync message |
 | `boot_screens_tests` | The slot test and address screens and their timing, shown without disturbing the board's own state |
 | `display_address_tests` | All 27 strap combinations through the stub GPIO, the pins left analog without pull, `boardAddress()` limits, `detectBoardAddress()` |
 | `crc32_tests` | `Crc32` against known vectors |
 
-Not covered natively: the refresh interrupt itself, the DMA and SPI transfers,
-and I2C transfer failures.
+Not covered natively: the refresh interrupt itself (frame starts, stamps,
+`applySync()`), `Utils::microsNow()`, the HSITRIM register access, the DMA
+and SPI transfers, and I2C transfer failures.
 
 ## Running the Tests
 

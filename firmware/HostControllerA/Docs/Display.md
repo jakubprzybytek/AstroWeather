@@ -65,6 +65,11 @@ the log and error log for a board that does not
 only by `submit()` (astro refresh) and `submitRemote()` (console), never by the
 clock, the current readout or the progress bar.
 
+Separately, `DisplaySyncTask` keeps the remote boards' refresh in step with
+the local board's: it broadcasts the local board's timeline position and polls
+each remote board's sync status, using `display` only to skip the host's own
+chain position ([firmware/Docs/Display.md](../../Docs/Display.md#timeline-sync)).
+
 ## Refresh Progress
 
 While an astro refresh runs, row 4 of the local matrix shows its progress in six
@@ -127,7 +132,8 @@ differs in other light.
 `AstroWeather_Init()` sets the host's address from its straps
 (`setLocalAddress()`), applies the saved low brightness, puts the "no data"
 state into the local board, shows the first slot-test frame and starts the
-refresh (`localBoard.start()`). `MainLoopTask` then runs the boot screens, after
+refresh (`localBoard.start()`), then starts `DisplaySyncTask`, whose syncs
+carry that refresh's timeline. `MainLoopTask` then runs the boot screens, after
 which the local board shows its own state: "no data" on numerics 0 and 1 and
 the matrix until the first astro refresh, with the current readout and the
 clock on numerics 2 and 3. See [Architecture.md](Architecture.md#init-order).

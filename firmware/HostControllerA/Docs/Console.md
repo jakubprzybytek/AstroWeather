@@ -446,7 +446,9 @@ failed save `ERR settings-unavailable`.
 
 ### time
 
-**HC.** Details in [RTC.md](RTC.md#console-commands).
+**HC.** The clock commands are detailed in [RTC.md](RTC.md#console-commands),
+`time hsi` and `time sync` in
+[Display.md](../../Docs/Display.md#timeline-sync).
 
 | Command | Reply |
 | --- | --- |
@@ -454,11 +456,18 @@ failed save `ERR settings-unavailable`.
 | `time set <YYYY-MM-DD> <HH:MM[:SS]>` | `OK time=2026-09-23 10:15:00`. Seconds default to `00`. |
 | `time trim <ppm>` | `OK time-trim=+18400ppm`. Range ±100000. Saved. |
 | `time display on\|off` | `OK time-display=on` or `OK time-display=off`. Saved. |
+| `time hsi` | `OK time-hsi=63 cal=0x8E saved=63`: the host's HSI16 trim (`HSITRIM`) in use, `HSICAL` as read back, and the saved trim. |
+| `time hsi <0-127>` | Sets the HSI16 trim; the same reply. Higher runs faster, about 0.33 % a step; 64 is the chip's default. Applies at once and at boot. Saved. Not the RTC's clock: see `time trim`. |
+| `time sync` | `OK time-sync sent=2 answered=0 last=9s-ago next=15s burst`: the timeline sync broadcasts sent, those at least one display board acknowledged, the age of the last, the time to the next, and `burst` or `every-300s`. Each board that answered the last status poll is appended as ` 0x11=locked` or ` 0x11=wants-sync`. |
+| `time sync now` | `OK time-sync=burst`: starts a burst of syncs, unless one is running. |
 
 `set=no` in `time show` means the clock has not been set since a power loss.
 The `prediv` and `calm` values depend on the trim; see
-[RTC.md](RTC.md#trimming). An invalid date or time, a trim out of range, or any
-other `time` line gets `ERR invalid-argument`.
+[RTC.md](RTC.md#trimming). How to measure the host's HSI and choose
+`time hsi` is in
+[Display.md](../../Docs/Display.md#trimming-the-hosts-hsi). An invalid date or
+time, a trim out of range, an HSI trim above 127, or any other `time` line gets
+`ERR invalid-argument`.
 
 ### adc
 
@@ -483,7 +492,7 @@ Details in [Settings.md](Settings.md).
 | `settings defaults` | `OK settings-defaults` |
 
 ```text
-OK settings adc-log=off adc-display=on time-display=on time-trim=+18400ppm display-low=off
+OK settings adc-log=off adc-display=on time-display=on time-trim=+18400ppm time-hsi=64 display-low=off
 OK settings wifi-ssid=MyNetwork wifi-password=<set>
 OK settings api-host=<built-in>
 OK settings api-path=/device/astro/wroclaw
@@ -500,8 +509,8 @@ what the EEPROM held at power-up, not its present content.
 `settings save` rewrites the stored copy, which is needed only after
 `boot-load` reported an error or after `eeprom erase`; the other commands save
 as they change. `settings defaults` resets every value and saves: adc log off,
-adc display on, time display on, trim 0, normal brightness, no WiFi, built-in
-API host and path. The running tasks keep their current behaviour until the
+adc display on, time display on, trim 0, HSI trim 64, normal brightness, no
+WiFi, built-in API host and path. The running tasks keep their current behaviour until the
 next boot, except the API target, which the next fetch reads.
 
 Any other line starting with `settings` gets

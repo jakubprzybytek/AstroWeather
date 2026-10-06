@@ -15,7 +15,8 @@ to five remote display boards.
 - It checks the payload's CRC, parses it, and shows it on its own LED board and
   on the remote display boards over I2C. Night *n* of the forecast goes to the
   board at address `0x10 + n`; every board, the host included, reads its
-  address from its straps.
+  address from its straps. It keeps the display boards' refresh in step with
+  its own, so blinking and the `LED_1` heartbeat run together on every board.
 - It keeps the date and time in the RTC, which runs from the internal LSI
   oscillator, trimmed per board and stepped to the server's time on every
   fetch. The time is shown as `HH:MM` on numeric display 3.
@@ -37,7 +38,7 @@ to five remote display boards.
 | SCT2xxx | LED drivers in one SPI3 daisy chain, multiplexed in five slots |
 | INA180A2 | Current-sense amplifier into ADC1 channel 10 (`PB2`) |
 | `SWITCH_1`, `SWITCH_2` | Push buttons on `PB12` (astro refresh) and `PB13` (low brightness) |
-| `LED_1`, `LED_2` | Heartbeat (`PC13`); switch presses and USB console traffic (`PB9`) |
+| `LED_1`, `LED_2` | Heartbeat from the display refresh (`PC13`); switch presses and USB console traffic (`PB9`) |
 | USB FS | CDC virtual COM port for the console |
 
 The full pin map and the interrupt priorities are in
@@ -88,11 +89,14 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | Numeric formatting: fixed point, time, `?`, "no data" | ✅ | -0.5 shows as `-0.5`; values that do not fit four digits show the error pattern | [Display.md](../Docs/Display.md#numeric-representation) |
 | Boot screens: slot test, then the host's strap address | ✅ | Shared with the display boards | [Display.md](../Docs/Display.md#boot-screens) |
 | Remote display boards over I2C | ✅ | Board `0x11` runs the [DisplayController](../DisplayController/README.md) firmware; I2C pull-ups needed (H-4) | [I2C.md](../Docs/I2C.md) |
+| Timeline sync: the display boards' refresh, blinking and heartbeat in step with the host's | 🟡 | `DisplaySync` broadcasts on the I2C general call at boot, on request and every 5 min, and polls each board's status; `time sync [now]`. Unit tested and simulated; not yet checked with a display board | [Display.md](../Docs/Display.md#timeline-sync) |
+| Heartbeat on `LED_1`, 20 ms every 2 s | ✅ | From the refresh interrupt, so it shows the refresh is running | [Display.md](../Docs/Display.md#the-timeline-on-every-board) |
 | Low-brightness step (`LOW_POWER_ENABLE`) for every board | ✅ | `display low on\|off` or switch 2, saved; cuts LED current by about half | [Display.md](Docs/Display.md#low-brightness) |
 | **Time** | | | |
 | RTC clock on numeric display 3, `time` commands | ✅ | Lost on power loss (no LSE crystal or backup battery) | [RTC.md](Docs/RTC.md) |
 | Clock sync from the server, with drift measurement | ✅ | | [RTC.md](Docs/RTC.md#sync-from-the-api) |
 | Clock trim | 🟡 | Set by hand with `time trim`; automatic trim not started | [RTC.md](Docs/RTC.md#open-items) |
+| HSI16 trim, measured against the PC | ✅ | `time hsi <0-127>`, saved and applied at boot; `tools/hsi_measure.py` suggests the value | [Display.md](../Docs/Display.md#trimming-the-hosts-hsi) |
 | **Power and sensing** | | | |
 | Current, temperature and VDDA monitor | ✅ (reworked board) | Needs the C-1 and H-1 rework | [CurrentSense.md](Docs/CurrentSense.md) |
 | VBUS voltage sense | ⚠️ | PC7 is not an ADC pin and has no divider (H-1, H-2) | [Hardware review](../../KiCad/Docs/Hardware_Review.md) |
@@ -105,7 +109,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | EEPROM settings | ✅ | | [Settings.md](Docs/Settings.md) |
 | Interrupt priorities: USB 1, everything else 3 | ✅ | | [Architecture.md](Docs/Architecture.md#interrupt-priorities) |
 | Firmware version and git hash | 🔴 | Only the build time is stamped | [Architecture.md](Docs/Architecture.md#shared-code) |
-| Unit tests | 🟡 | 15 native suites run in CI; the console, the settings store and the remote boards are not covered yet | [Testing.md](Docs/Testing.md) |
+| Unit tests | 🟡 | 16 native suites run in CI; the console, the settings store and the remote boards are not covered yet | [Testing.md](Docs/Testing.md) |
 
 ## Known Limitations and Open Items
 
@@ -126,6 +130,10 @@ Firmware, with details in each document's open items:
 - Astro refresh: stale data after a failed noon refresh, low-power wake
   ([AstroRefresh.md](Docs/AstroRefresh.md#open-items)).
 - Clock: automatic trim ([RTC.md](Docs/RTC.md#open-items)).
+- Display timeline sync: locks within a burst on the bench, but the boards
+  drift 76-81 ms apart over the 5-minute gap, so a board asks for a burst
+  about every 6 minutes
+  ([DisplayController open items](../DisplayController/Docs/Architecture.md#open-items)).
 - Settings: a torn write is detected but not recovered, credentials are stored
   in the clear, unknown tags are not preserved
   ([Settings.md](Docs/Settings.md#limitations)).
@@ -153,7 +161,7 @@ This project ([Docs](Docs/)):
 Shared with the display boards ([firmware/Docs](../Docs/README.md)):
 
 - [Development.md](../Docs/Development.md): build, flash, debug, connecting over USB, CubeMX rules
-- [Display.md](../Docs/Display.md): the display, its encoding and refresh
+- [Display.md](../Docs/Display.md): the display, its encoding and refresh, the timeline sync, trimming the host's HSI
 - [I2C.md](../Docs/I2C.md): the bus, the messages, the addresses, both sides of the link
 - [Testing.md](../Docs/Testing.md): the native test kit
-- [Utilities.md](../Docs/Utilities.md): tasks, mutexes, switches, LEDs
+- [Utilities.md](../Docs/Utilities.md): tasks, mutexes, switches, the microsecond clock, HSI trim, LEDs

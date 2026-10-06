@@ -14,6 +14,7 @@ Currently persisted:
 - Current-sense display output on/off (`adc display`).
 - Clock display on/off (`time display`).
 - Clock trim, the measured LSI error in ppm (`time trim`).
+- HSI trim, the HSI16 `HSITRIM` value 0-127 (`time hsi`).
 - Low brightness (`display low`, switch 2).
 - WiFi SSID and password.
 - API host and path (`api host`, `api path`).
@@ -130,7 +131,7 @@ must match it.
 | Tag | Name | Length | Value |
 | --- | --- | --- | --- |
 | `0x01` | `AdcFlags` | 1 | Bit 0 = current-sense logging enabled, bit 1 = current-sense display enabled. Remaining bits reserved, write 0. |
-| `0x02` | `ClockTrim` | 4 | Signed LSI error in ppm, big endian; see [RTC.md](RTC.md#trimming). Written only when non-zero. |
+| `0x02` | `ClockTrim` | 4 or 5 | Bytes 0-3: signed LSI error in ppm, big endian; see [RTC.md](RTC.md#trimming). Byte 4, optional: the HSI trim, `HSITRIM` 0-127; see [Display.md](../../Docs/Display.md#trimming-the-hosts-hsi). Written when either is not its default (LSI trim 0, HSI trim 64); the fifth byte only when the HSI trim is not 64. A fifth byte above 127 is ignored (HSI trim 64). An older build reads the first four bytes and ignores the fifth. |
 | `0x10` | `WifiSsid` | 1–32 | SSID bytes, not NUL terminated. |
 | `0x11` | `WifiPassword` | 1–63 | Passphrase bytes, not NUL terminated. |
 | `0x12` | `ApiHost` | 1–64 | API server host name, not NUL terminated. Absent: the built-in `APP_ST67_HTTP_HOST`. |
@@ -246,6 +247,7 @@ bug to spot.
 | `adcDisplayEnabled` | `true` | `CurrentSenseTask::displayEnabled_` |
 | `clockDisplayEnabled` | `true` | `ClockTask::displayEnabled_` |
 | `clockTrimPpm` | `0` | `ClockTask::trimPpm_` |
+| `hsiTrim` | `64` | The chip's reset `HSITRIM` (`HsiTrim::kDefault`); `AstroWeather_Init()` applies any other value |
 | `lowBrightness` | `false` | `LowBrightness`'s `enabled`, and the reset level of `PB8` |
 | `wifiSsid` | empty | — |
 | `wifiPassword` | empty | — |
@@ -259,7 +261,7 @@ plus two bytes of framing.
 | Content | Payload cost |
 | --- | --- |
 | `AdcFlags` | 3 |
-| `ClockTrim`, only when a trim is set | 6 |
+| `ClockTrim`, only when an LSI or HSI trim is set | 6, or 7 with the HSI trim |
 | `ClockFlags`, only when the clock display is off | 3 |
 | `DisplayFlags`, only when low brightness is on | 3 |
 | WiFi, typical (15-char SSID, 20-char password) | 39 |
@@ -267,7 +269,7 @@ plus two bytes of framing.
 | API host, only when saved (up to 64) | up to 66 |
 | API path, only when saved (up to 32) | up to 34 |
 | API key, only when saved (up to 32) | up to 34 |
-| **Worst case total** | **248 of 250** |
+| **Worst case total** | **249 of 250** |
 
 A measured image on hardware with SSID `AstroNet` and a 13-character password
 occupied 34 bytes, when the image was 128 bytes. With no WiFi configured the image is
@@ -323,6 +325,7 @@ The exact replies are in [Console.md](Console.md).
 | `adc display on\|off` | Toggle and save. |
 | `time display on\|off` | Toggle and save. HostController only. |
 | `time trim <ppm>` | Apply and save. HostController only. |
+| `time hsi <0-127>` | Apply and save. HostController only. |
 | `display low on\|off` | Apply and save. HostController only. |
 | Switch 2 | Toggle low brightness and save. HostController only. |
 | `api host <host>`, `api path <path>`, `api key <key>` | Check and save; used from the next fetch. HostController only. |
@@ -358,8 +361,9 @@ every optional record present, the empty-WiFi case, images written without the
 clock or display records, an image written when the region was 128 bytes, the
 API target costing nothing until set, and the one-record cost of clock trim,
 clock display off and low brightness, the key's one-record cost and its
-absence in an older image, and a 40-byte path from the 64-character era being
-dropped rather than truncated.
+absence in an older image, a 40-byte path from the 64-character era being
+dropped rather than truncated, and the HSI trim as the clock trim record's
+fifth byte: one byte's cost, absent at its default, and ignored above 127.
 
 The unknown-tag and absent-record cases are what pin down the compatibility
 rules. Do not delete them.
@@ -374,6 +378,9 @@ checked on hardware only.
 `osKernelStart()`. This is safe because EEPROM reads take no `osDelay` and the
 I2C bus mutex is uncontended at that point, so acquiring it takes the
 non-blocking path.
+
+A saved HSI trim is applied right after the load, before the display refresh
+starts.
 
 The outcome is logged, but not the values, since they include credentials. Note
 that this log line is emitted before USB CDC has enumerated, so it is only

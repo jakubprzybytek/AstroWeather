@@ -26,6 +26,7 @@ the peripheral latches BUSY on its first START and no device responds. They are
 
 | Address | Device |
 | --- | --- |
+| `0x00` | General call: the host's timeline sync, taken by every display board ([Timeline sync](#timeline-sync)) |
 | `0x08` | The host's own address in CubeMX; unused, since the host is never addressed. `eeprom scan` skips it |
 | `0x10`-`0x15` | Display boards, one per forecast block ([Addresses and straps](#addresses-and-straps)) |
 | `0x50`-`0x57` | The 24AA04 settings EEPROM. The SOT-23 part has no address pins and uses the low bit as the block select, so it answers on all eight; treat them as reserved. See [Settings.md](../HostControllerA/Docs/Settings.md#storage-medium) |
@@ -34,8 +35,11 @@ the peripheral latches BUSY on its first START and no device responds. They are
 
 ## Messages
 
-Every message is 36 bytes: one command byte and one 35-byte plane in the
-logical board layout ([Display.md](Display.md#logical-board-buffer)).
+Every message to a board's own address is 36 bytes: one command byte and one
+35-byte plane in the logical board layout
+([Display.md](Display.md#logical-board-buffer)). The timeline sync, the one
+other message, goes to the general-call address
+([Timeline sync](#timeline-sync)).
 
 | Offset | Size | Content |
 | ---: | ---: | --- |
@@ -66,6 +70,39 @@ the I2C ACK/NACK is the only acknowledgement.
 `serializeI2c()`, `serializeAttributesI2c()`, `deserializePlaneI2c()` and the
 content-only `deserializeI2c()` are in `DisplayI2cProtocol.cpp`.
 
+### Timeline sync
+
+The host broadcasts its refresh timeline's position to the general-call
+address `0x00`, so every display board takes it at the same instant; what the
+boards do with it is in [Display.md](Display.md#timeline-sync).
+
+| Offset | Size | Content |
+| ---: | ---: | --- |
+| 0 | 1 | `0x05` (`kSyncCommand`) |
+| 1 | 4 | The host's frame number, little-endian |
+| 5 | 2 | Microseconds into that frame, little-endian |
+
+A board takes command `0x05` only on the general call, never on its own
+address, and rejects a general-call write that is not a whole 7-byte sync
+message (`deserializeSync()`). The host stamps its timeline just before the
+START; `kSyncTransferMicros`, 750 us, is the time from that stamp to the
+board's receive-complete interrupt: START, the address and seven bytes at
+100 kHz, plus the HAL's setup. A broadcast that no board acknowledges, as with
+no display board on the bus, is not an error.
+
+### Status read
+
+A one-byte read from a board's own address answers its sync status:
+
+| Byte | Meaning |
+| --- | --- |
+| `0xA1` (`kSyncStatusLocked`) | On the host's timeline; no burst needed |
+| `0xA0` (`kSyncStatusWanted`) | Wants a burst of syncs: after a reset, a jump, an HSITRIM step or a sync that found it more than 10 ms out |
+| `0x00` | A board whose firmware has no timeline sync |
+
+`serializeSync()`, `deserializeSync()` and the status values are in
+`DisplayI2cProtocol`.
+
 ## Addresses and Straps
 
 Every board, the host included, has three address straps, `ADDR_0` (`PB10`),
@@ -93,16 +130,23 @@ chain (`remote` line).
 ## Host Side
 
 The host is a polled, blocking master: `HAL_I2C_Master_Transmit()`,
-`HAL_I2C_Mem_Read/Write()` and `HAL_I2C_IsDeviceReady()` with timeouts, no I2C
-interrupt and no DMA.
+`HAL_I2C_Master_Receive()`, `HAL_I2C_Mem_Read/Write()` and
+`HAL_I2C_IsDeviceReady()` with timeouts, no I2C interrupt and no DMA.
 
 ### `Device::I2cBus`
 
 `I2cBus` (`User/Src/Device/I2cBus.cpp`) owns `hi2c1` and a mutex held for one
 transfer at a time. The EEPROM driver and the display boards are driven from
-different tasks (console, refresh, `MainLoopTask`), so every client of the bus
-must go through the same `I2cBus`, never the raw handle. The clock and
-current-sense tasks touch only the local board and never use I2C.
+different tasks (console, refresh, `MainLoopTask`, `DisplaySync`), so every
+client of the bus must go through the same `I2cBus`, never the raw handle. The
+clock and current-sense tasks touch only the local board and never use I2C.
+
+Besides `transmit()`, `receive()` and the EEPROM's `memRead()`/`memWrite()`,
+`transmitFilled()` sends a message that carries the instant it goes out: once
+the bus is free it fills the message with interrupts off, then transmits with
+the scheduler suspended, so no task runs between the fill and the START. The
+scheduler is suspended inside the critical section, so no tick is held back
+before the fill reads the time. The 7-byte sync takes about 1 ms.
 
 ### `BufferedDisplayBoard`
 
@@ -140,26 +184,44 @@ Remote boards are written only by `Display::submit()`, after an astro refresh
 the clock and the progress bar change only the local board and send nothing,
 so an unreachable board is reported when something actually tries to reach it.
 
+Separately, `DisplaySyncTask` broadcasts the timeline sync and reads each
+remote board's status byte on its own schedule
+([Display.md](Display.md#syncs-from-the-host)), with a 5 ms timeout per
+transfer; neither is logged as a failure.
+
 ## Display Board Side
 
 `I2cTarget` (`DisplayController/User/Src/I2cTarget.cpp`) owns `hi2c1` in target
 mode, with the HAL's interrupt-driven sequential listen API:
 
-- `HAL_I2C_AddrCallback()`: the host addressed this board. A write starts a
-  36-byte receive (`I2C_FIRST_AND_LAST_FRAME`). A read, which the protocol does
-  not use, gets one byte (0) so the bus is not held. Every address match also
-  flashes `LED_2` for 20 ms.
-- `HAL_I2C_SlaveRxCpltCallback()`: all 36 bytes arrived. They are queued, four
-  deep (the host sends four messages a few ms apart; when full the oldest is
-  dropped and counted), and the `DisplayApp` task is woken.
+- `HAL_I2C_AddrCallback()`: the host addressed this board, or the general
+  call. A general-call write starts a 7-byte receive into the sync buffer. A
+  write to the board's own address starts a 36-byte receive
+  (`I2C_FIRST_AND_LAST_FRAME`) and flashes `LED_2` for 20 ms. A read gets one
+  byte, the sync status `TimelineFollower` last set ([Status read](#status-read)).
+  `LED_2` therefore shows the data traffic only: neither the sync broadcast
+  nor the status reads flash it.
+- `HAL_I2C_SlaveRxCpltCallback()`: for a sync, all 7 bytes arrived. The
+  interrupt stamps the board's timeline first (`PcbDisplayBoard::stampNow()`),
+  keeps the message with the stamp, a newer one replacing one not yet taken,
+  and wakes `DisplayApp` with `kFlagSync`. For a message, all 36 bytes
+  arrived. They are queued, four deep (the host sends four messages a few ms
+  apart; when full the oldest is dropped and counted), and `DisplayApp` is
+  woken with `kFlagFrame`.
 - `HAL_I2C_ListenCpltCallback()`, `HAL_I2C_ErrorCallback()`: the transfer
   ended. A write shorter than 36 bytes counts as a probe (no data, as the
-  host's `status` sends) or a short write; listening restarts.
+  host's `status` sends) or a short write, a general-call write shorter than
+  7 bytes as a short sync; listening restarts.
 
 Nothing is decoded in the interrupt. `DisplayApp` feeds each queued message to
 `FrameAssembler` (`User/Src/FrameAssembler.cpp`), which decodes it with
 `deserializePlaneI2c()`, stages attribute planes and applies them with the
-content.
+content, and each sync to `TimelineFollower`
+([Display.md](Display.md#following-the-host)).
+
+General call is enabled in `I2cTarget::begin()` (`Init.GeneralCallMode`), when
+it re-initialises I2C1 with the strap address; the CubeMX `.ioc` keeps it
+disabled ([Development.md](Development.md#settings-that-must-survive-regeneration)).
 
 The HAL NACKs any byte after the 36th, so a longer write fails on the host.
 Listening restarts after every error, and `DisplayApp` checks every second that
@@ -191,18 +253,21 @@ The host needs no I2C interrupt priority: it polls.
 
 The display board counts frames and attributes accepted, rejected messages,
 short writes, probes, bus errors, listen restarts, queue overruns, the last
-HAL error and late STOPs in `g_displayStats`, read over SWD; see
+HAL error, late STOPs and the syncs received, short, rejected and applied in
+`g_displayStats`, read over SWD; see
 [DisplayController Architecture](../DisplayController/Docs/Architecture.md#diagnostics).
-On the host, `status` (`remote` line) probes each chain address and the error
-log keeps the unreachable warnings.
+On the host, `status` (`remote` line) probes each chain address, `time sync`
+shows each board's answer to the last status read, and the error log keeps the
+unreachable warnings.
 
 ## Tests
 
 | Suite | Covers |
 | --- | --- |
-| `Common/tests/DisplayI2cProtocolTests.cpp` | The 36-byte layout, the round trip of content and attribute planes, masking of bits 21-23, rejection of short, long and null messages and unknown commands without touching the destination |
+| `Common/tests/DisplayI2cProtocolTests.cpp` | The 36-byte layout, the round trip of content and attribute planes, masking of bits 21-23, rejection of short, long and null messages and unknown commands without touching the destination; the sync message's layout, round trip and rejection |
 | `Common/tests/DisplayAddressTests.cpp` | All 27 strap combinations through the stub GPIO, the pins left analog without pull, `boardAddress()` limits, `detectBoardAddress()` |
 | `DisplayController/tests/FrameAssemblerTests.cpp` | The staging rules on the receiving side |
 
-Not covered natively: `I2cBus`, `BufferedDisplayBoard` and `I2cTarget`, which
-need the HAL; they are checked on the bench with the counters above.
+Not covered natively: `I2cBus`, `BufferedDisplayBoard`, `DisplaySyncTask` and
+`I2cTarget`, which need the HAL; they are checked on the bench with the
+counters above.

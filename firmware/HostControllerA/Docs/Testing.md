@@ -12,7 +12,7 @@ Line coverage measured with the `NativeTests-Coverage` preset on 2026-09-23:
 shared code (`NumericDisplay`, `DisplayCodec`, `DisplayI2cProtocol`,
 `DisplayAddress`, `Crc32` and the rest) are in `../Common/tests`; see the shared
 [Native Tests](../../Docs/Testing.md#common-suites). The others are in `tests/`;
-`error_log_tests` was added later and is not in the figure.
+`error_log_tests` and `sync_schedule_tests` are not in the figure.
 
 | Module | Suite | Line coverage |
 | --- | --- | --- |
@@ -25,6 +25,7 @@ shared code (`NumericDisplay`, `DisplayCodec`, `DisplayI2cProtocol`,
 | `CalendarDate` | `calendar_date_tests` | 100% |
 | `RtcTrim` | `rtc_trim_tests` | 100% |
 | `ClockSync` | `clock_sync_tests` | 100% |
+| `SyncSchedule` (display timeline sync) | `sync_schedule_tests` | not measured |
 | `RefreshSchedule` | `refresh_schedule_tests` | 95% |
 | `AstroDataParser` | `astro_data_parser_tests` | 96% |
 | `AstroDisplayMapper` | `astro_display_mapper_tests` | 100% |
@@ -40,7 +41,7 @@ shared code (`NumericDisplay`, `DisplayCodec`, `DisplayI2cProtocol`,
 | `BufferedDisplayBoard` | — | Not covered |
 | Console commands, `ConsoleService` line assembly | — | Not covered |
 | `AstroDataRefreshTask` run loop, `HttpClient` socket loop | — | Only through the extracted units |
-| `LogService`, `PcbDisplayBoard`, `ClockTask` RTC access, Wi-Fi session | — | Bench only |
+| `LogService`, `PcbDisplayBoard`, `DisplaySyncTask`, `ClockTask` RTC access, Wi-Fi session | — | Bench only |
 
 ## Not Covered Yet
 

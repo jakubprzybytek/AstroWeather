@@ -13,10 +13,10 @@ plan are in [archive/RAM_Usage_History.md](archive/RAM_Usage_History.md).
 | --- | ---: |
 | RAM capacity, STM32G0B1CETx | 147456 (144 KiB): the 139 KiB `RAM` region plus the 5 KiB `NOINIT` region |
 | `.data` | 644 |
-| `.bss` | 89032 |
+| `.bss` | 90416 |
 | `._user_heap_stack`: C heap `0x200` + main stack `0x400` | 1536 |
-| **`RAM` region in use**, as the link reports it | **91216** of 142336 (64.1%) |
-| **`RAM` region left** | **51120** |
+| **`RAM` region in use**, as the link reports it | **92600** of 142336 (65.1%) |
+| **`RAM` region left** | **49736** |
 | `.noinit` (`NOINIT` region) | 4364 of 5120 |
 
 The `NOINIT` region at the top of RAM holds the error log
@@ -46,12 +46,12 @@ From `arm-none-eabi-nm -S --size-sort` on the same ELF:
 | `CurrentSenseTask` object | 2480 | 2048-byte stack |
 | `MainLoopTask` object | 2480 | 2048-byte stack |
 | `ClockTask` object | 1600 | 1024-byte stack |
+| `DisplaySyncTask` object | 2520 | 2048-byte stack, the sync schedule and the boards' last status; `User/Src/Display/DisplaySyncTask.cpp` |
 | USB device state | about 2000 | `hpcd_USB_DRD_FS` 736, `hUsbDeviceFS` 732, `USBD_StrDesc` 512 |
-| `led1` (`BlinkingLed`) | 1200 | 768-byte stack |
 | FreeRTOS static support | about 3400 | Idle stack 512, timer stack 1024, their TCBs 384 each, ready lists 1120 |
 | ST67 static driver state | about 1200 | `W61_Obj` 992 bytes, the SPI transfer engine state |
-| `localBoard` (`PcbDisplayBoard`) | 908 | Content and attributes, two 280-byte sets of prepared pass frames, the sequencer |
-| `settingsStore` (`Settings::Store`) | 840 | `Values` (including the 65-byte API host and path), two 256-byte working images for `load()`/`save()`, the mutex; `User/Inc/Settings/SettingsStore.hpp` |
+| `localBoard` (`PcbDisplayBoard`) | 968 | Content and attributes, two 280-byte sets of prepared pass frames, the sequencer, the timeline servo and its two frame records |
+| `settingsStore` (`Settings::Store`) | 844 | `Values` (including the 65-byte API host and path), two 256-byte working images for `load()`/`save()`, the mutex; `User/Inc/Settings/SettingsStore.hpp` |
 
 The same astro payload is held twice: once in `St67Runtime::httpPayload`,
 which only the stress batches write, and once in
@@ -120,7 +120,7 @@ Application tasks, with static stacks inside their objects:
 | `MainLoopTask` | 2048 | Normal | `MainLoopTask.hpp`; the boot screens encode frames on it, 944 used at peak |
 | `LogService` | 1536 | Normal | `LogService.hpp` |
 | `Clock` | 1024 | BelowNormal | `ClockTask.hpp` |
-| `Led1` | 768 | Low | `BlinkingLed.hpp`, in `User/Src/AstroWeather.cpp` |
+| `DisplaySync` | 2048 | AboveNormal | `DisplaySyncTask.hpp`; 928 used after a logged burst (bench, 2026-10-06) |
 
 Generated and middleware tasks, with stacks from the FreeRTOS heap unless
 noted:

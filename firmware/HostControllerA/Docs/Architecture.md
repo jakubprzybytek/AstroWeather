@@ -41,9 +41,9 @@ create their FreeRTOS mutexes from static storage at that point.
 
 ### Init order
 
-`AstroWeather_Init()` first starts the `Led1` `BlinkingLed` task on `LED_1`
-(on 20 ms, off 1980 ms: a heartbeat every 2 s) and creates the timer of the
-`activityLed()` `PulseLed` on `LED_2`, then, in order:
+`AstroWeather_Init()` first creates the timer of the `activityLed()`
+`PulseLed` on `LED_2`, then, in order (`LED_1`, the heartbeat, needs no setup:
+the refresh interrupt drives it once `localBoard` starts):
 
 1. `LogService` `init()` (creates the log queue) and `start()`.
 2. `Display::detectBoardAddress()` reads the host's `ADDR_0`..`ADDR_2` straps,
@@ -56,7 +56,10 @@ create their FreeRTOS mutexes from static storage at that point.
    `errors`); `status` shows the address as `host` on the `remote` line.
 3. `settingsStore.load()` reads the EEPROM; the outcome, not the values, is
    logged. This works before the scheduler because EEPROM reads take no
-   `osDelay` and the bus mutex is uncontended.
+   `osDelay` and the bus mutex is uncontended. A saved HSI trim other than 64
+   is applied at once (`HsiTrim::set()`, logged as `HSI trim <n>`), so the
+   refresh timeline runs at the trimmed rate from its first frame; see
+   [Display.md](../../Docs/Display.md#trimming-the-hosts-hsi).
 4. `CurrentSenseTask`: logging and display flags from settings, the display,
    then `start()`.
 5. `ConsoleService`: `init(&display)`, EEPROM and settings pointers, `start()`.
@@ -66,22 +69,26 @@ create their FreeRTOS mutexes from static storage at that point.
    [Display.md](../../Docs/Display.md#time-blank-and-no-data)) but does not show it yet: the first
    slot-test frame (`Display::slotTestState(0)`) is shown instead, then
    `localBoard.start()` enables the SCT outputs and starts TIM2, whose
-   interrupt refreshes the board from then on. `Display` holds back every
+   interrupt refreshes the board, keeps the refresh timeline and drives the
+   `LED_1` heartbeat from then on. `Display` holds back every
    local submit until `MainLoopTask` has run the boot screens.
 8. `ClockTask`: display flag and trim from settings (an error is logged if the
    trim is rejected), the display, `start()`.
-9. `SetSt67CredentialSource(&settingsStore)`, then `StartSt67HttpFetchTask()`.
+9. `DisplaySyncTask`: `init(&i2c1Bus, &display)`, `start()`; after
+   `localBoard.start()`, since the sync carries its refresh timeline
+   ([Display.md](../../Docs/Display.md#syncs-from-the-host)).
+10. `SetSt67CredentialSource(&settingsStore)`, then `StartSt67HttpFetchTask()`.
    The credential source must be set first, since the fetch task reads the
    credentials on every connect.
-10. `AstroDataRefreshTask`: `init(&display)` restores the last successful
+11. `AstroDataRefreshTask`: `init(&display)` restores the last successful
     refresh time from backup register DR1 when the RTC is set, then `start()`.
-11. `MainLoopTask`: `init(activityLed(), &settingsStore, &display)` (switch 2
+12. `MainLoopTask`: `init(activityLed(), &settingsStore, &display)` (switch 2
     saves low brightness), `start()`. Its first act once the scheduler runs is
     `display.runBootScreens()`: each `DISPLAYx_EN` slot lit on its own for
     200 ms, then `AdNN` (the host's strap address) on numeric display 1 for
     2 s, then the local board's own state, which clients have kept writing
     meanwhile. See [DisplayController Architecture](../../DisplayController/Docs/Architecture.md#screens).
-12. `SwitchInput::attach()` routes the `SWITCH_1`/`SWITCH_2` EXTI interrupts to
+13. `SwitchInput::attach()` routes the `SWITCH_1`/`SWITCH_2` EXTI interrupts to
     `MainLoopTask` as thread flags.
 
 `defaultTask` initialises the USB device (`MX_USB_Device_Init()`) once the
@@ -98,7 +105,7 @@ Code both images need lives in [`../Common`](../../Common/README.md) and is
 compiled into each project against that project's HAL, `main.h` and FreeRTOS
 configuration, so the two CubeMX projects keep the same labels for the pins it
 uses. It is documented once, for both, in [firmware/Docs](../../Docs/README.md):
-the display model, encoding and refresh in
+the display model, encoding, refresh and timeline sync in
 [Display.md](../../Docs/Display.md), the I2C link in
 [I2C.md](../../Docs/I2C.md), and the tasks, mutexes, switches and LEDs in
 [Utilities.md](../../Docs/Utilities.md).
@@ -106,7 +113,8 @@ the display model, encoding and refresh in
 Everything else under `User/` is host-only: `Astro/` (the refresh task, parser,
 mapper, progress bar and schedule), `Clock/`, `WiFi/`, `Console/`, `Settings/`,
 `Sensors/`, `LogService`, the EEPROM driver and `I2cBus`, the aggregate
-`Display` with its `BufferedDisplayBoard`s, `LowBrightness` and `MainLoopTask`.
+`Display` with its `BufferedDisplayBoard`s, `DisplaySyncTask` and its
+`SyncSchedule`, `LowBrightness` and `MainLoopTask`.
 Shared code must not depend on any of these, in particular not on `LogService`.
 
 Every build also regenerates `BuildInfo.cpp` with the build time
@@ -124,15 +132,14 @@ others hold a reference to it.
 | --- | --- | --- |
 | `i2c1Bus` | `Device::I2cBus` | `hi2c1`, with a mutex per transfer |
 | `localSct` | `SCT2xxx` | `hspi3`, `SCT_ENABLE`, `SCT_LATCH` |
-| `localBoard` | `Display::PcbDisplayBoard` | `localSct`, `htim2`, `DISPLAY_1_EN`..`DISPLAY_5_EN`; refreshed from TIM2's interrupt |
+| `localBoard` | `Display::PcbDisplayBoard` | `localSct`, `htim2`, `DISPLAY_1_EN`..`DISPLAY_5_EN`; refreshed from TIM2's interrupt, which also keeps the refresh timeline the display boards follow and drives the `LED_1` heartbeat |
 | `remoteBoard10`..`remoteBoard15` | `Display::BufferedDisplayBoard` | `i2c1Bus` at 7-bit addresses `0x10`..`0x15`, one per forecast block; the one at the host's own address is unused |
 | `display` | `Display::Display` | `localBoard` plus the six remote boards; `AstroWeather_Init()` sets the host's address from its straps (`setLocalAddress()`) |
 | `settingsEeprom` | `Device::Eeprom24AA04` | `i2c1Bus`, address `0x50` |
 | `settingsStore` | `Settings::Store` | `settingsEeprom` and the in-RAM `Values` |
 | `activityLed()` | `PulseLed` (`../Common/Src/Debug/PulseLed.cpp`) | `LED_2`: a 250 ms pulse for switch 1, 50 ms for switch 2 (`MainLoopTask`), and 20 ms for every USB CDC transfer in either direction (`CDC_Receive_FS` in the USB interrupt, `CDC_Transmit_FS` after a successful send). The pin is set at once and a static FreeRTOS one-shot timer clears it, so a pulse never blocks and works from an interrupt; overlapping pulses merge. |
 
-The tasks other than `Led1` are singletons reached through
-`instance()`. The fetch task is private to `User/Src/WiFi/St67HttpFetchTask.cpp`
+The application tasks are singletons reached through `instance()`. The fetch task is private to `User/Src/WiFi/St67HttpFetchTask.cpp`
 and is reached through `StartSt67HttpFetchTask()`, `FetchSt67Data()` and
 `TriggerSt67ConnectivityCycle()`.
 
@@ -146,7 +153,7 @@ Middleware tasks come from the FreeRTOS heap and are not in that registry.
 
 CMSIS-RTOS2 priorities are FreeRTOS priorities (`configMAX_PRIORITIES` is 56):
 `osPriorityLow` = 8, `BelowNormal` = 16, `Normal` = 24, `Normal4` = 28,
-`Realtime` = 48.
+`AboveNormal` = 32, `Realtime` = 48.
 
 The local display is not refreshed by a task: `Display::PcbDisplayBoard`
 runs the multiplexing from TIM2's update interrupt, with SPI3 transfers by
@@ -157,6 +164,7 @@ DMA, so its timing depends on interrupt latency only; see
 | --- | --- | --- | ---: | --- | --- |
 | `Modem_Process` | ST67 driver `w61_at_common.c` | 47 | 2048 | heap | AT response and event handling |
 | `spi_xfer_engine` | ST67 driver `spi_iface.c` | 46 | 1536 | heap | SPI1 transfers to the module |
+| `DisplaySync` | `Display/DisplaySyncTask.cpp` | AboveNormal (32) | 2048 | static | Broadcasts the refresh timeline to the display boards and polls their sync status; a few milliseconds a minute, above the normal tasks so a due sync is not held up ([Display.md](../../Docs/Display.md#syncs-from-the-host)) |
 | `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | heap | Starts USB, then exits (stack freed) |
 | `LogService` | `Debug/LogService.cpp` | Normal (24) | 1536 | static | Drains the log queue to USB CDC; `stats` output |
 | `ConsoleService` | `Console/ConsoleService.cpp` | Normal (24) | 2304 | static | Assembles and runs console commands |
@@ -165,7 +173,6 @@ DMA, so its timing depends on interrupt latency only; see
 | `CurrentSense` | `Sensors/CurrentSenseTask.cpp` | BelowNormal (16) | 2048 | static | ADC every 100 ms, idle while `adc display` and `adc log` are both off |
 | `Clock` | `Clock/ClockTask.cpp` | BelowNormal (16) | 1024 | static | RTC, `HH:MM` on display 3 |
 | `St67HttpFetch` | `WiFi/St67HttpFetchTask.cpp` | BelowNormal (16) | 4096 | static | Owns the ST67 session and the HTTPS fetch |
-| `Led1` | `Debug/BlinkingLed.cpp` | Low (8) | 768 | static | Heartbeat on `LED_1` |
 | `Tmr Svc` | FreeRTOS | 2 | 1024 | static | FreeRTOS timer service |
 | `IDLE` | FreeRTOS | 0 | 512 | static | Idle |
 
@@ -226,6 +233,7 @@ queues and five mutexes.
 | `LogService` | `log()` from any task; `setStatsEnabled()` | Log queued, stats changed |
 | `Clock` | display and time setters | Redraw |
 | `AstroDataRefresh` | `requestRefresh()` from any task | Run a refresh |
+| `DisplaySync` | `requestBurst()` (`time sync now`) | Start a burst of syncs |
 | `St67HttpFetch` | `trigger()`, driver callbacks | Run a batch; DNS, HTTP, scan, connect, disconnect, driver error |
 | Refresh caller (`AstroDataRefresh`) | `St67HttpFetch` | `kFetchFlagDone`, `kFetchFlagStage` |
 
@@ -246,7 +254,7 @@ All are `Utils::Mutex` (priority inheritance, static storage).
 
 | Mutex | Protects |
 | --- | --- |
-| `I2cBus::mutex_` | One I2C1 transfer at a time: the EEPROM and the five remote boards, driven from the console and refresh tasks. The clock and current-sense tasks only use `submitLocal()` and never touch I2C. Held per transfer, not per operation. |
+| `I2cBus::mutex_` | One I2C1 transfer at a time: the EEPROM and the five remote boards, driven from the console, refresh and `DisplaySync` tasks. The clock and current-sense tasks only use `submitLocal()` and never touch I2C. Held per transfer, not per operation; the sync broadcast also suspends the scheduler for its transfer, about 1 ms ([I2C.md](../../Docs/I2C.md#devicei2cbus)). |
 | `Display::submitMutex_` | The SPI/I2C transfer sequence of `submit()` and `submitLocal()`. Setters are not locked; concurrent writers are last-writer-wins. |
 | `PcbDisplayBoard::submitMutex_` | One `submit()` at a time encoding into the back frame set; the refresh interrupt takes no lock and swaps the sets at a frame boundary. |
 | `ClockTask::rtcMutex_` | RTC reads and writes, from the clock task, the console and the refresh task's clock sync. |
@@ -282,12 +290,12 @@ From `Core/Inc/main.h` and `HostControllerA.ioc`.
 | GPIO | `PB6` `SCT_LATCH`, `PB7` `SCT_ENABLE` | SCT latch and output enable |
 | GPIO | `PD3`, `PA15`, `PD1`, `PD2`, `PD0` = `DISPLAY_1_EN`..`DISPLAY_5_EN` | Multiplex selects |
 | TIM2, 16 MHz / 16 = 1 MHz count | none | Display refresh: the interrupt sets each pass's length (four passes per 4 ms slot, 50 Hz frames) |
-| I2C1 | `PA9` SCL, `PA10` SDA | 24AA04 EEPROM (`0x50`) and remote boards (`0x10`..`0x15`) |
+| I2C1 | `PA9` SCL, `PA10` SDA | 24AA04 EEPROM (`0x50`), remote boards (`0x10`..`0x15`) and the timeline sync broadcast (general call `0x00`) |
 | ADC1, 16x oversampling | `PB2` `CURRENT_SENSE` (IN10), plus the internal temperature sensor and VREFINT | Current, temperature and VDDA; DMA1 channel 3 |
 | RTC | none (LSI) | Calendar and backup registers |
 | USB FS device, CDC | `PA11` DM, `PA12` DP | Console |
 | GPIO EXTI | `PB12` `SWITCH_1`, `PB13` `SWITCH_2` | Switches, falling edge |
-| GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat; switch presses and USB CDC traffic |
+| GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat from the refresh interrupt; switch presses and USB CDC traffic |
 | GPIO | `PB8` `LOW_POWER_EN` | Low-brightness step for every board, set by `display low` and toggled by switch 2 (HostController only; see [Display.md](Display.md#low-brightness)) |
 | GPIO inputs | `PB10`, `PB11`, `PB14` = `ADDR_0`..`ADDR_2` | Board address straps, read once at boot by `detectBoardAddress()`, then left analog |
 | SWD | `PA13`, `PA14` | Debug |

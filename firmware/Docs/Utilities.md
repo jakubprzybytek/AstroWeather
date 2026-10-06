@@ -12,7 +12,8 @@ The non-display code in `firmware/Common`, compiled into both the host
 | `Mutex`, `MutexGuard` | `Common/Inc/Utils/Mutex.hpp`, `Src/Utils/Mutex.cpp` |
 | `SwitchInput` | `Common/Inc/Utils/SwitchInput.hpp`, `Src/Utils/SwitchInput.cpp` |
 | `Crc32` | `Common/Inc/Utils/Crc32.hpp` (header only) |
-| `BlinkingLed` | `Common/Inc/Debug/BlinkingLed.hpp`, `Src/Debug/BlinkingLed.cpp` |
+| `Utils::microsNow()` | `Common/Inc/Utils/MicroClock.hpp`, `Src/Utils/MicroClock.cpp` |
+| `HsiTrim` | `Common/Inc/Device/HsiTrim.hpp`, `Src/Device/HsiTrim.cpp` |
 | `PulseLed`, `activityLed()`, `ActivityLed_Pulse()` | `Common/Inc/Debug/PulseLed.hpp`, `ActivityLedBridge.h`, `Src/Debug/PulseLed.cpp` |
 
 ## Tasks
@@ -56,19 +57,50 @@ is left to the project (the host uses it for the ST67 `RDY` line).
 check value of `"123456789"` is `0xCBF43926`. The host uses it to check the
 forecast payload.
 
+## Microsecond Clock
+
+`Utils::microsNow()` gives microseconds of the board's own clock, from the
+FreeRTOS tick (1 kHz) and SysTick's count within the tick. It is safe from any
+interrupt and from a task: interrupts are off for the few register reads, and
+a tick that SysTick has counted but whose interrupt has not yet run is added
+in. It wraps after about 71 minutes, so times are compared by unsigned
+difference. While the scheduler is suspended the kernel holds ticks back, so a
+time read then can be a millisecond or so early. The refresh timeline's stamps
+use it ([Display.md](Display.md#the-timeline-on-every-board)).
+
+## HSI Trim
+
+Both boards clock everything from HSI16: the refresh, the I2C timing and the
+FreeRTOS tick. `HsiTrim` reads and sets its user trim, `RCC_ICSCR.HSITRIM`:
+0-127, 64 by default, higher runs faster, about 0.33 % a step (measured on a
+G070 on 2026-10-05). A trim applies at once and is lost at reset.
+
+| Call | Does |
+| --- | --- |
+| `trim()` | The trim now |
+| `calibration()` | `HSICAL` as read back: the factory calibration plus the trim's offset from 64 |
+| `set(trim)` | Sets 0-127; false, and nothing changed, beyond that |
+| `allowedSteps(calibration, trim, steps, start, limit)` | How much of `steps` the trim may move: within ±`limit` of `start` and 0-127, and never letting `HSICAL` cross a multiple of 64, where AN5126 warns the frequency can step backwards. Pure |
+
+The host sets its trim from the console (`time hsi`, saved); a display board
+moves its own to follow the host's timeline, at most 8 steps from its boot
+trim. Both are described in [Display.md](Display.md#timeline-sync).
+
 ## LEDs
 
-- **`LED_1`, heartbeat.** `BlinkingLed` is a `Task<768>` at low priority that
-  lights an active-high LED for `onMs`, then leaves it off for `offMs`. Both
-  boards run it on `LED_1` from power-up at `kHeartbeatOnMs`/`kHeartbeatOffMs`,
-  20 ms every 2 s, so a running board looks the same whichever it is.
+- **`LED_1`, heartbeat.** Lit for one 20 ms refresh frame every 2 s, written
+  by the refresh interrupt at each frame start (`Display::heartbeatLit()`), so
+  it shows that the refresh interrupt is running. Boards on the host's
+  timeline flash together
+  ([Display.md](Display.md#the-timeline-on-every-board)).
 - **`LED_2`, activity.** `PulseLed::pulse(ms)` lights the LED at once and a
   static FreeRTOS one-shot timer clears it, so a pulse never blocks and works
   from an interrupt; overlapping pulses merge into one. `init()` creates the
   timer; pulses before that are ignored. `activityLed()` is the board's
   `LED_2`, and `ActivityLed_Pulse(ms)` in `ActivityLedBridge.h` reaches it from
   C code such as the USB device files. The host pulses it for switch presses and
-  USB CDC traffic, a display board for every I2C transaction addressed to it.
+  USB CDC traffic, a display board for every write addressed to it (not the
+  sync broadcast or the status reads).
 
 ## Rules for Shared Code
 

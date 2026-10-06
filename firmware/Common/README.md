@@ -9,19 +9,19 @@ display boards on an STM32G070.
 
 | Directory | Contents |
 | --- | --- |
-| `Src/Display`, `Inc/Display` | Logical display content and attributes (`DisplayTypes`), the PCB segment and matrix encoding (`DisplayCodec`), the pass sequencing (`RefreshSequencer`), the interrupt-driven multiplexing (`PcbDisplayBoard`), the boot screens (`BootScreens`), the I2C message format (`DisplayI2cProtocol`), the address straps (`DisplayAddress`) and the `DisplayBoard` interface |
-| `Src/Device`, `Inc/Device` | The `SCT2xxx` LED driver chain over SPI |
-| `Src/Utils`, `Inc/Utils` | `Task`/`TaskBase` (CMSIS-RTOS2 tasks with static stacks and a registry), `Mutex`, `SwitchInput`, `Crc32` |
-| `Src/Debug`, `Inc/Debug` | `BlinkingLed` (the `LED_1` heartbeat), `PulseLed` and `activityLed()` (`LED_2`, also from interrupts and C through `ActivityLedBridge.h`) |
+| `Src/Display`, `Inc/Display` | Logical display content and attributes (`DisplayTypes`), the PCB segment and matrix encoding (`DisplayCodec`), the pass sequencing (`RefreshSequencer`), the interrupt-driven multiplexing (`PcbDisplayBoard`), the refresh timeline and its sync (`Timeline`, `TimelineServo`, `TimelineSync`), the boot screens (`BootScreens`), the I2C message format (`DisplayI2cProtocol`), the address straps (`DisplayAddress`) and the `DisplayBoard` interface |
+| `Src/Device`, `Inc/Device` | The `SCT2xxx` LED driver chain over SPI; `HsiTrim`, the HSI16 user trim |
+| `Src/Utils`, `Inc/Utils` | `Task`/`TaskBase` (CMSIS-RTOS2 tasks with static stacks and a registry), `Mutex`, `SwitchInput`, `Crc32`, `microsNow()` (`MicroClock`) |
+| `Src/Debug`, `Inc/Debug` | `PulseLed` and `activityLed()` (`LED_2`, also from interrupts and C through `ActivityLedBridge.h`); the `LED_1` heartbeat comes from the refresh interrupt (`PcbDisplayBoard`) |
 | `tests/` | Native unit tests for the above, and the pieces both projects' own tests reuse: the HAL and RTOS stubs (`stubs/`), `Expect.hpp` (`support/`), `add_native_test()` (`NativeTest.cmake`) and a stand-in `main.h` (`board/`) |
 
 Each part is documented in the shared firmware docs, [firmware/Docs](../Docs/README.md):
 
 | Part | Document |
 | --- | --- |
-| Display content, attributes, PCB encoding, the multiplexing refresh, boot screens, `SCT2xxx` | [Display.md](../Docs/Display.md) |
-| The I2C message format and the address straps | [I2C.md](../Docs/I2C.md) |
-| `Task`, `Mutex`, `SwitchInput`, `Crc32`, the LEDs | [Utilities.md](../Docs/Utilities.md) |
+| Display content, attributes, PCB encoding, the multiplexing refresh, the timeline sync and the heartbeat, boot screens, `SCT2xxx` | [Display.md](../Docs/Display.md) |
+| The I2C message format, the sync broadcast and status read, the address straps | [I2C.md](../Docs/I2C.md) |
+| `Task`, `Mutex`, `SwitchInput`, `Crc32`, `microsNow()`, `HsiTrim`, the LEDs | [Utilities.md](../Docs/Utilities.md) |
 | The native test kit and the suites in `tests/` | [Testing.md](../Docs/Testing.md) |
 
 ## How It Is Built
