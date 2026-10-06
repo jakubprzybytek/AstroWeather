@@ -58,7 +58,7 @@ MEMORY
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 139K
 /* USER: retained RAM for the error log (.noinit): the last 5K, outside RAM so
    its address is the same in every build and the startup code never clears
-   it. See docs/Console.md#error-log and docs/CubeMXCompliance.md. */
+   it. See Docs/Console.md#error-log and firmware/Docs/Development.md (CubeMX compliance). */
 NOINIT (rw)    : ORIGIN = 0x20022C00, LENGTH = 5K
 FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 512K
 }

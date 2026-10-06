@@ -9,7 +9,7 @@ what shows on the displays.
 | --- | --- | --- |
 | [Matrix column faults around `U505`](#matrix-column-faults-around-u505) | Prototype host board | Open: column 1 stays lit |
 | [Off digits and matrix rows can glow](#other-known-issues) | Every board | Not seen on the prototype; next PCB revision |
-| [Random contents at power-up](#other-known-issues) | Every board | Firmware fix open |
+| [Random contents at power-up](#other-known-issues) | Host board | Fixed on the display boards; host firmware fix open |
 
 ## Matrix Column Faults Around `U505`
 
@@ -26,8 +26,8 @@ Faults on the prototype host board's dot matrix, all traced to the area around
 | 2026-10-01, during rework of pads 3–6 | Only numeric displays 1 and 2 worked. The rest of the matrix and numeric displays 3 and 4 were dark; column 1 was dark at first and lit a few seconds later | Recovered by itself moments later, with every display working. |
 | 2026-10-01, after that | Column 1 lit again, its brightness sometimes changes | Not measured again yet. |
 
-The console was unavailable during these observations (the USB port problem in
-[Development.md](../../firmware/Docs/Development.md#com-port-disappears-or-will-not-open)), so
+The console was unavailable during these observations (the USB port problem then, see
+[Development.md](../../firmware/Docs/Development.md#com-port-troubleshooting)), so
 none of the checks with `display` commands below have been run yet.
 
 ### How the Drivers Are Wired
@@ -159,7 +159,9 @@ Both are described in full in
   sources sit at about 3.7 V. A FET with a low threshold conducts enough to
   make "off" digits and rows glow. No glow was visible on the prototype host
   board on 2026-09-24; the fix is planned for the next PCB revision.
-- **Random contents at power-up (L-3).** `MX_GPIO_Init` enables the SCT
-  outputs (`SCT_ENABLE`, PB7, low) before any data has been latched, which can
-  briefly show whatever the drivers hold. The fix is to start PB7 high and
-  enable the outputs after the first latch.
+- **Random contents at power-up (L-3).** On the host, `MX_GPIO_Init` enables
+  the SCT outputs (`SCT_ENABLE`, PB7, low) before any data has been latched,
+  which can briefly show whatever the drivers hold. The DisplayController
+  already starts PB7 high (blanked) and enables the outputs after the first
+  frame is prepared; the host needs the same initial level in its CubeMX
+  configuration.

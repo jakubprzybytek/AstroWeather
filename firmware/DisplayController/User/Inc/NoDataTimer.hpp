@@ -11,7 +11,7 @@ constexpr uint32_t elapsedMs(uint32_t now, uint32_t since) { return now - since;
 // Tracks whether the board holds data from the host that is still current.
 // The host sends only when it has something new (an astro refresh every
 // 6 hours, or a console 'display' command), so the timeout must be longer than
-// one refresh interval; see docs/Architecture.md.
+// one refresh interval; see Docs/Architecture.md.
 class NoDataTimer {
 public:
     explicit constexpr NoDataTimer(uint32_t timeoutMs) : timeoutMs_(timeoutMs) {}

@@ -1,13 +1,12 @@
 # DisplayController Architecture
 
 How the display board firmware is put together. The display itself (content
-types, PCB mapping, multiplexing) and the I2C message format are shared with
-the host and described in
-[HostControllerA/docs/Display.md](../../HostControllerA/Docs/Display.md); pins
-and peripherals are in the [README](../README.md#hardware).
+types, PCB mapping, multiplexing) is shared with the host and described in
+[Display.md](../../Docs/Display.md), the I2C link to the host in
+[I2C.md](../../Docs/I2C.md); pins and peripherals are in the
+[README](../README.md#hardware).
 
-None of this has run on a display board yet: it compiles, and the screens and
-the stale-data timeout are unit tested.
+The first display board runs this firmware on the host's bus at `0x11`.
 
 ## Boot
 
@@ -25,8 +24,8 @@ scheduler starts:
 2. Shows the first slot-test frame (`Display::slotTestState(0)`) and starts the refresh
    (`PcbDisplayBoard::start()`: enables the SCT outputs and starts TIM6, whose
    interrupt then multiplexes the board with SPI1 DMA transfers, no task
-   involved; see the host's
-   [Display.md](../../HostControllerA/Docs/Display.md#refresh-operation)).
+   involved; see
+   [Display.md](../../Docs/Display.md#refresh-operation)).
    The test frame is prepared first, so the first frames latched are the
    test, not whatever the drivers held at reset.
 3. Starts the `DisplayApp` task and routes the switches to it
@@ -52,7 +51,7 @@ data, or "no data" if none has arrived yet.
 | Task | Owner | Priority | Stack (bytes) | Does |
 | --- | --- | --- | ---: | --- |
 | `DisplayApp` | `User/Src/DisplayApp.cpp` | Normal (24) | 2048 (peaks at ~1056 on the board) | Chooses what is shown: boot screens, data with its attributes, "no data", test screens |
-| `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | Exits at once (`osThreadExit()`); CubeMX does not allow removing it. It used to wake every tick |
+| `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | Exits at once (`osThreadExit()`); CubeMX does not allow removing it |
 | `Led1` | `Debug::BlinkingLed` (Common) | Low (8) | 768 | Heartbeat on `LED_1`, 20 ms every 2 s |
 
 `DisplayApp` and `Led1` are `Task<N>` objects with static stacks, and
@@ -106,52 +105,30 @@ kernel tick.
 
 ## I2C Target
 
-`I2cTarget` (`User/Src/I2cTarget.cpp`) owns `hi2c1` in target mode, using the
-HAL's interrupt-driven sequential listen API:
+`I2cTarget` (`User/Src/I2cTarget.cpp`) listens on I2C1 at the strap address
+with the HAL's interrupt-driven sequential listen API, queues each 36-byte
+message (four deep) and wakes `DisplayApp`, which decodes it with
+`FrameAssembler`: attribute planes are staged and applied with the next
+content. Listening starts only once the address is known and is checked every
+second. The protocol, both sides of the link and why the I2C interrupt runs at
+priority 1 are in [I2C.md](../../Docs/I2C.md#display-board-side).
 
-- `HAL_I2C_AddrCallback()`: the host addressed this board. For a write, a
-  36-byte receive is started (`I2C_FIRST_AND_LAST_FRAME`). For a read, which
-  the protocol does not use, one byte (0) is sent so the bus is not held.
-- `HAL_I2C_SlaveRxCpltCallback()`: all 36 bytes arrived. They are queued
-  (four deep, the oldest dropped and counted when full: the host sends a
-  board's three attribute planes and its content a few milliseconds apart)
-  and `kFlagFrame` is set.
-- `HAL_I2C_ListenCpltCallback()` and `HAL_I2C_ErrorCallback()`: the transfer
-  ended. A write that ended before 36 bytes is counted as a probe (no data
-  bytes, as the host's `status` sends) or a short write, and listening is
-  restarted.
+## Interrupt Priorities
 
-The task takes every queued message and feeds it to `FrameAssembler`
-(`User/Src/FrameAssembler.cpp`), which decodes it with
-`Display::deserializePlaneI2c()`: a known command and exactly 36 bytes, or it
-is rejected and nothing changes. The attribute commands `0x02`-`0x04` (blink,
-level bit 0, level bit 1) are staged; the content command `0x01` takes effect
-together with whatever is staged by then, so content and attributes always
-change as one. Staged attributes persist until the host replaces them, so a
-host that sends only content keeps the last attributes, and one that never
-sends any gets full brightness and no blinking. Nothing is decoded in the
-interrupt. The message format is in the host's
-[Display.md](../../HostControllerA/Docs/Display.md#i2c-transport).
+From `DisplayController.ioc` (NVIC) and `stm32g0xx_hal_conf.h`. Lower numbers
+pre-empt higher ones; the Cortex-M0+ has four levels, 0 to 3.
 
-The HAL NACKs the byte after the 36th; a host that sends more gets an error on
-its side. Listening is restarted after every error, and the task checks every
-second that the peripheral is still listening (`ensureListening()`), which
-also recovers from a bus error the HAL left in the ready state. Listening is
-never started without a strap address, so a board cannot answer on another
-board's address.
+| Interrupt | Priority | Why |
+| --- | ---: | --- |
+| `I2C1_IRQn` (I2C target) | 1 | Must handle a message's STOP before the host's next address matches, about 100 us later; at 3 it could wait behind the refresh interrupt and leave a NACK set ([I2C.md](../../Docs/I2C.md#interrupt-priority)) |
+| `TIM6_IRQn` (display refresh) | 3 | Runs the multiplexing, up to about 170 us per pass; latency only shifts a pass, never loses one ([Display.md](../../Docs/Display.md#refresh-operation)) |
+| `DMA1_Channel1_IRQn` (SPI1 TX) | 3 | Completes the HAL's SPI state after each pass's 56 us shift; it only has to run before the next pass starts a transfer, at least 480 us later |
+| `EXTI4_15_IRQn` (switches) | 3 | Switch presses, only a thread flag |
+| `TIM1_BRK_UP_TRG_COM_IRQn` (HAL tick) | 3 | `TICK_INT_PRIORITY`; HAL timeouts tolerate the delay |
+| SysTick, PendSV | 3 | FreeRTOS: the lowest level, as the port requires |
 
-The I2C interrupt has priority 1, above the refresh timer, DMA and EXTI (3).
-At 3, shared with the refresh interrupt (about 170 us), it could reach a
-message's STOP only after the host's next address had matched (the host
-starts the next message about 100 us after a STOP). The HAL sets `CR2.NACK`
-when it handles a STOP, and software cannot clear that bit, only an address
-match, a STOP or a sent NACK can; the late NACK then stayed set and the board
-refused the next message's second byte. The host saw error `0x4` about one
-refresh in seven and its retry covered it (see its
-[Display.md](../../HostControllerA/Docs/Display.md#i2c-transport)). Traced
-on the board on 2026-10-05: every failure was a short write of exactly one
-byte, after a STOP handled late (`stopWithAddrPending`), with no bus error. A digital noise filter (15 clocks)
-made no difference.
+Nothing is at 0 or 2. Interrupts at the same level do not pre-empt each other,
+so a level-3 handler waits for the refresh interrupt to finish.
 
 ## Diagnostics
 
@@ -203,11 +180,11 @@ current pass.
 | `User/Inc/NoDataTimer.hpp` | Stale-data timeout on the wrapping tick |
 | `User/Inc/Stats.hpp` | `g_displayStats` |
 | `tests/ScreensTests.cpp`, `tests/NoDataTimerTests.cpp`, `tests/FrameAssemblerTests.cpp` | Native tests |
-| `../Common` | Display types, attributes and encoding, the pass sequencing, `PcbDisplayBoard`, `SCT2xxx`, the I2C messages, the address straps, tasks and mutexes |
+| `../Common` | Display types, attributes and encoding, the pass sequencing, `PcbDisplayBoard`, `SCT2xxx`, the I2C messages, the address straps, tasks and mutexes; see [firmware/Docs](../../Docs/) |
 
 ## Open Items
 
-- Run it on a display board: the interrupt-driven refresh on SPI1/TIM6 with
-  DMA, the I2C target against the host including the attribute messages, and
-  the boot and test screens.
-- Console over USART2 (PA2/PA3); see the README.
+- Not yet checked on the board: rejecting unknown commands and short writes,
+  recovery from bus errors, the 7-hour "no data" timeout and the switch test
+  screens.
+- Console over USART2 (`PA2`/`PA3`); see the [README](../README.md#features).

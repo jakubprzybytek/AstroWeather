@@ -8,7 +8,7 @@
 // welcome message. Pure: LogService feeds it and supplies the storage, which
 // lives in a RAM region the startup code does not clear, so the log survives
 // a reset, a crash and reflashing, but not a power loss. See
-// docs/Console.md#error-log.
+// Docs/Console.md#error-log.
 //
 // Entries are ordered by their latest occurrence, oldest first. A message
 // identical to a kept entry, at the same level, bumps that entry's count and

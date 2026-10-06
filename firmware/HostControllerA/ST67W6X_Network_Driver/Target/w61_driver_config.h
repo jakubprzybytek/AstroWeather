@@ -64,7 +64,7 @@ extern "C" {
 #define SPI_THREAD_PRIO                 46U
 #define W61_MDM_RX_TASK_PRIO            47U
 
-/* Larger SPI engine stack; see docs/CubeMXCompliance.md. */
+/* Larger SPI engine stack; see firmware/Docs/Development.md (CubeMX compliance). */
 #define SPI_THREAD_STACK_SIZE           1536U
 /* USER CODE END EC */
 

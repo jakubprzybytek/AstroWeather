@@ -7,7 +7,7 @@
 
 // How a parsed astro payload is drawn on the boards. Hardware-free, so it runs
 // in the native tests; AstroDataRefreshTask fills the Display's boards with it
-// and then submits them. See docs/AstroRefresh.md#display-mapping.
+// and then submits them. See Docs/AstroRefresh.md#display-mapping.
 //
 // Block n goes to the board at I2C address 0x10 + n (Display/BoardChain.hpp),
 // which is the local board when that is the host's own address. Each numeric

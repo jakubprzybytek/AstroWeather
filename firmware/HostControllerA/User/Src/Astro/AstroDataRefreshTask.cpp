@@ -109,7 +109,7 @@ void logNumeric(uint8_t index, const AstroNumericValue& value)
 }
 
 // The clock follows the server's `time` on every successful fetch; see
-// docs/RTC.md. A missing or bad value leaves the clock alone but not the forecast.
+// Docs/RTC.md. A missing or bad value leaves the clock alone but not the forecast.
 void syncClock(const AstroServerTime& serverTime, uint32_t responseTick)
 {
     if (!serverTime.present)

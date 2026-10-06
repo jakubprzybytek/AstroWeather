@@ -1,0 +1,208 @@
+# I2C
+
+The I2C bus that links the host to its settings EEPROM and to the remote
+display boards, and everything both firmware images do on it. The message
+format and the address straps are shared code in [`../Common`](../Common/README.md);
+the host's master side is in [HostControllerA](../HostControllerA/README.md), the
+display board's target side in [DisplayController](../DisplayController/README.md).
+
+## Bus
+
+| | |
+| --- | --- |
+| Peripheral | I2C1 on both boards, `PA9` SCL, `PA10` SDA, 7-bit addressing |
+| Speed | 100 kHz standard mode (`Timing` `0x00503D58` from the 16 MHz HSI), analog filter on, digital filter off |
+| Pull-ups | 2.2 kΩ to 3V3 on SCL and SDA, fitted once on the bus |
+| Wiring | Daisy-chained through `J102`/`J104` together with power, `LED_BRIGHTNESS` and `LOW_POWER_ENABLE` |
+| Controller | The host, the only master |
+
+The pull-ups are sized for the eventual bus of one EEPROM and up to ten
+display boards, roughly 300-450 pF, where the common 4.7 kΩ would exceed the
+1 us rise time 100 kHz allows. Without pull-ups the lines never return high,
+the peripheral latches BUSY on its first START and no device responds. They are
+`dnp` in the schematic ([Hardware review](../../KiCad/Docs/Hardware_Review.md) H-4).
+
+### Devices
+
+| Address | Device |
+| --- | --- |
+| `0x08` | The host's own address in CubeMX; unused, since the host is never addressed. `eeprom scan` skips it |
+| `0x10`-`0x15` | Display boards, one per forecast block ([Addresses and straps](#addresses-and-straps)) |
+| `0x50`-`0x57` | The 24AA04 settings EEPROM. The SOT-23 part has no address pins and uses the low bit as the block select, so it answers on all eight; treat them as reserved. See [Settings.md](../HostControllerA/Docs/Settings.md#storage-medium) |
+
+`eeprom scan` on the host console lists every device that answers.
+
+## Messages
+
+Every message is 36 bytes: one command byte and one 35-byte plane in the
+logical board layout ([Display.md](Display.md#logical-board-buffer)).
+
+| Offset | Size | Content |
+| ---: | ---: | --- |
+| 0 | 1 | Command |
+| 1 | 35 | The content, or one attribute plane in the same layout |
+
+| Command | Plane | Receiver |
+| ---: | --- | --- |
+| `0x01` | Content | Replaces the content, applies the staged attributes, shows the board |
+| `0x02` | `BoardAttributes::blink` | Staged |
+| `0x03` | `BoardAttributes::level0` | Staged |
+| `0x04` | `BoardAttributes::level1` | Staged |
+
+The plane is serialized as numeric display 1, numeric display 2, matrix rows 0
+to 4, numeric display 3, numeric display 4: five segment bytes per numeric
+display, three bytes per matrix row, little-endian with bit 0 in the first
+byte's least significant bit, bits 21-23 zero.
+
+The host sends a board its three attribute planes first, `0x02`, `0x03`,
+`0x04`, then the content, `0x01`, each message about 3.6 ms at 100 kHz. The
+board stages the attribute planes and applies them with the next content, so
+content and attributes always change together. Staged attributes stay until
+replaced: a host that sends only content keeps the last attributes, and one
+that never sends any gets full brightness and no blinking. An unknown command
+or a wrong length is rejected and changes nothing. There is no reply message;
+the I2C ACK/NACK is the only acknowledgement.
+
+`serializeI2c()`, `serializeAttributesI2c()`, `deserializePlaneI2c()` and the
+content-only `deserializeI2c()` are in `DisplayI2cProtocol.cpp`.
+
+## Addresses and Straps
+
+Every board, the host included, has three address straps, `ADDR_0` (`PB10`),
+`ADDR_1` (`PB11`) and `ADDR_2` (`PB14`). Each can be left floating (0), tied to
+ground (1) or tied to VCC (2), which gives 27 board IDs; the address is
+`0x10 + id`, `0x10` to `0x2A`, so a board with no straps fitted is `0x10`.
+
+`Display::detectBoardAddress()` (`DisplayAddress.cpp`) reads each pin twice:
+
+1. As an input with the internal pull-down: high means VCC, state 2.
+2. Otherwise with the internal pull-up: high means floating, state 0; low means
+   ground, state 1.
+
+The pins are then left in analog mode, so a strap tied to VCC draws no pull
+current, and `id = ADDR_0 + 3 × ADDR_1 + 9 × ADDR_2`.
+
+The address decides what a board shows: forecast block *n* goes to the board at
+`0x10 + n` (`BoardChain.hpp`, chain positions 0 to 5). The host's own display is
+not special; it shows the block of its own address, block 0 with no straps.
+The host sends to every other address of the chain and skips its own. A host
+strapped outside the chain shows no block. Boards boot showing their address
+([Display.md](Display.md#boot-screens)), and the host's `status` probes the
+chain (`remote` line).
+
+## Host Side
+
+The host is a polled, blocking master: `HAL_I2C_Master_Transmit()`,
+`HAL_I2C_Mem_Read/Write()` and `HAL_I2C_IsDeviceReady()` with timeouts, no I2C
+interrupt and no DMA.
+
+### `Device::I2cBus`
+
+`I2cBus` (`User/Src/Device/I2cBus.cpp`) owns `hi2c1` and a mutex held for one
+transfer at a time. The EEPROM driver and the display boards are driven from
+different tasks (console, refresh, `MainLoopTask`), so every client of the bus
+must go through the same `I2cBus`, never the raw handle. The clock and
+current-sense tasks touch only the local board and never use I2C.
+
+### `BufferedDisplayBoard`
+
+One per chain address (`User/Src/Display/BufferedDisplayBoard.cpp`). It keeps
+the board's content and attributes in RAM and on `submit()` sends the three
+attribute messages and the content, stopping at the first failure.
+
+| | |
+| --- | --- |
+| Transfer timeout | 50 ms per message (`kTransferTimeoutMs`); the HAL times the whole transfer, so a task kept off the CPU that long also fails it |
+| Probe | `present()`: `HAL_I2C_IsDeviceReady()`, one trial, 5 ms |
+| Retry | A board that fails but still answers a probe gets the whole submit again, up to 3 attempts 5 ms apart; an absent board is not retried |
+| `lastSubmitOk()` | Whether the last submit reached the board |
+
+Logging, through the host's log and error log:
+
+- `DisplayBoard 0x11 sent on attempt 2, first error=0x...`, a warning, when a
+  retry was needed.
+- `DisplayBoard 0x14 unreachable status=1 error=0x... attempts=n` when it
+  failed: once on the transition, then every 30 s while it keeps being sent to.
+  Restating it matters for a board missing from boot, which fails before USB
+  has enumerated.
+- `DisplayBoard 0x11 online` when it answers again.
+
+The error is the HAL's `HAL_I2C_ERROR_*` bits: `0x04` NACK, `0x01` bus error,
+`0x02` arbitration lost, `0x20` timeout.
+
+### When the boards are sent to
+
+Remote boards are written only by `Display::submit()`, after an astro refresh
+(every board) and by the console's `display` commands
+(`display 0x12 ...` one board, `display all ...` every board, via
+`Display::submitRemote()`); see
+[Console.md](../HostControllerA/Docs/Console.md#display). The current readout,
+the clock and the progress bar change only the local board and send nothing,
+so an unreachable board is reported when something actually tries to reach it.
+
+## Display Board Side
+
+`I2cTarget` (`DisplayController/User/Src/I2cTarget.cpp`) owns `hi2c1` in target
+mode, with the HAL's interrupt-driven sequential listen API:
+
+- `HAL_I2C_AddrCallback()`: the host addressed this board. A write starts a
+  36-byte receive (`I2C_FIRST_AND_LAST_FRAME`). A read, which the protocol does
+  not use, gets one byte (0) so the bus is not held. Every address match also
+  flashes `LED_2` for 20 ms.
+- `HAL_I2C_SlaveRxCpltCallback()`: all 36 bytes arrived. They are queued, four
+  deep (the host sends four messages a few ms apart; when full the oldest is
+  dropped and counted), and the `DisplayApp` task is woken.
+- `HAL_I2C_ListenCpltCallback()`, `HAL_I2C_ErrorCallback()`: the transfer
+  ended. A write shorter than 36 bytes counts as a probe (no data, as the
+  host's `status` sends) or a short write; listening restarts.
+
+Nothing is decoded in the interrupt. `DisplayApp` feeds each queued message to
+`FrameAssembler` (`User/Src/FrameAssembler.cpp`), which decodes it with
+`deserializePlaneI2c()`, stages attribute planes and applies them with the
+content.
+
+The HAL NACKs any byte after the 36th, so a longer write fails on the host.
+Listening restarts after every error, and `DisplayApp` checks every second that
+the peripheral is still listening (`ensureListening()`), which also recovers
+from a bus error the HAL left in the ready state.
+
+Listening starts only once the straps are read, after I2C1 is re-initialised
+with the strap address, so a board never answers on another board's address.
+Until then, for a few milliseconds after reset, CubeMX's placeholder own
+address `0x10` is set but not serviced; a host write in that window is
+acknowledged and held until the host's 50 ms timeout.
+
+### Interrupt priority
+
+The display board's I2C1 interrupt has priority 1, above the refresh timer,
+the display DMA and the switches at 3
+([DisplayController Architecture](../DisplayController/Docs/Architecture.md#interrupt-priorities)).
+The refresh interrupt runs up to about 170 us, and the host starts the next
+message about 100 us after a STOP. The HAL sets `CR2.NACK` when it handles a
+STOP, and software cannot clear that bit; if the STOP is handled only after the
+host's next address has matched, the NACK stays set and the board refuses that
+message's second byte (error `0x04` on the host). At priority 1 the STOP is
+always handled in time. `stopWithAddrPending` in `g_displayStats` counts any
+STOP handled late and should stay 0.
+
+The host needs no I2C interrupt priority: it polls.
+
+### Diagnostics
+
+The display board counts frames and attributes accepted, rejected messages,
+short writes, probes, bus errors, listen restarts, queue overruns, the last
+HAL error and late STOPs in `g_displayStats`, read over SWD; see
+[DisplayController Architecture](../DisplayController/Docs/Architecture.md#diagnostics).
+On the host, `status` (`remote` line) probes each chain address and the error
+log keeps the unreachable warnings.
+
+## Tests
+
+| Suite | Covers |
+| --- | --- |
+| `Common/tests/DisplayI2cProtocolTests.cpp` | The 36-byte layout, the round trip of content and attribute planes, masking of bits 21-23, rejection of short, long and null messages and unknown commands without touching the destination |
+| `Common/tests/DisplayAddressTests.cpp` | All 27 strap combinations through the stub GPIO, the pins left analog without pull, `boardAddress()` limits, `detectBoardAddress()` |
+| `DisplayController/tests/FrameAssemblerTests.cpp` | The staging rules on the receiving side |
+
+Not covered natively: `I2cBus`, `BufferedDisplayBoard` and `I2cTarget`, which
+need the HAL; they are checked on the bench with the counters above.

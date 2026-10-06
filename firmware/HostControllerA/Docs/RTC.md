@@ -41,8 +41,9 @@ against a nominal 32 000 Hz, well inside the datasheet spread. Untrimmed, the
 clock gained 66 s an hour, or 26 minutes a day. The 26 Hz is not scatter in the
 measurement: the frequency really moves, over hours. Each 1 Hz is about 30 ppm,
 or 2.6 s a day, so the trim needs the frequency to roughly 0.1 Hz to be worth
-much, and no fixed trim can beat the spread, about ±34 s a day here. See the
-[measurement history](#measurement-history).
+much, and no fixed trim can beat the spread, about ±34 s a day here. The
+measurements are in
+[archive/RTC_Drift_Measurements.md](archive/RTC_Drift_Measurements.md).
 
 ## CubeMX Configuration
 
@@ -60,7 +61,8 @@ The generated `MX_RTC_Init()` sets the time to 00:00:00, 1 September of year
 0, on every boot. The `USER CODE BEGIN Check_RTC_BKUP` section in `main.c` returns
 before that when the time has been set; `RTC_TIME_SET_MARKER` in `main.h`
 defines the marker. That is the only change to generated code; see
-[CubeMXCompliance.md](archive/CubeMX_Compliance_Migration.md) and the next section.
+[Development.md](../../Docs/Development.md) for the CubeMX rules and the next
+section.
 
 ## Software
 
@@ -118,9 +120,8 @@ rewriting the prescalers drops the part of the current second already counted:
   holds the trim from before the reset, not with the generated 127/249. It
   rewrites them only if they differ.
 
-Measured on the first board, three resets and a re-flash each cost less than
-5 ms, below what `tools/rtc_offset.py` can resolve. The RTC keeps counting
-through a reset.
+A reset or a re-flash costs less than 5 ms, below what `tools/rtc_offset.py`
+can resolve. The RTC keeps counting through a reset.
 
 The LSI runs from VDD, so the clock cannot keep time while unpowered even if a
 battery were on VBAT: the registers would survive but not count, and the time
@@ -180,25 +181,27 @@ The lower `PREDIV_A` makes the RTC draw slightly more current, which does not
 matter for a mains-powered controller.
 
 What limits accuracy is how stable the LSI stays, not the arithmetic or the
-trim. On the first board the drift on one trim climbed from +1 ppm just after a
-power-up to +308 ppm six hours later, near the +341 ppm measured on a board
-that had been running for hours. A following overnight run averaged +798 ppm,
-so the spread seen so far is about 800 ppm, or 69 s a day. The cause is not
-known. It builds up over hours, which is too slow for the chip warming up, so
-ambient temperature or the supply are the likelier candidates; the fastest run
-being the overnight one points at a cooler room. The PC's clock is ruled out:
-checked against time.windows.com after the overnight run, it was 0.5 s off,
-about 15 ppm over that run. The MCU's own temperature sensor would settle it; the ADC
-already reads it, but the two have not been logged together.
+trim. On the first board the LSI moves by about 1000 ppm with the conditions:
+the drift on one trim has ranged from +1 ppm just after a power-up to about
++1300 ppm, building up over hours and fastest overnight, which points at the
+ambient temperature or the supply rather than the chip warming up. The MCU's
+own temperature sensor would settle it; the ADC already reads it, but the two
+have not been logged together.
 
-A trim is therefore worth taking from a settled period rather than from a run
-that is still climbing, or aimed at the middle of the range seen over a whole
-day and night, and the residual spread stays. Resyncing from the API
-bounds the error regardless, which matters more than refining the trim.
+The first board runs at **`time trim 19300`**, the middle of the range seen
+over day and night; the swing of about ±500 ppm (±43 s a day) around it
+remains. A trim is worth taking from a settled period, or aimed at the middle
+of the range over a whole day and night. Resyncing from the API bounds the
+error regardless, which matters more than refining the trim.
 
 ## Measuring the Drift
 
-The PC clock is the reference; Windows keeps it synced to internet time.
+The API syncs are the everyday reference: each `Clock sync` line gives the
+RTC's error against the server to about ±150 ms, and the drift tracker turns
+them into a rate (see [Drift measurement](#drift-measurement)). For a
+measurement independent of the network, the PC clock is the reference;
+resync Windows time first (`w32tm /resync`, as administrator), since an
+unsynchronized PC has been seen 0.7 s behind the server.
 `tools/rtc_offset.py` reads the RTC over SWD in HOTPLUG mode, which leaves the
 firmware running. It stamps the PC time before and after each read and keeps the
 fastest of four reads, so one reading is good to a few tens of ms.
@@ -235,38 +238,6 @@ gets an old `TR` with a current `SSR`, which can be off by a whole second or
 more. It also hands the firmware one stale reading. The tool reads `DR` first
 to release any freeze, then `SSR`, `TR` and `DR`, the same order as the HAL.
 
-### Measurement history
-
-First board (HostControllerA). The drift is what remained on the trim in use,
-and the frequency is what that makes the LSI:
-
-| When | Trim | Result |
-| --- | --- | --- |
-| 2026-09-22 14:14 → 15:20, 66 min | none | +18 372 ppm, uncertain by about 300 ppm because of the sync delay |
-| 2026-09-22 14:14 → 15:49, 95 min | none | **+18 390 … +18 405 ppm**, 32 588.8 Hz; `time trim 18400` set |
-| 2026-09-22 15:57 → 16:24, 27 min | +18 400 | +341 ± 60 ppm, 32 599.9 Hz: the fastest seen, on a board running for hours |
-| 2026-09-22 16:26 → 16:33 | +18 400 | ended by the power-cycle test |
-| 2026-09-22 16:35 → 17:25, 50 min, just after power-up | +18 400 | +1 ± 30 ppm, 32 588.8 Hz |
-| 2026-09-22 17:25 → 18:24, 59 min | +18 400 | +142 ± 27 ppm, 32 593.4 Hz: rising as the board runs |
-| 2026-09-22 18:24 → 19:54, 1.5 h | +18 400 | +275 ± 18 ppm, 32 597.8 Hz: still climbing |
-| 2026-09-22 19:54 → 22:33, 2.7 h | +18 400 | +308 ± 10 ppm, 32 598.8 Hz: near the fastest seen |
-| 2026-09-22 16:35 → 22:33, 6.0 h in total | +18 400 | +230 ± 5 ppm, 32 596.3 Hz on average, 19.9 s/day |
-| 2026-09-22 22:35 → 22:41 | +18 400 | ended by a power cycle, recovering the USB console port |
-| 2026-09-22 22:51:31 → ?, offset +0.043 s | +18 400 | ended by an unplugged board, not read before; the clock was later set by hand, 2.1 s ahead |
-| 2026-09-22 23:49:52 → 2026-09-23 09:09, 9.3 h overnight, board up since 23:11 | +18 400 | **+798 ± 3 ppm**, 32 614.8 Hz, 69 s/day: the fastest by far |
-| 2026-09-22 23:49:52 → 2026-09-23 09:32, 9.7 h | +18 400 | +806 ± 3 ppm, 32 614.9 Hz; ended by the first API sync, which stepped the RTC back 28.6 s |
-| from 2026-09-23 09:40:14, offset +0.010 s | +18 400 | ended by later API syncs; the SWD run could not be kept going through the testing of the following days |
-| 2026-09-23 10:16 → 12:53, 2.6 h, from the API syncs | +18 400 | about +324 ppm (stepped back 2.89 s) |
-| 2026-09-27 18:10 → 19:31, 81 min, from the API syncs | +18 400 | about **+1300 ppm** (stepped back 6.35 s) |
-| 2026-09-27 20:10 → 20:17, 7 min, from the API syncs | +18 400 | about +950 ppm (stepped back 0.40 s; rough, a sync leaves up to 250 ms) |
-| from 2026-09-27 20:21 | +19 300 | `time trim 19300` set, centring the +300 … +1300 ppm range seen with +18 400; the day/night swing of about ±500 ppm remains |
-
-From 2026-09-23 the API syncs are the reference: each `Clock sync` line gives
-the RTC's error against the server, to about ±150 ms. The SWD tool compares
-against the PC's clock instead, which was found 0.7 s behind the server on
-2026-09-27 with Windows time not synchronized; resync it
-(`w32tm /resync`, as administrator) before trusting an SWD baseline.
-
 ## Limits
 
 - **The time is lost when power is lost**, until the next astro fetch or
@@ -286,7 +257,7 @@ against the PC's clock instead, which was found 0.7 s behind the server on
   future date display have it. The RTC rolls it over, including leap years. Its
   two-digit year limits it to 2000..2099.
 - **LSI stability.** The trim is right only for the conditions it was measured
-  in. The LSI has been seen to move by about 800 ppm between runs; see
+  in. The LSI has been seen to move by about 1000 ppm with the conditions; see
   [Trimming](#trimming).
 
 ## Sync from the API
@@ -321,23 +292,18 @@ the sync is skipped with a warning.
 The RTC is stepped when the offset is 250 ms or more either way, or 1 s with a
 whole-seconds `time` (`Precision::adjustThresholdMs`). A smaller offset is
 within the error of the comparison, and stepping it would add noise rather than
-remove it. At the ~800 ppm the first board drifts, 250 ms builds up in about
-5 minutes, so nearly every fetch steps the clock back by a fraction of a
-second. After a
+remove it. At a drift of 500 ppm, 250 ms builds up in under 10 minutes, so
+nearly every fetch steps the clock by a fraction of a second. After a
 power-up, when the RTC has not been set, it is always set.
 
 The RTC can only be set to a whole second, and starts that second when it is
 written. So `stepToServer()` waits for the server's next second to begin, up to
 a second, and writes it then; the log gives how many ms late the write was,
 normally 0. It goes through the same path as `time set`, so the time is marked
-set and survives a reset. The first sync on the first board stepped the RTC by
-−28.574 s; `tools/rtc_offset.py` then found it within 10 ms of the PC clock.
+set and survives a reset.
 
-Under the T02 architecture the generated SNTP client in `LWIP/App/sntp.c` also
-wrote the RTC when it ran, so it was kept off. Since the T01 switch
-(2026-10-03) the module has its own SNTP (`W6X_Net_SNTP_*`), not enabled by
-the firmware; it would set the module's clock, not the RTC, so there is nothing
-to keep off on the host.
+The ST67 module has its own SNTP client (`W6X_Net_SNTP_*`), which the firmware
+does not enable; it would set the module's clock, not the RTC.
 
 ### Drift measurement
 
@@ -357,8 +323,8 @@ change.
 
 ### Log
 
-Every sync logs the comparison and the decision, then the drift. From the first
-board, with the whole-seconds server, a sync that stepped the RTC after a flash:
+Every sync logs the comparison and the decision, then the drift. A sync that
+stepped the RTC after a flash, with a whole-seconds server:
 
 ```
 Clock sync: server 2026-09-23 09:37:54 (response 1312 ms ago), RTC 2026-09-23 09:38:24.486, offset +28.574 s (RTC minus server, +-600 ms)
@@ -366,17 +332,7 @@ Clock sync: RTC stepped by -28.574 s, as the offset reached the 1000 ms threshol
 Clock drift: measurement starts at this sync, trim +18400 ppm
 ```
 
-and a later one that kept it:
-
-```
-Clock sync: server 2026-09-23 09:45:21 (response 1213 ms ago), RTC 2026-09-23 09:45:22.843, offset +0.030 s (RTC minus server, +-600 ms)
-Clock sync: RTC kept, the offset is under the 1000 ms threshold
-Clock drift since the previous sync: -0.127 s over 111 s, -1145 ppm +-10820
-Clock drift since 2026-09-23 09:43:31: -0.127 s over 111 s, -1145 ppm +-10820, -98.9 s/day; LSI 32551.5 +-346.2 Hz at trim +18400 ppm
-Clock trim: too early to judge (+-10820 ppm); +-50 ppm needs 6.7 h of syncs with no reset, time set or time trim
-```
-
-and one with milliseconds:
+and one that kept it, with milliseconds:
 
 ```
 Clock sync: server 2026-09-23 10:26:57.134 (response 1313 ms ago), RTC 2026-09-23 10:26:58.601, offset +0.054 s (RTC minus server, +-150 ms)
@@ -391,23 +347,14 @@ That measurement started on a whole-seconds sync, so its ±3156 ppm is
 
 The last line is the verdict on the trim. Once the error is within ±50 ppm it
 says either that the trim is right to within the error, or which `time trim`
-would cancel the drift. It never applies it: the LSI moves by about 800 ppm
+would cancel the drift. It never applies it: the LSI moves by about 1000 ppm
 with the conditions, so a trim taken from one span can be wrong for the next.
 
-## Planned: Automatic Trim
+## Open Items
 
-The drift measurement above gives what an automatic trim needs, as
-`trim' = (1 + trim) × (1 + ppm) − 1`. It already restarts on `time set`,
-`time trim`, a reset and implausible jumps, and waits for ±50 ppm before
-suggesting anything. Still to decide, so that one bad sample cannot spoil the
-trim:
-
-- Reject results far from the current trim, for example more than 1 000 ppm.
-  Those point at a bad timestamp, not at the LSI.
-- Move only part of the way, for example half, so noise averages out and a
-  temperature swing does not cause overshoot.
-- Save to the EEPROM only when the trim moves by more than a few ppm. The part
-  is rated for 1 000 000 writes per page, and a save rewrites only the changed
-  page.
-- Log every adjustment with the drift, interval and new value, and show it in
-  `status`.
+- **Automatic trim.** The drift measurement gives what it needs,
+  `trim' = (1 + trim) × (1 + ppm) − 1`, but the trim is still set by hand.
+  An automatic one should reject results far from the current trim (over
+  about 1000 ppm points at a bad timestamp), move only part of the way, save
+  to the EEPROM only when the trim moves by more than a few ppm, and log each
+  adjustment.

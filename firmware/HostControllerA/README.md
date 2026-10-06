@@ -2,27 +2,30 @@
 
 Firmware for the AstroWeather host controller board: an STM32G0B1 with an
 ST67W611M1 Wi-Fi module that fetches an astronomy and weather forecast and
-shows it on seven-segment and dot-matrix LED displays.
+shows it on seven-segment and dot-matrix LED displays, its own and those of up
+to five remote display boards.
 
 ## What It Does
 
 - Every 6 hours, at 00:10, 06:10, 12:10 and 18:10 local time, it joins Wi-Fi
   and fetches a line-based forecast payload over HTTPS from the AstroWeather
-  server (`../../sst`), sending the device key saved with `api key`. A slot missed while the board was off or offline is caught
-  up once, and failures are retried with a growing delay.
+  server (`../../sst`), sending the device key saved with `api key`. A slot
+  missed while the board was off or offline is caught up once, and failures
+  are retried with a growing delay.
 - It checks the payload's CRC, parses it, and shows it on its own LED board and
-  on up to five remote display boards reached over I2C. Night *n* of the
-  forecast goes to the board at address `0x10 + n`; every board, the host
-  included, reads its address from its straps.
+  on the remote display boards over I2C. Night *n* of the forecast goes to the
+  board at address `0x10 + n`; every board, the host included, reads its
+  address from its straps.
 - It keeps the date and time in the RTC, which runs from the internal LSI
-  oscillator. Each board's LSI error is measured once and stored as a trim, and
-  every successful fetch steps the clock to the server's time and logs the drift.
-  The time is shown as `HH:MM` on numeric display 3.
-- It offers a USB CDC console for logs, status and commands.
-- It keeps its settings, including the Wi-Fi credentials, the server address and
-  the clock trim, in an I2C EEPROM.
+  oscillator, trimmed per board and stepped to the server's time on every
+  fetch. The time is shown as `HH:MM` on numeric display 3.
+- It offers a USB CDC console for logs, status and commands, and keeps the
+  last 24 warnings and errors over resets.
+- It keeps its settings, including the Wi-Fi credentials, the server address
+  and key and the clock trim, in an I2C EEPROM.
 - It measures the board's supply current, die temperature and VDDA.
-- Switch 2 toggles a low-brightness step on every board.
+- Switch 1 starts a refresh; switch 2 toggles a low-brightness step on every
+  board.
 
 ## Hardware
 
@@ -37,34 +40,30 @@ shows it on seven-segment and dot-matrix LED displays.
 | `LED_1`, `LED_2` | Heartbeat (`PC13`); switch presses and USB console traffic (`PB9`) |
 | USB FS | CDC virtual COM port for the console |
 
-Each display board has four four-digit seven-segment displays and a 5x21 dot
-matrix. The full pin map is in [docs/Architecture.md](Docs/Architecture.md#peripherals-and-pins).
-Hardware issues are tracked in [../../KiCad/Hardware_Review.md](../../KiCad/Docs/Hardware_Review.md).
-
-## Shared Code
-
-The remote display boards run their own firmware,
-[`../DisplayController`](../DisplayController/README.md), on an STM32G070. Code
-both images use (the display encoding and multiplexing, the SCT2xxx driver, the
-I2C message format, the address straps and the task and mutex helpers) lives in
-[`../Common`](../Common/README.md) and is compiled into each project; see
-[docs/Architecture.md](Docs/Architecture.md#shared-code).
+The full pin map and the interrupt priorities are in
+[Architecture.md](Docs/Architecture.md#peripherals-and-pins). The board design
+and its known issues are in [KiCad/Docs](../../KiCad/Docs/README.md).
 
 ## Quick Start
 
 1. Copy `Appli/App/app_credentials.h.template` to `Appli/App/app_credentials.h`
    (ignored by git) and set `APP_ST67_HTTP_HOST`, a bare host name, and
    `APP_ST67_HTTP_PATH`, starting with `/`. These are the built-in server; a
-   board can be pointed elsewhere later with `api host` and `api path`. The SSID
-   and password macros in the template are no longer used.
+   board can be pointed elsewhere with `api host` and `api path`. The SSID and
+   password macros in the template are not used.
 2. Build, flash and open the console as described in
-   [docs/Development.md](../Docs/Development.md), for example with the
-   `Debug` preset.
-3. On the console, store the Wi-Fi credentials with
-   `wifi set <ssid> <password>`. They are saved to the EEPROM and a refresh
-   starts straight away; `status` shows the result.
+   [Development.md](../Docs/Development.md).
+3. On the console, store the Wi-Fi credentials and the device key; both are
+   saved to the EEPROM:
+
+   ```text
+   wifi set <ssid> <password>
+   api key <key>
+   ```
+
+   `wifi set` runs a refresh straight away; `status` shows the result.
 4. If the board is new, measure and set its clock trim (`time trim <ppm>`) as
-   described in [docs/RTC.md](Docs/RTC.md).
+   described in [RTC.md](Docs/RTC.md#measuring-the-drift).
 
 ## Features
 
@@ -75,70 +74,86 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | Feature | Status | Notes | Document |
 | --- | --- | --- | --- |
 | **Connectivity** | | | |
-| Wi-Fi connection (ST67W611M1): join, DHCP, failure diagnosis | ✅ Done | Credentials are set with `wifi set` and saved to the EEPROM | [WiFi.md](Docs/WiFi.md) |
-| Fetch data over HTTP | ✅ Done | Plain HTTP on port 80 only | [WiFi.md](Docs/WiFi.md) |
-| Server host and path from the console | ✅ Done | `api host`, `api path`, saved; the built-in values from `app_credentials.h` are the fallback | [WiFi.md](Docs/WiFi.md#server) |
-| Fetch data over HTTPS | ✅ Done | TLS in the ST67 module (T01); chain and hostname verified by the module; 199/200 stress cycles. Open: expiry check, transport fault cases | [HTTPS plan](Docs/archive/ST67_HTTPS_Implementation_Plan.md) |
-| Module power saving between fetches | 🔴 Not started | The module stays up between fetches | [WiFi.md](Docs/WiFi.md#open-items) |
+| Wi-Fi connection (ST67W611M1): join, DHCP, failure diagnosis | ✅ | Credentials set with `wifi set`, saved to the EEPROM | [WiFi.md](Docs/WiFi.md) |
+| Fetch over HTTPS | ✅ | TLS in the module (T01), certificate chain and hostname verified against the built-in Amazon Root CA 1; 100/100 stress cycles | [WiFi.md](Docs/WiFi.md#http) |
+| Server host, path and device key from the console | ✅ | `api host`, `api path`, `api key`, saved; `app_credentials.h` gives the built-in fallback | [WiFi.md](Docs/WiFi.md#server) |
+| Module power saving between fetches | 🔴 | The module stays initialized between fetches | [WiFi.md](Docs/WiFi.md#open-items) |
 | **Astro data** | | | |
-| Payload parser (protocol 1, 6 blocks) | ✅ Done | Unit tested | [AstroRefresh.md](Docs/AstroRefresh.md) |
-| Refresh every 6 hours with retry and catch-up | ✅ Done | The last success is lost on power loss | [AstroRefresh.md](Docs/AstroRefresh.md#schedule) |
-| Refresh from switch 1 or the console | ✅ Done | The switch is debounced only in hardware (RC); a second press while busy is rejected | [AstroRefresh.md](Docs/AstroRefresh.md) |
+| Payload parser (protocol 3, 6 blocks) | ✅ | Unit tested | [AstroRefresh.md](Docs/AstroRefresh.md) |
+| Refresh every 6 hours with retry and catch-up | ✅ | The last success is lost on power loss | [AstroRefresh.md](Docs/AstroRefresh.md#schedule) |
+| Refresh from switch 1 or the console | ✅ | A second request while busy is rejected | [AstroRefresh.md](Docs/AstroRefresh.md#triggers) |
 | **Display** | | | |
-| Local LED board (multiplexing, progress bar) | ⚠️ Works, HW issue | Off digits glow because the slot P-FETs do not fully turn off (H-3). On the prototype, matrix column 1 stays lit from a leak at `U505` ([Display-Issues.md](../../KiCad/Docs/Display-Issues.md#matrix-column-faults-around-u505)) | [Display.md](Docs/Display.md) |
-| Sending data to the 5 remote boards over I2C | ✅ Done (host side) | Needs I2C pull-ups, which are `dnp` in the schematic (H-4) | [Display.md](Docs/Display.md#i2c-transport) |
-| DisplayController firmware for the remote boards | 🟡 Built, not run | Local display, I2C target, boot and test screens, "no data" timeout; unit tested, but no display board has been built yet | [DisplayController README](../DisplayController/README.md#features) |
-| Low-brightness step (`LOW_POWER_ENABLE`) | ✅ Done | `display low on\|off` or switch 2, both saved, for all boards; it still follows the light sensor. Cuts LED current by about half (measured 59–65 → 28 mA with all LEDs lit). Remote boards need the DisplayController firmware from 2026-09-24, which releases their `PB8` (M-4) | [Display.md](Docs/Display.md#low-brightness) |
-| "No data" state at boot: segment G on the last digit of each numeric display, matrix blank, until the first refresh | ✅ Done | Shared with the display boards, which also return to it after 7 h without a frame | [Display.md](Docs/Display.md#no-data) |
-| Numeric formatting (fixed point, time, `?`) | ✅ Done | -0.5 °C shows as `-0.5`; values that do not fit 4 digits show the error pattern | [Display.md](Docs/Display.md#fixed-point-values) |
-| Display effects: blinking, 4 brightness levels | ✅ Done | Per segment and pixel, made in time by the refresh; the forecast's matrix rows carry levels and blink (API protocol 2), the clock's colon and the refresh progress bar blink. `display test` shows it all. Levels tuned by eye at normal brightness; not yet run on a display board | [Display.md](Docs/Display.md#blink-and-brightness-levels) |
-| Error log: the last 16 warnings and errors, with date and time or uptime, kept over resets and reflashing | ✅ Done | `errors [clear]`; the welcome message shows the count and the newest. Lost on power loss | [Console.md](Docs/Console.md#error-log) |
+| Local LED board: interrupt-driven multiplexing, refresh progress bar | ✅ | Matrix column 1 stays lit on the prototype ([Display-Issues.md](../../KiCad/Docs/Display-Issues.md)) | [Display.md](../Docs/Display.md) |
+| Blinking and four brightness levels per segment and pixel | ✅ | The forecast's matrix rows carry levels and blink; the clock's colon and the progress bar blink | [Display.md](../Docs/Display.md#blink-and-brightness-levels) |
+| Numeric formatting: fixed point, time, `?`, "no data" | ✅ | -0.5 shows as `-0.5`; values that do not fit four digits show the error pattern | [Display.md](../Docs/Display.md#numeric-representation) |
+| Boot screens: slot test, then the host's strap address | ✅ | Shared with the display boards | [Display.md](../Docs/Display.md#boot-screens) |
+| Remote display boards over I2C | ✅ | Board `0x11` runs the [DisplayController](../DisplayController/README.md) firmware; I2C pull-ups needed (H-4) | [I2C.md](../Docs/I2C.md) |
+| Low-brightness step (`LOW_POWER_ENABLE`) for every board | ✅ | `display low on\|off` or switch 2, saved; cuts LED current by about half | [Display.md](Docs/Display.md#low-brightness) |
 | **Time** | | | |
-| RTC clock on numeric display 3, `time` commands | ✅ Done | Lost on power loss (no LSE crystal or backup battery) | [RTC.md](Docs/RTC.md) |
-| Clock sync from the server | ✅ Done | | [RTC.md](Docs/RTC.md#sync-from-the-api) |
-| Clock trim | 🟡 Partial | Set by hand with `time trim`; automatic trim is planned | [RTC.md](Docs/RTC.md) |
+| RTC clock on numeric display 3, `time` commands | ✅ | Lost on power loss (no LSE crystal or backup battery) | [RTC.md](Docs/RTC.md) |
+| Clock sync from the server, with drift measurement | ✅ | | [RTC.md](Docs/RTC.md#sync-from-the-api) |
+| Clock trim | 🟡 | Set by hand with `time trim`; automatic trim not started | [RTC.md](Docs/RTC.md#open-items) |
 | **Power and sensing** | | | |
-| Current, temperature and VDDA monitor | ✅ Done (reworked board) | Works on the prototype with `VREF+` rewired to VDD; the schematic and PCB still tie it to GND (C-1). Current sense also relies on the PC6→PB2 connection (H-1) | [CurrentSense.md](Docs/CurrentSense.md) |
-| ADC idle when the current is neither displayed nor logged | ✅ Done | With `adc display off` and `adc log off` the task stops sampling until either is switched on | [CurrentSense.md](Docs/CurrentSense.md#sampling) |
-| VBUS voltage sense | ⚠️ Blocked by HW | PC7 is not an ADC pin and has no divider (H-1, H-2) | [Hardware review](../../KiCad/Docs/Hardware_Review.md) |
-| USB-PD negotiation for more than 5 V | 🔴 Not implemented | Feasibility study only; the hardware needs changes | [USB_PD_Feasibility.md](../../KiCad/Docs/archive/USB_PD_Feasibility.md) |
-| Reading the USB-C current limit (CC pins) | 🔴 Not implemented | Worst-case load exceeds the USB default (H-5) | [Hardware review](../../KiCad/Docs/Hardware_Review.md) |
+| Current, temperature and VDDA monitor | ✅ (reworked board) | Needs the C-1 and H-1 rework | [CurrentSense.md](Docs/CurrentSense.md) |
+| VBUS voltage sense | ⚠️ | PC7 is not an ADC pin and has no divider (H-1, H-2) | [Hardware review](../../KiCad/Docs/Hardware_Review.md) |
+| USB-PD negotiation for more than 5 V | 🔴 | Hardware changes needed; see the [study](../../KiCad/Docs/archive/USB_PD_Feasibility.md) | |
+| Reading the USB-C current limit (CC pins) | 🔴 | Worst-case load exceeds the USB default (H-5) | [Hardware review](../../KiCad/Docs/Hardware_Review.md) |
 | **System** | | | |
-| USB console and logging | ✅ Done | | [Console.md](Docs/Console.md) |
-| EEPROM settings | ✅ Done | A read failure is reported as "blank" | [Settings.md](Docs/Settings.md) |
-| Firmware version and git hash | 🔴 Not started | Only the build time is stamped | [Development.md](../Docs/Development.md) |
-| Unit tests | 🟡 Partial | 19 native suites, 95% line coverage of the code they compile, run in CI; console commands and the EEPROM store are next (phases 3-4) | [Testing.md](Docs/Testing.md) |
+| USB console: commands, help, log, statistics | ✅ | `help`, `help <group> <command>`, `help all` | [Console.md](Docs/Console.md) |
+| Display commands for this board, a remote board or all | ✅ | `display 0x12 test`, `display all clear` | [Console.md](Docs/Console.md#display) |
+| Error log: the last 24 warnings and errors, kept over resets | ✅ | `errors [clear]`; lost on power loss | [Console.md](Docs/Console.md#error-log) |
+| EEPROM settings | ✅ | | [Settings.md](Docs/Settings.md) |
+| Interrupt priorities: USB 1, everything else 3 | ✅ | | [Architecture.md](Docs/Architecture.md#interrupt-priorities) |
+| Firmware version and git hash | 🔴 | Only the build time is stamped | [Architecture.md](Docs/Architecture.md#shared-code) |
+| Unit tests | 🟡 | 15 native suites run in CI; the console, the settings store and the remote boards are not covered yet | [Testing.md](Docs/Testing.md) |
 
-## Known Limitations
+## Known Limitations and Open Items
+
+Hardware:
 
 - **The prototype host board carries hand rework** that the design files do not
   show yet: `VREF+` rewired to VDD (C-1) and the current-sense net taken to PB2
   (H-1). Boards built from the current files need the same changes.
+- **Random contents at power-up (L-3):** the host still starts `SCT_ENABLE`
+  low; the display boards already start it high
+  ([Display-Issues.md](../../KiCad/Docs/Display-Issues.md#other-known-issues)).
+
+Firmware, with details in each document's open items:
+
+- Wi-Fi: module power policy, repeated cold restarts, the HTTP error paths at
+  run time, small heap retentions, no fetch cancellation, certificate validity
+  dates ([WiFi.md](Docs/WiFi.md#open-items)).
+- Astro refresh: stale data after a failed noon refresh, low-power wake
+  ([AstroRefresh.md](Docs/AstroRefresh.md#open-items)).
+- Clock: automatic trim ([RTC.md](Docs/RTC.md#open-items)).
+- Settings: a torn write is detected but not recovered, credentials are stored
+  in the clear, unknown tags are not preserved
+  ([Settings.md](Docs/Settings.md#limitations)).
+- RAM: the forecast payload is held twice; holding it once would save 4 KB
+  ([Firmware-RAM-Usage.md](Docs/Firmware-RAM-Usage.md)).
+- Tests: the console, `Settings::Store`, the EEPROM driver and
+  `BufferedDisplayBoard` ([Testing.md](Docs/Testing.md#not-covered-yet)).
 
 ## Documentation
 
-Current:
+This project ([Docs](Docs/)):
 
-- [docs/Architecture.md](Docs/Architecture.md)
-- [docs/Development.md](../Docs/Development.md)
-- [docs/Console.md](Docs/Console.md)
-- [docs/WiFi.md](Docs/WiFi.md)
-- [docs/AstroRefresh.md](Docs/AstroRefresh.md)
-- [docs/Display.md](Docs/Display.md)
-- [docs/RTC.md](Docs/RTC.md)
-- [docs/Settings.md](Docs/Settings.md)
-- [docs/CurrentSense.md](Docs/CurrentSense.md)
-- [docs/Testing.md](Docs/Testing.md): native unit tests, coverage and the test plan
-- [docs/Firmware-RAM-Usage.md](Docs/Firmware-RAM-Usage.md): static RAM breakdown
-- [docs/CubeMXCompliance.md](Docs/archive/CubeMX_Compliance_Migration.md): keeping application
-  changes out of generated code
+- [Architecture.md](Docs/Architecture.md): boot, tasks, inter-task communication, interrupt priorities, pins, memory
+- [Console.md](Docs/Console.md): the USB device, the log, the error log and every console command
+- [WiFi.md](Docs/WiFi.md): the ST67 module, the session, HTTPS, the server settings
+- [AstroRefresh.md](Docs/AstroRefresh.md): the refresh pipeline, the payload, the display mapping, the schedule
+- [Display.md](Docs/Display.md): the host's side of the displays: the aggregate display, remote boards, progress bar, low brightness
+- [RTC.md](Docs/RTC.md): the clock, its trim and the sync from the server
+- [Settings.md](Docs/Settings.md): the EEPROM settings image
+- [CurrentSense.md](Docs/CurrentSense.md): current, temperature and VDDA
+- [Testing.md](Docs/Testing.md): this project's suites, coverage and bench tests
+- [Firmware-RAM-Usage.md](Docs/Firmware-RAM-Usage.md): static RAM breakdown
+- [archive](Docs/archive/README.md): plans, investigations and measurement logs
 
-Plans and hardware:
+Shared with the display boards ([firmware/Docs](../Docs/README.md)):
 
-- [docs/ST67_HTTPS_Implementation_Plan.md](Docs/archive/ST67_HTTPS_Implementation_Plan.md): HTTPS plan
-- [docs/USB_PD_Feasibility.md](../../KiCad/Docs/archive/USB_PD_Feasibility.md): USB Power Delivery study
-- [docs/Display_Board_Purchasing.md](../../KiCad/Docs/Display_Board_Purchasing.md) and
-  [Display_Board_BOM.csv](../../KiCad/Docs/Display_Board_BOM.csv): display board parts
-- [../../KiCad/Hardware_Review.md](../../KiCad/Docs/Hardware_Review.md): hardware issues
-
-Superseded plans and logs are kept in [docs/archive](Docs/archive/README.md).
+- [Development.md](../Docs/Development.md): build, flash, debug, connecting over USB, CubeMX rules
+- [Display.md](../Docs/Display.md): the display, its encoding and refresh
+- [I2C.md](../Docs/I2C.md): the bus, the messages, the addresses, both sides of the link
+- [Testing.md](../Docs/Testing.md): the native test kit
+- [Utilities.md](../Docs/Utilities.md): tasks, mutexes, switches, LEDs

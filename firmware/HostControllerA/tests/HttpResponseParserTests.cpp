@@ -248,7 +248,7 @@ void testContentLengthLimit()
 
 void testHeaderNamesAreCaseSensitive()
 {
-    // HTTP headers are case-insensitive; see docs/Testing.md known issues.
+    // HTTP headers are case-insensitive; see Docs/Testing.md known issues.
     // Current behaviour: only the exact spelling "Content-Length:" counts.
     Head head{};
     expect(parse(response("HTTP/1.1 200 OK", "content-length: 5\r\n"), head) &&

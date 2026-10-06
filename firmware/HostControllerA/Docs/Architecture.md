@@ -4,7 +4,8 @@
 
 This page describes how the firmware is put together: how it boots, which
 tasks run and how they talk to each other, which peripherals and pins it uses,
-what the unit tests cover, and which code is present but unused. The feature
+which interrupts it enables and at what priority, what the unit tests cover,
+and which code is present but unused. The feature
 documents listed in the [README](../README.md#documentation) describe each
 subsystem in depth.
 
@@ -16,7 +17,8 @@ code lives under `User/` and, for the parts shared with the DisplayController
 firmware, under `../Common/` (see [Shared Code](#shared-code)); CubeMX owns
 `Core/`, `Drivers/`, `Middlewares/`,
 `USB_Device/` and `ST67W6X_Network_Driver/`, and application changes
-there stay inside `USER CODE` sections (see [CubeMXCompliance.md](archive/CubeMX_Compliance_Migration.md)).
+there stay inside `USER CODE` sections (see
+[Development.md](../../Docs/Development.md#cubemx-compliance)).
 
 ## Boot Sequence
 
@@ -61,7 +63,7 @@ create their FreeRTOS mutexes from static storage at that point.
 6. `LowBrightness::set()` applies the saved low brightness to `PB8`, before the
    displays light up.
 7. The local board gets the "no data" state (`Display::noDataState()`, see
-   [Display.md](Display.md#no-data)) but does not show it yet: the first
+   [Display.md](../../Docs/Display.md#time-blank-and-no-data)) but does not show it yet: the first
    slot-test frame (`Display::slotTestState(0)`) is shown instead, then
    `localBoard.start()` enables the SCT outputs and starts TIM2, whose
    interrupt refreshes the board from then on. `Display` holds back every
@@ -91,20 +93,15 @@ waking again.
 ## Shared Code
 
 The remote display boards run the separate
-[DisplayController](../../DisplayController/README.md) project: an STM32G070
-with its own CubeMX configuration, presets and `User/` tree. Code both images
-need lives in `../Common` and is compiled into each project against that
-project's HAL, `main.h` and FreeRTOS configuration
-(`Common/CommonSources.cmake`), so the two CubeMX projects must keep the same
-labels for the pins it uses.
-
-| Location | Contents |
-| --- | --- |
-| `../Common/Src/Display/`, `Inc/Display/` | `DisplayTypes`, `DisplayCodec`, `DisplayI2cProtocol`, `DisplayAddress`, the `DisplayBoard` interface and `PcbDisplayBoard` |
-| `../Common/Src/Device/` | `SCT2xxx` |
-| `../Common/Src/Utils/`, `Inc/Utils/` | `Task`, `TaskBase`, `Mutex`, `SwitchInput`, `Crc32` |
-| `../Common/Src/Debug/` | `BlinkingLed`, `PulseLed` |
-| `../Common/tests/` | Their native tests, and the HAL/RTOS stubs, `Expect.hpp` and `add_native_test()` that this project's tests reuse |
+[DisplayController](../../DisplayController/README.md) project, an STM32G070.
+Code both images need lives in [`../Common`](../../Common/README.md) and is
+compiled into each project against that project's HAL, `main.h` and FreeRTOS
+configuration, so the two CubeMX projects keep the same labels for the pins it
+uses. It is documented once, for both, in [firmware/Docs](../../Docs/README.md):
+the display model, encoding and refresh in
+[Display.md](../../Docs/Display.md), the I2C link in
+[I2C.md](../../Docs/I2C.md), and the tasks, mutexes, switches and LEDs in
+[Utilities.md](../../Docs/Utilities.md).
 
 Everything else under `User/` is host-only: `Astro/` (the refresh task, parser,
 mapper, progress bar and schedule), `Clock/`, `WiFi/`, `Console/`, `Settings/`,
@@ -127,7 +124,7 @@ others hold a reference to it.
 | --- | --- | --- |
 | `i2c1Bus` | `Device::I2cBus` | `hi2c1`, with a mutex per transfer |
 | `localSct` | `SCT2xxx` | `hspi3`, `SCT_ENABLE`, `SCT_LATCH` |
-| `localBoard` | `Display::PcbDisplayBoard` | `localSct`, `htim2`, `DISPLAY_1_EN`..`DISPLAY_5_EN`; is also the `DisplayRefresh` task |
+| `localBoard` | `Display::PcbDisplayBoard` | `localSct`, `htim2`, `DISPLAY_1_EN`..`DISPLAY_5_EN`; refreshed from TIM2's interrupt |
 | `remoteBoard10`..`remoteBoard15` | `Display::BufferedDisplayBoard` | `i2c1Bus` at 7-bit addresses `0x10`..`0x15`, one per forecast block; the one at the host's own address is unused |
 | `display` | `Display::Display` | `localBoard` plus the six remote boards; `AstroWeather_Init()` sets the host's address from its straps (`setLocalAddress()`) |
 | `settingsEeprom` | `Device::Eeprom24AA04` | `i2c1Bus`, address `0x50` |
@@ -154,7 +151,7 @@ CMSIS-RTOS2 priorities are FreeRTOS priorities (`configMAX_PRIORITIES` is 56):
 The local display is not refreshed by a task: `Display::PcbDisplayBoard`
 runs the multiplexing from TIM2's update interrupt, with SPI3 transfers by
 DMA, so its timing depends on interrupt latency only; see
-[Display.md](Display.md#refresh-operation).
+[Display.md](../../Docs/Display.md#refresh-operation).
 
 | Task name | Owner | Priority | Stack (bytes) | Allocation | Does |
 | --- | --- | --- | ---: | --- | --- |
@@ -173,12 +170,45 @@ DMA, so its timing depends on interrupt latency only; see
 | `IDLE` | FreeRTOS | 0 | 512 | static | Idle |
 
 The two middleware tasks are created on the first fetch by `W6X_Init()`. After
-an ordinary refresh the module stays up, so they persist. (Under the T02
-architecture used until 2026-10-03 there were two more, LwIP's `tcpip_thread`
-and the generated `netif` task.) The driver priorities 46 and 47 are overridden in
-`ST67W6X_Network_Driver/Target/w61_driver_config.h`, from when the display
-refresh was a task they had to stay below; it now runs from TIM2's interrupt
-and no task priority affects it.
+an ordinary refresh the module stays up, so they persist. Their priorities, 46
+and 47, and the SPI engine's 1536-byte stack are set in the `USER CODE` block of
+`ST67W6X_Network_Driver/Target/w61_driver_config.h` (see
+[Development.md](../../Docs/Development.md#cubemx-compliance)). No task
+priority affects the display, which is refreshed from TIM2's interrupt.
+
+## Interrupt Priorities
+
+The Cortex-M0+ has four interrupt priority levels, 0 (highest) to 3. It has no
+`BASEPRI`, so a FreeRTOS critical section masks every interrupt (`PRIMASK`);
+the levels only decide which interrupt runs first and which may preempt
+another. The application uses two of them. Set in `HostControllerA.ioc` and
+generated into `MX_DMA_Init()`/`MX_GPIO_Init()` (`Core/Src/main.c`), the MSP
+functions (`Core/Src/stm32g0xx_hal_msp.c`) and `HAL_PCD_MspInit()`
+(`USB_Device/Target/usbd_conf.c`):
+
+| Interrupt | Priority | Source |
+| --- | ---: | --- |
+| `USB_UCPD1_2` | 1 | USB FS device: the CDC console |
+| `TIM2` | 3 | Display refresh, once per pass ([Display.md](../../Docs/Display.md#refresh-operation)) |
+| `DMA1_Channel1` | 3 | SPI1 RX, ST67 module |
+| `DMA1_Channel2_3` | 3 | SPI1 TX (channel 2), ST67 module; ADC1 (channel 3), current sense |
+| `DMA1_Ch4_7_DMA2_Ch1_5_DMAMUX1_OVR` | 3 | SPI3 TX (channel 4), the local display's SCT chain |
+| `EXTI4_15` | 3 | `ST67_RDY` (`PA4`), `SWITCH_1` (`PB12`), `SWITCH_2` (`PB13`) |
+| `ADC1_COMP` | 3 | ADC1 |
+| `TIM1_BRK_UP_TRG_COM` | 3 | HAL time base (`TICK_INT_PRIORITY`) |
+| `SysTick`, `PendSV` | 3 | FreeRTOS tick and context switch |
+
+I2C1 has no interrupt: the host is a polled master with timeouts (see
+[I2C.md](../../Docs/I2C.md)).
+
+USB is the one interrupt above the rest because the USB peripheral does not
+answer a new SETUP packet while the previous endpoint-0 interrupt is still
+pending, and the host gives up after three tries; queued behind a refresh
+interrupt (up to about 170 us) it missed requests, so the COM port failed to
+open or enumerate. See [Console.md](Console.md#usb-device). The refresh
+interrupt can in turn be delayed by a USB interrupt (100-290 us in the Debug
+build); its shortest pass is 480 us, and a late one is counted as
+`late interrupts` in `status`.
 
 ## Inter-task Communication
 
@@ -251,7 +281,7 @@ From `Core/Inc/main.h` and `HostControllerA.ioc`.
 | SPI3, master TX only, 1 Mbit/s | `PB3` SCK, `PB5` MOSI | SCT2xxx daisy chain of the local board |
 | GPIO | `PB6` `SCT_LATCH`, `PB7` `SCT_ENABLE` | SCT latch and output enable |
 | GPIO | `PD3`, `PA15`, `PD1`, `PD2`, `PD0` = `DISPLAY_1_EN`..`DISPLAY_5_EN` | Multiplex selects |
-| TIM2, 16 MHz / 16000 / 4 | none | 250 Hz multiplex tick, interrupt |
+| TIM2, 16 MHz / 16 = 1 MHz count | none | Display refresh: the interrupt sets each pass's length (four passes per 4 ms slot, 50 Hz frames) |
 | I2C1 | `PA9` SCL, `PA10` SDA | 24AA04 EEPROM (`0x50`) and remote boards (`0x10`..`0x15`) |
 | ADC1, 16x oversampling | `PB2` `CURRENT_SENSE` (IN10), plus the internal temperature sensor and VREFINT | Current, temperature and VDDA; DMA1 channel 3 |
 | RTC | none (LSI) | Calendar and backup registers |
@@ -259,7 +289,7 @@ From `Core/Inc/main.h` and `HostControllerA.ioc`.
 | GPIO EXTI | `PB12` `SWITCH_1`, `PB13` `SWITCH_2` | Switches, falling edge |
 | GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat; switch presses and USB CDC traffic |
 | GPIO | `PB8` `LOW_POWER_EN` | Low-brightness step for every board, set by `display low` and toggled by switch 2 (HostController only; see [Display.md](Display.md#low-brightness)) |
-| GPIO inputs | `PB10`, `PB11`, `PB14` = `ADDR_0`..`ADDR_2` | Board address straps, read only by the unused `detectBoardAddress()` |
+| GPIO inputs | `PB10`, `PB11`, `PB14` = `ADDR_0`..`ADDR_2` | Board address straps, read once at boot by `detectBoardAddress()`, then left analog |
 | SWD | `PA13`, `PA14` | Debug |
 | TIM1 | none | HAL time base |
 
@@ -281,8 +311,8 @@ Both survive a reset and are lost with power, like the calendar.
 
 ## Memory
 
-FreeRTOS uses `heap_4.c` with `configTOTAL_HEAP_SIZE` of 32000 bytes (40000
-until 2026-10-04, reduced after measuring a 15.9 KB peak under T01). The heap
+FreeRTOS uses `heap_4.c` with `configTOTAL_HEAP_SIZE` of 32000 bytes, against
+a measured peak use of about 15.9 KB. The heap
 holds `defaultTask` until it exits after starting USB, the two middleware tasks, the CMSIS objects created
 without static memory, and the ST67 driver's allocations, including the HTTP
 client's per-request buffers; application tasks and their stacks are static. See
@@ -299,7 +329,7 @@ watchdog, so it stays that way until reset.
 
 The native suites in `tests/` build with the `NativeTests` preset
 (`BUILD_NATIVE_TESTS=ON`) and run under CTest; see
-[Development.md](../../Docs/Development.md). Decisions are kept out of the tasks: parsing,
+[Testing.md](../../Docs/Testing.md). Decisions are kept out of the tasks: parsing,
 mapping and timing logic lives in small hardware-free units (for example
 `AstroDisplayMapper`, `AstroProgressBar`, `HttpResponseParser`,
 `St67ConnectDiagnosis`), and the tasks only do the I/O around them. Code that
@@ -323,9 +353,6 @@ firmware:
   brightness; kept for bench use.
 - **`TriggerSt67SmokeTest()`**: an old alias of `TriggerSt67ConnectivityCycle()`
   with no callers.
-- **`Display::detectBoardAddress()`** (`../Common/Src/Display/DisplayAddress.cpp`):
-  reads the `ADDR_0`..`ADDR_2` straps, meant for the DisplayController I2C
-  target; no callers in this project.
 - **The driver's HTTP, MQTT and BLE services** (`Middlewares/ST/ST67W6X_Network_Driver/Core/w6x_http.c`,
   `w6x_mqtt.c`, `w6x_ble.c`): compiled by the CubeMX CMake list, with no
   callers; discarded at link time. The firmware uses its own

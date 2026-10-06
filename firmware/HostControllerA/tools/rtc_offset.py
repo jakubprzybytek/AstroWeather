@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure the board RTC against this PC's clock, over SWD. See docs/RTC.md.
+"""Measure the board RTC against this PC's clock, over SWD. See Docs/RTC.md.
 
 Reads the RTC registers with STM32_Programmer_CLI in HOTPLUG mode, which
 leaves the firmware running, and brackets each read with PC timestamps. The

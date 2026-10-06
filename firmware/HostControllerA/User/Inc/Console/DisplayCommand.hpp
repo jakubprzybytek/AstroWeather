@@ -15,7 +15,7 @@ enum class CommandResult {
 // The 'display' commands: content, blink and level of a board, a test
 // pattern, and the pass table behind the levels. Replies itself on success
 // ('OK display ...') and for a board that does not answer; see
-// docs/Console.md#display.
+// Docs/Console.md#display.
 //
 // An optional target after 'display' picks the board: none is the local
 // board, 0x10-0x15 the board at that address (the local one at the host's

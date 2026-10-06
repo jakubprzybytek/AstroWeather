@@ -1,5 +1,7 @@
 # ST67 Bypass and Bootloader Project Guide
 
+> Archived 2026-10-06. Current state: [ST67_Bypass_Maintainer_Notes.md](../ST67_Bypass_Maintainer_Notes.md).
+
 ## Purpose
 
 Extend an already bootstrapped, working STM32G0B1 CMake firmware that currently echoes data over USB CDC. Its final job is to connect a PC to the ST67:

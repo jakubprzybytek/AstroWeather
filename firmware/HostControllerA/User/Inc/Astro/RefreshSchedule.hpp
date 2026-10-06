@@ -4,7 +4,7 @@
 
 // When the scheduled astro refresh runs. Pure arithmetic, so it runs in the
 // native tests; AstroDataRefreshTask reads the clock and asks it. See
-// docs/AstroRefresh.md.
+// Docs/AstroRefresh.md.
 //
 // Refreshes run in fixed local-time slots, 10 minutes after the server's
 // Clear Outside ingestion (sst.config.ts, 00:00/06:00/12:00/18:00

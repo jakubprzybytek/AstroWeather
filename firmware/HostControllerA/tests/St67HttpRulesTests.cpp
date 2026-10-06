@@ -125,7 +125,7 @@ void testContentTypeMissing()
 {
     expect(check("") == ContentTypeCheck::Missing, "empty headers");
     expect(check(headersWith("X-Other: 1")) == ContentTypeCheck::Missing, "no Content-Type");
-    // HTTP headers are case-insensitive; see docs/Testing.md known issues.
+    // HTTP headers are case-insensitive; see Docs/Testing.md known issues.
     // Current behaviour: the header name must be spelled exactly.
     expect(check(headersWith("content-type: text/plain; charset=utf-8")) ==
                ContentTypeCheck::Missing,

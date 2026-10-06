@@ -3,7 +3,7 @@
 #include <cstdint>
 
 // Calendar arithmetic for the RTC date, which the firmware tracks but does not
-// display. See docs/RTC.md.
+// display. See Docs/RTC.md.
 //
 // The RTC stores the year as 0..99 and the weekday as 1 (Monday) to 7 (Sunday),
 // and works out neither leap years nor the weekday for itself.

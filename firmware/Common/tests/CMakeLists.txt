@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 
 # Native unit tests for the shared code. board/main.h stands in for a firmware
 # project's Core/Inc/main.h, with the pin labels the shared code uses. See
-# HostControllerA/docs/Testing.md.
+# firmware/Docs/Testing.md.
 
 set(NATIVE_TEST_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(NATIVE_TEST_INCLUDE_DIRS)

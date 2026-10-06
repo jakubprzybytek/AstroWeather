@@ -108,7 +108,7 @@ void HAL_PCD_MspInit(PCD_HandleTypeDef* pcdHandle)
        is unserviced the peripheral does not answer a new SETUP; at priority 3
        the ~170 us refresh interrupt could hold it off past the host's three
        retries, and Windows then failed the request: error 31 on opening the
-       port, or a failed enumeration. See docs/Development.md. */
+       port, or a failed enumeration. See Docs/Console.md#usb-device. */
 
   /* USER CODE END USB_DRD_FS_MspInit 1 */
   }

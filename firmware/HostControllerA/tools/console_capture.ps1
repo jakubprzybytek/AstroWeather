@@ -6,8 +6,8 @@
 .DESCRIPTION
   Opens the board's CDC port exactly once, logs every line to a file, and
   sends the given commands one per CommandDelaySeconds. Made for the bench
-  runs in docs/ST67_HTTPS_Implementation_Plan.md section 8 and for the port
-  behaviour described in docs/Development.md ("COM port disappears or will
+  runs in Docs/archive/ST67_HTTPS_Implementation_Plan.md section 8 and for the port
+  behaviour described in firmware/Docs/Development.md ("COM port disappears or will
   not open"): on the development PC the port opens once per board reset and
   then fails, so everything a test needs goes into one session.
 

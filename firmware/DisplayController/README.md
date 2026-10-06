@@ -1,55 +1,47 @@
 # DisplayController Firmware
 
 Firmware for the AstroWeather remote display boards: an STM32G070CBT6 that
-will receive a display buffer from the host over I2C and multiplex it onto its
-own four seven-segment displays and 5x21 dot matrix. A display board is the
-same PCB as the host, populated without the Wi-Fi module, the USB port and the
-EEPROM; see
+receives its display content from the host over I2C and multiplexes it onto
+its own four seven-segment displays and 5x21 dot matrix. A display board is
+the same PCB as the host, populated without the Wi-Fi module, the USB port and
+the EEPROM; see
 [Display_Board_Purchasing.md](../../KiCad/Docs/Display_Board_Purchasing.md).
+
+The first display board runs it on the host's I2C bus at `0x11`.
 
 ## Features
 
-Started 2026-09-25. The first display board runs it since 2026-10-04, on the
-host's I2C bus at `0x11`. Everything marked 🔵 compiles and its logic is unit
-tested, but has not yet been checked on that board.
-
-The display behaviour and the I2C link are documented once, for both boards, in
-the host's [Display.md](../HostControllerA/Docs/Display.md); how this firmware
-is put together is in [docs/Architecture.md](Docs/Architecture.md).
-
-Status: ✅ done · 🔵 built, not yet run on a board · 🔴 not started.
+Status: ✅ done and checked on the board · 🔵 built and unit tested, not yet
+checked on the board · 🔴 not started.
 
 | Feature | Status | Notes | Document |
 | --- | --- | --- | --- |
-| **Build and platform** | | | |
-| Separate CubeMX project on the STM32G070, `Debug` and `Release` presets | ✅ Done | Compiles the shared code from `../Common` | [Build and Flash](#build-and-flash) |
-| FreeRTOS with statically allocated tasks | ✅ Done | Heap 3072 B; only `defaultTask` uses it | [Architecture.md](Docs/Architecture.md#tasks) |
-| Remove `defaultTask` | 🔴 Not started | CubeMX's placeholder task only idles. Delete it in CubeMX (FreeRTOS, Tasks and Queues), then shrink `configTOTAL_HEAP_SIZE`, since nothing else uses the heap; frees about 3 KB of RAM | [Architecture.md](Docs/Architecture.md#tasks) |
 | **Display** | | | |
-| Drive the local LED board (5-slot multiplex, 250 Hz) | 🔵 Built | `PcbDisplayBoard` on SPI1 and TIM6 | [Display.md](../HostControllerA/Docs/Display.md#refresh-operation) |
-| Safe power-up: outputs blanked, all slots off | ✅ Done | `SCT_ENABLE` and the slot selects start high (CubeMX) | [Display.md](../HostControllerA/Docs/Display.md#refresh-operation) |
-| Boot slot test: each `DISPLAYx_EN` slot on its own, everything it drives, 200 ms each (1 s) | 🔵 Built | Shows dead segments and dead slot switches without the host; shared with the host (`Display::showBootScreens()`) | [Architecture.md](Docs/Architecture.md#screens) |
-| Board address at boot: `Ad12` for 0x12 on numeric display 1, for 2 s | 🔵 Built | Checks the straps in place | [Architecture.md](Docs/Architecture.md#screens) |
-| "No data" state: segment G on the last digit of every numeric display, matrix blank | 🔵 Built | Shared (`Display::noDataState()`); after the boot screens until the first frame. The host shows it too (verified on the host board) | [Display.md](../HostControllerA/Docs/Display.md#no-data) |
-| Back to "no data" after 7 h without a frame | 🔵 Built | Just over the host's 6-hour refresh interval, since the host sends only on a refresh or a `display` command | [Display.md](../HostControllerA/Docs/Display.md#no-data) |
+| Drive the local LED board: five slots, 50 Hz frames, four passes per slot | ✅ | `PcbDisplayBoard` from TIM6's interrupt, SPI1 by DMA; shared with the host | [Display.md](../Docs/Display.md#refresh-operation) |
+| Blink and four brightness levels per segment and pixel | ✅ | Sent by the host as attribute planes with the content | [Display.md](../Docs/Display.md#blink-and-brightness-levels) |
+| Safe power-up: outputs blanked, all slots off | ✅ | `SCT_ENABLE` and the slot selects start high (CubeMX); the first frame is prepared before the outputs are enabled | [Architecture.md](Docs/Architecture.md#boot) |
+| Boot screens: slot test (each `DISPLAYx_EN` slot on its own, 1 s), then the board address (`Ad11`, 2 s) | ✅ | Shared with the host (`Display::showBootScreens()`) | [Display.md](../Docs/Display.md#boot-screens) |
+| "No data" until the first frame, and again after 7 h without one | 🔵 | Shared state (`Display::noDataState()`); 7 h is just over the host's 6-hour refresh interval | [Architecture.md](Docs/Architecture.md#screens) |
 | **I2C link to the host** | | | |
-| Address from the `ADDR_0..2` straps (27 IDs, `0x10`–`0x2A`) | ✅ Done | `detectBoardAddress()`, floating 0, ground 1, VCC 2, so no straps is `0x10`; the pins are left analog afterwards. Board 1 reads `0x11` (`ADDR_0` grounded) | [Display.md](../HostControllerA/Docs/Display.md#i2c-transport) |
-| I2C target: receive the 36-byte message, command `0x01` | ✅ Done | Interrupt listen mode; the message is decoded in the `DisplayApp` task. On the bench `astro test` gave 1 frame and 3 attribute messages accepted, nothing rejected, no bus errors; `status` and `eeprom scan` probes answered | [Architecture.md](Docs/Architecture.md#i2c-target) |
-| Listen only once the address is known | ✅ Done | I2C1 is re-initialised with the strap address before listening starts; the host sees `0x11` and nothing on CubeMX's placeholder `0x10` | [Architecture.md](Docs/Architecture.md#i2c-target) |
-| Reject unknown commands and short writes, keeping the previous frame | 🔵 Built | Counted in `g_displayStats` | [Architecture.md](Docs/Architecture.md#i2c-target) |
-| Recover from bus errors | 🔵 Built | Listening is restarted after an error, and checked every second | [Architecture.md](Docs/Architecture.md#i2c-target) |
+| Address from the `ADDR_0..2` straps, `0x10`–`0x2A` | ✅ | Floating 0, ground 1, VCC 2; board 1 reads `0x11` | [I2C.md](../Docs/I2C.md#addresses-and-straps) |
+| I2C target: content and attribute messages | ✅ | Interrupt-driven listen; the messages are decoded in the `DisplayApp` task. The I2C interrupt is at priority 1 so every message is acknowledged | [I2C.md](../Docs/I2C.md#display-board-side) |
+| Listen only once the address is known | ✅ | Nothing answers on CubeMX's placeholder `0x10` | [I2C.md](../Docs/I2C.md#display-board-side) |
+| Reject unknown commands and short writes, keeping the previous frame | 🔵 | Counted in `g_displayStats` | [I2C.md](../Docs/I2C.md#display-board-side) |
+| Recover from bus errors | 🔵 | Listening restarts after an error and is checked every second | [I2C.md](../Docs/I2C.md#display-board-side) |
 | **Brightness** | | | |
-| Never drive the bussed `LOW_POWER_ENABLE` line | ✅ Done | PB8 is analog ([Hardware review](../../KiCad/Docs/Hardware_Review.md) M-4) | [Display.md](../HostControllerA/Docs/Display.md#low-brightness) |
+| Never drive the bussed `LOW_POWER_ENABLE` line | ✅ | `PB8` stays analog; the host drives it for every board ([Hardware review](../../KiCad/Docs/Hardware_Review.md) M-4) | [Display.md](../Docs/Display.md#low-brightness) |
 | **Development aids** | | | |
-| Heartbeat on `LED_1` | ✅ Done | 20 ms on every 2 s from power-up, the host's rate (`BlinkingLed::kHeartbeatOnMs`/`kHeartbeatOffMs` in `../Common`) | [Architecture.md](Docs/Architecture.md#tasks) |
-| `LED_2` flashes on every I2C transaction addressed to the board | 🔵 Built | 20 ms, from the address-match interrupt, through the host's `PulseLed` (now in `../Common`) | [Architecture.md](Docs/Architecture.md#screens) |
-| Switch 1 steps through test screens, switch 2 shows the address | 🔵 Built | All segments, then an identify pattern, then back; test screens close after 60 s, the address after 3 s | [Architecture.md](Docs/Architecture.md#screens) |
-| Diagnostic counters | ✅ Done | `g_displayStats`, read over SWD: frames accepted and rejected, short writes, probes, bus errors, listen restarts, stale timeouts | [Architecture.md](Docs/Architecture.md#diagnostics) |
-| Stack overflow hook, as on the host | ✅ Done | Halts with the task name in `g_stackOverflowTaskName`; it caught `DisplayApp` on its first board run (stack now 2048) | [Architecture.md](Docs/Architecture.md#diagnostics) |
-| Console over USART2 (PA2/PA3, 115200) | 🔴 Not started | The G070 has no USB; USART2 is disabled in CubeMX for now. Wiring in [Display_Board_Purchasing.md](../../KiCad/Docs/Display_Board_Purchasing.md#console-over-uart) | |
-| **Tests** | | | |
-| Native tests for the shared code (codec, protocol, address, "no data") | ✅ Done | 5 suites in `../Common/tests` | [Testing.md](../HostControllerA/Docs/Testing.md) |
-| Native tests for the screens and the stale-data timeout | ✅ Done | 2 suites in `tests/` | [Build and Flash](#build-and-flash) |
+| Heartbeat on `LED_1`, 20 ms every 2 s | ✅ | Shared `BlinkingLed`, the host's rate | [Utilities.md](../Docs/Utilities.md) |
+| `LED_2` flashes on every I2C transaction addressed to the board | ✅ | 20 ms, from the address-match interrupt, through the shared `PulseLed` | [Architecture.md](Docs/Architecture.md#screens) |
+| Switch 1 steps through test screens, switch 2 shows the address | 🔵 | All segments, then an identify pattern; test screens close after 60 s, the address after 3 s | [Architecture.md](Docs/Architecture.md#screens) |
+| Diagnostic counters, read over SWD | ✅ | `g_displayStats`: frames, attributes, rejects, short writes, probes, I2C errors, refresh counters | [Architecture.md](Docs/Architecture.md#diagnostics) |
+| Stack overflow hook | ✅ | Halts with the task name in `g_stackOverflowTaskName` | [Architecture.md](Docs/Architecture.md#diagnostics) |
+| Console over USART2 (`PA2`/`PA3`, 115200) | 🔴 | The G070 has no USB; USART2 is disabled in CubeMX. Wiring in [Display_Board_Purchasing.md](../../KiCad/Docs/Display_Board_Purchasing.md#console-over-uart) | |
+| **Platform** | | | |
+| CubeMX project on the STM32G070, `Debug` and `Release` presets | ✅ | Compiles the shared code from `../Common` | [Development.md](../Docs/Development.md) |
+| FreeRTOS with static tasks; `defaultTask` exits at start | ✅ | The 3072-byte heap is used only by `defaultTask` until it exits | [Architecture.md](Docs/Architecture.md#tasks) |
+| Interrupt priorities: I2C 1, everything else 3 | ✅ | | [Architecture.md](Docs/Architecture.md#interrupt-priorities) |
+| Native tests for the screens, the stale-data timeout and the frame assembly | ✅ | 3 suites in `tests/`; the shared code's suites are in `../Common/tests` | [Testing.md](../Docs/Testing.md) |
 
 ## Hardware
 
@@ -58,45 +50,28 @@ shared code compiles unchanged.
 
 | Peripheral | Pins | Use |
 | --- | --- | --- |
-| SPI1, master TX only, 1 Mbit/s | `PB3` SCK, `PB5` MOSI | SCT2xxx daisy chain |
+| SPI1, master TX only, 1 Mbit/s, TX by DMA1 channel 1 | `PB3` SCK, `PB5` MOSI | SCT2xxx daisy chain |
 | GPIO | `PB6` `SCT_LATCH`, `PB7` `SCT_ENABLE` (starts high: outputs blanked) | SCT latch and output enable |
 | GPIO | `PD3`, `PA15`, `PD1`, `PD2`, `PD0` = `DISPLAY_1_EN`..`DISPLAY_5_EN` (start high: off) | Active-low multiplex selects |
-| TIM6, 16 MHz / 16000 / 4 | none | 250 Hz multiplex tick, interrupt (the G070 has no TIM2) |
-| I2C1, target, interrupt | `PA9` SCL, `PA10` SDA | Messages from the host, at `0x10` + the strap ID |
-| GPIO inputs, pull-down at reset | `PB10`, `PB11`, `PB14` = `ADDR_0`..`ADDR_2` | Board address straps; analog once read |
-| GPIO EXTI, falling edge, internal pull-up | `PB12` `SWITCH_1`, `PB13` `SWITCH_2` | Switches, for `Utils::SwitchInput`. The buttons and their pull-ups are optional on a display board; without the internal pull-up the inputs floated, and noise at boot read as a switch 2 press that held the address screen for 3 s more (seen 2026-10-05) |
+| TIM6, prescaler 15 (1 MHz count) | none | Display refresh; the interrupt sets each pass's length (the G070 has no TIM2) |
+| I2C1, target, interrupt at priority 1 | `PA9` SCL, `PA10` SDA | Messages from the host, at `0x10` + the strap ID |
+| GPIO inputs | `PB10`, `PB11`, `PB14` = `ADDR_0`..`ADDR_2` | Board address straps; analog once read |
+| GPIO EXTI, falling edge, internal pull-up | `PB12` `SWITCH_1`, `PB13` `SWITCH_2` | Switches; the buttons and their external pull-ups are optional on a display board |
 | GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat, I2C traffic |
-| Analog | `PB8` `LOW_POWER_ENABLE` | Bussed net driven by the host; never driven here ([Hardware review](../../KiCad/Docs/Hardware_Review.md) M-4) |
+| Analog | `PB8` `LOW_POWER_ENABLE` | Bussed net driven by the host; never driven here |
 | SWD | `PA13`, `PA14` | Debug |
 | TIM1 | none | HAL time base |
 
-FreeRTOS through CMSIS-RTOS2, 3072-byte heap: the tasks and mutexes use
-static memory, so only `defaultTask` comes from it.
-
 ## Build and Flash
 
-Same toolchain and workflow as the host
-([Development.md](../Docs/Development.md)): GNU Arm Embedded
-with Ninja through the CMake presets `Debug` and `Release`.
+The toolchain, presets, flashing and native tests are shared with the other
+firmware projects and described in
+[Development.md](../Docs/Development.md). In short:
 
 ```bash
 cmake --preset Debug
 cmake --build --preset Debug
-arm-none-eabi-size build/Debug/DisplayController.elf
 STM32_Programmer_CLI -c port=SWD -w build/Debug/DisplayController.elf -v -hardRst
-```
-
-`.vscode/launch.json` has **DisplayController Debug** and **Release** entries
-for the ST-LINK debugger.
-
-Native tests for this project's own logic (the screens and the stale-data
-timeout) build with the host compiler; the shared code's suites are in
-`../Common/tests`:
-
-```bash
-cmake --preset NativeTests
-cmake --build --preset NativeTests
-ctest --test-dir build/native-tests-local --output-on-failure
 ```
 
 ## Layout
@@ -105,6 +80,32 @@ ctest --test-dir build/native-tests-local --output-on-failure
 | --- | --- |
 | `DisplayController.ioc`, `Core/`, `Drivers/`, `Middlewares/`, `cmake/stm32cubemx/`, the startup file and linker script | CubeMX; application changes only inside `USER CODE` sections |
 | `CMakeLists.txt`, `CMakePresets.json` | The project: adds `User/` and `../Common` to the CubeMX target |
-| `User/Inc`, `User/Src` | Application code specific to the display board; see [docs/Architecture.md](Docs/Architecture.md) |
+| `User/Inc`, `User/Src` | Application code specific to the display board |
 | `tests/` | Native tests of that code |
-| `../Common` | Code shared with the host, compiled into this image |
+| `../Common` | Code shared with the host, compiled into this image ([README](../Common/README.md)) |
+
+## Documentation
+
+This project:
+
+- [Docs/Architecture.md](Docs/Architecture.md): boot, tasks, screens, interrupt priorities, the SWD diagnostics
+- [Docs/archive](Docs/archive/): [I2C_NACK_Investigation.md](Docs/archive/I2C_NACK_Investigation.md), how the I2C interrupt priority was found
+
+Shared with the host ([firmware/Docs](../Docs/README.md)):
+
+- [Development.md](../Docs/Development.md): build, flash, debug, CubeMX rules
+- [Display.md](../Docs/Display.md): the display, its encoding and refresh
+- [I2C.md](../Docs/I2C.md): the bus, the messages, the addresses, both sides of the link
+- [Testing.md](../Docs/Testing.md): native tests
+- [Utilities.md](../Docs/Utilities.md): tasks, mutexes, switches, LEDs
+
+Hardware: [KiCad/Docs](../../KiCad/Docs/README.md).
+
+## Known Limitations and Open Items
+
+- Not yet checked on the board: rejecting unknown commands and short writes,
+  recovery from bus errors, the 7-hour "no data" timeout and the switch test
+  screens.
+- No console: the counters are read over SWD until the USART2 console exists.
+- The FreeRTOS heap (3072 B) could shrink, since only `defaultTask` uses it
+  and only until it exits.

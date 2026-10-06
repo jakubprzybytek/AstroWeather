@@ -18,8 +18,10 @@ The measurement works on the prototype host board, which has a hand rework:
 `VREF+` (U302 pin 5) is tied to GND in the schematic and PCB, and has been
 rewired to VDD on the board. Boards built from the current design files need
 the same rework until the schematic and PCB are fixed (issue C-1 in
-[Hardware_Review.md](../../../KiCad/Docs/Hardware_Review.md)). See
-[Troubleshooting history](#troubleshooting-history).
+[Hardware_Review.md](../../../KiCad/Docs/Hardware_Review.md)). Without it the
+ADC has no reference and every result, VREFINT and temperature included, is
+meaningless. The investigation that found this is archived in
+[ADC_Current_Monitor_Troubleshooting.md](archive/ADC_Current_Monitor_Troubleshooting.md).
 
 ## Signal Chain
 
@@ -43,10 +45,10 @@ protection or transient detection.
 ### PB2 or PC6: hardware item
 
 The firmware reads `PB2` (pin 21). The KiCad schematic routes
-`CURRENT_SENSE_FLTR` to `PC6` (pin 30) instead; see
-[USB_PD_Feasibility.md](../../../KiCad/Docs/archive/USB_PD_Feasibility.md). During bring-up `PC6` was
-found physically connected to `PB2` on the board in use, so both pins see the
-filtered signal. `PC6` (and `PC7`, `VOLTAGE_SENS_FLTR`) are configured as
+`CURRENT_SENSE_FLTR` to `PC6` (pin 30) instead (issue H-1 in
+[Hardware_Review.md](../../../KiCad/Docs/Hardware_Review.md)). On the prototype
+host board `PC6` is connected to `PB2`, so both pins see the filtered
+signal. `PC6` (and `PC7`, `VOLTAGE_SENS_FLTR`) are configured as
 analog inputs with no pull, which keeps them high impedance.
 
 Confirm which revision a board is before relying on this, and resolve the
@@ -181,127 +183,3 @@ side of 9999.
 Not covered: the task, the ADC and DMA configuration, reading the factory
 calibration values, and the display output. These have been checked on hardware only,
 on the reworked prototype.
-
-## Troubleshooting History
-
-This records the investigation into readings that did not match the pin
-voltage, from the former `ADC_Current_Monitor_Troubleshooting.md`
-([archive](archive/ADC_Current_Monitor_Troubleshooting.md)). That document
-recorded **no resolution**. The configuration it was debugging was a single
-channel read by polling; the firmware has since moved to the three-channel DMA
-scan above, **with oversampling enabled**, which is the opposite of what its
-resolution path recommended while diagnosing.
-
-**Resolution:** the 2026-09-23 hardware review found `VREF+` (U302 pin 5) tied
-to GND in both the schematic and the PCB, so the ADC had no reference and every
-result, VREFINT and temperature included, was meaningless. Rewiring pin 5 to
-VDD on the prototype fixed it; current sensing now works with the shipped
-three-channel, oversampled configuration. The schematic and PCB still carry
-the fault (issue C-1 in
-[Hardware_Review.md](../../../KiCad/Docs/Hardware_Review.md)). The rest of this
-section is kept for reference.
-
-### Symptom
-
-An oscilloscope showed 20–30 mV at `PB2`, which should read about 25–37 counts,
-or 8–12 mA. The firmware reported instead:
-
-- **Oversampling off**: only `raw=255` (0x0FF, 82 mA) and `raw=511` (0x1FF,
-  164 mA), which would be 205 mV and 412 mV.
-- **16× oversampling, shift 4**: values such as 511, 495, 447, 431, 367, 303,
-  271 and 319, many of the form 16 × N − 1 (511 = 16 × 32 − 1,
-  495 = 16 × 31 − 1, 447 = 16 × 28 − 1).
-
-A repeated low nibble of `0xF` is not what ordinary quantisation produces. The
-exact 0x0FF and 0x1FF values are suspicious but not proof of misalignment: they
-are also valid readings of a real 205 mV or 412 mV. Left alignment would give
-about 4080 for 205 mV, so it does not explain them either.
-
-### Ruled out
-
-- The 32-bit overflow in the conversion, since fixed with 64-bit arithmetic.
-- Pin and channel setup: `PB2` analog with no pull, `ADC1_IN10` at rank 1,
-  12-bit right-aligned, 160.5-cycle sample time, 100 ms cadence.
-
-### Still possible
-
-1. The scope and the ADC were not measuring the same node or ground.
-2. The ADC's runtime registers differ from the generated source or the flashed
-   image.
-3. The result is being read in the wrong format.
-4. Something else on the `PB2`/`PC6` net affects the signal.
-5. The signal moves faster than the scope capture or the sampling reveals.
-6. Oversampling or its shift is not applied as configured.
-
-### Register check
-
-Capture the data, status and configuration registers at conversion time and
-log them in hex:
-
-```cpp
-const uint32_t dr = ADC1->DR;
-const uint32_t isr = ADC1->ISR;
-const uint32_t cfgr1 = ADC1->CFGR1;
-const uint32_t cfgr2 = ADC1->CFGR2;
-```
-
-Reading `DR` clears the end-of-conversion flag, so read it once and use that
-value as the sample. With DMA the data register has already been read by the
-DMA, so for this check use the DMA buffer as the sample and read the
-configuration registers only. Expect:
-
-| Field | Expected now |
-| --- | --- |
-| `CFGR1.RES` | 12-bit |
-| `CFGR1.ALIGN` | right |
-| `CHSELR` | channel 10, the temperature sensor and `VREFINT` |
-| `CFGR2.OVSE` | 1, oversampling on |
-| `CFGR2.OVSR` | 16× |
-| `CFGR2.OVSS` | shift 4 |
-
-### Known-voltage test
-
-Apply a stable voltage directly to `PB2` and compare. Never exceed VDDA.
-
-| Voltage | Expected raw at 3.3 V |
-| --- | --- |
-| 0.000 V | ≈ 0 |
-| 0.330 V | ≈ 410 |
-| 1.000 V | ≈ 1241 |
-| 1.650 V | ≈ 2048 |
-
-If this passes, the problem is in the analog path; if not, in the ADC setup.
-
-### Hardware checks
-
-Measure, against MCU ground, both the INA180 output and the `PB2`/`PC6` net at
-the MCU pin, preferably with a scope trace of each; `PB2` should be much slower
-than the amplifier output. The network should be:
-
-```text
-INA180 OUT ---- 100 kΩ ---- PB2
-                            |
-                           1 µF
-                            |
-                           GND
-```
-
-Confirm that:
-
-- the capacitor is fitted, is really 1 µF, and is on the `PB2` side of the
-  resistor;
-- `PC6` has no external pull, digital output or other connection;
-- the INA180 and MCU grounds are common;
-- INA180 `REF` is connected for unidirectional measurement;
-- the INA180 output stays within its supply and the ADC input limits.
-
-### Suggested order
-
-1. Run the known-voltage test on the shipped configuration.
-2. Capture the registers.
-3. If both are right, investigate the INA180 output, the RC network and the
-   `PB2`/`PC6` net.
-4. If the known-voltage test fails with oversampling, repeat it with
-   oversampling off to separate the two.
-5. Then measure the zero-current offset against a trusted meter, and decide
-   whether to subtract it.

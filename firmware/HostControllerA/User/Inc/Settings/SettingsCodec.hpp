@@ -45,7 +45,7 @@ constexpr uint8_t kContainerVersion = 1U;
 // default. The version above tracks the container - header layout, CRC choice -
 // not the set of settings, so it should almost never change.
 //
-// docs/Settings.md is the specification, and holds the authoritative tag
+// Docs/Settings.md is the specification, and holds the authoritative tag
 // registry. Follow its "Adding a new setting" checklist before editing this
 // enum, and update the registry there to match.
 enum class Tag : uint8_t {
@@ -66,7 +66,7 @@ constexpr std::size_t kMaxPasswordLength = 63U;
 // The host is also bounded by the TLS SNI buffer (HTTP_SNI_MAX_SIZE, 64).
 constexpr std::size_t kMaxApiHostLength = 64U;
 // The path was 64 until the device key was added; 32 keeps the worst-case
-// image within the payload (see docs/Settings.md, Space budget).
+// image within the payload (see Docs/Settings.md, Space budget).
 constexpr std::size_t kMaxApiPathLength = 32U;
 // The API's device key, sent as the `key` query parameter.
 constexpr std::size_t kMaxApiKeyLength = 32U;

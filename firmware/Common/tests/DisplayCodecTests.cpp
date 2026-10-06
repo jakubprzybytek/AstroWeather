@@ -4,7 +4,7 @@
 
 #include <string>
 
-// Expected values come from docs/Display.md ("PCB Encoding", "Numeric Segment
+// Expected values come from firmware/Docs/Display.md ("PCB Encoding", "Numeric Segment
 // Wiring" and "Multiplexing Mapping"), not from the encoder's own tables.
 
 namespace {
@@ -153,7 +153,7 @@ void testMatrixUnusedBitsCleared()
 }
 
 // Slot k is driven by DISPLAY_(k+1)_EN. The encoder puts logical row 4 (the
-// bottom) in slot 0 and row 0 (the top) in slot 4; docs/Display.md numbers
+// bottom) in slot 0 and row 0 (the top) in slot 4; firmware/Docs/Display.md numbers
 // the rows 1 to 5 by enable line without saying which end row 1 is.
 void testMatrixRowsMapTopToBottom()
 {

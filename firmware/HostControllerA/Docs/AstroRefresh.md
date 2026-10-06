@@ -22,8 +22,7 @@ The payload contract is maintained on the server side in
 describes what the firmware actually accepts, and where that differs from the
 contract. See [Payload as parsed](#payload-as-parsed).
 
-The design history, including the retired `SwitchTask` and the original
-implementation phases, is in
+The plan that led to this design is archived in
 [archive/Astro_Data_Refresh_Implementation_Plan.md](archive/Astro_Data_Refresh_Implementation_Plan.md).
 
 ## Software
@@ -204,7 +203,7 @@ Within each block the records must come in this order:
 | `Success` | `success` | Six complete blocks. |
 | `InvalidArgument` | `invalid-argument` | Empty body. |
 | `Malformed` | `malformed` | A line with no `=`. |
-| `UnsupportedProtocol` | `unsupported-protocol` | `protocol` is not `2`. |
+| `UnsupportedProtocol` | `unsupported-protocol` | `protocol` is not `3`. |
 | `UnsupportedBoard` | `unsupported-board` | `board` is not `num4x4_matrix5x21`. |
 | `MissingRecord` | `missing-record` | `protocol` or `configurationId` not first, `configurationId` over 20 characters, or a block record missing or out of order. |
 | `InvalidDisplay` | `invalid-display` | The first block is not `display=0`, or a block index is not the next one. |
@@ -274,13 +273,13 @@ On each board:
 The numerics carry no attributes in the payload, so the mapper resets theirs
 to plain (full level, no blink) on every board it draws; the clock re-applies
 its blinking colon on its next redraw. What the levels and `*` look like is
-described in [Display.md](Display.md#blink-and-brightness-levels).
+described in [Display.md](../../Docs/Display.md#blink-and-brightness-levels).
 
 A numeric `?` is drawn as the decimal point on all four digits and nothing in
 the indicator slot. That is distinct from the numeric display's own error
 pattern, segment D (an underscore) on all four digits, which a value the
 display cannot show gets instead: a temperature outside -999 … 9999, or an
-hour above 99. See [Display.md](Display.md#numeric-representation).
+hour above 99. See [Display.md](../../Docs/Display.md#numeric-representation).
 
 Only a fully parsed payload is published. After a fetch, CRC or parse failure
 the display keeps whatever it showed.
@@ -303,7 +302,7 @@ So with the defaults, block 0's `numeric_2` and `numeric_3` are effectively
 hidden. They show only with `adc display off` or `time display off`: turning
 the owner off stops it writing (the clock blanks numeric 3 once, at the switch),
 and the next refresh's value then stays. The refresh's clock sync wakes the
-clock task, but while off it no longer blanks on a wake, so the minimum
+clock task, but while off it does not blank on a wake, so the minimum
 temperature survives the refresh that drew it. Display setters are
 last-writer-wins by design; there is no field ownership.
 
@@ -334,7 +333,7 @@ progress. The row is split into six segments, one per step:
   the next successful refresh, at most a retry delay away.
 
 The blinking is the display's own blink attribute (1 Hz, see
-[Display.md](Display.md#blink-and-brightness-levels)), so the row is drawn once
+[Display.md](../../Docs/Display.md#blink-and-brightness-levels)), so the row is drawn once
 per change, as a `Row` of lit columns and a blink mask. The patterns and timing
 are `AstroProgressBar`'s; the refresh task keeps its `Indicator` state and
 draws the bar itself, from the WiFi task's progress callback and its own
@@ -473,27 +472,16 @@ Not covered by tests:
 
 These have been checked on hardware only.
 
-## Future Work
+## Open Items
 
-### Shift stale data at the noon rollover
-
-Not implemented. If the 12:10 refresh keeps failing, every board shows data one
-night old: block 0 is the night that has just ended. The payload already holds
-six consecutive nights, so the firmware could keep the last parsed `AstroData`
-(about 700 B) and, at local noon, publish it shifted by one night:
-
-- board 0 shows what board 1 showed, and so on up to board 4;
-- board 5 shows the unavailable pattern (four decimal points, matrix off);
-- repeat at each following noon until a refresh succeeds, so the display stays
-  correct, with fewer nights, for up to five days offline.
-
-Shift only while the clock is set. Compare the stored `nightId` of board 0 with
-the current observing night rather than counting noons, so a reset or a clock
-step cannot shift twice, and discard the stored data once nothing is left to
-shift. Weather values carry no expiry of their own and would simply age with
-the data, as they do today.
-
-### Low-power wake
-
-A future low-power mode would replace the 60-second wake with an RTC alarm set
-to `RefreshSchedule::nextSlotStart()` or the next retry.
+- **Stale data after the noon rollover.** If the 12:10 refresh keeps failing,
+  every board shows data one night old: block 0 is the night that has just
+  ended. The payload holds six consecutive nights, so the firmware could keep
+  the last parsed `AstroData` (about 700 B) and, at local noon, publish it
+  shifted by one night (board 0 shows what board 1 showed, board 5 the
+  unavailable pattern), for up to five days offline. It should shift only
+  while the clock is set, and compare the stored `nightId` of board 0 with the
+  current observing night rather than count noons, so a reset or a clock step
+  cannot shift twice.
+- **Low-power wake.** A low-power mode would replace the 60-second wake with
+  an RTC alarm set to `RefreshSchedule::nextSlotStart()` or the next retry.

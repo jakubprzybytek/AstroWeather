@@ -1,4 +1,4 @@
-// Board address straps, read through the stub GPIO model. docs/Display.md
+// Board address straps, read through the stub GPIO model. firmware/Docs/I2C.md
 // ("I2C Transport"): a pin tied to VCC is state 2, a pin tied to ground state 1
 // and a floating pin state 0; board_id = ADDR_0 + 3 * ADDR_1 + 9 * ADDR_2
 // and the address is 0x10 + board_id.

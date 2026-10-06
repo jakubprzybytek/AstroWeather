@@ -1,7 +1,7 @@
 // The status a client fetch reports for each first-failure stage. Every
 // stage name St67NetworkSession and St67HttpFetchTask pass to fail() is
 // listed; several map to HttpFailure although nothing HTTP went wrong, which is
-// current behaviour (docs/WiFi.md, "Failure mapping").
+// current behaviour (Docs/WiFi.md, "Failure mapping").
 
 #include <WiFi/St67FetchStatusMap.hpp>
 

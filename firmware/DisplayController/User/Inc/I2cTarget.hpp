@@ -11,7 +11,7 @@
 // The board's side of the I2C link to the host: listens on its own address,
 // receives the 36-byte display message in interrupts, and hands it to a task
 // through a thread flag. The message format is Display::deserializeI2c();
-// see HostControllerA/docs/Display.md#i2c-transport.
+// see firmware/Docs/I2C.md.
 //
 // One instance, for hi2c1; the HAL callbacks are routed to it. Every
 // transaction addressed to this board, read or write, pulses LED_2.

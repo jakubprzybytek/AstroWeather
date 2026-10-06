@@ -1,69 +1,33 @@
 # Firmware RAM Usage
 
-## T01 switch, 2026-10-03
-
-The ST67 driver moved from the T02 architecture (LwIP on the host) to T01
-(TCP/IP in the module); see [WiFi.md](WiFi.md). The Debug build linked on
-2026-10-03 has `.data` 644 and `.bss` **90 264** bytes (Release: 456 and
-90 260), against `.bss` 138 412 the day before: the LwIP heap (33 551), its
-pools and tables (about 11 000) and the `tcpip_thread` and `netif` stacks are
-gone, and the FreeRTOS heap no longer has to carry those two tasks. Text is
-215 832 bytes in Debug and 110 152 in Release. The HTTP client now allocates
-per request from the FreeRTOS heap: a 2 KiB header buffer, a 1 KiB read
-buffer, a 512-byte request, plus the driver's own socket state. Run-time
-`heapMin` under T01, measured on 2026-10-04 with the fetch task at 4096 B:
-39 080 B free before the module starts, 29 384 B free with the module and
-its two tasks up, **24 368 B minimum** through an HTTPS fetch, the same after
-a second fetch in the same boot and across three boots. Under T02 the same
-figure was 14 680 to 18 944 B.
-
-**Heap reduced to 32 000 B, 2026-10-04.** With the peak demand measured at
-15 632 B (15 888 B on a re-initialisation after `stop()`) and flat over 100
-HTTPS cycles, `configTOTAL_HEAP_SIZE` went from 40 000 to 32 000 in the
-`.ioc`. Debug `.bss` is now **83 808** B. Measured afterwards: 31 080 B free
-before the module starts, 21 384 B with it up, `heapMin` **16 368 B** through
-an HTTPS fetch, twice the 8 KiB floor. 100 cycles at this size: 99 passed,
-one transient connect failure, `heapMin` 16 336 B, 30 808 B free after the
-batch's `stop()`; details in the HTTPS plan's bench record.
-
-The sections below are the T02 measurements and remain valid as the record of
-that configuration; the per-subsystem figures will be re-measured once the T01
-build has been on the bench.
+Where the HostController's RAM goes, from the Debug build of 2026-10-06
+(`build/Debug/HostControllerA.elf`, GNU Tools for STM32 14.3.1). The ST67
+module runs the T01 firmware, so TCP/IP and TLS are in the module and no
+network stack is linked on the host; see [WiFi.md](WiFi.md). Earlier
+measurements, including the T02 configuration with LwIP, and the reduction
+plan are in [archive/RAM_Usage_History.md](archive/RAM_Usage_History.md).
 
 ## Summary
 
-Measured on 2026-09-24 from the Debug HostController build in
-`build/Debug/` (`HostControllerA.elf` linked 2026-09-24 13:01; it
-includes the `api` settings and low brightness), using `arm-none-eabi-size`
-from GNU Tools for STM32 14.3.1:
-
 | Item | Bytes |
 | --- | ---: |
-| RAM capacity, STM32G0B1CETx | 147456 (144 KiB): 142 KiB `RAM` region plus the 2 KiB `NOINIT` region of the error log |
-| `.data` | 616 |
-| `.bss` | 132792 |
+| RAM capacity, STM32G0B1CETx | 147456 (144 KiB): the 139 KiB `RAM` region plus the 5 KiB `NOINIT` region |
+| `.data` | 644 |
+| `.bss` | 89032 |
 | `._user_heap_stack`: C heap `0x200` + main stack `0x400` | 1536 |
-| **Total statically reserved** | **134944** |
-| **Remaining** | **12512** |
-| Static RAM usage | about **91.5%** |
+| **`RAM` region in use**, as the link reports it | **91216** of 142336 (64.1%) |
+| **`RAM` region left** | **51120** |
+| `.noinit` (`NOINIT` region) | 4364 of 5120 |
 
-Since 2026-09-27 the top of RAM is a separate `NOINIT` region for the
-error log, not cleared at startup so the log survives a reset; see
-[Console.md](Console.md#error-log). It was 2 KiB for 16 entries of 102-byte
-text; since 2026-10-06 it is 5 KiB, `ErrorLog::Storage` being 4364 bytes for
-24 entries of 160-byte text, and `RAM` 139 KiB. The link-time report shows
-`RAM` and `NOINIT` separately. `errors` reads a copy of the log, a second
-4364 bytes in `.bss` (`ErrorsCommand.cpp`). On 2026-10-06 the link reported
-`RAM` 91216 bytes of 139 KiB (64.1%).
+The `NOINIT` region at the top of RAM holds the error log
+(`ErrorLog::Storage`, 24 entries of 160-byte text). The startup code does not
+clear it, so the log survives a reset; see [Console.md](Console.md#error-log).
+The linker script change that creates it is described in
+[Development.md](../../Docs/Development.md).
 
-The previous measurement, on 2026-08-30 from `build/Debug/`,
-was 131564 bytes of `.data + .bss` and 14352 bytes remaining. On 2026-09-23
-it was 132632 with 13288 remaining; the 776 bytes since are mostly the settings
-store's two 256-byte working images and the API host and path.
-
-The percentage describes address-space reservation at link time; it does not
-mean every byte is in use at every moment. About 73.5 KB of it is two heaps,
-FreeRTOS and LwIP, whose use is only visible at run time.
+The figures are address-space reservation at link time, not use at any one
+moment. 32 000 B of it is the FreeRTOS heap, whose use is only visible at run
+time; see [FreeRTOS heap](#freertos-heap).
 
 ## Largest RAM Reservations
 
@@ -71,46 +35,62 @@ From `arm-none-eabi-nm -S --size-sort` on the same ELF:
 
 | Allocation | Bytes | Owner / source |
 | --- | ---: | --- |
-| FreeRTOS heap (`ucHeap`) | 40000 | `configTOTAL_HEAP_SIZE` in `Core/Inc/FreeRTOSConfig.h` |
-| LwIP heap (`ram_heap`) | 33551 | `MEM_SIZE` calculated in `LWIP/Target/lwipopts.h` |
+| FreeRTOS heap (`ucHeap`) | 32000 | `configTOTAL_HEAP_SIZE` in `Core/Inc/FreeRTOSConfig.h` |
+| `St67HttpFetchTask` object | 8928 | 4096-byte stack and `St67Runtime`, including its own 4096-byte `httpPayload`, and the fetcher's `ApiTarget`; `User/Src/WiFi/St67HttpFetchTask.cpp` |
 | `AstroDataRefreshTask` object | 8040 | 3328-byte stack, 4096-byte response buffer and state; `User/Inc/Astro/AstroDataRefreshTask.hpp` |
-| `St67HttpFetchTask` object | 7336 | 2560-byte stack and `St67Runtime`, including its own 4096-byte `httpPayload`, and the fetcher's `ApiTarget`; `User/Src/WiFi/St67HttpFetchTask.cpp` |
 | `LogService` object | 6464 | 1536-byte stack and a 16-entry queue of 257-byte events; `User/Inc/Debug/LogService.hpp` |
+| Error log (`errorLogStorage`, `NOINIT`) | 4364 | `User/Src/Debug/LogService.cpp` |
+| Error log copy for `errors` (`snapshot`) | 4364 | `User/Src/Console/ErrorsCommand.cpp` |
 | `ConsoleService` object | 4256 | 2304-byte stack, 8-entry command queue of 128-byte lines, 256-byte RX ring; `User/Inc/Console/ConsoleService.hpp` |
 | USB CDC buffers | 4096 | `UserRxBufferFS` and `UserTxBufferFS`, 2048 bytes each |
 | `CurrentSenseTask` object | 2480 | 2048-byte stack |
-| `MainLoopTask` object | 2472 | 2048-byte stack |
-| `settingsStore` (`Settings::Store`) | 840 | `Values` (including the 65-byte API host and path), two 256-byte working images for `load()`/`save()`, the mutex; `User/Inc/Settings/SettingsStore.hpp` |
-| `localBoard` (`PcbDisplayBoard`) | ~800 | Content and attributes, two 280-byte sets of prepared pass frames, the sequencer; no task since the refresh moved into TIM2's interrupt |
+| `MainLoopTask` object | 2480 | 2048-byte stack |
 | `ClockTask` object | 1600 | 1024-byte stack |
+| USB device state | about 2000 | `hpcd_USB_DRD_FS` 736, `hUsbDeviceFS` 732, `USBD_StrDesc` 512 |
 | `led1` (`BlinkingLed`) | 1200 | 768-byte stack |
 | FreeRTOS static support | about 3400 | Idle stack 512, timer stack 1024, their TCBs 384 each, ready lists 1120 |
-| LwIP pools and tables | about 11000 | `memp_memory_*` pools 6770, DNS table 1184, IPv6 neighbour and destination caches 920, and smaller state |
-| ST67 static driver state | about 1400 | Includes `W61_Obj` at 992 bytes |
+| ST67 static driver state | about 1200 | `W61_Obj` 992 bytes, the SPI transfer engine state |
+| `localBoard` (`PcbDisplayBoard`) | 908 | Content and attributes, two 280-byte sets of prepared pass frames, the sequencer |
+| `settingsStore` (`Settings::Store`) | 840 | `Values` (including the 65-byte API host and path), two 256-byte working images for `load()`/`save()`, the mutex; `User/Inc/Settings/SettingsStore.hpp` |
 
-By subsystem, summing the map's `.data` and `.bss` input sections: LwIP
-44.6 KB (with its heap), FreeRTOS 44.0 KB (with its heap), `User/` code
-34.2 KB, USB 6.9 KB, ST67 driver 1.4 KB, `Core/` 1.0 KB.
-
-The same astro payload is held twice: once in `St67Runtime::httpPayload` as the
-WiFi task receives it, and once in `AstroDataRefreshTask::responseBuffer_`,
-the copy it hands over. See [Reduction Plan](#reduction-plan).
+The same astro payload is held twice: once in `St67Runtime::httpPayload`,
+which only the stress batches write, and once in
+`AstroDataRefreshTask::responseBuffer_`, which every refresh uses. Holding it
+once would save 4 KB; it is listed with the open items in the
+[README](../README.md).
 
 ## FreeRTOS Usage
 
+### FreeRTOS heap
+
+`configTOTAL_HEAP_SIZE` is 32 000 B, for `heap_4.c`. It holds `defaultTask`
+until it exits after starting USB, the CMSIS objects created without static
+memory, the ST67 driver's two tasks and its queues, event group and transfer
+buffers, and the HTTP client's per-request buffers: a 2 KiB header buffer, a
+1 KiB read buffer and a 512-byte request, plus the driver's socket state.
+Application tasks and their stacks are static.
+
+Measured on the bench with this heap size:
+
+| State | Free |
+| --- | ---: |
+| Before the module starts | about 31 000 B |
+| Module and its two tasks up, idle | about 21 400 B |
+| Lowest through an HTTPS fetch (`heapMin`) | about 16 400 B |
+
+The peak demand is about 15.9 KB, on a re-initialisation after `stop()`,
+which leaves about twice an 8 KiB margin; it stays flat over 100 HTTPS cycles.
+Reduce the heap further only after measuring `heapMin` under the worst-case
+WiFi workload: connect, DHCP, HTTPS, the certificate upload, failure paths
+and a restart after `stop()`.
+
 ### Static reservation
 
-- FreeRTOS dynamic heap: `40000` bytes at the time of this measurement
-  (`32000` since 2026-10-04, see above)
 - Idle task stack: `512` bytes (`configMINIMAL_STACK_SIZE` 128 words)
 - Timer task stack: `1024` bytes (`configTIMER_TASK_STACK_DEPTH` 256 words)
 - Idle and timer TCBs: `384` bytes each
 - Ready-task lists and scheduler state: about `1120` bytes
 - The application task objects listed above, whose stacks are static
-
-`configTOTAL_HEAP_SIZE` is a reservation for `heap_4.c`; it is not the same as
-the heap currently allocated. The heap is shared by CMSIS-RTOS2 objects created
-without static memory, ST67, LwIP and the generated `defaultTask`.
 
 ### Runtime diagnostics
 
@@ -123,10 +103,9 @@ without static memory, ST67, LwIP and the generated `defaultTask`.
 ```
 
 `[STACK]` covers the application's `Task<>` objects only, not `defaultTask`
-or the middleware tasks. `heapMin` measured during a worst-case ST67 connect,
-DHCP and HTTP workload is the value to use when deciding whether
-`configTOTAL_HEAP_SIZE` can be reduced. Every task stack should also be reduced
-only after checking its high-water mark under its deepest call path.
+or the middleware tasks. Reduce a stack only after checking its high-water
+mark under its deepest call path. `log()` and `logf()` build their 257-byte
+line on the caller's stack, so every task that logs needs that headroom.
 
 ### Tasks and configured stacks
 
@@ -134,12 +113,12 @@ Application tasks, with static stacks inside their objects:
 
 | Task (name in `[STACK]`) | Stack | Priority | Source |
 | --- | ---: | --- | --- |
-| `AstroDataRefresh` | 3328 | Normal | `AstroDataRefreshTask.hpp`; 2048 overflowed once the clock sync ran on it; at 3072, 224 were left, raised when log lines grew to 256 bytes |
-| `St67HttpFetch` | 2560 | BelowNormal | `User/Src/WiFi/St67HttpFetchTask.cpp` |
+| `St67HttpFetch` | 4096 | BelowNormal | `User/Src/WiFi/St67HttpFetchTask.cpp`; the W6X socket path and the driver's AT trace run on it |
+| `AstroDataRefresh` | 3328 | Normal | `AstroDataRefreshTask.hpp`; the clock sync and the logging run on it |
+| `ConsoleService` | 2304 | Normal | `ConsoleService.hpp`; `status` is its deepest command, about 490 B left |
 | `CurrentSense` | 2048 | BelowNormal | `CurrentSenseTask.hpp` |
-| `ConsoleService` | 2304 | Normal | `ConsoleService.hpp`; at 2048, `status` left 288, raised when log lines grew to 256 bytes |
-| `LogService` | 1536 | Normal | `LogService.hpp` |
 | `MainLoopTask` | 2048 | Normal | `MainLoopTask.hpp`; the boot screens encode frames on it, 944 used at peak |
+| `LogService` | 1536 | Normal | `LogService.hpp` |
 | `Clock` | 1024 | BelowNormal | `ClockTask.hpp` |
 | `Led1` | 768 | Low | `BlinkingLed.hpp`, in `User/Src/AstroWeather.cpp` |
 
@@ -151,126 +130,27 @@ noted:
 | `defaultTask` | 512 | `Core/Src/main.c`, `128 * 4`; freed when it exits after starting USB |
 | FreeRTOS idle | 512 | static, see above |
 | FreeRTOS timer | 1024 | static, see above |
-| LwIP `tcpip_thread` | 4096 | `TCPIP_THREAD_STACKSIZE` in `LWIP/Target/lwipopts.h` |
-| ST67 netif task | 2048 | `NETIF_TASK_STACK` in `LWIP/App/lwip_netif.h` |
 | ST67 modem RX task | 2048 | `W61_MDM_RX_TASK_STACK_SIZE_BYTES` in the ST67 driver |
 | ST67 SPI transfer engine | 1536 | `SPI_THREAD_STACK_SIZE` in `ST67W6X_Network_Driver/Target/w61_driver_config.h` |
 
-The LwIP and ST67 HTTP client tasks (`LWIP/App/http_client.c`,
-`w6x_http.c`) are not linked: the firmware uses its own
-`User/Src/WiFi/HttpClient.cpp` on the fetch task. `St67ProbeTask`
-(`Task<2048>`) is compiled but has no instance in this image. The middleware
-stack sizes are in bytes and converted to FreeRTOS words where the task is
-created.
-
-## LwIP Usage
-
-LwIP reserves `33551` bytes for its heap. This comes from:
-
-```c
-#define PBUF_LINK_ENCAPSULATION_HLEN 388
-#define FACTOR 64
-#define MEM_MIN (2300 + FACTOR * (100 + PBUF_LINK_ENCAPSULATION_HLEN))
-```
-
-That calculates to `33532` bytes; with two block headers and alignment padding, `ram_heap` links at `33551`.
-
-Additional linked LwIP pools and tables use about `11000` bytes. The current
-configuration also enables or sizes several high-water features:
-
-- TCP receive window: `22 * TCP_MSS`, approximately `32120` bytes of protocol window capacity
-- TCP send buffer: `16 * TCP_MSS`, approximately `23360` bytes
-- TCP segment and pbuf pools sized from the send buffer
-- `TCPIP_MBOX_SIZE`: `64`
-- Raw/UDP/TCP/accept mailbox sizes: `32`, `64`, `64`, and `32`
-- IPv6, MLD, ND, IPv6 forwarding, and route-table support
-- DHCP, DNS, IGMP, packet reassembly, and socket APIs
-
-The TCP window and send-buffer values are protocol capacities; they are not
-all directly reserved as one contiguous RAM allocation. They nevertheless drive
-LwIP pool counts and can increase the amount of RAM required during traffic
-bursts. The astro payload is about 1.5 KB, far below these capacities.
+The driver's own HTTP client (`w6x_http.c`) is not linked: the firmware uses
+its own `User/Src/WiFi/HttpClient.cpp` on the fetch task. `St67ProbeTask`
+(`Task<2048>`) is compiled but has no instance in this image.
 
 ## ST67 Middleware Usage
 
 ST67 has two kinds of RAM cost:
 
-1. Static driver state linked into `.bss`, about `1400` bytes including the
-   `992`-byte `W61_Obj`.
-2. Dynamic allocations made from the shared FreeRTOS heap: the modem RX task
-   and its receive buffer (`W61_MAX_SPI_XFER = 1520` bytes), the SPI transfer
-   task, queues, event group and transfer buffers, the netif task, scan
-   results, and network and socket state.
+1. Static driver state linked into `.bss`, about 1200 bytes including the
+   992-byte `W61_Obj`.
+2. Dynamic allocations from the shared FreeRTOS heap: the modem RX task and
+   its receive buffer (`W61_MAX_SPI_XFER = 1520` bytes), the SPI transfer
+   task, queues, event group and transfer buffers, scan results, and socket
+   state. The module up and idle costs about 10 KB of the heap, a fetch about
+   5 KB more.
 
-The dynamic allocations are not visible in the ELF because they come from
-`ucHeap` at run time. Their effect is captured by `heapFree` and `heapMin`.
-
-The ST67 source set also includes its complete W61 AT/Core implementation and
-LwIP integration. Code inclusion mainly affects flash; only global/static
-objects and runtime allocations affect RAM.
-
-## Reduction Plan
-
-Apply reductions in this order and validate each step with the complete
-application workload.
-
-### 1. Reduce the log queue: done
-
-The queue, then in `DebugService`, held 64 events of about 200 bytes, some
-12.8 KB. `LogService::kLogQueueDepth` is now 16, which saved about 9.6 KB. The
-overflow policy drops the oldest event, so producers never block; burst
-tolerance is lower, and `[STATS] dropped=` shows when that bites.
-
-### 2. Measure before reducing the FreeRTOS heap: done 2026-10-04
-
-Run the full ST67 workflow, including association, DHCP, HTTP, repeated
-requests, and TLS if TLS is required. Record the lowest `heapMin` value. Reduce
-`configTOTAL_HEAP_SIZE` only when that value leaves an explicit margin for
-error paths and future changes.
-
-Done under T01 with HTTPS: 100 persistent cycles, certificate failure cases
-and a restart after `stop()` gave a peak demand of 15 888 B, and the heap was
-reduced to 32 000 B (see the T01 section at the top). Saved 8 000 B of `.bss`.
-
-Do not infer required heap from the current free value after initialization;
-temporary HTTP, TLS, and scan allocations can produce a lower watermark later.
-
-### 3. Hold the payload once: not done, new
-
-The fetch task and the refresh task each keep a 4096-byte payload buffer.
-Handing the refresh task's buffer to the fetch request, or parsing straight
-from the fetch task's buffer while the refresh task still holds the request,
-would save 4 KB without changing the maximum response size.
-
-### 4. Reduce LwIP capacities: not done
-
-The largest candidates are:
-
-- `FACTOR` in `LWIP/Target/lwipopts.h`
-- `TCP_WND`
-- `TCP_SND_BUF`
-- TCP segment/pbuf counts derived from `TCP_SND_BUF`
-- TCP/IP and API mailbox depths
-
-Reducing `FACTOR` from 64 to 48 would save roughly `7.8 KiB` of LwIP heap.
-Reducing it to 32 would save roughly `15.6 KiB`. These changes must be tested
-with the maximum expected packet size and concurrent traffic.
-
-### 5. Tune task stacks from high-water marks: ongoing
-
-Use the `[STACK]` diagnostics after exercising the deepest path. Reduce a stack
-only when the observed margin remains comfortably above the largest interrupt,
-library, formatting, and error-path requirements. `LogService::logf()` uses
-formatted output and has already needed substantial stack headroom in callers:
-`AstroDataRefreshTask` had to grow from 2048 to 3072 bytes.
-
-### 6. Disable unused network features: not done
-
-If the product does not need them, IPv6/MLD/ND, IGMP, packet reassembly, AP
-support, unused socket features, and unused PPP sources can be removed or
-disabled. Feature removal should be done through the applicable LwIP/ST67
-configuration and regenerated project settings, not by deleting generated
-source files ad hoc.
+The dynamic allocations are not visible in the ELF; `heapFree` and `heapMin`
+show them.
 
 ## Verification Commands
 
@@ -282,13 +162,7 @@ arm-none-eabi-size -A -d build/<preset>/HostControllerA.elf
 arm-none-eabi-nm -S --size-sort --radix=d -C build/<preset>/HostControllerA.elf
 ```
 
-The most important link-time values are `.data`, `.bss`, `._user_heap_stack`,
-`ucHeap`, and `ram_heap`. `arm-none-eabi-size -B` reports `bss` including
-`._user_heap_stack`. Compare the link-time results again after every RAM
-configuration change.
-
-## Current Recommendation
-
-About 12.5 KB remain. Before adding RAM-hungry features, first take the cheap
-4 KB from holding the payload once, then measure `heapMin` under the worst-case
-WiFi workload before touching the FreeRTOS heap, the LwIP heap or task stacks.
+The most important link-time values are `.data`, `.bss`, `.noinit`,
+`._user_heap_stack` and `ucHeap`. `arm-none-eabi-size -B` reports `bss`
+including `._user_heap_stack`. Compare the link-time results again after every
+RAM configuration change.

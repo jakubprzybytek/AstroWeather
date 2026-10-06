@@ -1,5 +1,7 @@
 # ST67 Bootloader Mode Implementation Plan
 
+> Archived 2026-10-06. Current state: [ST67_Bypass_Maintainer_Notes.md](../ST67_Bypass_Maintainer_Notes.md).
+
 ## 1. Objective
 
 Implement and validate `ST67_MODE_BOOTLOADER` in the standalone STM32G0B0

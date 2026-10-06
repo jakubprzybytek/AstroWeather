@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-# Native (host) unit tests for the HostControllerA code. See docs/Testing.md.
+# Native (host) unit tests for the HostControllerA code. See Docs/Testing.md.
 # The code shared with the DisplayController has its own suites in
 # ../../Common/tests.
 #

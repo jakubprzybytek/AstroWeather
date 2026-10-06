@@ -4,7 +4,7 @@
 
 // Setting the RTC from the time the astro API sends, and measuring the LSI
 // drift between syncs. Pure arithmetic, so it runs in the native tests; the RTC
-// access and the log lines are in ClockTask. See docs/RTC.md.
+// access and the log lines are in ClockTask. See Docs/RTC.md.
 //
 // Times are in milliseconds since 2000-01-01 00:00 local time
 // (Calendar::secondsSince2000() * 1000). An offset is RTC minus server, so a

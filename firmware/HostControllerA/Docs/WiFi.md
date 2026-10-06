@@ -6,9 +6,7 @@ The HostController fetches the astro forecast over WiFi with an ST67W611M1
 module. The module runs ST's **T01** firmware: TCP/IP, DHCP, DNS and TLS run
 inside the module, and the STM32 drives them through the driver's `W6X_Net_*`
 socket API. The two talk over SPI1 with DMA, paced by the module's `ST67_RDY`
-line. Until 2026-10-03 the module ran the T02 firmware with LwIP on the STM32;
-the switch is recorded in
-[ST67_HTTPS_Implementation_Plan.md](archive/ST67_HTTPS_Implementation_Plan.md).
+line. No TCP/IP stack runs on the STM32.
 
 One task, `St67HttpFetchTask`, owns the module. Every fetch joins the network,
 waits for the module's DHCP, downloads one HTTPS response into the caller's
@@ -17,11 +15,8 @@ running; see [Lifecycle](#lifecycle). The SSID and password come from the
 EEPROM (`wifi set`), the server host and path from the EEPROM (`api host`,
 `api path`), each falling back to a compile-time default; see [Server](#server).
 
-**Bench status (2026-10-04):** HTTPS fetches from the API (CloudFront, then the API Gateway custom domain) through
-the module pass, and the module refuses a wrong CA, a hostname mismatch, an
-untrusted root and a self-signed certificate in the handshake (see
-[Bench results](#bench-results) and the plan's bench record). The validity
-date check and the 100-cycle run are still to do.
+What has been verified on the bench is summed up in
+[Verified on the bench](#verified-on-the-bench).
 
 The only regular client is the astro refresh; see
 [AstroRefresh.md](AstroRefresh.md). The task can also run a stress batch, a
@@ -30,11 +25,9 @@ bench test that nothing triggers at present; see [Stress batch](#stress-batch).
 Only the HostController has WiFi: `User/Src/WiFi` belongs to this project and
 is not part of the shared `../Common` code.
 
-This document replaces the ST67 phase plans, now in
-[archive](archive/ST67_Daily_Fetch_Implementation_Plan.md). The HTTPS work,
-including the T02 to T01 switch and its bench plan, is in
-[ST67_HTTPS_Implementation_Plan.md](archive/ST67_HTTPS_Implementation_Plan.md). Rules
-for generated code are in [CubeMXCompliance.md](archive/CubeMX_Compliance_Migration.md).
+Rules for generated code are in
+[Development.md](../../Docs/Development.md). The plans and bench records that
+led here are in the [archive](archive/README.md).
 
 ## Architecture
 
@@ -76,26 +69,16 @@ switches (`../Common/Src/Utils/SwitchInput.cpp`).
 
 | Task | Priority | Stack | Set in |
 | --- | --- | --- | --- |
-| `St67HttpFetch` | `osPriorityBelowNormal` (16) | 4096 B, static (2560 B until 2026-10-04; the W6X socket path and the driver's AT trace run on it) | `St67HttpFetchTask.cpp` |
+| `St67HttpFetch` | `osPriorityBelowNormal` (16) | 4096 B, static; the W6X socket path and the driver's AT trace run on it | `St67HttpFetchTask.cpp` |
 | W61 modem RX | 47 | 2048 B | priority in `w61_driver_config.h`, stack default in `w61_at_common.h` |
 | `spi_xfer_engine` | 46 | 1536 B | `w61_driver_config.h` |
 
-The LwIP `tcpip_thread` (4096 B) and the generated `netif` task (2048 B,
-priority 50) went with T02.
-
-The driver's two tasks default to 53 and 54, above the display multiplexing
-task `DisplayRefresh`, then at `osPriorityRealtime` (48). There they held a display
-slot for up to 14 ms during WiFi activity, which flashed the whole display, so
-they are overridden to 46 and 47. The overrides must live in the `USER CODE
-BEGIN EC` block of `w61_driver_config.h`: definitions on the CMake target never
-reach the driver, which is compiled in the generated `STM32_Drivers` library.
-See [CubeMXCompliance.md](archive/CubeMX_Compliance_Migration.md#st67-driver-task-settings).
-
-The generated `netif` task ran at 50, a value that could not be overridden (see
-CubeMXCompliance.md). At 50 it held the display off for up to 5.4 ms during a
-refresh, so `DisplayRefresh` was raised to `osPriorityRealtime7` (55), above
-all of these tasks; the display refresh has since moved into the TIM2
-interrupt and competes with no task at all.
+The driver's defaults, 53 and 54, are overridden to 46 and 47. No task
+priority affects the display, which refreshes from the TIM2 interrupt; the
+values are kept from when it was a task. The overrides must live in the
+`USER CODE BEGIN EC` block of `w61_driver_config.h`: definitions on the CMake
+target never reach the driver, which is compiled in the generated
+`STM32_Drivers` library. See [Development.md](../../Docs/Development.md).
 
 The driver tasks are created from the 32 000-byte FreeRTOS heap when the module
 is first started; the module idle costs about 10.6 KB of it and a fetch about
@@ -139,8 +122,7 @@ HTTP 200 as success, does not check `Content-Type`, and runs each request in a
 task of its own. `HttpClient.cpp` does the same socket work (`W6X_Net_Socket`,
 the TLS options, `W6X_Net_Connect`, `W6X_Net_Send`, `W6X_Net_Recv`) under the
 project's bounded parser instead, with its own result codes and no dependency
-on generated headers. Under T02 the same file ran over LwIP sockets; the parser
-and its tests did not change.
+on generated headers.
 
 ## Client API
 
@@ -259,20 +241,13 @@ tasks=...` and `ST67 batch-final mode=1 pass=... fail=...`.
 
 ### Why persistent
 
-The original plan was to shut the module down (`CHIP_EN` low, about 200 nA)
-between daily fetches. Under T02 that needed a full LwIP teardown, which the
-generated code did not provide, and even with a customized one 20 cold
-restarts lost about 6 KB of heap; see [Bench results](#bench-results).
-
-Keeping everything initialized passed 100 cycles with a flat heap, so client
-fetches always use it. `stop()` exists (`W6X_Net_DeInit()`,
-`W6X_WiFi_DeInit()`, `W6X_DeInit()`, then a check that `CHIP_EN` and
-`ST67_RDY` are low) and a later `initialize()` re-inits all three layers. With
-LwIP gone the teardown obstacle is gone too: on 2026-10-04 a `wifi test`
-after the stress batch's `stop()` re-initialised the driver and fetched
-normally, with the heap back to 38 840 B of the 39 080 B at boot in between.
-That is one restart; the old T02 heap loss was never explained, so the
-persistent policy stands until a cold-restart batch (mode 2) is measured.
+Keeping the module and the driver initialized between fetches passed 100
+cycles with a flat heap, so client fetches always use it. `stop()` exists
+(`W6X_Net_DeInit()`, `W6X_WiFi_DeInit()`, `W6X_DeInit()`, then a check that
+`CHIP_EN` and `ST67_RDY` are low) and a later `initialize()` re-inits all
+three layers; one restart after a stress batch has been seen to work. Shutting
+the module down between fetches (`CHIP_EN` low, about 200 nA) waits until a
+cold-restart batch (mode 2) has been measured; see [Open items](#open-items).
 
 ### Lifecycle modes
 
@@ -287,9 +262,8 @@ A **client fetch always runs as `PersistentStress` for 1 cycle**, whatever
 | 2 | `COLD_RESTART_STRESS` | 20 cycles like mode 0, with `APP_ST67_COLD_RESTART_DELAY_MS` (1 s) between them. |
 | 3 | `HTTP_PERSISTENT_STRESS` (**default**) | Like mode 1 with `APP_ST67_HTTP_PERSISTENT_STRESS_CYCLES` (100). |
 
-Modes 1 and 3 now differ only in which cycle-count macro they use: both
-fetch in every cycle. In the Phase 3 bench runs mode 1 was join, DHCP and
-disconnect without HTTP. In the persistent modes a cycle after the first
+Modes 1 and 3 differ only in which cycle-count macro they use: both
+fetch in every cycle. In the persistent modes a cycle after the first
 starts only if `isReady()` confirms the stack is idle and the station
 disconnected; otherwise it fails as `persistent-ready` and the batch stops.
 A batch also stops at the first failed teardown.
@@ -356,8 +330,8 @@ The `api host` and `api path` commands apply the same rules before saving.
 ## HTTP
 
 HTTPS by default, with TLS in the module; plain HTTP is a build option for the
-bench (`APP_ST67_HTTP_USE_TLS=0`). The design, its history and the bench plan
-are in [ST67_HTTPS_Implementation_Plan.md](archive/ST67_HTTPS_Implementation_Plan.md).
+bench (`APP_ST67_HTTP_USE_TLS=0`). The plan that led here is archived in
+[ST67_HTTPS_Implementation_Plan.md](archive/ST67_HTTPS_Implementation_Plan.md).
 
 1. **DNS.** `W6X_Net_ResolveHostAddress()`: the module's resolver, synchronous,
    bounded by the driver's own timeout (`APP_ST67_DNS_TIMEOUT_MS` is not
@@ -380,8 +354,8 @@ are in [ST67_HTTPS_Implementation_Plan.md](archive/ST67_HTTPS_Implementation_Pla
    After a module restart the module reports the file's size rounded up to
    256 bytes, so the first fetch of each boot rewrites it (about 3 s); later
    fetches find it unchanged. The module enforces chain and hostname
-   verification and fails closed (plan, section 8); what it does about
-   validity dates is still to be established.
+   verification and fails closed; what it does about validity dates is still
+   to be established.
 3. **Connect and send.** `W6X_Net_Connect()` does the TCP connect and, on a
    TLS socket, the handshake; the driver's own timeout bounds it. The request
    is exactly:
@@ -494,16 +468,14 @@ and reply as `AT> ...` / `AT< ...` Debug lines. It is the fastest way to see
 what the module answers, and it found the file-listing timeout above. Two
 cautions: it logs `AT+CWJAP="<ssid>","<password>"`, so the Wi-Fi password
 goes into the console and any capture of it, and it must never be committed
-on; and it runs on the calling task's stack, which is what overflowed the
-fetch task at 2560 B on 2026-10-04.
+on; and it runs on the calling task's stack, which is why the fetch task has
+4096 B.
 
 ## Stress batch
 
 **Bench and test behaviour, not a product feature.** The console command
 `wifi stress` ([Console.md](Console.md#wifi)) calls
-`TriggerSt67ConnectivityCycle()`; switch 2 used to, but since 2026-09-24 it
-only toggles low brightness ([Display.md](Display.md#low-brightness)). The
-trigger starts a batch in `APP_ST67_LIFECYCLE_MODE`: by default 100 join,
+`TriggerSt67ConnectivityCycle()`; nothing else calls it. The trigger starts a batch in `APP_ST67_LIFECYCLE_MODE`: by default 100 join,
 DHCP, fetch and disconnect cycles, 1 s apart, then `stop()`, which powers the
 module down. At about 13 s per HTTPS cycle that takes about 25 minutes.
 
@@ -516,31 +488,36 @@ module down. At about 13 s per HTTPS cycle that takes about 25 minutes.
 - It ends with `ST67 batch-final mode=3 pass=<n> fail=<n> first=<cycle>
   stage=<stage> status=<w6x> heap=<start>/<end> min=<low> tasks=<start>/<end>`,
   the line to read for a stress result.
-- After it, the module is off and the next fetch re-initializes the driver;
-  exercised once under T01 on 2026-10-04 (see [Bench results](#bench-results)).
+- After it, the module is off and the next fetch re-initializes the driver.
 
 `TriggerSt67SmokeTest()` is an unused alias for the same trigger.
 
-## Bench results
+## Verified on the bench
 
-All runs used the first board. Details are in the
-archived phase plans; the heap figures before 2026-08-26 are from the tree with
-the customized LwIP teardown, since removed.
+On the first board, with the module on the T01 image and the API behind its
+API Gateway custom domain:
 
-| Phase | Date | Result |
-| --- | --- | --- |
-| 0.1 Raw AT/CWLAP probe | 2026-08-21 | SPI framing, CS/RDY handshake and multi-frame AT replies work; scans returned 0 to 19 APs. [Daily fetch plan](archive/ST67_Daily_Fetch_Implementation_Plan.md) |
-| 1 SPI DMA | 2026-08-21 | 100 DMA init/transfer/deinit cycles, no timeouts or HAL errors, heap flat at 39 080 B. |
-| 2 Official driver | 2026-08-21 | `W6X_Init`, WiFi and LwIP init and a scan (20 APs) passed; a HardFault in the scan was fixed by raising the SPI engine stack from 768 to 1536 B. [Phase 2](archive/ST67_Phase_2_Implementation_Plan.md) |
-| 3 Join/DHCP/disconnect | 2026-08-22..23 | 100/100 persistent cycles, heap flat at 23 984 B, min 21 552 B. 20/20 cold restarts passed but free heap fell from 33 896 to 27 864 B: not resource-stable. Wrong password, no credentials and AP-off all failed cleanly and recovered. [Phase 3](archive/ST67_Phase_3_Implementation_Plan.md) |
-| 4 HTTP fetch | 2026-08-23..24 | First GET: HTTP 200, 83 B. 100/100 `HttpPersistentStress` cycles, heap flat, min 14 680 B. The client-owned buffer hand-off (`FetchSt67Data`) validated, CRC matched. [Phase 4](archive/ST67_Phase_4_Implementation_Plan.md) |
-| CubeMX regeneration | 2026-08-26 | With the User-owned `HttpClient`, adapter and RDY bridge: smoke test, 100/100 persistent and 100/100 HTTP persistent cycles, min heap 18 944 B, `St67HttpFetch` 840 B stack left. [CubeMXCompliance.md](archive/CubeMX_Compliance_Migration.md) |
-| Driver priorities | 2026-09-21 | Longest display slot gap during WiFi fell from 14 ms to 8 ms with fetches still succeeding. |
-| Connect diagnosis | 2026-09-21 | A wrong WPA2 password reported reason 7 and was classified `WrongPassword`. |
-| T01 and HTTPS | 2026-10-03..04 | Host rewritten against `W6X_Net`; `.bss` 91 808 B against 138 412 B under T02. Module programmed with `mission_t01_v2.0.106` through `firmware/Bypass`. Three faults found and fixed on the bench: `W6X_Net_Init()` asserting without a registered net callback; the station reporting `GOT_IP` straight after the join; the driver's file listing of ST's 31 sample certificates overrunning its 2 s timeout before every certificate upload (fixed by programming a LittleFS image holding only Amazon Root CA 1, `Bypass/tools/Build-LittleFS.sh`). The driver's AT trace also overflowed the 2560 B fetch stack, now 4096 B. **First HTTPS fetch passed**: DNS 0.3 s, certificate upload 3 s (first time only), TLS handshake with CloudFront about 1 s, HTTP 200, 1906 bytes, CRC valid, parse OK; `heapMin` 24 368 B. Certificate cases on a bench build trusting ISRG Root X1 (`-DAPP_ST67_TLS_BENCH_ANCHOR_ISRG=ON`, badssl.com hosts): wrong CA, hostname mismatch, untrusted root, self-signed and an ISRG Root X2 chain all refused in the handshake; `sha256`/`rsa2048.badssl.com` completed with HTTP 200. `wifi stress`: **100/100 HTTPS cycles** in 21.5 min, free heap 29 384 B after every cycle, `heapMin` 24 368 B throughout, 13 tasks; after `stop()` 38 840 B free and a `wifi test` restarted the module and fetched. Repeated with the heap at 32 000 B: 99/100 (one transient connect failure, recovered), `heapMin` 16 336 B. Details in the plan's bench record. The date check is left open. |
-| API without CloudFront | 2026-10-04 | The API moved from CloudFront to an API Gateway custom domain, HTTPS only (`sst/docs/architecture.md`). Same ACM chain to Amazon Root CA 1, so the firmware is unchanged; build from `main` at `64e3b54`. On `int`: `astro refresh` (module cold start) and `wifi test` each fetched `/astro/wroclaw` with HTTP 200, 1906 bytes, CRC valid, parse OK, about 10 s and 8 s; free heap 21 384 B, `heapMin` 16 560 B. Before the router was restarted it kept serving the deleted CloudFront addresses for over 30 min after the DNS change, with a fresh TTL each time; the device resolves through it, so after a hostname move check its answer before testing. |
-| Device key | 2026-10-04 | The API now needs credentials; the device uses `GET /device/astro/{id}?key=<key>` with the stage's `DeviceApiKey` (`sst/docs/architecture.md#access-control`), set in `APP_ST67_HTTP_PATH`, no code change. On `int`: `astro refresh` and `wifi test` each fetched `/device/astro/wroclaw?key=...` with HTTP 200, 1906 bytes, CRC valid, outcome ok; heap unchanged (21 384 B free, `heapMin` 16 560 B). The key was at first part of the path, so `api show` and the fetch log printed it. |
-| Key in EEPROM | 2026-10-04 | `api key` saves the key as setting `0x14` (`ApiKey`); the fetch appends `?key=` and logs only `key=<set>`. On `int`, built-in path `/device/astro/wroclaw` and no built-in key: without a key the fetch got HTTP 401; after `api key` it got 200, 1906 bytes, CRC valid. After a reset `api show` reported `key=<set> (saved)`, and `astro test` (`/device/astro/test`, 1747 bytes) and `astro refresh` both returned 200. |
+- **HTTPS fetches** of `/device/astro/<id>?key=...`: HTTP 200, the full
+  payload (about 1.9 KB), CRC valid, parse OK. DNS takes about 0.3 s, the
+  TLS handshake about 1 s, the certificate upload about 3 s on the first fetch
+  of a boot. A missing key gets 401 from the server, a wrong one 403.
+- **Certificates.** With a bench build trusting ISRG Root X1
+  (`-DAPP_ST67_TLS_BENCH_ANCHOR_ISRG=ON`, badssl.com hosts; see
+  [Testing.md](Testing.md)), a wrong CA, a hostname mismatch, an untrusted
+  root, a self-signed certificate and a chain to another root are all refused
+  in the handshake; the positive controls complete with HTTP 200. Expired
+  certificates have not been tried.
+- **Stress.** `wifi stress`: 100/100 HTTPS cycles in about 21 minutes, free
+  heap the same after every cycle, 13 tasks; with the FreeRTOS heap at
+  32 000 B, 99/100 (one transient connect failure, recovered) and `heapMin`
+  16 336 B. After `stop()`, a `wifi test` restarted the module and fetched.
+- **Connect diagnosis.** A wrong WPA2 password reports reason 7 and is
+  classified `WrongPassword`.
+- **Heap.** With the module up and idle, about 21.4 KB of the 32 000 B heap is
+  free; a fetch takes the low-water mark to about 16.5 KB.
+
+The bench record, with dates and figures, is in
+[archive/WiFi_Bench_Results.md](archive/WiFi_Bench_Results.md).
 
 ## Open items
 
@@ -548,24 +525,16 @@ the customized LwIP teardown, since removed.
   automatic power save between fetches. Its current in that state, during a
   transfer and in `CHIP_EN` shutdown has not been measured, nor have CS, RDY
   and `CHIP_EN` levels or back-powering through GPIO.
-- **T01 bench validation** is outstanding: the module must be programmed with
-  the T01 image through `firmware/Bypass`, then the plan's spike run
-  (good CA, wrong CA, hostname mismatch, expired certificate, heap and size
-  readings, 100 cycles). See
-  [ST67_HTTPS_Implementation_Plan.md](archive/ST67_HTTPS_Implementation_Plan.md).
-- **Cold restart.** Full shutdown and restart lost about 6 KB of heap over 20
-  cycles in Phase 3 under T02. The cause was not found. `stop()` now
-  deinitializes Net, WiFi and W6X; one restart after a stress batch worked
-  under T01 (2026-10-04), the repeated cold-restart batches (modes 0 and 2)
-  have not been run.
+- **Cold restart.** Only one restart after `stop()` has been run; the
+  cold-restart batches (modes 0 and 2) have not.
+- **Certificate validity dates.** Whether the module checks them is not
+  established.
 - **HTTP error paths untested at runtime:** DNS failure, connection refused,
-  TLS failures, timeouts, malformed, truncated, oversized and chunked
-  responses, loss of the network mid-transfer. None has been exercised on the
-  bench.
-- **Small heap retentions.** In the 2026-10-04 stress runs a cycle that
-  failed in the TLS connect kept 32 B of heap for good, and every
-  `stop()`/re-initialisation keeps about 240 to 270 B (plan, section 8).
-  Successful cycles keep nothing. Not located in the driver yet.
+  timeouts, malformed, truncated, oversized and chunked responses, loss of the
+  network mid-transfer.
+- **Small heap retentions.** A cycle that fails in the TLS connect keeps 32 B
+  of heap for good, and every `stop()`/re-initialisation keeps about 240 to
+  270 B. Successful cycles keep nothing. Not located in the driver yet.
 - **No cancellation.** A fetch cannot be stopped once started, and a
   timed-out client leaves the task busy until it finishes; the 15 s total
   deadline bounds the HTTP part only.

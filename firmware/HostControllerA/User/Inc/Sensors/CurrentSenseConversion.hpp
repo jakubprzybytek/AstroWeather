@@ -7,7 +7,7 @@
 // __LL_ADC_CALC_VREFANALOG_VOLTAGE() and __LL_ADC_CALC_TEMPERATURE() for 12-bit
 // data; the factory calibration values are passed in, because the task reads
 // them from system memory (VREFINT_CAL_ADDR, TEMPSENSOR_CAL1/2_ADDR), which the
-// native build cannot. See docs/CurrentSense.md#conversion.
+// native build cannot. See Docs/CurrentSense.md#conversion.
 namespace CurrentSense {
 
 // Conditions of the factory calibration, as in stm32g0xx_ll_adc.h:

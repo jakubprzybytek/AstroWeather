@@ -8,7 +8,7 @@
 // columns are lit and which blink for each step, and for the outcome shown
 // afterwards. Pure arithmetic, so it runs in the native tests;
 // AstroDataRefreshTask owns the state, draws the rows and decides when to
-// wake. See docs/AstroRefresh.md#progress-bar.
+// wake. See Docs/AstroRefresh.md#progress-bar.
 //
 // Six segments spread across the 21 columns, one per refresh step: module
 // start-up, joining WiFi, DHCP, download, disconnect, and processing (CRC

@@ -9,16 +9,20 @@ display boards on an STM32G070.
 
 | Directory | Contents |
 | --- | --- |
-| `Src/Display`, `Inc/Display` | Logical display content (`DisplayTypes`), the PCB segment and matrix encoding (`DisplayCodec`), the multiplexing refresh task (`PcbDisplayBoard`), the I2C message format (`DisplayI2cProtocol`), the address straps (`DisplayAddress`) and the `DisplayBoard` interface |
+| `Src/Display`, `Inc/Display` | Logical display content and attributes (`DisplayTypes`), the PCB segment and matrix encoding (`DisplayCodec`), the pass sequencing (`RefreshSequencer`), the interrupt-driven multiplexing (`PcbDisplayBoard`), the boot screens (`BootScreens`), the I2C message format (`DisplayI2cProtocol`), the address straps (`DisplayAddress`) and the `DisplayBoard` interface |
 | `Src/Device`, `Inc/Device` | The `SCT2xxx` LED driver chain over SPI |
 | `Src/Utils`, `Inc/Utils` | `Task`/`TaskBase` (CMSIS-RTOS2 tasks with static stacks and a registry), `Mutex`, `SwitchInput`, `Crc32` |
 | `Src/Debug`, `Inc/Debug` | `BlinkingLed` (the `LED_1` heartbeat), `PulseLed` and `activityLed()` (`LED_2`, also from interrupts and C through `ActivityLedBridge.h`) |
 | `tests/` | Native unit tests for the above, and the pieces both projects' own tests reuse: the HAL and RTOS stubs (`stubs/`), `Expect.hpp` (`support/`), `add_native_test()` (`NativeTest.cmake`) and a stand-in `main.h` (`board/`) |
 
-The display code is described in
-[HostControllerA/docs/Display.md](../HostControllerA/Docs/Display.md), the
-tasks and mutexes in
-[Architecture.md](../HostControllerA/Docs/Architecture.md#shared-code).
+Each part is documented in the shared firmware docs, [firmware/Docs](../Docs/README.md):
+
+| Part | Document |
+| --- | --- |
+| Display content, attributes, PCB encoding, the multiplexing refresh, boot screens, `SCT2xxx` | [Display.md](../Docs/Display.md) |
+| The I2C message format and the address straps | [I2C.md](../Docs/I2C.md) |
+| `Task`, `Mutex`, `SwitchInput`, `Crc32`, the LEDs | [Utilities.md](../Docs/Utilities.md) |
+| The native test kit and the suites in `tests/` | [Testing.md](../Docs/Testing.md) |
 
 ## How It Is Built
 
@@ -49,6 +53,6 @@ ctest --test-dir build/native-tests-local --output-on-failure
 ```
 
 `NativeTests-Coverage` adds `--coverage` for `gcovr`. The GitHub Actions
-workflow `firmware-native-tests.yml` runs these suites and the host's on every
-push. How to write a test, the stubs and the coverage table are in
-[HostControllerA/docs/Testing.md](../HostControllerA/Docs/Testing.md).
+workflow `firmware-native-tests.yml` runs these suites and both projects' on
+every push. How to write a test, the stubs and what each suite covers are in
+[Testing.md](../Docs/Testing.md).

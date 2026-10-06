@@ -6,7 +6,7 @@
 // chain), whose default chain ends in Amazon Root CA 1 (RSA 2048,
 // valid to 2038-01-17). Public data, so it lives in source; the Wi-Fi password
 // does not. If ACM ever changes the chain, add the new root here and record
-// the rotation in docs/ST67_HTTPS_Implementation_Plan.md.
+// the rotation in Docs/archive/ST67_HTTPS_Implementation_Plan.md.
 //
 // A bench build configured with -DAPP_ST67_TLS_BENCH_ANCHOR_ISRG=ON trusts
 // ISRG Root X1 instead, so that the badssl.com test hosts can be fetched and

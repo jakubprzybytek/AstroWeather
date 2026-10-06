@@ -3,7 +3,7 @@
 #include <cstdint>
 
 // Turns a measured LSI error into RTC prescaler and smooth-calibration
-// settings. See docs/RTC.md.
+// settings. See Docs/RTC.md.
 //
 // The trim is how far the LSI runs from its nominal 32 kHz, in ppm: +18000
 // means the LSI is at 32 576 Hz and an untrimmed clock gains 1.8%. The RTC

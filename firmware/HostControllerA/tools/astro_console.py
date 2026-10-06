@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CLI for talking to the HostControllerA USB CDC console.
 
-Wraps the connect/send/read pattern from docs/Development.md so that
+Wraps the connect/send/read pattern from firmware/Docs/Development.md so that
 manual verification and ad-hoc scripting don't need to reimplement it.
 Requires pyserial (python -m pip install pyserial).
 

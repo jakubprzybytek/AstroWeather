@@ -133,7 +133,7 @@ void testEncodePassesIsEncodePcbOfEachPass()
         }
     }
 
-    // Spot checks against the wiring in docs/Display.md: numeric 1 segment A
+    // Spot checks against the wiring in firmware/Docs/Display.md: numeric 1 segment A
     // is bit 2 of the last wire byte; slot 0 is the first seven bytes.
     expectEqual(frames[Display::kBlinkOn][0][6] & 0x04U, 0x04U,
                 "level-1 numeric 1 lit in pass 0");

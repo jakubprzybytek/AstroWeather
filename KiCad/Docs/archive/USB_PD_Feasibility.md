@@ -1,5 +1,7 @@
 # USB Power Delivery Feasibility
 
+> Archived 2026-10-06. Current state: [Hardware_Review.md](../Hardware_Review.md).
+
 ## Goal
 
 Negotiate a VBUS voltage above 5 V through USB Power Delivery (PD) so the host controller can deliver more power to the external boards connected on `J102`/`J104`.

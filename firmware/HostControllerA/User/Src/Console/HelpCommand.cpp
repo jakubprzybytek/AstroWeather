@@ -179,7 +179,7 @@ const Command kTime[] = {
      "e.g. 'time set 2026-09-22 21:45' or 'time set 2026-09-22 21:45:30'"},
     {"time trim <ppm>", "correct for this board's LSI clock (saved)",
      "ppm the LSI runs fast (+) or slow (-) of 32 kHz, up to +-100000; 0 for\n"
-     "none. See docs/RTC.md to measure it. e.g. 'time trim 18372'"},
+     "none. See Docs/RTC.md to measure it. e.g. 'time trim 18372'"},
     {"time display on|off", "the time on numeric display 3 (saved)",
      "An astro refresh may overwrite display 3; the time returns at the next\n"
      "minute."},

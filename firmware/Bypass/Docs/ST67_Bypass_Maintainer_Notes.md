@@ -2,12 +2,11 @@
 
 Internal reference for anyone extending, fixing, or re-validating this
 project. User-facing build/usage instructions are in the root
-[README.md](../README.md). Full design rationale and the staged validation
-plan are in [ST67_Bootloader_Mode_Implementation_Plan.md](ST67_Bootloader_Mode_Implementation_Plan.md).
-[ST67_Bypass_Bootloader_Project_Guide.md](ST67_Bypass_Bootloader_Project_Guide.md)
-is the original bring-up guide; parts of it (bootloader straps "not yet
-specified", STM32G0B1 references) are now stale and should be reconciled with
-this document once someone has time.
+[README.md](../README.md). The original design rationale and staged
+validation plan ([ST67_Bootloader_Mode_Implementation_Plan.md](archive/ST67_Bootloader_Mode_Implementation_Plan.md))
+and bring-up guide ([ST67_Bypass_Bootloader_Project_Guide.md](archive/ST67_Bypass_Bootloader_Project_Guide.md))
+are archived; where they disagree with this document (bootloader straps "not
+yet specified", STM32G0B1 references), this document is right.
 
 ## Source layout
 
@@ -296,9 +295,5 @@ flashed over ST-LINK, then the HostController flashed back the same way):
 ## Open items / suggested next steps
 
 1. Re-validate `Dump-ST67-Flash.sh` across boards with different flash chips.
-2. Update `ST67_Bypass_Bootloader_Project_Guide.md`: replace the "bootloader
-   straps not yet specified" section with the verified sequence in
-   `st67_mode.c`, and reconcile its STM32G0B1 references with the actual
-   STM32G0B0 target.
-3. Delete any stale `build/Debug` / `build/Release` directories left over
+2. Delete any stale `build/Debug` / `build/Release` directories left over
    from before the four-preset scheme, if they reappear.

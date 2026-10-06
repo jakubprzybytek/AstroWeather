@@ -28,7 +28,7 @@ of this document, and the rules that preserve it are listed under
 | Property | Value |
 | --- | --- |
 | Part | Microchip 24AA04HT-I/OT, datasheet DS20002119 |
-| Bus | I2C1, shared with the remote Display Controllers |
+| Bus | I2C1, shared with the remote display boards; see [I2C.md](../../Docs/I2C.md) |
 | Device address | `0x50`, 7-bit |
 | Capacity | 512 bytes, as two 256-byte blocks |
 | Page size | 16 bytes |
@@ -58,7 +58,7 @@ written through block 1.
 Access goes through `Device::Eeprom24AA04`, which splits writes on page
 boundaries, places bit 8 of the offset in `B0`, and polls for the internal write
 cycle. That driver in turn uses `Device::I2cBus`, which holds the mutex
-serializing all I2C1 traffic.
+serializing all I2C1 traffic ([I2C.md](../../Docs/I2C.md#host-side)).
 
 ## Image Layout
 
@@ -67,10 +67,10 @@ block of the part. The upper 256 bytes are unused. A fixed header carries
 integrity information, and the payload after it is a sequence of
 variable-length records.
 
-Until 2026-09-24 the image was 128 bytes. Growing it to 256 needed no version
-bump and no migration: the CRC covers only the version, `payloadLen` and the
-`payloadLen` bytes of payload, never the padding behind them, so an image
-written at 128 bytes is also a valid 256-byte image. Whatever the bytes behind
+An image written by older firmware with a 128-byte region is also a valid
+256-byte image, with no version bump or migration: the CRC covers only the
+version, `payloadLen` and the `payloadLen` bytes of payload, never the padding
+behind them. Whatever the bytes behind
 it held, such as test data from raw `eeprom write`s, is ignored. 256 is the
 limit for this header, because `payloadLen` is a single byte. See
 [When the version must change](#when-the-version-must-change).
@@ -104,7 +104,8 @@ It covers `version`, `payloadLen` and the payload, that is bytes `0x04` through
 `0x05 + payloadLen`. It does **not** cover the magic or the padding.
 
 Implemented in software rather than using the STM32 CRC peripheral, so that the
-feature needs no `.ioc` change. See [CubeMXCompliance.md](archive/CubeMX_Compliance_Migration.md).
+feature needs no `.ioc` change. See [Development.md](../../Docs/Development.md)
+for the CubeMX rules.
 
 ### Payload records
 
@@ -133,7 +134,7 @@ must match it.
 | `0x10` | `WifiSsid` | 1–32 | SSID bytes, not NUL terminated. |
 | `0x11` | `WifiPassword` | 1–63 | Passphrase bytes, not NUL terminated. |
 | `0x12` | `ApiHost` | 1–64 | API server host name, not NUL terminated. Absent: the built-in `APP_ST67_HTTP_HOST`. |
-| `0x13` | `ApiPath` | 1–32 | API path starting with `/`, not NUL terminated. Absent: the built-in `APP_ST67_HTTP_PATH`. Up to 64 before 2026-10; a longer record is ignored on decode (built-in path) rather than cut short. |
+| `0x13` | `ApiPath` | 1–32 | API path starting with `/`, not NUL terminated. Absent: the built-in `APP_ST67_HTTP_PATH`. A longer record, which older firmware allowed up to 64, is ignored on decode (built-in path) rather than cut short. |
 | `0x14` | `ApiKey` | 1–32 | API device key, letters, digits and `- _ . ~`, not NUL terminated; sent as `?key=`. Absent: the built-in `APP_ST67_HTTP_KEY`. |
 | `0x20` | `ClockFlags` | 1 | Bit 0 = clock shown on local numeric display 3. Remaining bits reserved, write 0. Written only when it differs from the default, so normally absent. |
 | `0x21` | `DisplayFlags` | 1 | Bit 0 = low brightness (`LOW_POWER_ENABLE` driven high); see [Display.md](Display.md#low-brightness). Remaining bits reserved, write 0. Written only when set. |
@@ -279,10 +280,10 @@ consuming 99 bytes, and the API target another 130.
 When adding a setting, check the worst case still fits, and prefer omitting a
 record over writing a default value.
 
-The API key (2026-10) did not fit beside a 64-character path: the worst case
-would have been 280. The path limit was cut to 32 instead, since the real
-path, `/device/astro/wroclaw`, has 21 characters. The other way out, for when
-the next setting does not fit either, is the upper 256 bytes of the 512-byte
+The path is limited to 32 characters so that the API key fits beside it; with
+a 64-character path the worst case would be 280. The real path,
+`/device/astro/wroclaw`, has 21. When the next setting does not fit, the way
+out is the upper 256 bytes of the 512-byte
 part, which the image leaves unused (see [Storage Medium](#storage-medium)):
 a payload over 255 bytes needs a wider `payloadLen`, which is a container
 change with a version bump and a decoder that still reads version 1 (see

@@ -4,7 +4,7 @@
 
 #include <string>
 
-// Byte layout from docs/Display.md, "I2C Transport": command, numeric 1,
+// Byte layout from firmware/Docs/I2C.md: command, numeric 1,
 // numeric 2, matrix rows 0-4 (three bytes each, little-endian), numeric 3,
 // numeric 4.
 
