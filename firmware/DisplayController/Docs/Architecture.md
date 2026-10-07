@@ -32,7 +32,8 @@ scheduler starts:
    (`Utils::SwitchInput`).
 4. Reads the address straps (`Display::detectBoardAddress()`) and stores the
    address in `g_displayStats.address`; `TimelineFollower::init()` notes the
-   boot HSITRIM and sets the status byte to "wants syncs"; then the I2C target
+   boot HSITRIM; the status byte starts as "wants syncs" and "needs content"
+   (`0xA2`); then the I2C target
    starts on the address (`I2cTarget::begin()`, which also enables the general
    call for the host's timeline sync).
 
@@ -106,6 +107,11 @@ The stale-data timeout is 7 hours (`DisplayApp::kNoDataTimeoutMs`), just over
 the host's 6-hour refresh interval: the host sends to the remote boards only on
 an astro refresh or a `display` command, so a shorter timeout would show "no
 data" for most of the day. One missed refresh is therefore enough to show it.
+The board then asks for content in its status byte, as it does from boot until
+the first content message arrives; the host's next poll, within a minute,
+sends the content it holds if that is younger than 7 h
+([I2C.md](../../Docs/I2C.md#status-read)). The constant is shared with the host
+as `Display::kContentLifetimeMs`.
 `NoDataTimer` (`User/Inc/NoDataTimer.hpp`) does the arithmetic on the wrapping
 kernel tick.
 
@@ -117,7 +123,8 @@ message (four deep) and wakes `DisplayApp`, which decodes it with
 `FrameAssembler`: attribute planes are staged and applied with the next
 content. It also takes the host's timeline sync on the general-call address,
 stamping the board's timeline in the address-match interrupt, and answers
-a one-byte read with the sync status `TimelineFollower` sets. Listening starts
+a one-byte read with the status: the timeline locked (`TimelineFollower`) and
+content wanted (`DisplayApp`). Listening starts
 only once the address is known and is checked every second. The protocol,
 both sides of the link and why the I2C interrupt runs at priority 1 are in
 [I2C.md](../../Docs/I2C.md#display-board-side).

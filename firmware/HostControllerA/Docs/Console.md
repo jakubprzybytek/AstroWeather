@@ -458,7 +458,7 @@ failed save `ERR settings-unavailable`.
 | `time display on\|off` | `OK time-display=on` or `OK time-display=off`. Saved. |
 | `time hsi` | `OK time-hsi=63 cal=0x8E saved=63`: the host's HSI16 trim (`HSITRIM`) in use, `HSICAL` as read back, and the saved trim. |
 | `time hsi <0-127>` | Sets the HSI16 trim; the same reply. Higher runs faster, about 0.33 % a step; 64 is the chip's default. Applies at once and at boot. Saved. Not the RTC's clock: see `time trim`. |
-| `time sync` | `OK time-sync sent=2 answered=0 last=9s-ago next=15s burst`: the timeline sync broadcasts sent, those at least one display board acknowledged, the age of the last, the time to the next, and `burst` or `every-120s`. Each board that answered the last status poll is appended as ` 0x11=locked` or ` 0x11=wants-sync`. |
+| `time sync` | `OK time-sync sent=2 answered=0 last=9s-ago next=15s burst`: the timeline sync broadcasts sent, those at least one display board acknowledged, the age of the last, the time to the next, and `burst` or `every-120s`. Each board that answered the last status poll is appended as ` 0x11=locked` or ` 0x11=wants-sync`, with `+needs-content` added while the board asks for its content, which the host then re-sends ([Display.md](Display.md#the-display-aggregate)). |
 | `time sync now` | `OK time-sync=burst`: starts a burst of syncs, unless one is running. |
 
 `set=no` in `time show` means the clock has not been set since a power loss.

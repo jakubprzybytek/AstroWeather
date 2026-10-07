@@ -164,7 +164,7 @@ DMA, so its timing depends on interrupt latency only; see
 | --- | --- | --- | ---: | --- | --- |
 | `Modem_Process` | ST67 driver `w61_at_common.c` | 47 | 2048 | heap | AT response and event handling |
 | `spi_xfer_engine` | ST67 driver `spi_iface.c` | 46 | 1536 | heap | SPI1 transfers to the module |
-| `DisplaySync` | `Display/DisplaySyncTask.cpp` | AboveNormal (32) | 2048 | static | Broadcasts the refresh timeline to the display boards and polls their sync status; a few milliseconds a minute, above the normal tasks so a due sync is not held up ([TimelineSync.md](../../Docs/TimelineSync.md#syncs-from-the-host)) |
+| `DisplaySync` | `Display/DisplaySyncTask.cpp` | AboveNormal (32) | 2048 | static | Broadcasts the refresh timeline to the display boards, polls their status and re-sends the content of a board that asks for it; a few milliseconds a minute, above the normal tasks so a due sync is not held up ([TimelineSync.md](../../Docs/TimelineSync.md#syncs-from-the-host)) |
 | `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | heap | Starts USB, then exits (stack freed) |
 | `LogService` | `Debug/LogService.cpp` | Normal (24) | 1536 | static | Drains the log queue to USB CDC; `stats` output |
 | `ConsoleService` | `Console/ConsoleService.cpp` | Normal (24) | 2304 | static | Assembles and runs console commands |

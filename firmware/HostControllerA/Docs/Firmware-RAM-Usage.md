@@ -1,6 +1,6 @@
 # Firmware RAM Usage
 
-Where the HostController's RAM goes, from the Debug build of 2026-10-06
+Where the HostController's RAM goes, from the Debug build of 2026-10-07
 (`build/Debug/HostControllerA.elf`, GNU Tools for STM32 14.3.1). The ST67
 module runs the T01 firmware, so TCP/IP and TLS are in the module and no
 network stack is linked on the host; see [WiFi.md](WiFi.md). Earlier
@@ -13,10 +13,10 @@ plan are in [archive/RAM_Usage_History.md](archive/RAM_Usage_History.md).
 | --- | ---: |
 | RAM capacity, STM32G0B1CETx | 147456 (144 KiB): the 139 KiB `RAM` region plus the 5 KiB `NOINIT` region |
 | `.data` | 644 |
-| `.bss` | 90416 |
+| `.bss` | 90448 |
 | `._user_heap_stack`: C heap `0x200` + main stack `0x400` | 1536 |
-| **`RAM` region in use**, as the link reports it | **92600** of 142336 (65.1%) |
-| **`RAM` region left** | **49736** |
+| **`RAM` region in use**, as the link reports it | **92632** of 142336 (65.1%) |
+| **`RAM` region left** | **49704** |
 | `.noinit` (`NOINIT` region) | 4364 of 5120 |
 
 The `NOINIT` region at the top of RAM holds the error log
@@ -46,7 +46,7 @@ From `arm-none-eabi-nm -S --size-sort` on the same ELF:
 | `CurrentSenseTask` object | 2480 | 2048-byte stack |
 | `MainLoopTask` object | 2480 | 2048-byte stack |
 | `ClockTask` object | 1600 | 1024-byte stack |
-| `DisplaySyncTask` object | 2520 | 2048-byte stack, the sync schedule and the boards' last status; `User/Src/Display/DisplaySyncTask.cpp` |
+| `DisplaySyncTask` object | 2528 | 2048-byte stack, the sync schedule and the boards' last status; `User/Src/Display/DisplaySyncTask.cpp` |
 | USB device state | about 2000 | `hpcd_USB_DRD_FS` 736, `hUsbDeviceFS` 732, `USBD_StrDesc` 512 |
 | FreeRTOS static support | about 3400 | Idle stack 512, timer stack 1024, their TCBs 384 each, ready lists 1120 |
 | ST67 static driver state | about 1200 | `W61_Obj` 992 bytes, the SPI transfer engine state |
@@ -120,7 +120,7 @@ Application tasks, with static stacks inside their objects:
 | `MainLoopTask` | 2048 | Normal | `MainLoopTask.hpp`; the boot screens encode frames on it, 944 used at peak |
 | `LogService` | 1536 | Normal | `LogService.hpp` |
 | `Clock` | 1024 | BelowNormal | `ClockTask.hpp` |
-| `DisplaySync` | 2048 | AboveNormal | `DisplaySyncTask.hpp`; 928 used after a logged burst (bench, 2026-10-06) |
+| `DisplaySync` | 2048 | AboveNormal | `DisplaySyncTask.hpp`; 1008 used after a logged burst and a logged content re-send (bench, 2026-10-07) |
 
 Generated and middleware tasks, with stacks from the FreeRTOS heap unless
 noted:

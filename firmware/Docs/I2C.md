@@ -94,15 +94,21 @@ no display board on the bus, is not an error.
 
 ### Status read
 
-A one-byte read from a board's own address answers its sync status:
+A one-byte read from a board's own address answers its status: `0xA0`
+(`kStatusTag`) with two flags (`boardStatus()`).
 
-| Byte | Meaning |
-| --- | --- |
-| `0xA1` (`kSyncStatusLocked`) | On the host's timeline; no burst needed |
-| `0xA0` (`kSyncStatusWanted`) | Wants a burst of syncs: after a reset, a jump or an HSITRIM step, until a sync has measured its rate |
-| `0x00` | A board whose firmware has no timeline sync |
+| Bit | Set | Clear |
+| --- | --- | --- |
+| 0, `kStatusLocked` | On the host's timeline; no burst needed | Wants a burst of syncs: after a reset, a jump or an HSITRIM step, until a sync has measured its rate |
+| 1, `kStatusNeedsContent` | Wants its content: from boot until the first content message, and again once its content has expired (7 h, `kContentLifetimeMs`) | Showing content the host sent |
 
-`serializeSync()`, `deserializeSync()` and the status values are in
+So a board answers `0xA2` just after a reset and `0xA1` once settled. `0x00`
+is a board whose firmware has neither. A host that knew only `0xA0` and
+`0xA1` reads `0xA2` and `0xA3` as neither, so it starts no burst for a board
+with this firmware: host and boards are updated together.
+
+`serializeSync()`, `deserializeSync()`, `boardStatus()` and the
+`statusValid()`, `statusWantsSyncs()` and `statusNeedsContent()` tests are in
 `DisplayI2cProtocol`.
 
 ## Addresses and Straps
@@ -189,7 +195,9 @@ so an unreachable board is reported when something actually tries to reach it.
 Separately, `DisplaySyncTask` broadcasts the timeline sync and reads each
 remote board's status byte on its own schedule
 ([TimelineSync.md](TimelineSync.md#syncs-from-the-host)), with a 5 ms timeout per
-transfer; neither is logged as a failure.
+transfer; neither is logged as a failure. A board that answers "needs
+content" gets its state sent again at once, through `Display::resendRemote()`
+([host Display.md](../HostControllerA/Docs/Display.md#the-display-aggregate)).
 
 ## Display Board Side
 
@@ -200,7 +208,8 @@ mode, with the HAL's interrupt-driven sequential listen API:
   call. A general-call write starts a 7-byte receive into the sync buffer. A
   write to the board's own address starts a 36-byte receive
   (`I2C_FIRST_AND_LAST_FRAME`) and flashes `LED_2` for 20 ms. A read gets one
-  byte, the sync status `TimelineFollower` last set ([Status read](#status-read)).
+  byte, the status from the flags `TimelineFollower` (locked) and `DisplayApp`
+  (needs content) last set ([Status read](#status-read)).
   `LED_2` therefore shows the data traffic only: neither the sync broadcast
   nor the status reads flash it.
 - `HAL_I2C_SlaveRxCpltCallback()`: for a sync, all 7 bytes arrived. The

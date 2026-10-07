@@ -93,7 +93,10 @@ length (see [Accuracy](#accuracy)).
 ### A Board That Starts Later
 
 A board that is reset or powered up while the host runs sets itself to
-"wants syncs". The host's next poll, at most 60 s later, starts a burst; a
+"wants syncs" and "needs content". The host's next poll, at most 60 s later,
+sends it the content the host holds for it
+([host Display.md](../HostControllerA/Docs/Display.md#the-display-aggregate))
+and starts a burst; a
 regular sync may reach the board first and only set its phase. From that
 burst: the first sync jumps the board onto the host's frame numbers, the
 second finds the phase within about 50 ms, the third (30 s) measures the rate
@@ -141,7 +144,9 @@ intervals could only measure the rate worse.
 
 `locked()` is true once a sync has measured the rate; a jump or an HSITRIM
 step clears it, since the rate is then unknown or has just changed. The board
-answers the host's status read with it: `0xA1` locked, `0xA0` wants syncs.
+answers the host's status read with it, bit 0 of the status byte: set
+(`0xA1`) locked, clear (`0xA0`) wants syncs
+([I2C.md](I2C.md#status-read)).
 
 `TimelineFollower` moves HSITRIM by the suggested steps, at most 8 steps from
 the trim the board booted with (`kHsiLimit`) and never across an HSICAL band
@@ -243,7 +248,7 @@ pc_time  elapsed_s  syncs jumps locked  error_ms  drift_ms  rate_ppm trim hsiChg
 The line after a reset has `frames` and `syncs` back at 0. A read that fails
 or is implausible (while the probe reconnects) prints `read failed`. The host
 side of the same run is the console's `time sync` (broadcasts sent and
-answered, each board's `locked` or `wants-sync`) and `tools/hsi_measure.py`
+answered, each board's `locked` or `wants-sync`, with `+needs-content`) and `tools/hsi_measure.py`
 for the host against the PC.
 
 ## Accuracy

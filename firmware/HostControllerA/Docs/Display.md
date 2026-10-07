@@ -63,11 +63,24 @@ message, up to three attempts for a board that still answers, and warnings in
 the log and error log for a board that does not
 ([I2C.md](../../Docs/I2C.md#buffereddisplayboard)). Remote boards are sent to
 only by `submit()` (astro refresh) and `submitRemote()` (console), never by the
-clock, the current readout or the progress bar.
+clock, the current readout or the progress bar, and by `resendRemote()` when a
+board asks.
+
+A display board that has been reset, or whose content has expired, asks for
+content in its status byte ([I2C.md](../../Docs/I2C.md#status-read)).
+`DisplaySyncTask`'s poll, every 60 s, sees it and calls
+`resendRemote(position)`, which sends the board the state the host holds for
+it: the last refresh with any `display` commands since, as `submitRemote()`
+would. It sends nothing for a board no client has submitted since the host
+booted, or whose last submit is 7 h old or more (`kContentLifetimeMs`, the
+board's own no-data timeout), so such a board stays on "no data" rather than
+showing blanks or expired data. A re-send logs
+`Display: 0x12 needs content, re-sent`; a failure is reported like any submit
+and tried again at the next poll.
 
 Separately, `DisplaySyncTask` keeps the remote boards' refresh in step with
 the local board's: it broadcasts the local board's timeline position and polls
-each remote board's sync status, using `display` only to skip the host's own
+each remote board's status, using `display` only to skip the host's own
 chain position ([firmware/Docs/TimelineSync.md](../../Docs/TimelineSync.md)).
 
 ## Refresh Progress

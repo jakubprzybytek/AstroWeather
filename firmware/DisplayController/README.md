@@ -28,7 +28,7 @@ checked on the board · 🔴 not started.
 | Address from the `ADDR_0..2` straps, `0x10`–`0x2A` | ✅ | Floating 0, ground 1, VCC 2; board 1 reads `0x11` | [I2C.md](../Docs/I2C.md#addresses-and-straps) |
 | I2C target: content and attribute messages | ✅ | Interrupt-driven listen; the messages are decoded in the `DisplayApp` task. The I2C interrupt is at priority 1 so every message is acknowledged | [I2C.md](../Docs/I2C.md#display-board-side) |
 | Listen only once the address is known | ✅ | Nothing answers on CubeMX's placeholder `0x10` | [I2C.md](../Docs/I2C.md#display-board-side) |
-| Timeline sync on the general call, sync status on a one-byte read | 🔵 | `0xA1` locked, `0xA0` wants a burst of syncs | [I2C.md](../Docs/I2C.md#timeline-sync) |
+| Timeline sync on the general call, status on a one-byte read | 🔵 | `0xA0` with flags: locked, needs content; a reset board asks for and gets the host's content within a minute | [I2C.md](../Docs/I2C.md#timeline-sync) |
 | Reject unknown commands and short writes, keeping the previous frame | 🔵 | Counted in `g_displayStats` | [I2C.md](../Docs/I2C.md#display-board-side) |
 | Recover from bus errors | 🔵 | Listening restarts after an error and is checked every second | [I2C.md](../Docs/I2C.md#display-board-side) |
 | **Brightness** | | | |

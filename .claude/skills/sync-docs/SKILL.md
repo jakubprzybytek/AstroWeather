@@ -15,7 +15,7 @@ is checked against the source, the `.ioc` or the built ELF.
 
 | Content | Place |
 | --- | --- |
-| Shared firmware docs: development workflow (build, flash, USB CDC connection, COM-port troubleshooting, CubeMX rules), the `Common` code, I2C, the native test kit | `firmware/Docs/` (`README.md`, `Development.md`, `Display.md`, `I2C.md`, `Testing.md`, `Utilities.md`) |
+| Shared firmware docs: development workflow (build, flash, USB CDC connection, COM-port troubleshooting, CubeMX rules), the `Common` code, I2C, the timeline sync, the native test kit | `firmware/Docs/` (`README.md`, `Development.md`, `Display.md`, `I2C.md`, `TimelineSync.md`, `Testing.md`, `Utilities.md`) |
 | One firmware project's docs | `firmware/<Project>/Docs/` (`HostControllerA`, `DisplayController`, `Bypass`) |
 | Each project's entry point | `firmware/<Project>/README.md`; `firmware/Common/README.md` points at `firmware/Docs` |
 | Hardware: design review, display faults, purchasing, BOM | `KiCad/Docs/` with its `README.md` |
@@ -70,6 +70,7 @@ Change all of them together:
 | Task stacks, object sizes, RAM | `HostControllerA/Docs/Architecture.md` (tasks table), `Firmware-RAM-Usage.md`, `Console.md` fixed limits |
 | CubeMX settings that must survive regeneration | `firmware/Docs/Development.md#cubemx-compliance`, the `Architecture.md` pin tables |
 | Error log size, log line length | `Console.md` (error log, fixed limits), `ErrorLog.hpp`, help text |
+| Display board status byte (`0xA0` + locked + needs content) and the 7 h content lifetime | `firmware/Docs/I2C.md#status-read`, `TimelineSync.md`, host `Display.md`, `Console.md` (`time sync`) and its help text, DisplayController `Architecture.md` and `README.md` |
 | Hardware issue IDs (C-1, H-1, ...) | `KiCad/Docs/Hardware_Review.md`, cited from the READMEs and feature docs |
 
 ## Procedure
@@ -87,6 +88,7 @@ List the changed areas and map them to documents:
 | Code | Documents |
 | --- | --- |
 | `firmware/Common/Src/Display/**`, `Device/SCT2xxx` | `firmware/Docs/Display.md` |
+| `Timeline*`, `TimelineServo`, `TimelineSync`, `Device/HsiTrim`, `SyncSchedule`, `DisplaySyncTask`, `TimelineFollower`, `DisplayController/tools/stats_log.py` | `firmware/Docs/TimelineSync.md` |
 | `DisplayI2cProtocol`, `DisplayAddress`, `Device/I2cBus`, `BufferedDisplayBoard`, `DisplayController/User/*I2c*`, `FrameAssembler` | `firmware/Docs/I2C.md` |
 | `firmware/Common/Src/Utils/**`, `Common/Src/Debug/**` | `firmware/Docs/Utilities.md` |
 | `*/tests/**`, `NativeTest.cmake`, presets, CI workflow | `firmware/Docs/Testing.md`, the project's `Testing.md` |
