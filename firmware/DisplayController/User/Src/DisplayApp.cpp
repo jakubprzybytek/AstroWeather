@@ -49,6 +49,8 @@ void DisplayApp::run()
 
         if (noData_.expire(now)) {
             ++g_displayStats.staleTimeouts;
+            // The host may hold newer content that did not reach this board.
+            link_.setNeedsContent(true);
             changed = true;
         }
         if (screenTimedOut(now)) {
@@ -76,6 +78,7 @@ bool DisplayApp::receiveFrames(uint32_t now)
         case DisplayController::FrameAssembler::Result::Content:
             newContent = true;
             noData_.onFrame(now);
+            link_.setNeedsContent(false);
             ++g_displayStats.framesAccepted;
             g_displayStats.lastFrameTick = now;
             break;

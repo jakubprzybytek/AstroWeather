@@ -102,7 +102,7 @@ void I2cTarget::onAddress(uint8_t direction, uint16_t matchCode)
                                      static_cast<uint16_t>(receiveBuffer_.size()),
                                      I2C_FIRST_AND_LAST_FRAME);
     } else {
-        readReply_ = status_;
+        readReply_ = Display::boardStatus(syncLocked_, needsContent_);
         HAL_I2C_Slave_Seq_Transmit_IT(&handle_, &readReply_, 1U, I2C_FIRST_AND_LAST_FRAME);
     }
 }

@@ -55,6 +55,14 @@ public:
     // a position with no remote board, or a board that did not take it.
     bool submitRemote(uint8_t position);
 
+    // Sends the remote board at `position` the state it holds again, for a
+    // board that asks for content after a reset (DisplaySyncTask). Only what
+    // a client has submitted since boot, and not older than a board shows it
+    // (kContentLifetimeMs): a board is better left on "no data" than shown
+    // blanks or expired data.
+    enum class Resend : uint8_t { Sent, Failed, NothingToSend };
+    Resend resendRemote(uint8_t position, uint32_t nowMs);
+
     // The boot screens on the local board (Display/BootScreens.hpp), about
     // 3 s, then its own state. Until this returns, submit() and submitLocal()
     // leave the local board out: clients keep writing its state, which shows
@@ -69,7 +77,12 @@ private:
     // Set from construction, so nothing reaches the local board before the
     // boot screens have run; guarded by submitMutex_.
     bool bootScreens_ = true;
+    // When a client last submitted each remote board (kernel ms); 0 for never.
+    // Guarded by submitMutex_.
+    std::array<uint32_t, kChainLength> submittedAt_{};
     Mutex submitMutex_;
+
+    void noteSubmitted(uint8_t position);
 };
 
 } // namespace Display

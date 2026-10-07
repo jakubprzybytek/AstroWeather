@@ -222,10 +222,34 @@ void testSyncMessage()
     expectEqual(frame, 7U, "rejected leaves the output");
 }
 
+void testBoardStatus()
+{
+    expectEqual(Display::boardStatus(false, false), static_cast<uint8_t>(0xA0U), "wants syncs");
+    expectEqual(Display::boardStatus(true, false), static_cast<uint8_t>(0xA1U), "locked");
+    expectEqual(Display::boardStatus(false, true), static_cast<uint8_t>(0xA2U),
+                "after a reset: wants syncs and content");
+    expectEqual(Display::boardStatus(true, true), static_cast<uint8_t>(0xA3U),
+                "locked, content wanted");
+
+    expect(Display::statusWantsSyncs(0xA0U) && Display::statusWantsSyncs(0xA2U), "unlocked");
+    expect(!Display::statusWantsSyncs(0xA1U) && !Display::statusWantsSyncs(0xA3U), "locked");
+    expect(Display::statusNeedsContent(0xA2U) && Display::statusNeedsContent(0xA3U), "content");
+    expect(!Display::statusNeedsContent(0xA0U) && !Display::statusNeedsContent(0xA1U),
+           "the two values of a board without it");
+
+    // No answer, a board without sync, or a byte from something else.
+    for (const uint8_t other : {0x00U, 0xFFU, 0xA4U, 0x02U, 0xB2U}) {
+        expect(!Display::statusValid(other), "not a status");
+        expect(!Display::statusWantsSyncs(other) && !Display::statusNeedsContent(other),
+               "asks for nothing");
+    }
+}
+
 } // namespace
 
 int main()
 {
+    testBoardStatus();
     testSyncMessage();
     testMessageSize();
     testSerializeLayout();

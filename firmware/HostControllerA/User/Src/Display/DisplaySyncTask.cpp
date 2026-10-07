@@ -122,14 +122,31 @@ void DisplaySyncTask::pollBoards(uint32_t now)
         const HAL_StatusTypeDef status =
             bus_->receive(Display::chainAddress(position), &reply, 1U, kTransferTimeoutMs);
         boardStatus_[position] = (status == HAL_OK) ? reply : 0U;
-        if (status == HAL_OK && reply == Display::kSyncStatusWanted && wanting == 0U) {
+        if (status != HAL_OK) {
+            continue;
+        }
+        if (Display::statusWantsSyncs(reply) && wanting == 0U) {
             wanting = Display::chainAddress(position);
+        }
+        if (Display::statusNeedsContent(reply)) {
+            resendContent(position, now);
         }
     }
     if (wanting != 0U && !schedule_.inBurst()) {
         char reason[24];
         std::snprintf(reason, sizeof(reason), "0x%02X wants syncs", static_cast<unsigned>(wanting));
         startBurst(now, reason);
+    }
+}
+
+// A board that has shown nothing since it booted, or whose content expired,
+// gets the host's copy at once rather than at the next refresh. A failure is
+// logged by the board's submit; the next poll tries again.
+void DisplaySyncTask::resendContent(uint8_t position, uint32_t now)
+{
+    if (display_->resendRemote(position, now) == Display::Display::Resend::Sent) {
+        LogService::instance().logf(LogService::Level::Info, "Display: 0x%02X needs content, re-sent",
+                                    static_cast<unsigned>(Display::chainAddress(position)));
     }
 }
 

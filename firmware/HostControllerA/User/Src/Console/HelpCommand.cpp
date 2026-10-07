@@ -192,7 +192,8 @@ const Command kTime[] = {
      "The host broadcasts its refresh timeline to every board every 2 min, and\n"
      "in a burst (0, 10, 40, 100 s) at boot and when a board asks for one; 'now'\n"
      "starts a burst. Shows the broadcasts sent and answered, the next, and\n"
-     "each board's answer to the last poll: locked or wants-sync."},
+     "each board's answer to the last poll: locked or wants-sync, and\n"
+     "+needs-content for a board the host is re-sending its content to."},
 };
 
 const Command kAdc[] = {

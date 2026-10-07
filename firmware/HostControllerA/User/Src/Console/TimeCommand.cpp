@@ -52,10 +52,11 @@ void showSync()
             continue;
         }
         used += std::snprintf(&message[used], sizeof(message) - static_cast<std::size_t>(used),
-                              " 0x%02X=%s", static_cast<unsigned>(Display::chainAddress(position)),
-                              (answer == Display::kSyncStatusLocked) ? "locked"
-                              : (answer == Display::kSyncStatusWanted) ? "wants-sync"
-                                                                       : "?");
+                              " 0x%02X=%s%s", static_cast<unsigned>(Display::chainAddress(position)),
+                              !Display::statusValid(answer)         ? "?"
+                              : Display::statusWantsSyncs(answer)   ? "wants-sync"
+                                                                    : "locked",
+                              Display::statusNeedsContent(answer) ? "+needs-content" : "");
     }
     LogService::instance().sendLine(message);
 }

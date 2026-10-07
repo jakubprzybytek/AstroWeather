@@ -54,6 +54,7 @@ private:
     DisplaySyncTask();
     void sendSync(uint32_t now);
     void pollBoards(uint32_t now);
+    void resendContent(uint8_t position, uint32_t now);
     void startBurst(uint32_t now, const char* reason);
 
     Device::I2cBus* bus_ = nullptr;

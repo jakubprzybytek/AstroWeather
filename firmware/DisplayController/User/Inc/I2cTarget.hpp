@@ -18,8 +18,9 @@
 // It also answers the general-call address 0x00, where the host broadcasts
 // its timeline sync (Display::kSyncCommand): the address-match interrupt
 // stamps the board's own timeline at once, and the task gets the message and
-// the stamp through a second thread flag. A one-byte read answers the sync
-// status the task sets (Display::kSyncStatusLocked or ...Wanted).
+// the stamp through a second thread flag. A one-byte read answers the status
+// the tasks set: whether the timeline is locked and whether content is wanted
+// (Display::boardStatus()).
 //
 // One instance, for hi2c1; the HAL callbacks are routed to it. Every write
 // addressed to this board pulses LED_2; the sync broadcast and the host's
@@ -68,8 +69,10 @@ public:
     };
     bool takeSync(Sync& sync);
 
-    // The answer to the host's one-byte read.
-    void setStatus(uint8_t status) { status_ = status; }
+    // The answer to the host's one-byte read (Display::boardStatus()): the
+    // timeline locked, and content wanted.
+    void setSyncLocked(bool locked) { syncLocked_ = locked; }
+    void setNeedsContent(bool needs) { needsContent_ = needs; }
 
     uint16_t address() const { return address_; }
     I2C_HandleTypeDef& handle() { return handle_; }
@@ -104,8 +107,9 @@ private:
     volatile bool receivingSync_ = false;
     volatile bool syncStamped_ = false;
 
-    // Answer to a read from the host; set by the task, copied into readReply_
-    // as the read starts.
-    volatile uint8_t status_ = Display::kSyncStatusWanted;
+    // Answer to a read from the host; set by the task, combined into
+    // readReply_ as the read starts. From boot: not locked, content wanted.
+    volatile bool syncLocked_ = false;
+    volatile bool needsContent_ = true;
     uint8_t readReply_ = 0U;
 };

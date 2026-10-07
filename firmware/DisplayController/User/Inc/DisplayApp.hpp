@@ -24,8 +24,8 @@ public:
 
     // Longer than the host's 6-hour refresh interval: the host sends nothing
     // between refreshes, so a shorter timeout would show "no data" most of
-    // the day.
-    static constexpr uint32_t kNoDataTimeoutMs = 7UL * 60UL * 60UL * 1000UL;
+    // the day. The host re-sends nothing older (Display::kContentLifetimeMs).
+    static constexpr uint32_t kNoDataTimeoutMs = Display::kContentLifetimeMs;
 
     DisplayApp(Display::DisplayBoard& board, I2cTarget& link, TimelineFollower& timeline);
 

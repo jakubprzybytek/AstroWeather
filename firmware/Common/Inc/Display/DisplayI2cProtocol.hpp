@@ -35,10 +35,38 @@ using SyncMessage = std::array<uint8_t, kSyncMessageSize>;
 // an interrupt that holds the host up between them does not move it.
 constexpr uint32_t kSyncTransferMicros = 130U;
 
-// A board's answer to a one-byte read: whether it wants a burst of syncs
-// (TimelineSync::locked()). A board without sync answers 0x00.
-constexpr uint8_t kSyncStatusLocked = 0xA1U;
-constexpr uint8_t kSyncStatusWanted = 0xA0U;
+// A board's answer to a one-byte read: 0xA0 with two flags. kStatusLocked:
+// its timeline is on the host's (TimelineSync::locked()); clear, it wants a
+// burst of syncs. kStatusNeedsContent: it has shown no content since it
+// booted, or its content has expired (kContentLifetimeMs); the host sends its
+// copy. A board without either answers 0x00. A host that knew only 0xA0 and
+// 0xA1 reads the needs-content values as neither, so both boards go together.
+constexpr uint8_t kStatusTag = 0xA0U;
+constexpr uint8_t kStatusTagMask = 0xFCU;
+constexpr uint8_t kStatusLocked = 0x01U;
+constexpr uint8_t kStatusNeedsContent = 0x02U;
+
+constexpr uint8_t boardStatus(bool locked, bool needsContent)
+{
+    return static_cast<uint8_t>(kStatusTag | (locked ? kStatusLocked : 0U) |
+                                (needsContent ? kStatusNeedsContent : 0U));
+}
+constexpr bool statusValid(uint8_t status)
+{
+    return (status & kStatusTagMask) == kStatusTag;
+}
+constexpr bool statusWantsSyncs(uint8_t status)
+{
+    return statusValid(status) && (status & kStatusLocked) == 0U;
+}
+constexpr bool statusNeedsContent(uint8_t status)
+{
+    return statusValid(status) && (status & kStatusNeedsContent) != 0U;
+}
+
+// How long a display board shows content after the last frame before it
+// shows "no data" and asks again; the host re-sends nothing older.
+constexpr uint32_t kContentLifetimeMs = 7UL * 60UL * 60UL * 1000UL;
 
 void serializeSync(uint32_t frame, uint16_t micros, SyncMessage& message);
 // False, and both outputs untouched, unless it is a whole sync message.
