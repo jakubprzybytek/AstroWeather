@@ -8,17 +8,23 @@ namespace Display {
 // When the host broadcasts its timeline sync and polls the display boards
 // for theirs. Pure; DisplaySyncTask drives it with the kernel tick (ms).
 //
-// - A burst of four syncs, at 0, 10, 30 and 60 s, at boot and whenever a
-//   board asks for syncs (or 'time sync now' does): the first sets the
-//   board's phase, the later ones measure its rate and pick its HSITRIM.
-// - Then one every 5 minutes, counted from the burst's last.
+// - A burst of four syncs, at 0, 10, 40 and 100 s, at boot and whenever a
+//   board asks for syncs (or 'time sync now' does): the first two set the
+//   board's phase, the last two measure its rate, over 30 and then 60 s,
+//   and pick its HSITRIM. A board asks right after a sync that jumped or
+//   stepped its trim, so a sync sent within the last 10 s serves as the
+//   burst's first: the board has its phase from it already.
+// - Then one every 2 minutes, counted from the burst's last. The boards'
+//   clocks against the host's wander 100-150 ppm in 5 minutes whenever one
+//   warms or cools (after a reset, a change of content, the sun), which is
+//   45 ms at the end of a 5-minute interval and about 6 ms of a 2-minute one.
 // - A poll of every board's sync status 15 s after boot and then every
 //   minute; a board that wants syncs starts a burst. A request during a
 //   burst is ignored: the burst serves it.
 class SyncSchedule {
 public:
-    static constexpr std::array<uint32_t, 4> kBurstOffsetsMs = {0U, 10000U, 30000U, 60000U};
-    static constexpr uint32_t kIntervalMs = 300000U;
+    static constexpr std::array<uint32_t, 4> kBurstOffsetsMs = {0U, 10000U, 40000U, 100000U};
+    static constexpr uint32_t kIntervalMs = 120000U;
     static constexpr uint32_t kFirstPollMs = 15000U;
     static constexpr uint32_t kPollIntervalMs = 60000U;
 
@@ -34,6 +40,13 @@ public:
         if (inBurst()) {
             return false;
         }
+        if (sent_ && static_cast<uint32_t>(now - lastSyncAt_) < kBurstOffsetsMs[1]) {
+            // The sync just sent is the burst's first.
+            burstStart_ = lastSyncAt_;
+            burstIndex_ = 1U;
+            syncAt_ = burstStart_ + kBurstOffsetsMs[1];
+            return true;
+        }
         startBurst(now);
         return true;
     }
@@ -43,6 +56,8 @@ public:
     bool syncDue(uint32_t now) const { return reached(now, syncAt_); }
     void onSyncSent(uint32_t now)
     {
+        lastSyncAt_ = now;
+        sent_ = true;
         if (inBurst()) {
             ++burstIndex_;
             syncAt_ = burstStart_ + (inBurst() ? kBurstOffsetsMs[burstIndex_]
@@ -89,6 +104,8 @@ private:
     std::size_t burstIndex_ = kBurstOffsetsMs.size();
     uint32_t syncAt_ = 0U;
     uint32_t pollAt_ = 0U;
+    uint32_t lastSyncAt_ = 0U;
+    bool sent_ = false;
 };
 
 } // namespace Display

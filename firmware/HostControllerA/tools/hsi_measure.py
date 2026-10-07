@@ -4,8 +4,8 @@
 'stats on' makes the host print a report every 5000 ms of its own clock, on
 an absolute schedule; the PC's arrival times of those reports, fitted to a
 line, give the host's clock rate. Ten minutes gives a few tens of ppm, far
-finer than a trim step (about 0.33 %, 3300 ppm). See firmware/Docs/Display.md,
-"Trimming the host's HSI".
+finer than a trim step (about 0.33 %, 3300 ppm). See firmware/Docs/TimelineSync.md,
+"Trimming the Host's HSI".
 
 The PC's own clock is the reference: its error is tens of ppm at most, which
 does not change the step chosen. Requires pyserial.

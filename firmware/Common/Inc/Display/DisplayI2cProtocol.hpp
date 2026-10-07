@@ -29,9 +29,11 @@ constexpr uint16_t kGeneralCallAddress = 0x00U;
 constexpr std::size_t kSyncMessageSize = 7U;
 using SyncMessage = std::array<uint8_t, kSyncMessageSize>;
 
-// From the host's stamp to the board's receive-complete interrupt: START,
-// the address and seven bytes at 100 kHz, plus the HAL's setup.
-constexpr uint32_t kSyncTransferMicros = 750U;
+// From the host's stamp to the board's address-match interrupt: the HAL's
+// setup, START and the address byte with its ACK at 100 kHz (90 us), and the
+// interrupt's entry. The seven data bytes come after the board's stamp, so
+// an interrupt that holds the host up between them does not move it.
+constexpr uint32_t kSyncTransferMicros = 130U;
 
 // A board's answer to a one-byte read: whether it wants a burst of syncs
 // (TimelineSync::locked()). A board without sync answers 0x00.

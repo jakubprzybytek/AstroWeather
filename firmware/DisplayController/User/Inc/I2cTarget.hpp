@@ -16,7 +16,7 @@
 // see firmware/Docs/I2C.md.
 //
 // It also answers the general-call address 0x00, where the host broadcasts
-// its timeline sync (Display::kSyncCommand): the receive-complete interrupt
+// its timeline sync (Display::kSyncCommand): the address-match interrupt
 // stamps the board's own timeline at once, and the task gets the message and
 // the stamp through a second thread flag. A one-byte read answers the sync
 // status the task sets (Display::kSyncStatusLocked or ...Wanted).
@@ -98,9 +98,11 @@ private:
     volatile bool receiving_ = false;
 
     Display::SyncMessage syncBuffer_{};
+    Display::TimelineStamp syncStamp_{};
     Sync sync_{};
     volatile bool syncReady_ = false;
     volatile bool receivingSync_ = false;
+    volatile bool syncStamped_ = false;
 
     // Answer to a read from the host; set by the task, copied into readReply_
     // as the read starts.

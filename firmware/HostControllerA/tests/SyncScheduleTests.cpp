@@ -40,15 +40,32 @@ void testBootBurstThenEveryFiveMinutes()
     schedule.start(1000U);
     expect(schedule.inBurst(), "boot starts a burst");
     uint32_t sent[16] = {};
-    const std::size_t count = run(schedule, 1000U, 960000U, sent, 16U);
+    const std::size_t count = run(schedule, 1000U, 500000U, sent, 16U);
     expectEqual(count, static_cast<std::size_t>(7), "four in the burst, three after");
     expectEqual(sent[0], 0U, "at once");
     expectEqual(sent[1], 10000U, "10 s");
-    expectEqual(sent[2], 30000U, "30 s");
-    expectEqual(sent[3], 60000U, "60 s");
-    expectEqual(sent[4], 360000U, "then 5 min after the last");
-    expectEqual(sent[5], 660000U, "every 5 min");
+    expectEqual(sent[2], 40000U, "40 s");
+    expectEqual(sent[3], 100000U, "100 s");
+    expectEqual(sent[4], 220000U, "then 2 min after the last");
+    expectEqual(sent[5], 340000U, "every 2 min");
     expect(!schedule.inBurst(), "burst over");
+}
+
+// A board asks for syncs at the poll after a sync that jumped its timeline
+// or stepped its HSITRIM: that sync is the burst's first.
+void testBurstAfterASync()
+{
+    SyncSchedule schedule;
+    schedule.start(0U);
+    uint32_t sent[8] = {};
+    run(schedule, 0U, 220000U, sent, 8U);
+    expectEqual(sent[4], 220000U, "the first 2-minute sync");
+    expect(schedule.requestBurst(220005U), "a burst 5 ms after it");
+    expect(schedule.inBurst(), "in the burst");
+    expect(!schedule.syncDue(220005U), "no second sync now");
+    expectEqual(schedule.untilSyncMs(220005U), 9995U, "the burst's 10 s from that sync");
+    schedule.onSyncSent(230000U);
+    expectEqual(schedule.untilSyncMs(230000U), 30000U, "then its 40 s");
 }
 
 void testPolls()
@@ -69,10 +86,10 @@ void testRequestedBurst()
     expect(!schedule.requestBurst(5000U), "ignored during the boot burst");
     uint32_t sent[8] = {};
     run(schedule, 0U, 100000U, sent, 8U);
-    expect(schedule.requestBurst(100000U), "accepted after it");
-    expect(schedule.syncDue(100000U), "a sync at once");
-    schedule.onSyncSent(100000U);
-    expectEqual(schedule.untilSyncMs(100000U), 10000U, "then the burst's 10 s");
+    expect(schedule.requestBurst(150000U), "accepted after it");
+    expect(schedule.syncDue(150000U), "a sync at once");
+    schedule.onSyncSent(150000U);
+    expectEqual(schedule.untilSyncMs(150000U), 10000U, "then the burst's 10 s");
 }
 
 void testTickWrap()
@@ -81,9 +98,9 @@ void testTickWrap()
     const uint32_t start = 0xFFFFF000U;
     schedule.start(start);
     uint32_t sent[8] = {};
-    const std::size_t count = run(schedule, start, 61000U, sent, 8U);
+    const std::size_t count = run(schedule, start, 101000U, sent, 8U);
     expectEqual(count, static_cast<std::size_t>(4), "the burst across the tick wrap");
-    expectEqual(sent[3], 60000U, "on time");
+    expectEqual(sent[3], 100000U, "on time");
 }
 
 } // namespace
@@ -91,6 +108,7 @@ void testTickWrap()
 int main()
 {
     testBootBurstThenEveryFiveMinutes();
+    testBurstAfterASync();
     testPolls();
     testRequestedBurst();
     testTickWrap();

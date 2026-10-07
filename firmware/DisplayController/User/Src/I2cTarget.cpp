@@ -3,6 +3,7 @@
 #include <Debug/PulseLed.hpp>
 #include <Display/PcbDisplayBoard.hpp>
 #include <Stats.hpp>
+#include <Utils/MicroClock.hpp>
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -84,8 +85,10 @@ void I2cTarget::onAddress(uint8_t direction, uint16_t matchCode)
 {
     finishReceive();
     if (matchCode == Display::kGeneralCallAddress) {
-        // The sync broadcast; a general-call read is not a thing.
+        // The sync broadcast; a general-call read is not a thing. Stamp now:
+        // the host's interrupts can stretch the data bytes that follow.
         receivingSync_ = true;
+        syncStamped_ = Display::PcbDisplayBoard::stampNow(syncStamp_);
         HAL_I2C_Slave_Seq_Receive_IT(&handle_, syncBuffer_.data(),
                                      static_cast<uint16_t>(syncBuffer_.size()),
                                      I2C_FIRST_AND_LAST_FRAME);
@@ -107,12 +110,15 @@ void I2cTarget::onAddress(uint8_t direction, uint16_t matchCode)
 void I2cTarget::onReceiveComplete()
 {
     if (receivingSync_) {
-        // Stamp first: the sync is only as good as this instant.
         receivingSync_ = false;
-        Display::TimelineStamp stamp{};
-        if (Display::PcbDisplayBoard::stampNow(stamp)) {
+        if (syncStamped_) {
+            const uint32_t dataMicros = Utils::microsNow() - syncStamp_.now;
+            g_displayStats.syncDataMicros = dataMicros;
+            if (dataMicros > g_displayStats.syncDataMaxMicros) {
+                g_displayStats.syncDataMaxMicros = dataMicros;
+            }
             sync_.message = syncBuffer_;
-            sync_.stamp = stamp;
+            sync_.stamp = syncStamp_;
             syncReady_ = true;
             ++g_displayStats.syncsReceived;
             if (recipient_ != nullptr) {

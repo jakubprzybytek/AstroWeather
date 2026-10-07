@@ -45,7 +45,7 @@ void showSync()
         message, sizeof(message), "OK time-sync sent=%lu answered=%lu last=%s next=%lus %s",
         static_cast<unsigned long>(status.sent), static_cast<unsigned long>(status.answered), last,
         static_cast<unsigned long>((status.untilNextMs + 999U) / 1000U),
-        status.inBurst ? "burst" : "every-300s");
+        status.inBurst ? "burst" : "every-120s");
     for (uint8_t position = 0; position < Display::kChainLength; ++position) {
         const uint8_t answer = status.boardStatus[position];
         if (answer == 0U || used < 0 || static_cast<std::size_t>(used) >= sizeof(message)) {

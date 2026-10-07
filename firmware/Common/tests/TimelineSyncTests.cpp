@@ -81,57 +81,83 @@ void testRateAndHsiSuggestion()
 {
     Display::TimelineSync sync;
     sync.onSync(1000000, 1000000, 0, 0);
-    // 10 s later the board is 48 ms behind: 4800 ppm slow.
-    const auto decision = sync.onSync(11000000, 11000000 - 48000, 0, 0);
-    expect(!decision.jumped, "48 ms is drift, not a jump");
+    // 30 s later the board is 144 ms behind: 4800 ppm slow.
+    const auto decision = sync.onSync(31000000, 31000000 - 144000, 0, 0);
+    expect(!decision.jumped, "144 ms over 30 s is drift, not a jump");
     expect(decision.rateMeasured, "rate measured");
     expectEqual(decision.ratePpm, -4800, "rate");
-    expectEqual(decision.driftMicros, 48000, "drift");
-    expectEqual(decision.phaseMicros, 48000, "phase to correct");
+    expectEqual(decision.driftMicros, 144000, "drift");
+    expectEqual(decision.phaseMicros, 144000, "phase to correct");
     expectEqual(static_cast<int>(decision.hsiSteps), 1, "one step faster");
+    expect(sync.locked(), "a measured rate locks");
     expectEqual(sync.afterHsiSteps(decision.ratePpm, 1), -1500, "the servo keeps the rest");
     expect(!sync.locked(), "an HSITRIM step unlocks");
 
     // What the servo still had to correct at the stamp is not drift.
     Display::TimelineSync pending;
     pending.onSync(0, 0, 0, 0);
-    const auto withPending = pending.onSync(10000000, 10000000 - 3000, 3000, -1000);
+    const auto withPending = pending.onSync(30000000, 30000000 - 3000, 3000, -1000);
     expectEqual(withPending.driftMicros, 0, "pending correction is not drift");
     expectEqual(withPending.ratePpm, -1000, "rate unchanged");
-    expectEqual(static_cast<int>(withPending.hsiSteps), 0, "no step within 2000 ppm");
-    expect(pending.locked(), "locked within 10 ms with a rate");
+    expectEqual(static_cast<int>(withPending.hsiSteps), 0, "no step within 2500 ppm");
+    expect(pending.locked(), "locked with a rate");
+    // 5 minutes later 40 ms ahead: measured over the interval, still locked.
+    const auto far = pending.onSync(330000000, 330000000 + 40000, 0, -1000);
+    expect(far.rateMeasured, "a large error is measured");
+    expectEqual(far.ratePpm, -867, "the rate over the interval");
+    expect(pending.locked(), "not a reason for a burst");
 
     Display::TimelineSync quick;
     quick.onSync(0, 0, 0, 0);
-    const auto soon = quick.onSync(2000000, 2000000 - 400, 0, 0);
-    expect(!soon.rateMeasured, "under 5 s: phase only");
+    const auto soon = quick.onSync(10000000, 10000000 - 400, 0, 0);
+    expect(!soon.rateMeasured, "under 25 s: phase only");
     expectEqual(soon.phaseMicros, 400, "phase still corrected");
+    expect(!quick.locked(), "no rate, no lock");
+
+    // A sync 20 ms after one that found 144 ms: 143 ms of it still pending
+    // is no jump, whatever the 50 ms threshold of a 20 ms interval.
+    Display::TimelineSync again;
+    again.onSync(0, 0, 0, 0);
+    again.onSync(30000000, 30000000 - 144000, 0, 0);
+    const auto repeat = again.onSync(30020000, 30020000 - 143000, 143000, -4800);
+    expect(!repeat.jumped, "a pending correction is not a jump");
+    expectEqual(repeat.phaseMicros, 143000, "the phase, counted from the stamp");
 }
 
-// A burst's 20-30 s intervals give noisy rates: they set the rate but never
-// a trend. Two 5-minute intervals do.
-void testTrendOnlyFromLongIntervals()
+// A short interval's rough rate only nudges the rate; a long one sets it.
+void testShortIntervalsNudge()
 {
     Display::TimelineSync sync;
     sync.onSync(0, 0, 0, 0);
-    // 30 s at -1000 ppm, then 30 s at -1150 ppm: 30 ms and 34.5 ms behind.
+    // 30 s at -1000 ppm: 30 ms behind. The first rate is taken as it is.
     auto decision = sync.onSync(30000000, 30000000 - 30000, 0, 0);
-    expectEqual(decision.ratePpm, -1000, "first interval's rate");
+    expectEqual(decision.ratePpm, -1000, "the first rate");
+    // Another 30 s, 4.5 ms behind at -1000 ppm: -1150 over this interval,
+    // weighed equally with the 30 s before it.
     decision = sync.onSync(60000000, 60000000 - 4500, 0, -1000);
-    expectEqual(decision.ratePpm, -1150, "30 s intervals: the rate, no trend");
+    expectEqual(decision.ratePpm, -1075, "nudged halfway");
 
-    // Two 5-minute intervals, the second 100 ppm slower: trend -100 more.
-    decision = sync.onSync(360000000, 360000000, 0, -1150);
-    expectEqual(decision.ratePpm, -1150, "steady over 5 min");
-    decision = sync.onSync(660000000, 660000000 - 30000, 0, -1150);
-    expectEqual(decision.ratePpm, -1350, "5-minute intervals carry the trend");
+    // 2 minutes, exactly on: the rate stands.
+    decision = sync.onSync(180000000, 180000000, 0, -1075);
+    expectEqual(decision.ratePpm, -1075, "a long interval sets the rate");
+    // Another 2 minutes, 12 ms behind: -1175 over it, and no trend from the
+    // change.
+    decision = sync.onSync(300000000, 300000000 - 12000, 0, -1075);
+    expectEqual(decision.ratePpm, -1175, "the average, nothing carried on");
+
+    // A burst's 30 s with a 3 ms stamp error, 100 ppm, weighed against the
+    // 2 minutes before it.
+    decision = sync.onSync(330000000, 330000000 + 3000, 0, -1175);
+    expectEqual(decision.ratePpm, -1155, "a short interval moves it a fifth of the way");
+    decision = sync.onSync(450000000, 450000000, 0, -1155);
+    expectEqual(decision.ratePpm, -1155, "the next long one sets it");
 }
 
 void testLaterJump()
 {
     Display::TimelineSync sync;
     sync.onSync(0, 0, 0, 0);
-    sync.onSync(10000000, 10000000, 0, 0);
+    sync.onSync(30000000, 30000000, 0, 0);
     expect(sync.locked(), "locked");
     // The host rebooted: its frames start again from 1.
     const auto decision = sync.onSync(500000, 20000000, 0, 0);
@@ -153,7 +179,7 @@ void testAllowedSteps()
 }
 
 // One display board against the host, frame by frame, on the host's real
-// schedule: a burst at 0, 10, 30 and 60 s, then every 5 min. The board's
+// schedule: a burst at 0, 10, 40 and 100 s, then every 2 min. The board's
 // clock is `errorPpm` slow or fast and drifts `driftPpmPerHour`; HSITRIM
 // steps it by `stepPpm`. Returns the worst offset after the first
 // `settleSeconds`, in us; `steps` gets the HSITRIM steps taken.
@@ -171,8 +197,8 @@ SimulationResult simulate(double errorPpm, double driftPpmPerHour, double stepPp
     Display::TimelineSync sync;
     const double frameMicros = Display::kFrameMicros;
 
-    std::vector<double> syncTimes = {0.0, 10e6, 30e6, 60e6};
-    for (double at = 60e6 + 300e6; at < minutes * 60e6; at += 300e6) {
+    std::vector<double> syncTimes = {0.0, 10e6, 40e6, 100e6};
+    for (double at = 100e6 + 120e6; at < minutes * 60e6; at += 120e6) {
         syncTimes.push_back(at);
     }
     // Real time is the host's clock; the board's first frame starts at
@@ -250,11 +276,12 @@ void testSimulatedBench()
 {
     // The 2026-10-05 boards: the display 4800 ppm slow of the host, a real
     // step of 0.338 % where the board assumes 0.33 %.
-    const SimulationResult result = simulate(-4800.0, 0.0, 3380.0, 60.0, 90.0, 7654321.0);
+    const SimulationResult result = simulate(-4800.0, 0.0, 3380.0, 60.0, 150.0, 7654321.0);
     expect(result.worstMicros < 2000.0, "within 2 ms once settled");
     expectEqual(result.steps, 1, "one HSITRIM step");
     expect(result.locked, "locked");
-    expect(result.worstAdjust < 100, "frames within 0.5 % once settled");
+    // A slow slew (100 us) over the rate (28 us), never a fast one.
+    expect(result.worstAdjust < 200, "frames within 1 % once settled");
 }
 
 void testSimulatedWorstClock()
@@ -270,14 +297,12 @@ void testSimulatedTemperatureDrift()
 {
     // The bench saw the display's HSI move ~400 ppm in an hour.
     const SimulationResult result = simulate(-2500.0, 400.0, 3380.0, 120.0, 90.0, 123456.0);
-    // The first 5-minute interval after the burst has no trend yet: ~10 ms.
-    expect(result.worstMicros < 12000.0, "within 12 ms between 5 min syncs");
-    // Once two 5-minute rates give the trend, only the bow of a constant rate
-    // against a drifting clock is left: 400 ppm/h * (5 min)^2 / 8, 1.25 ms.
-    const SimulationResult steady = simulate(-2500.0, 400.0, 3380.0, 120.0, 900.0, 123456.0);
-    expect(steady.worstMicros < 2000.0, "within 2 ms once the trend is known");
+    // The rate is the last interval's average, 13 ppm stale by the end of
+    // the next: 400 ppm/h * 2 min * 2 min / 2, 1.6 ms, plus the burst's
+    // 60 s rate being a minute staler at the first 2-minute sync.
+    expect(result.worstMicros < 4000.0, "within 4 ms between 2 min syncs");
     const SimulationResult falling = simulate(1500.0, -400.0, 3380.0, 120.0, 90.0, 9999.0);
-    expect(falling.worstMicros < 12000.0, "falling too");
+    expect(falling.worstMicros < 4000.0, "falling too");
     expectEqual(falling.steps, 0, "1500 ppm needs no HSITRIM step");
 }
 
@@ -306,7 +331,7 @@ int main()
     testServoSlew();
     testFirstSyncJumps();
     testRateAndHsiSuggestion();
-    testTrendOnlyFromLongIntervals();
+    testShortIntervalsNudge();
     testLaterJump();
     testAllowedSteps();
     testHeartbeat();

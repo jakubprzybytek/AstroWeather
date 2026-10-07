@@ -7,7 +7,7 @@
 // demangling:
 //
 //   arm-none-eabi-nm build/Debug/DisplayController.elf | grep g_displayStats
-//   STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x70
+//   STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x78
 //
 // Each field has a single writer (the I2C interrupt or the DisplayApp task), so
 // no locking is needed.
@@ -47,6 +47,11 @@ struct DisplayControllerStats {
     uint32_t syncRatePpm;      // the servo's rate: this clock against the host's, signed
     uint32_t hsiTrim;          // RCC_ICSCR.HSITRIM now
     uint32_t hsiChanges;       // HSITRIM steps taken
+    // From the sync's address match to its receive-complete interrupt: the
+    // seven data bytes, 630 us at 100 kHz, plus whatever held the host up
+    // between them. The stamp is taken before, so this does not move it.
+    uint32_t syncDataMicros;     // the last sync's
+    uint32_t syncDataMaxMicros;  // the longest
 };
 
 extern volatile DisplayControllerStats g_displayStats;

@@ -31,7 +31,7 @@ struct TimelineStamp {
     uint32_t frameStart;     // when it started
     uint32_t frameMicros;    // its length on this board's clock, corrections included
     uint32_t now;            // the instant stamped
-    int32_t pendingMicros;   // phase correction the servo had still to make
+    int32_t pendingMicros;   // phase correction the servo had still to make then
 };
 
 // Where a stamp falls on the timeline, in nominal microseconds from the start

@@ -103,6 +103,10 @@ bool PcbDisplayBoard::stampNow(TimelineStamp& stamp)
     const uint32_t primask = __get_PRIMASK();
     __disable_irq();
     stamp = board->records_[board->activeRecord_];
+    // Read live, not from the record: applySync() changes it mid-frame, and a
+    // sync applied against the record's stale copy was corrected twice
+    // (bench, 2026-10-07).
+    stamp.pendingMicros = board->servo_.pending();
     stamp.now = Utils::microsNow();
     __set_PRIMASK(primask);
     return true;
@@ -113,6 +117,10 @@ void PcbDisplayBoard::applySync(int32_t jumpFrames, int32_t phaseMicros, int32_t
 {
     taskENTER_CRITICAL();
     sequencer_.addFrames(jumpFrames);
+    // The record the next stampNow() reads is renumbered too: the interrupt
+    // only rewrites it at the next frame start, and a sync stamped before
+    // that would jump by the same frames again (bench, 2026-10-07).
+    records_[activeRecord_].frame += static_cast<uint32_t>(jumpFrames);
     const int32_t correctedSince = pendingAtStamp - servo_.pending();
     servo_.setPending(phaseMicros - correctedSince);
     servo_.setRatePpm(ratePpm);
@@ -214,8 +222,7 @@ void PcbDisplayBoard::startFrame()
     const uint32_t sinceStart = __HAL_TIM_GET_COUNTER(&timer_);
     const uint8_t spare = static_cast<uint8_t>(activeRecord_ ^ 1U);
     records_[spare] = {frame, Utils::microsNow() - sinceStart,
-                       static_cast<uint32_t>(static_cast<int32_t>(kFrameMicros) + adjust), 0U,
-                       servo_.pending()};
+                       static_cast<uint32_t>(static_cast<int32_t>(kFrameMicros) + adjust), 0U, 0};
     activeRecord_ = spare;
 }
 

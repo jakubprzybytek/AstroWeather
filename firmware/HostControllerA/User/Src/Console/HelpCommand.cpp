@@ -185,12 +185,12 @@ const Command kTime[] = {
      "minute."},
     {"time hsi [<0-127>]", "trim this board's HSI16 clock (saved)",
      "Higher runs faster, about 0.33 % a step; 64 is the chip's default. Applies\n"
-     "at once and at boot. See firmware/Docs/Display.md to measure it. Without\n"
+     "at once and at boot. See firmware/Docs/TimelineSync.md to measure it. Without\n"
      "a value it shows the trim, HSICAL and the saved trim:\n"
      "'OK time-hsi=63 cal=0x8E saved=63'. Not the RTC's clock: see 'time trim'."},
     {"time sync [now]", "the display boards' timeline sync",
-     "The host broadcasts its refresh timeline to every board every 5 min, and\n"
-     "in a burst (0, 10, 30, 60 s) at boot and when a board asks for one; 'now'\n"
+     "The host broadcasts its refresh timeline to every board every 2 min, and\n"
+     "in a burst (0, 10, 40, 100 s) at boot and when a board asks for one; 'now'\n"
      "starts a burst. Shows the broadcasts sent and answered, the next, and\n"
      "each board's answer to the last poll: locked or wants-sync."},
 };
