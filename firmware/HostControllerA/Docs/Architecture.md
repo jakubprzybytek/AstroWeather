@@ -59,7 +59,7 @@ the refresh interrupt drives it once `localBoard` starts):
    `osDelay` and the bus mutex is uncontended. A saved HSI trim other than 64
    is applied at once (`HsiTrim::set()`, logged as `HSI trim <n>`), so the
    refresh timeline runs at the trimmed rate from its first frame; see
-   [Display.md](../../Docs/Display.md#trimming-the-hosts-hsi).
+   [TimelineSync.md](../../Docs/TimelineSync.md#trimming-the-hosts-hsi).
 4. `CurrentSenseTask`: logging and display flags from settings, the display,
    then `start()`.
 5. `ConsoleService`: `init(&display)`, EEPROM and settings pointers, `start()`.
@@ -76,7 +76,7 @@ the refresh interrupt drives it once `localBoard` starts):
    trim is rejected), the display, `start()`.
 9. `DisplaySyncTask`: `init(&i2c1Bus, &display)`, `start()`; after
    `localBoard.start()`, since the sync carries its refresh timeline
-   ([Display.md](../../Docs/Display.md#syncs-from-the-host)).
+   ([TimelineSync.md](../../Docs/TimelineSync.md#syncs-from-the-host)).
 10. `SetSt67CredentialSource(&settingsStore)`, then `StartSt67HttpFetchTask()`.
    The credential source must be set first, since the fetch task reads the
    credentials on every connect.
@@ -164,7 +164,7 @@ DMA, so its timing depends on interrupt latency only; see
 | --- | --- | --- | ---: | --- | --- |
 | `Modem_Process` | ST67 driver `w61_at_common.c` | 47 | 2048 | heap | AT response and event handling |
 | `spi_xfer_engine` | ST67 driver `spi_iface.c` | 46 | 1536 | heap | SPI1 transfers to the module |
-| `DisplaySync` | `Display/DisplaySyncTask.cpp` | AboveNormal (32) | 2048 | static | Broadcasts the refresh timeline to the display boards and polls their sync status; a few milliseconds a minute, above the normal tasks so a due sync is not held up ([Display.md](../../Docs/Display.md#syncs-from-the-host)) |
+| `DisplaySync` | `Display/DisplaySyncTask.cpp` | AboveNormal (32) | 2048 | static | Broadcasts the refresh timeline to the display boards and polls their sync status; a few milliseconds a minute, above the normal tasks so a due sync is not held up ([TimelineSync.md](../../Docs/TimelineSync.md#syncs-from-the-host)) |
 | `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | heap | Starts USB, then exits (stack freed) |
 | `LogService` | `Debug/LogService.cpp` | Normal (24) | 1536 | static | Drains the log queue to USB CDC; `stats` output |
 | `ConsoleService` | `Console/ConsoleService.cpp` | Normal (24) | 2304 | static | Assembles and runs console commands |

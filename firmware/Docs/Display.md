@@ -6,7 +6,7 @@ model, the PCB encoding and the interrupt-driven multiplexing. All of it is in
 [HostController](../HostControllerA/README.md) and the
 [DisplayController](../DisplayController/README.md), including the refresh
 timeline the display boards keep in step with the host's
-([Timeline Sync](#timeline-sync)). How the host spreads the forecast over
+([Timeline Sync](TimelineSync.md)). How the host spreads the forecast over
 several boards is in the host's
 [Display.md](../HostControllerA/Docs/Display.md); how boards talk to each
 other is in [I2C.md](I2C.md).
@@ -42,7 +42,7 @@ compiles unchanged; each project passes its own SPI and timer handles in.
 | `DisplayCodec` | Encoding of a logical state into SPI-ready slot frames, per pass and blink phase |
 | `RefreshSequencer` | The pass table, pass order and blink phase, the frame numbers and the per-frame length adjustment |
 | `PcbDisplayBoard` | A `DisplayBoard` that multiplexes its own LEDs from the refresh timer's interrupt and keeps the board's timeline |
-| `Timeline` | The timeline's constants, the `LED_1` heartbeat, `TimelineStamp` and `positionMicros()`; see [Timeline Sync](#timeline-sync) |
+| `Timeline` | The timeline's constants, the `LED_1` heartbeat, `TimelineStamp` and `positionMicros()`; see [Timeline Sync](TimelineSync.md) |
 | `TimelineServo`, `TimelineSync` | A display board's per-frame correction and its decisions on each sync from the host |
 | `BootScreens` | The slot test and address screens every board shows at power-up |
 | `DisplayAddress` | The address straps; see [I2C.md](I2C.md#addresses-and-straps) |
@@ -105,7 +105,7 @@ host's clock sets its colon to blink once and keeps calling `setTime()`.
   half a second (`RefreshSequencer::kBlinkHalfPeriodFrames`, 25 frames at
   50 Hz). The phase follows the frame number, frames 1-25 on and 26-50 off, so
   boards on the host's timeline blink together
-  ([Timeline Sync](#timeline-sync)); a display board blinks on its own phase
+  ([Timeline Sync](TimelineSync.md)); a display board blinks on its own phase
   only from its boot until the first sync arrives.
 - **Levels** are made in time. Each multiplexing slot is shown as four passes of
   12, 31, 27 and 30 % of its 4 ms, and a level lights the passes in
@@ -307,7 +307,7 @@ The interrupt runs once per pass:
    pass of a frame the interrupt first starts the frame on the timeline
    (`startFrame()`): it takes the frame's length correction from the servo,
    sets `LED_1` for the heartbeat and records when the frame started; see
-   [Timeline Sync](#timeline-sync).
+   [Timeline Sync](TimelineSync.md).
 3. **Start the DMA** that shifts the next pass's seven bytes (56 us at 1 MHz)
    while this pass is lit. At a frame boundary a pending submission is swapped
    in first, so a frame never mixes two submissions.
@@ -361,166 +361,12 @@ start high (CubeMX), so nothing lights before the first frame.
 
 ## Timeline Sync
 
-Every board's refresh frames form a timeline: 20 ms frames
-(`kFrameMicros`, 50 Hz), numbered from the host's boot
-(`Display/Timeline.hpp`). The display boards keep their timelines on the
-host's, so the blink phase and the `LED_1` heartbeat, which both run off the
-frame number, are in step on every board. The host's own refresh is the
-reference and is never corrected. A display board runs free from its own boot
-until the first sync arrives.
-
-### The timeline on every board
-
-- **Frames.** `RefreshSequencer` numbers the frames, the first one 1.
-  `addFrames(delta)` renumbers them without touching the timing, and the
-  blink phase follows the new numbers from the next frame on.
-  `setFrameAdjust(micros)` lengthens or shortens every frame from then on: the
-  adjustment is shared out over the five slots' first, longest, passes, and
-  what does not divide evenly goes a microsecond each to the first slots
-  (-23 us is -5, -5, -5, -4, -4).
-- **Heartbeat.** `heartbeatLit(frame)` is true for frame 1 of every 100-frame
-  cycle (`kCycleFrames`, 2 s), so `LED_1` is lit for one 20 ms frame every
-  2 s, starting with the first blink-on phase. The refresh interrupt writes
-  it at every frame start, so a flashing `LED_1` shows that the refresh
-  interrupt is running, and synced boards flash together.
-- **Frame start.** At the first pass of each frame the refresh interrupt
-  (`PcbDisplayBoard::startFrame()`) takes the frame's correction from the
-  board's `TimelineServo`, sets it on the sequencer, writes `LED_1` and
-  publishes a record of the frame: its number, its start time and its length
-  on this board's clock. The record is double-buffered, so a reader in a
-  higher-priority interrupt never sees half of one.
-- **Stamps.** `PcbDisplayBoard::stampNow()`, from any interrupt or task, gives
-  that record plus the time now (`TimelineStamp`). Times are
-  `Utils::microsNow()` microseconds of the board's own clock
-  ([Utilities.md](Utilities.md#microsecond-clock)). `positionMicros()` turns
-  a stamp into nominal microseconds from the start of frame 0, scaling the
-  time into the frame by that frame's actual length, so a corrected frame
-  still spans 20 ms of timeline.
-
-On the host the servo stays at zero: its frames are exactly `kFrameMicros` of
-its own clock.
-
-### Syncs from the host
-
-`DisplaySyncTask` on the host broadcasts its timeline position to the I2C
-general-call address: it stamps its own timeline with interrupts off and
-sends the frame number and the microseconds into it, a 7-byte message
-([I2C.md](I2C.md#timeline-sync)). Every display board takes the message at
-the same instant and stamps its own timeline in the receive-complete
-interrupt. The host's position at that instant is its stamp plus
-`kSyncTransferMicros`, 750 us: START, the address and seven bytes at 100 kHz,
-plus the HAL's setup.
-
-The host's schedule (`HostControllerA/User/Inc/Display/SyncSchedule.hpp`):
-
-| When | What |
-| --- | --- |
-| At boot, and when a board asks or `time sync now` is given | A burst of four syncs, at 0, 10, 30 and 60 s. The first sets each board's phase, the later ones measure its rate and pick its HSITRIM. A request during a burst is ignored: the burst serves it |
-| After a burst | One sync every 300 s, counted from the burst's last |
-| 15 s after boot, then every 60 s | A one-byte status read of each remote chain address, `0x10`-`0x15` except the host's own. A board that answers "wants syncs" starts a burst, logged as `Display sync: burst, 0x11 wants syncs` |
-
-With no display board on the bus the broadcast is not acknowledged; that is
-not an error. `time sync` on the console shows the broadcasts sent and
-answered, the next one and each board's answer
-([Console.md](../HostControllerA/Docs/Console.md#time)).
-
-### Following the host
-
-On a display board, `TimelineFollower` (`DisplayController/User/Src`) runs on
-the `DisplayApp` task. For each sync it compares the host's position with its
-own at the stamp, asks `Display::TimelineSync` for a decision and applies it
-with `PcbDisplayBoard::applySync()`: renumber the frames, set the phase still
-to correct and set the rate.
-
-`TimelineServo` sets each frame's length from two corrections, added:
-
-- **Rate**: this board's clock against the host's, in ppm, clamped to
-  ±20000. A board running fast (positive) needs more of its own microseconds
-  per frame. It is applied a whole microsecond at a time, 1 us per 50 ppm of
-  a 20 ms frame, with the remainder carried, so any rate comes out exact on
-  average.
-- **Phase**: how far the board is behind the host (positive: shorter frames)
-  or ahead (negative: longer frames). It is taken out at 100 us a frame
-  (0.5 %), or 1000 us a frame (5 %) while more than 5 ms out, so the pass
-  lengths, and with them the brightness, change only slightly.
-
-`TimelineSync` decides on each sync:
-
-| Case | Decision |
-| --- | --- |
-| The first sync, or an error larger than 50 ms plus 2.5 % of the time since the previous sync (more than drift can explain: the host rebooted) | Jump: renumber the frames by the nearest whole number of frames, and slew out the rest, at most half a frame |
-| Otherwise | Correct the phase by the error. If at least 5 s have passed since the previous sync, measure the rate: the drift is the error less what the servo still had to correct at the stamp, and the average rate over the interval is the servo's rate less the drift divided by the interval |
-| This and the previous measured interval each at least 2 minutes (never a burst's) | Add a trend: `(average - previous average) × interval × 2 / (interval + previous interval)`, clamped to ±500 ppm, so a clock drifting with temperature is followed rather than trailed by half an interval |
-| The new rate more than 2000 ppm out | Suggest HSITRIM steps, rounded at 3300 ppm a step (0.33 %, measured on a G070 on 2026-10-05); slow wants a higher trim |
-
-The servo's rate is the average plus the trend. `locked()` is true once a sync
-has measured the rate and found the timeline within 10 ms, and stays true
-while later syncs find it within 10 ms; a jump, an HSITRIM step or a larger
-error clears it. The board answers the host's status read with it: `0xA1`
-locked, `0xA0` wants syncs.
-
-`TimelineFollower` moves HSITRIM by the suggested steps, at most 8 steps from
-the trim the board booted with (`kHsiLimit`) and never across an HSICAL band
-edge ([Utilities.md](Utilities.md#hsi-trim)). The servo's rate then gains
-3300 ppm per step, the board unlocks, and the rate averages start again; the
-servo covers the rest, up to 2 %. Its counters, the last error, drift and rate
-and the trim are in `g_displayStats`
-([DisplayController Architecture](../DisplayController/Docs/Architecture.md#diagnostics)).
-
-### Accuracy
-
-The simulation in `timeline_sync_tests` runs one board against the host frame
-by frame on the real schedule. The worst offset after settling:
-
-| Board clock | HSITRIM steps | Worst offset |
-| --- | ---: | ---: |
-| -4800 ppm, the bench boards of 2026-10-05, with a real step of 0.338 % | 1 | about 1 us |
-| -10000 ppm (1 %) | 3 | about 1 us |
-| -2500 ppm, drifting +400 ppm an hour | 1 | about 10 ms at the end of the first 5-minute interval, before there is a trend; about 1.5 ms once it is known |
-| +1500 ppm, drifting -400 ppm an hour | 0 | about 10 ms in the first interval, likewise |
-
-Once the trend is known, what remains is the bow of a constant rate against a
-clock drifting at *k* ppm per unit time over an interval *I*, about
-*k*·*I*²/8: 1.25 ms for 400 ppm an hour and 5 minutes. Against 20 ms frames
-and a 1 s blink phase, a few milliseconds are not visible. The first interval
-after a burst has no trend yet, since a burst's intervals are too short to
-give one; a board that ends it more than 10 ms out asks for another burst.
-
-### Trimming the host's HSI
-
-The display boards follow the host whatever its clock, but each moves its own
-HSITRIM to match the host's rate, within ±8 steps of its boot trim, and the
-host's HSI16 also sets its own frame rate, FreeRTOS tick and I2C timing.
-Trimming the host's HSI16 close to 16 MHz keeps all of them near nominal.
-
-`time hsi <0-127>` sets the host's HSITRIM: higher runs faster, about 0.33 %
-a step, 64 is the chip's default. It applies at once, is saved to the EEPROM
-([Settings.md](../HostControllerA/Docs/Settings.md#tag-registry)) and is
-applied at boot before the refresh starts. `time hsi` alone shows the trim,
-HSICAL and the saved trim ([Console.md](../HostControllerA/Docs/Console.md#time)).
-
-To measure, from `firmware/HostControllerA`, with no other program holding
-the console's COM port:
-
-1. Run `python tools/hsi_measure.py` (`--duration`, default 600 s; `--port`,
-   default auto-detected; needs pyserial). It reads the trim with `time hsi`,
-   turns on `stats on`, fits a line to the PC's arrival times of the reports
-   the host sends every 5000 ms of its own clock, and prints the host's clock
-   against the PC's and the trim to set:
-
-   ```text
-   host clock <ppm> ppm against the PC, from <n> reports over <s> s (worst arrival <ms> ms off the line)
-   trim <old> -> <new>: 'time hsi <new>', about <ppm> ppm after; measure again to confirm
-   ```
-
-   or `trim <n> is already the closest; no change`.
-2. Set the suggested value with `time hsi <new>`.
-3. Run the tool again to confirm.
-
-The PC's clock is the reference; its error, tens of ppm at most, does not
-change the step chosen. Measured on 2026-10-05 against the PC at trim 64: the
-host +2660 ppm (trim 63 estimated at about -650 ppm), the display board at
-`0x11` -2147 to -2500 ppm.
+Every board's refresh frames form a timeline of 20 ms frames numbered from the
+host's boot, and the display boards keep theirs on the host's, so the blink
+phase and the `LED_1` heartbeat, which both run off the frame number, are in
+step on every board. The timeline, the host's schedule of syncs, how a board
+follows them, HSITRIM and how to measure it are in
+[TimelineSync.md](TimelineSync.md).
 
 ## Low Brightness
 
@@ -549,7 +395,7 @@ Native suites in `../Common/tests` (see [Testing.md](Testing.md)):
 | `DisplayAttributesTests.cpp` | Attribute defaults, the blink and level setters with their masks, clamping and out-of-range indices, the plane operations |
 | `DisplayPassesTests.cpp` | The pass table's invariants (sums to 100, the level percentages, the matrix's 70 %), which elements each pass and blink phase show, `encodePasses()` against `encodePcb()` |
 | `RefreshSequencerTests.cpp` | Pass lengths and their validation, the longest-first order, slot and frame boundaries, the blink phase, the frame adjustment's split over the slots, renumbering the frames |
-| `TimelineSyncTests.cpp` | The servo's rate and slew, the jump, rate, trend and HSITRIM decisions, `HsiTrim::allowedSteps()`, the heartbeat frame, `positionMicros()`, and the simulated board against the host's schedule ([Accuracy](#accuracy)) |
+| `TimelineSyncTests.cpp` | The servo's rate and slew, the jump, rate and HSITRIM decisions, `HsiTrim::allowedSteps()`, the heartbeat frame, `positionMicros()`, and the simulated board against the host's schedule ([TimelineSync.md](TimelineSync.md#accuracy)) |
 | `BootScreensTests.cpp` | The slot-test and address states and the boot sequence |
 
 The I2C message and address-strap suites are listed in

@@ -68,7 +68,7 @@ clock, the current readout or the progress bar.
 Separately, `DisplaySyncTask` keeps the remote boards' refresh in step with
 the local board's: it broadcasts the local board's timeline position and polls
 each remote board's sync status, using `display` only to skip the host's own
-chain position ([firmware/Docs/Display.md](../../Docs/Display.md#timeline-sync)).
+chain position ([firmware/Docs/TimelineSync.md](../../Docs/TimelineSync.md)).
 
 ## Refresh Progress
 

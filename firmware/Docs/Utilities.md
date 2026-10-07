@@ -66,7 +66,7 @@ a tick that SysTick has counted but whose interrupt has not yet run is added
 in. It wraps after about 71 minutes, so times are compared by unsigned
 difference. While the scheduler is suspended the kernel holds ticks back, so a
 time read then can be a millisecond or so early. The refresh timeline's stamps
-use it ([Display.md](Display.md#the-timeline-on-every-board)).
+use it ([TimelineSync.md](TimelineSync.md#the-timeline-on-every-board)).
 
 ## HSI Trim
 
@@ -84,7 +84,7 @@ G070 on 2026-10-05). A trim applies at once and is lost at reset.
 
 The host sets its trim from the console (`time hsi`, saved); a display board
 moves its own to follow the host's timeline, at most 8 steps from its boot
-trim. Both are described in [Display.md](Display.md#timeline-sync).
+trim. Both are described in [TimelineSync.md](TimelineSync.md).
 
 ## LEDs
 
@@ -92,7 +92,7 @@ trim. Both are described in [Display.md](Display.md#timeline-sync).
   by the refresh interrupt at each frame start (`Display::heartbeatLit()`), so
   it shows that the refresh interrupt is running. Boards on the host's
   timeline flash together
-  ([Display.md](Display.md#the-timeline-on-every-board)).
+  ([TimelineSync.md](TimelineSync.md#the-timeline-on-every-board)).
 - **`LED_2`, activity.** `PulseLed::pulse(ms)` lights the LED at once and a
   static FreeRTOS one-shot timer clears it, so a pulse never blocks and works
   from an interrupt; overlapping pulses merge into one. `init()` creates the

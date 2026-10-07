@@ -74,7 +74,7 @@ content-only `deserializeI2c()` are in `DisplayI2cProtocol.cpp`.
 
 The host broadcasts its refresh timeline's position to the general-call
 address `0x00`, so every display board takes it at the same instant; what the
-boards do with it is in [Display.md](Display.md#timeline-sync).
+boards do with it is in [TimelineSync.md](TimelineSync.md).
 
 | Offset | Size | Content |
 | ---: | ---: | --- |
@@ -85,9 +85,11 @@ boards do with it is in [Display.md](Display.md#timeline-sync).
 A board takes command `0x05` only on the general call, never on its own
 address, and rejects a general-call write that is not a whole 7-byte sync
 message (`deserializeSync()`). The host stamps its timeline just before the
-START; `kSyncTransferMicros`, 750 us, is the time from that stamp to the
-board's receive-complete interrupt: START, the address and seven bytes at
-100 kHz, plus the HAL's setup. A broadcast that no board acknowledges, as with
+START; `kSyncTransferMicros`, 130 us, is the time from that stamp to the
+board's address-match interrupt, where the board stamps its own: the HAL's
+setup, START and the address byte at 100 kHz, and the interrupt's entry. The
+data bytes come after both stamps, so an interrupt that holds the host up
+between them (its refresh interrupt runs up to 850 us) moves neither. A broadcast that no board acknowledges, as with
 no display board on the bus, is not an error.
 
 ### Status read
@@ -97,7 +99,7 @@ A one-byte read from a board's own address answers its sync status:
 | Byte | Meaning |
 | --- | --- |
 | `0xA1` (`kSyncStatusLocked`) | On the host's timeline; no burst needed |
-| `0xA0` (`kSyncStatusWanted`) | Wants a burst of syncs: after a reset, a jump, an HSITRIM step or a sync that found it more than 10 ms out |
+| `0xA0` (`kSyncStatusWanted`) | Wants a burst of syncs: after a reset, a jump or an HSITRIM step, until a sync has measured its rate |
 | `0x00` | A board whose firmware has no timeline sync |
 
 `serializeSync()`, `deserializeSync()` and the status values are in
@@ -186,7 +188,7 @@ so an unreachable board is reported when something actually tries to reach it.
 
 Separately, `DisplaySyncTask` broadcasts the timeline sync and reads each
 remote board's status byte on its own schedule
-([Display.md](Display.md#syncs-from-the-host)), with a 5 ms timeout per
+([TimelineSync.md](TimelineSync.md#syncs-from-the-host)), with a 5 ms timeout per
 transfer; neither is logged as a failure.
 
 ## Display Board Side
@@ -217,7 +219,7 @@ Nothing is decoded in the interrupt. `DisplayApp` feeds each queued message to
 `FrameAssembler` (`User/Src/FrameAssembler.cpp`), which decodes it with
 `deserializePlaneI2c()`, stages attribute planes and applies them with the
 content, and each sync to `TimelineFollower`
-([Display.md](Display.md#following-the-host)).
+([TimelineSync.md](TimelineSync.md#following-the-host)).
 
 General call is enabled in `I2cTarget::begin()` (`Init.GeneralCallMode`), when
 it re-initialises I2C1 with the strap address; the CubeMX `.ioc` keeps it

@@ -131,7 +131,7 @@ must match it.
 | Tag | Name | Length | Value |
 | --- | --- | --- | --- |
 | `0x01` | `AdcFlags` | 1 | Bit 0 = current-sense logging enabled, bit 1 = current-sense display enabled. Remaining bits reserved, write 0. |
-| `0x02` | `ClockTrim` | 4 or 5 | Bytes 0-3: signed LSI error in ppm, big endian; see [RTC.md](RTC.md#trimming). Byte 4, optional: the HSI trim, `HSITRIM` 0-127; see [Display.md](../../Docs/Display.md#trimming-the-hosts-hsi). Written when either is not its default (LSI trim 0, HSI trim 64); the fifth byte only when the HSI trim is not 64. A fifth byte above 127 is ignored (HSI trim 64). An older build reads the first four bytes and ignores the fifth. |
+| `0x02` | `ClockTrim` | 4 or 5 | Bytes 0-3: signed LSI error in ppm, big endian; see [RTC.md](RTC.md#trimming). Byte 4, optional: the HSI trim, `HSITRIM` 0-127; see [TimelineSync.md](../../Docs/TimelineSync.md#trimming-the-hosts-hsi). Written when either is not its default (LSI trim 0, HSI trim 64); the fifth byte only when the HSI trim is not 64. A fifth byte above 127 is ignored (HSI trim 64). An older build reads the first four bytes and ignores the fifth. |
 | `0x10` | `WifiSsid` | 1–32 | SSID bytes, not NUL terminated. |
 | `0x11` | `WifiPassword` | 1–63 | Passphrase bytes, not NUL terminated. |
 | `0x12` | `ApiHost` | 1–64 | API server host name, not NUL terminated. Absent: the built-in `APP_ST67_HTTP_HOST`. |

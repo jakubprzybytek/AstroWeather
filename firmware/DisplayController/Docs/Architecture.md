@@ -57,7 +57,7 @@ data, or "no data" if none has arrived yet.
 
 The `LED_1` heartbeat, 20 ms every 2 s, is not a task: the refresh interrupt
 writes it at each frame start, in step with the host's
-([Display.md](../../Docs/Display.md#the-timeline-on-every-board)).
+([TimelineSync.md](../../Docs/TimelineSync.md#the-timeline-on-every-board)).
 
 `DisplayApp` is a `Task<N>` object with a static stack, and
 `Utils::Mutex` uses static storage, so the 3072-byte FreeRTOS heap holds only
@@ -72,7 +72,7 @@ checks:
 | `kFlagFrame` | `I2cTarget`, from the I2C interrupt | One or more complete 36-byte messages are waiting |
 | `kFlagSwitch1` | `SwitchInput`, from the EXTI interrupt | Switch 1 pressed |
 | `kFlagSwitch2` | `SwitchInput` | Switch 2 pressed |
-| `kFlagSync` | `I2cTarget`, from the I2C interrupt | A timeline sync from the host has arrived, stamped; `TimelineFollower::onSync()` applies it ([Display.md](../../Docs/Display.md#following-the-host)) |
+| `kFlagSync` | `I2cTarget`, from the I2C interrupt | A timeline sync from the host has arrived, stamped; `TimelineFollower::onSync()` applies it ([TimelineSync.md](../../Docs/TimelineSync.md#following-the-host)) |
 
 Every second it also checks whether the data has gone stale, closes a test
 screen that has been up too long, and restarts I2C listening if it has
@@ -116,7 +116,7 @@ with the HAL's interrupt-driven sequential listen API, queues each 36-byte
 message (four deep) and wakes `DisplayApp`, which decodes it with
 `FrameAssembler`: attribute planes are staged and applied with the next
 content. It also takes the host's timeline sync on the general-call address,
-stamping the board's timeline in the receive-complete interrupt, and answers
+stamping the board's timeline in the address-match interrupt, and answers
 a one-byte read with the sync status `TimelineFollower` sets. Listening starts
 only once the address is known and is checked every second. The protocol,
 both sides of the link and why the I2C interrupt runs at priority 1 are in
@@ -142,8 +142,8 @@ so a level-3 handler waits for the refresh interrupt to finish.
 ## Diagnostics
 
 Until the board has a console, its counters are read over SWD. They are in
-`g_displayStats` (`User/Inc/Stats.hpp`), a C-linkage struct of 28 32-bit
-fields, 0x70 bytes. Signed values are stored as two's complement:
+`g_displayStats` (`User/Inc/Stats.hpp`), a C-linkage struct of 30 32-bit
+fields, 0x78 bytes. Signed values are stored as two's complement:
 
 | Field | Counts |
 | --- | --- |
@@ -169,19 +169,23 @@ fields, 0x70 bytes. Signed values are stored as two's complement:
 | `syncsRejected` | Sync broadcasts that did not decode |
 | `syncsApplied` | Syncs decided on by `TimelineFollower` |
 | `syncJumps` | Of those, jumps: the first sync, or one more than 50 ms plus 2.5 % of the interval out |
-| `syncLocked` | 1 while the board tells the host it needs no burst |
+| `syncLocked` | 1 while the board tells the host it needs no burst: a sync has measured its rate since the last jump or HSITRIM step |
 | `syncErrorMicros` | Host minus board at the last sync, before any jump, signed |
 | `syncDriftMicros` | Drift over the last interval long enough to measure the rate, signed |
 | `syncRatePpm` | The servo's rate, this board's clock against the host's, signed |
 | `hsiTrim` | `RCC_ICSCR.HSITRIM` now |
 | `hsiChanges` | HSITRIM steps taken |
+| `syncDataMicros` | The last sync's seven data bytes, from the address match, where the board stamps, to the receive-complete interrupt: 630 us at 100 kHz plus whatever held the host up between them |
+| `syncDataMaxMicros` | The longest of those |
 
 ```bash
 arm-none-eabi-nm build/Debug/DisplayController.elf | grep g_displayStats
-STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x70
+STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <address> 0x78
 ```
 
-`mode=HOTPLUG` attaches without resetting the board.
+`mode=HOTPLUG` attaches without resetting the board. `tools/stats_log.py`
+reads the struct on a loop and prints a line per sync
+([TimelineSync.md](../../Docs/TimelineSync.md#measuring)).
 
 A stack overflow halts the board in `vApplicationStackOverflowHook()`
 (`Core/Src/main.c`), with interrupts disabled and the task's name in
@@ -200,6 +204,7 @@ current pass.
 | `User/Src/Screens.cpp` | Self-test, identify and address screens |
 | `User/Inc/NoDataTimer.hpp` | Stale-data timeout on the wrapping tick |
 | `User/Inc/Stats.hpp` | `g_displayStats` |
+| `tools/stats_log.py` | Logs the timeline sync fields of `g_displayStats` over SWD ([TimelineSync.md](../../Docs/TimelineSync.md#measuring)) |
 | `tests/ScreensTests.cpp`, `tests/NoDataTimerTests.cpp`, `tests/FrameAssemblerTests.cpp` | Native tests |
 | `../Common` | Display types, attributes and encoding, the pass sequencing, `PcbDisplayBoard`, the timeline and its sync decisions, `SCT2xxx`, `HsiTrim`, the I2C messages, the address straps, tasks and mutexes; see [firmware/Docs](../../Docs/) |
 
@@ -208,9 +213,7 @@ current pass.
 - Not yet checked on the board: rejecting unknown commands and short writes,
   recovery from bus errors, the 7-hour "no data" timeout and the switch test
   screens.
-- The timeline sync is checked on board `0x11` over two 5-minute syncs only
-  (bench, 2026-10-06): it jumps onto the host's timeline, steps HSITRIM 64 to
-  65, locks within the burst, and the 5-minute syncs found it 7.6 and -2.0 ms
-  out. A longer run, over a day's temperature, is still to do
-  ([Display.md](../../Docs/Display.md#accuracy)).
+- The timeline sync: a run over a day's temperature, and the cause of the
+  host's clock moving 100-200 ppm within minutes
+  ([TimelineSync.md](../../Docs/TimelineSync.md#open-items)).
 - Console over USART2 (`PA2`/`PA3`); see the [README](../README.md#features).

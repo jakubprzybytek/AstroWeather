@@ -30,7 +30,7 @@ The G0B1 RTC can be clocked from only three sources:
 | LSI, the internal RC oscillator, nominally 32 kHz | **Used.** |
 
 HSI16 cannot clock the RTC, so `time hsi`, which trims the HSI16 for the
-display timeline ([Display.md](../../Docs/Display.md#trimming-the-hosts-hsi)),
+display timeline ([TimelineSync.md](../../Docs/TimelineSync.md#trimming-the-hosts-hsi)),
 does not change the clock.
 
 The LSI needs no parts, but it is not precise. The datasheet allows a wide

@@ -19,8 +19,8 @@ checked on the board · 🔴 not started.
 | **Display** | | | |
 | Drive the local LED board: five slots, 50 Hz frames, four passes per slot | ✅ | `PcbDisplayBoard` from TIM6's interrupt, SPI1 by DMA; shared with the host | [Display.md](../Docs/Display.md#refresh-operation) |
 | Blink and four brightness levels per segment and pixel | ✅ | Sent by the host as attribute planes with the content | [Display.md](../Docs/Display.md#blink-and-brightness-levels) |
-| Refresh timeline kept on the host's: blinking and the heartbeat in step on every board | 🔵 | Syncs broadcast by the host on the I2C general call; per-frame rate and phase correction, simulated within a few ms | [Display.md](../Docs/Display.md#timeline-sync) |
-| HSITRIM moved to follow the host's clock | 🔵 | Up to 8 steps from the boot trim, never across an HSICAL band edge; the servo covers the rest, up to 2 % | [Display.md](../Docs/Display.md#following-the-host) |
+| Refresh timeline kept on the host's: blinking and the heartbeat in step on every board | 🔵 | Syncs broadcast by the host on the I2C general call; per-frame rate and phase correction, simulated within a few ms | [TimelineSync.md](../Docs/TimelineSync.md) |
+| HSITRIM moved to follow the host's clock | 🔵 | Up to 8 steps from the boot trim, never across an HSICAL band edge; the servo covers the rest, up to 2 % | [TimelineSync.md](../Docs/TimelineSync.md#following-the-host) |
 | Safe power-up: outputs blanked, all slots off | ✅ | `SCT_ENABLE` and the slot selects start high (CubeMX); the first frame is prepared before the outputs are enabled | [Architecture.md](Docs/Architecture.md#boot) |
 | Boot screens: slot test (each `DISPLAYx_EN` slot on its own, 1 s), then the board address (`Ad11`, 2 s) | ✅ | Shared with the host (`Display::showBootScreens()`) | [Display.md](../Docs/Display.md#boot-screens) |
 | "No data" until the first frame, and again after 7 h without one | 🔵 | Shared state (`Display::noDataState()`); 7 h is just over the host's 6-hour refresh interval | [Architecture.md](Docs/Architecture.md#screens) |
@@ -34,7 +34,7 @@ checked on the board · 🔴 not started.
 | **Brightness** | | | |
 | Never drive the bussed `LOW_POWER_ENABLE` line | ✅ | `PB8` stays analog; the host drives it for every board ([Hardware review](../../KiCad/Docs/Hardware_Review.md) M-4) | [Display.md](../Docs/Display.md#low-brightness) |
 | **Development aids** | | | |
-| Heartbeat on `LED_1`, 20 ms every 2 s, from the refresh interrupt | 🔵 | Frame 1 of every 100 on the shared timeline, so in step with the host once synced | [Display.md](../Docs/Display.md#the-timeline-on-every-board) |
+| Heartbeat on `LED_1`, 20 ms every 2 s, from the refresh interrupt | 🔵 | Frame 1 of every 100 on the shared timeline, so in step with the host once synced | [TimelineSync.md](../Docs/TimelineSync.md#the-timeline-on-every-board) |
 | `LED_2` flashes on every write addressed to the board | 🔵 | 20 ms, from the address-match interrupt, through the shared `PulseLed`; not for the sync broadcast or the status reads | [Architecture.md](Docs/Architecture.md#screens) |
 | Switch 1 steps through test screens, switch 2 shows the address | 🔵 | All segments, then an identify pattern; test screens close after 60 s, the address after 3 s | [Architecture.md](Docs/Architecture.md#screens) |
 | Diagnostic counters, read over SWD | ✅ | `g_displayStats`: frames, attributes, rejects, short writes, probes, I2C errors, refresh counters; the sync counters, error, drift, rate and HSITRIM (🔵) | [Architecture.md](Docs/Architecture.md#diagnostics) |
@@ -97,7 +97,8 @@ This project:
 Shared with the host ([firmware/Docs](../Docs/README.md)):
 
 - [Development.md](../Docs/Development.md): build, flash, debug, CubeMX rules
-- [Display.md](../Docs/Display.md): the display, its encoding and refresh, the timeline sync
+- [Display.md](../Docs/Display.md): the display, its encoding and refresh
+- [TimelineSync.md](../Docs/TimelineSync.md): the timeline kept on the host's, the sync schedule and decisions, HSITRIM, measuring it with `tools/stats_log.py`
 - [I2C.md](../Docs/I2C.md): the bus, the messages, the addresses, both sides of the link
 - [Testing.md](../Docs/Testing.md): native tests
 - [Utilities.md](../Docs/Utilities.md): tasks, mutexes, switches, the microsecond clock, HSI trim, LEDs
@@ -109,9 +110,9 @@ Hardware: [KiCad/Docs](../../KiCad/Docs/README.md).
 - Not yet checked on the board: rejecting unknown commands and short writes,
   recovery from bus errors, the 7-hour "no data" timeout and the switch test
   screens.
-- The timeline sync is bench-checked over two 5-minute syncs only (7.6 and
-  -2.0 ms); a day-long run is still to do
-  ([Architecture.md](Docs/Architecture.md#open-items)).
+- The timeline sync: a run over a day's temperature, the cause of the host's
+  clock wander
+  ([TimelineSync.md](../Docs/TimelineSync.md#open-items)).
 - No console: the counters are read over SWD until the USART2 console exists.
 - The FreeRTOS heap (3072 B) could shrink, since only `defaultTask` uses it
   and only until it exits.
