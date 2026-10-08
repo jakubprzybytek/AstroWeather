@@ -103,6 +103,51 @@ coverage. The suites, the stubs and how to write a test are in
 
 ## Flash and Debug
 
+### Which Board Is on the ST-LINK
+
+There is one ST-LINK, moved by hand between the host, the display boards and
+the Bypass board. Unless you have just seen which board it is on, check the
+MCU before writing anything: the programmer writes any image to any STM32G0
+without a warning, so a display image lands on the host as readily as on a
+display board (it happened on 2026-10-08). The same goes for SWD reads such as
+`tools/stats_log.py`: on the wrong board they read another firmware's RAM.
+
+Connect without resetting and read the device:
+
+```bash
+STM32_Programmer_CLI -c port=SWD mode=HOTPLUG | grep -E "Device ID|Device name|Flash size"
+```
+
+| Device | Board | Image |
+| --- | --- | --- |
+| `0x460`, `STM32G07x/STM32G08x`, 128 KB | Display board (STM32G070) | `DisplayController.elf` |
+| `0x467`, `STM32G0B0xx/B1xx/C1xx`, 512 KB | Host (STM32G0B1) or the Bypass board (STM32G0B0) | `HostControllerA.elf`, or see [Bypass](../Bypass/README.md) |
+
+The host and the Bypass board share the device ID. To tell them apart, or to
+see which image a board runs, compare the first words of its flash, the stack
+pointer and the reset vector, with the ELF's:
+
+```bash
+STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 0x08000000 8
+arm-none-eabi-objcopy -O binary -j .isr_vector build/Debug/HostControllerA.elf vectors.bin
+od -An -tx4 -N8 vectors.bin
+```
+
+The stack pointer depends only on the linker script, so it survives rebuilds:
+the host's is `0x20022C00` (below the `NOINIT` error log), a display board's
+`0x20009000`. The reset vector matches only the same build. If the words match
+none of the ELFs, ask whoever moved the ST-LINK rather than guess.
+
+In a script, check and write in one command, so the board cannot change in
+between:
+
+```bash
+case "$(STM32_Programmer_CLI -c port=SWD mode=HOTPLUG | grep 'Device name')" in
+  *G07x*) STM32_Programmer_CLI -c port=SWD -w build/Debug/DisplayController.elf -v -hardRst ;;
+  *) echo "Not a display board: not flashing" ;;
+esac
+```
+
 ### From VS Code
 
 Each firmware project has `.vscode/launch.json` with a Debug and a Release
