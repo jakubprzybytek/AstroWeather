@@ -18,10 +18,14 @@ constexpr uint32_t kCycleFrames = 100U;
 
 // LED_1 is lit for the first frame of each cycle: 20 ms every 2 s. Frame 1,
 // since the refresh numbers its first frame 1 (RefreshSequencer), so the
-// heartbeat starts with the first blink-on phase.
-constexpr bool heartbeatLit(uint32_t frame)
+// heartbeat starts with the first blink-on phase. `twice`, on a display board
+// not locked to the host's timeline, adds a second flash 200 ms later.
+constexpr uint32_t kHeartbeatSecondFrame = 11U;
+
+constexpr bool heartbeatLit(uint32_t frame, bool twice = false)
 {
-    return (frame % kCycleFrames) == 1U;
+    const uint32_t inCycle = frame % kCycleFrames;
+    return inCycle == 1U || (twice && inCycle == kHeartbeatSecondFrame);
 }
 
 // The timeline at one instant, as PcbDisplayBoard::stampNow() reads it.

@@ -15,6 +15,7 @@ void TimelineFollower::init()
     bootTrim_ = HsiTrim::trim();
     g_displayStats.hsiTrim = bootTrim_;
     link_.setSyncLocked(false);
+    board_.setHeartbeatTwice(true);
 }
 
 void TimelineFollower::onSync(const I2cTarget::Sync& sync)
@@ -44,6 +45,7 @@ void TimelineFollower::onSync(const I2cTarget::Sync& sync)
     }
     board_.applySync(decision.jumpFrames, decision.phaseMicros, sync.stamp.pendingMicros, rate);
     link_.setSyncLocked(sync_.locked());
+    board_.setHeartbeatTwice(!sync_.locked());
 
     g_displayStats.syncsApplied = sync_.syncs();
     g_displayStats.syncJumps = sync_.jumps();

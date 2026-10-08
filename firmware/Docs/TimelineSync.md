@@ -35,7 +35,11 @@ until the first sync arrives.
   cycle (`kCycleFrames`, 2 s), so `LED_1` is lit for one 20 ms frame every
   2 s, starting with the first blink-on phase. The refresh interrupt writes
   it at every frame start, so a flashing `LED_1` shows that the refresh
-  interrupt is running, and synced boards flash together.
+  interrupt is running, and synced boards flash together. A display board
+  that is not `locked()` ([below](#following-the-host)) flashes twice, frames 1 and
+  11, 200 ms apart (`heartbeatLit(frame, true)`,
+  `PcbDisplayBoard::setHeartbeatTwice()`): from boot until a sync has
+  measured its rate, and again after a jump or an HSITRIM step.
 - **Frame start.** At the first pass of each frame the refresh interrupt
   (`PcbDisplayBoard::startFrame()`) takes the frame's correction from the
   board's `TimelineServo`, sets it on the sequencer, writes `LED_1` and

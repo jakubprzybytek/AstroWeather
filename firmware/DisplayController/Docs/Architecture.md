@@ -57,7 +57,9 @@ data, or "no data" if none has arrived yet.
 | `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | Exits at once (`osThreadExit()`); CubeMX does not allow removing it |
 
 The `LED_1` heartbeat, 20 ms every 2 s, is not a task: the refresh interrupt
-writes it at each frame start, in step with the host's
+writes it at each frame start, in step with the host's. Until the board is
+locked to the host's timeline it flashes twice, 200 ms apart
+(`TimelineFollower` sets `PcbDisplayBoard::setHeartbeatTwice()`)
 ([TimelineSync.md](../../Docs/TimelineSync.md#the-timeline-on-every-board)).
 
 `DisplayApp` is a `Task<N>` object with a static stack, and

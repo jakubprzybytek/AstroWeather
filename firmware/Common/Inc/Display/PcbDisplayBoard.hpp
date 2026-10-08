@@ -53,6 +53,10 @@ public:
                    int32_t ratePpm);
     int32_t ratePpm() const { return servo_.ratePpm(); }
 
+    // Flashes the heartbeat twice per cycle instead of once: a display board
+    // not locked to the host's timeline. The host never sets it.
+    void setHeartbeatTwice(bool twice) { heartbeatTwice_ = twice; }
+
 private:
     static PcbDisplayBoard* activeBoard_;
 
@@ -73,6 +77,7 @@ private:
     std::array<TimelineStamp, 2> records_{};
     volatile uint8_t activeRecord_ = 0U;
     volatile bool started_ = false;
+    volatile bool heartbeatTwice_ = false;
     // Double-buffered: the interrupt reads front_, submit() writes back_ and
     // asks for a swap, which the interrupt does before it shifts the first
     // pass of a frame, so a frame never mixes two submissions.

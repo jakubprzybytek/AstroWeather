@@ -216,7 +216,7 @@ void PcbDisplayBoard::startFrame()
     sequencer_.setFrameAdjust(adjust);
     const uint32_t frame = sequencer_.frames();
     HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin,
-                      heartbeatLit(frame) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+                      heartbeatLit(frame, heartbeatTwice_) ? GPIO_PIN_SET : GPIO_PIN_RESET);
 
     // The counter has run since the update that started the frame.
     const uint32_t sinceStart = __HAL_TIM_GET_COUNTER(&timer_);

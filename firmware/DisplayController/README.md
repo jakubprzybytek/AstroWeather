@@ -34,7 +34,7 @@ checked on the board · 🔴 not started.
 | **Brightness** | | | |
 | Never drive the bussed `LOW_POWER_ENABLE` line | ✅ | `PB8` stays analog; the host drives it for every board ([Hardware review](../../KiCad/Docs/Hardware_Review.md) M-4) | [Display.md](../Docs/Display.md#low-brightness) |
 | **Development aids** | | | |
-| Heartbeat on `LED_1`, 20 ms every 2 s, from the refresh interrupt | 🔵 | Frame 1 of every 100 on the shared timeline, so in step with the host once synced | [TimelineSync.md](../Docs/TimelineSync.md#the-timeline-on-every-board) |
+| Heartbeat on `LED_1`, 20 ms every 2 s, from the refresh interrupt | 🔵 | Frame 1 of every 100 on the shared timeline, so in step with the host once synced; twice (frames 1 and 11) while not locked to it | [TimelineSync.md](../Docs/TimelineSync.md#the-timeline-on-every-board) |
 | `LED_2` flashes on every write addressed to the board | 🔵 | 20 ms, from the address-match interrupt, through the shared `PulseLed`; not for the sync broadcast or the status reads | [Architecture.md](Docs/Architecture.md#screens) |
 | Switch 1 steps through test screens, switch 2 shows the address | 🔵 | All segments, then an identify pattern; test screens close after 60 s, the address after 3 s | [Architecture.md](Docs/Architecture.md#screens) |
 | Diagnostic counters, read over SWD | ✅ | `g_displayStats`: frames, attributes, rejects, short writes, probes, I2C errors, refresh counters; the sync counters, error, drift, rate and HSITRIM (🔵) | [Architecture.md](Docs/Architecture.md#diagnostics) |

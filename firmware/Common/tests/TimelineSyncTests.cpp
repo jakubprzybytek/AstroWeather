@@ -311,6 +311,12 @@ void testHeartbeat()
     expect(Display::heartbeatLit(1U), "frame 1 lit");
     expect(Display::heartbeatLit(101U), "every 100 frames");
     expect(!Display::heartbeatLit(0U) && !Display::heartbeatLit(2U), "one frame only");
+    expect(!Display::heartbeatLit(11U), "one flash when locked");
+    expect(Display::heartbeatLit(1U, true) && Display::heartbeatLit(111U, true),
+           "twice: the first flash");
+    expect(Display::heartbeatLit(11U, true), "twice: the second, 200 ms later");
+    expect(!Display::heartbeatLit(10U, true) && !Display::heartbeatLit(12U, true),
+           "twice: one frame each");
 }
 
 void testPosition()

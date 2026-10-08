@@ -91,7 +91,8 @@ trim. Both are described in [TimelineSync.md](TimelineSync.md).
 - **`LED_1`, heartbeat.** Lit for one 20 ms refresh frame every 2 s, written
   by the refresh interrupt at each frame start (`Display::heartbeatLit()`), so
   it shows that the refresh interrupt is running. Boards on the host's
-  timeline flash together
+  timeline flash together; a display board not yet locked to it flashes
+  twice, 200 ms apart
   ([TimelineSync.md](TimelineSync.md#the-timeline-on-every-board)).
 - **`LED_2`, activity.** `PulseLed::pulse(ms)` lights the LED at once and a
   static FreeRTOS one-shot timer clears it, so a pulse never blocks and works
