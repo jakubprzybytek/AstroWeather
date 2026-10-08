@@ -22,7 +22,7 @@ checked on the board · 🔴 not started.
 | Refresh timeline kept on the host's: blinking and the heartbeat in step on every board | 🔵 | Syncs broadcast by the host on the I2C general call; per-frame rate and phase correction, simulated within a few ms | [TimelineSync.md](../Docs/TimelineSync.md) |
 | HSITRIM moved to follow the host's clock | 🔵 | Up to 8 steps from the boot trim, never across an HSICAL band edge; the servo covers the rest, up to 2 % | [TimelineSync.md](../Docs/TimelineSync.md#following-the-host) |
 | Safe power-up: outputs blanked, all slots off | ✅ | `SCT_ENABLE` and the slot selects start high (CubeMX); the first frame is prepared before the outputs are enabled | [Architecture.md](Docs/Architecture.md#boot) |
-| Boot screens: slot test (each `DISPLAYx_EN` slot on its own, 1 s), then the board address (`Ad11`, 2 s) | ✅ | Shared with the host (`Display::showBootScreens()`) | [Display.md](../Docs/Display.md#boot-screens) |
+| Boot screens: slot test (each `DISPLAYx_EN` slot on its own, 1 s), then the board address (`Ad11`) and build number, 2 s | ✅ | Shared with the host (`Display::showBootScreens()`) | [Display.md](../Docs/Display.md#boot-screens) |
 | "No data" until the first frame, and again after 7 h without one | 🔵 | Shared state (`Display::noDataState()`); 7 h is just over the host's 6-hour refresh interval | [Architecture.md](Docs/Architecture.md#screens) |
 | **I2C link to the host** | | | |
 | Address from the `ADDR_0..2` straps, `0x10`–`0x2A` | ✅ | Floating 0, ground 1, VCC 2; board 1 reads `0x11` | [I2C.md](../Docs/I2C.md#addresses-and-straps) |

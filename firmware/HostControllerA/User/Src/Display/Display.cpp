@@ -1,5 +1,6 @@
 #include <Display/Display.hpp>
 
+#include <Debug/BuildInfo.hpp>
 #include <Display/BootScreens.hpp>
 #include <Display/DisplayI2cProtocol.hpp>
 
@@ -66,7 +67,7 @@ void Display::noteSubmitted(uint8_t position)
 
 void Display::runBootScreens()
 {
-    showBootScreens(local_, localAddress_);
+    showBootScreens(local_, localAddress_, kFirmwareBuildNumber);
     MutexGuard guard(submitMutex_);
     bootScreens_ = false;
     local_.submit();

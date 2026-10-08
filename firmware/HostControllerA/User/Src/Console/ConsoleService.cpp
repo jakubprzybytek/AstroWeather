@@ -77,7 +77,8 @@ void ConsoleService::onHostLineCoding()
 
 void ConsoleService::sendWelcome()
 {
-    reply("OK connected to AstroWeather %s, built %s", firmwareVariant(), firmwareBuildTime());
+    reply("OK connected to AstroWeather %s, build %lu, built %s", firmwareVariant(),
+          static_cast<unsigned long>(firmwareBuildNumber()), firmwareBuildTime());
     // The startup log is emitted before USB has enumerated and never reaches
     // the host, so restate the one boot-time result worth knowing.
     if (settings_ != nullptr) {

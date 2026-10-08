@@ -330,7 +330,8 @@ CommandResult handleStatusCommand(const char* command, Display::Display* display
     formatDuration(osKernelGetTickCount(), uptime, sizeof(uptime));
 
     LogService::instance().sendLine("OK status");
-    line("firmware   %s, built %s", firmwareVariant(), firmwareBuildTime());
+    line("firmware   %s, build %lu, built %s", firmwareVariant(),
+         static_cast<unsigned long>(firmwareBuildNumber()), firmwareBuildTime());
     line("uptime     %s", uptime);
     line("heap       %lu B free, %lu B lowest since boot",
          static_cast<unsigned long>(xPortGetFreeHeapSize()),

@@ -67,9 +67,14 @@ arm-none-eabi-size build/Debug/HostControllerA.elf      # or DisplayController.e
 The link step prints the use of each memory region. On the host these are
 `RAM` (139 KiB), `NOINIT` (the 5 KiB retained error log) and `FLASH`.
 
-Every host build regenerates `BuildInfo.cpp` with the build time
-(`cmake/BuildInfo.cmake`), which the console's welcome line and `status`
-report. There is no version number or git hash.
+Every firmware build, host and display board, runs
+`Common/cmake/BuildInfo.cmake`: it adds one to the project's `BUILD_NUMBER` and
+regenerates `BuildInfo.cpp` with that number and the build time
+(`Debug/BuildInfo.hpp`). Every board shows its build number on the address
+boot screen ([Display.md](Display.md#boot-screens)); the host's console
+welcome line and `status` report both. `BUILD_NUMBER` is committed, so every
+build, an up-to-date one included, changes it; commit it with the change it
+was built from. There is no version number or git hash.
 
 ### Shared code
 

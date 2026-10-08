@@ -1,5 +1,6 @@
 #include <DisplayApp.hpp>
 
+#include <Debug/BuildInfo.hpp>
 #include <Display/BootScreens.hpp>
 #include <Screens.hpp>
 #include <Stats.hpp>
@@ -14,7 +15,7 @@ void DisplayApp::run()
     // Boot: each slot lit on its own (spot a dead segment or slot switch),
     // then this board's address. Frames and switch presses arriving meanwhile
     // stay pending in the thread flags.
-    Display::showBootScreens(board_, link_.address());
+    Display::showBootScreens(board_, link_.address(), kFirmwareBuildNumber);
     show();
 
     for (;;) {
@@ -138,7 +139,7 @@ void DisplayApp::show()
         board_.setState(DisplayController::identifyState());
         break;
     case Screen::Address:
-        board_.setState(Display::addressState(link_.address()));
+        board_.setState(Display::addressState(link_.address(), kFirmwareBuildNumber));
         break;
     case Screen::Data:
     default:

@@ -210,8 +210,10 @@ own state is untouched and shows afterwards:
    with its dot (slot 5: L1-L3), and matrix row *n* counted from the top, so
    the matrix steps top to bottom (that row is driven by slot 6 - *n*). A dead
    slot switch shows as a step with its digits unlit.
-2. **Address**: `Ad12` (for 0x12) on numeric display 1 for 2 s, from the
-   board's straps; `Ad--` without a valid address.
+2. **Address and build**: `Ad12` (for 0x12) on numeric display 1 for 2 s,
+   from the board's straps, `Ad--` without a valid address; the firmware's
+   build number on numeric display 2, right-aligned, its last four digits
+   above 9999 ([Development.md](Development.md#build)).
 
 Both are plain: full brightness, nothing blinking. On the host
 `MainLoopTask` runs them; on a display board `DisplayApp` does.

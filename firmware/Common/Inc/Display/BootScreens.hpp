@@ -6,7 +6,7 @@
 #include <cstdint>
 
 // What every board, the host's own included, shows right after power-up: the
-// slot test, then its I2C address. The states are pure and tested natively;
+// slot test, then its I2C address and firmware build number. The states are pure and tested natively;
 // showBootScreens() runs the sequence with osDelay.
 namespace Display {
 
@@ -23,12 +23,14 @@ constexpr uint32_t kBootAddressMs = 2000U;
 LogicalBoardState slotTestState(uint8_t slot);
 
 // "Ad" and the 7-bit I2C address in hex on numeric display 1, e.g. "Ad12" for
-// 0x12; "Ad--" for an address outside 0x01-0xFF. Everything else blank.
-LogicalBoardState addressState(uint16_t address);
+// 0x12; "Ad--" for an address outside 0x01-0xFF. The firmware build number in
+// decimal on numeric display 2, right-aligned without leading zeros ("  42");
+// its last four digits above 9999. Everything else blank.
+LogicalBoardState addressState(uint16_t address, uint32_t buildNumber);
 
 // The slot test, then the address, each frame shown with board.show() at full
 // brightness and no blinking, so the board's own state is left alone.
 // Blocks for about 3 s.
-void showBootScreens(DisplayBoard& board, uint16_t address);
+void showBootScreens(DisplayBoard& board, uint16_t address, uint32_t buildNumber);
 
 } // namespace Display

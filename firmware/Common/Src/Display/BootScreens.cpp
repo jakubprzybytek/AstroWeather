@@ -17,6 +17,8 @@ constexpr uint8_t kAllDigitSegments = 0xFFU;
 // Slot 4 carries the indicators L1, L2 and L3 as segments A, B and C.
 constexpr uint8_t kIndicatorSlot = 4U;
 constexpr uint8_t kAllIndicators = 0x07U;
+constexpr uint8_t kDigitCount = 4U;
+constexpr uint32_t kBuildNumberModulo = 10000U;
 
 } // namespace
 
@@ -34,7 +36,7 @@ LogicalBoardState slotTestState(uint8_t slot)
     return state;
 }
 
-LogicalBoardState addressState(uint16_t address)
+LogicalBoardState addressState(uint16_t address, uint32_t buildNumber)
 {
     const bool valid = address >= 0x01U && address <= 0xFFU;
     const uint8_t high = valid ? kHexGlyphs[(address >> 4U) & 0x0FU] : kGlyphMinus;
@@ -42,17 +44,26 @@ LogicalBoardState addressState(uint16_t address)
 
     LogicalBoardState state{};
     state.numeric[0].slots = {kGlyphA, kGlyphD, high, low, 0U};
+
+    uint32_t remaining = buildNumber % kBuildNumberModulo;
+    for (uint8_t digit = kDigitCount; digit > 0U; --digit) {
+        state.numeric[1].slots[digit - 1U] = kHexGlyphs[remaining % 10U];
+        remaining /= 10U;
+        if (remaining == 0U) {
+            break;
+        }
+    }
     return state;
 }
 
-void showBootScreens(DisplayBoard& board, uint16_t address)
+void showBootScreens(DisplayBoard& board, uint16_t address, uint32_t buildNumber)
 {
     const BoardAttributes plain{};
     for (uint8_t slot = 0U; slot < kSlotCount; ++slot) {
         board.show(slotTestState(slot), plain);
         osDelay(kSlotTestMs);
     }
-    board.show(addressState(address), plain);
+    board.show(addressState(address, buildNumber), plain);
     osDelay(kBootAddressMs);
 }
 

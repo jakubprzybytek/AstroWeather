@@ -17,8 +17,11 @@ using Test::expectEqual;
 
 using Slots = std::array<uint8_t, Display::kSlotCount>;
 
+constexpr uint8_t kGlyph0 = 0x3FU;
 constexpr uint8_t kGlyph1 = 0x06U;
 constexpr uint8_t kGlyph2 = 0x5BU;
+constexpr uint8_t kGlyph4 = 0x66U;
+constexpr uint8_t kGlyph9 = 0x6FU;
 constexpr uint8_t kGlyphA = 0x77U;
 constexpr uint8_t kGlyphD = 0x5EU;
 constexpr uint8_t kGlyphF = 0x71U;
@@ -86,10 +89,10 @@ void testSlotTestCoversBoard()
 
 void expectAddress(uint16_t address, const Slots& expected, const char* caseName)
 {
-    const LogicalBoardState state = Display::addressState(address);
+    const LogicalBoardState state = Display::addressState(address, 1U);
     expect(state.numeric[0].slots == expected, caseName);
-    for (uint8_t index = 1U; index < Display::kNumericDisplayCount; ++index) {
-        expect(blankNumeric(state.numeric[index]), "address: numerics 2-4 blank");
+    for (uint8_t index = 2U; index < Display::kNumericDisplayCount; ++index) {
+        expect(blankNumeric(state.numeric[index]), "address: numerics 3-4 blank");
     }
     for (uint32_t row : state.matrix) {
         expectEqual(row, 0U, "address: matrix blank");
@@ -105,6 +108,25 @@ void testAddress()
     expectAddress(0x100U, {kGlyphA, kGlyphD, kMinus, kMinus, 0U}, "out of range shows Ad--");
 }
 
+void expectBuild(uint32_t build, const Slots& expected, const char* caseName)
+{
+    const LogicalBoardState state = Display::addressState(0x12U, build);
+    expect(state.numeric[1].slots == expected, caseName);
+}
+
+void testBuildNumber()
+{
+    expectBuild(0U, {0U, 0U, 0U, kGlyph0, 0U}, "build 0 shows    0");
+    expectBuild(1U, {0U, 0U, 0U, kGlyph1, 0U}, "build 1 shows    1");
+    expectBuild(42U, {0U, 0U, kGlyph4, kGlyph2, 0U}, "build 42 right-aligned, no leading zeros");
+    expectBuild(1024U, {kGlyph1, kGlyph0, kGlyph2, kGlyph4, 0U}, "build 1024 keeps its inner zero");
+    expectBuild(9999U, {kGlyph9, kGlyph9, kGlyph9, kGlyph9, 0U}, "build 9999 fills the display");
+    expectBuild(10042U, {0U, 0U, kGlyph4, kGlyph2, 0U}, "above 9999: the last four digits");
+    expect(Display::addressState(0x12U, 42U).numeric[0].slots ==
+               Slots{kGlyphA, kGlyphD, kGlyph1, kGlyph2, 0U},
+           "the build number leaves the address alone");
+}
+
 void testSequence()
 {
     RecordingBoard board;
@@ -112,7 +134,7 @@ void testSequence()
     const LogicalBoardState before = board.state();
     const uint32_t start = Stub::tick();
 
-    Display::showBootScreens(board, 0x11U);
+    Display::showBootScreens(board, 0x11U, 42U);
 
     expectEqual(board.shown.size(), static_cast<std::size_t>(Display::kSlotCount + 1U),
                 "five slot steps, then the address");
@@ -125,8 +147,10 @@ void testSequence()
         expectEqual(step.attributes.blink.matrix[0], 0U, "boot screens do not blink");
     }
     const auto& address = board.shown[Display::kSlotCount];
-    expect(address.state.numeric[0].slots == Display::addressState(0x11U).numeric[0].slots,
+    expect(address.state.numeric[0].slots == Display::addressState(0x11U, 42U).numeric[0].slots,
            "address after the slot test");
+    expect(address.state.numeric[1].slots == Display::addressState(0x11U, 42U).numeric[1].slots,
+           "with the build number");
     expectEqual(address.tick - start, 1000U, "address after 1 s");
     expectEqual(Stub::tick() - start, 3000U, "address for 2 s, 3 s in all");
     expectEqual(board.submits, 0, "boot screens never submit");
@@ -141,6 +165,7 @@ int main()
     testSlotTest();
     testSlotTestCoversBoard();
     testAddress();
+    testBuildNumber();
     testSequence();
     return Test::finish("BootScreens");
 }

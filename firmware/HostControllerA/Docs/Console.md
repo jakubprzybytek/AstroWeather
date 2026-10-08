@@ -53,7 +53,7 @@ Opening the port prints a welcome, so a connected device is visibly alive even
 with statistics off:
 
 ```text
-[0:00:05:12] [INFO] OK connected to AstroWeather HostController, built 2026-09-23 10:12:40
+[0:00:05:12] [INFO] OK connected to AstroWeather HostController, build 42, built 2026-09-23 10:12:40
 [0:00:05:12] [INFO] Settings loaded from EEPROM: ok
 [0:00:05:12] [INFO] 5 warnings/errors kept ('errors' lists them); newest: W 2026-09-27 12:19:50: DisplayBoard 0x14 unreachable status=1
 [0:00:05:12] [INFO] Type 'help' for commands. Periodic stats are off; 'stats on' to switch.
@@ -61,8 +61,9 @@ with statistics off:
 
 The third line appears only while the [error log](#error-log) holds entries.
 
-The build time comes from `cmake/BuildInfo.cmake`, which regenerates it on
-every build, so it identifies the flashed image. The settings line gives
+The build number and time come from `../Common/cmake/BuildInfo.cmake`, which
+counts every build in `BUILD_NUMBER` and regenerates both, so they identify
+the flashed image ([Development.md](../../Docs/Development.md#build)). The settings line gives
 `Settings::Store::describe()` of the boot-time load (`ok`, `blank`,
 `bad-crc`, ...; see [Settings.md](Settings.md#decode-results)). It is repeated
 here because the startup log is written before USB has enumerated and never
@@ -325,7 +326,7 @@ A one-screen summary, 15 lines on the HostController:
 
 ```text
 OK status
-firmware   HostController, built 2026-09-23 10:12:40
+firmware   HostController, build 42, built 2026-09-23 10:12:40
 uptime     0d 00:03:11
 heap       24752 B free, 19352 B lowest since boot
 stats      off
@@ -343,7 +344,7 @@ remote     0x10 host 0x11 no 0x12 no 0x13 no 0x14 no 0x15 no
 
 | Line | Content and alternative forms |
 | --- | --- |
-| `firmware` | Variant and build time. |
+| `firmware` | Variant, build number (`BUILD_NUMBER`) and build time. |
 | `uptime` | `d hh:mm:ss` from the RTOS tick, which wraps after about 49 days. |
 | `heap` | Free FreeRTOS heap now and the lowest it has been. |
 | `stats` | `on, every 5 s` or `off`. |

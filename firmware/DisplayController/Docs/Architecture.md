@@ -91,7 +91,7 @@ stopped.
 | --- | --- | --- |
 | Slot test | One `DISPLAYx_EN` slot at a time, everything it drives: digit *n* of every numeric display with its dot (slot 5: L1-L3) and matrix row *n* from the top, so the matrix steps top to bottom (driven by slot 6 - *n*). A dead slot switch shows as a step with its digits unlit | At boot, 200 ms per slot, 1 s in all |
 | All segments | Every digit segment with its dot, L1-L3, every matrix dot | Switch 1 |
-| Address | `Ad12` (for 0x12) on numeric display 1, everything else blank; `Ad--` if the straps gave no address | 2 s at boot, after the slot test; 3 s on switch 2 |
+| Address | `Ad12` (for 0x12) on numeric display 1, `Ad--` if the straps gave no address; the build number on numeric display 2 (`  42`); everything else blank | 2 s at boot, after the slot test; 3 s on switch 2 |
 | Identify | Numeric display *n* (0-3) shows *n* + 1 on all four digits (`1111` to `4444`); matrix row *r* lights its first *r* + 1 columns, so the top row has one dot | Switch 1, after all segments |
 | Data | The last content from the host, with the blink and level attributes it sent | After a frame arrives, until it goes stale |
 | No data | Segment G on the last digit of every numeric display (`   -`), everything else off, matrix blank | Before the first frame, and after 7 h without one |

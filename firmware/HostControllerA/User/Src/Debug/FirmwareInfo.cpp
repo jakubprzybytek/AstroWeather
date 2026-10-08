@@ -1,14 +1,18 @@
 #include <Debug/FirmwareInfo.hpp>
 
+#include <Debug/BuildInfo.hpp>
+
 const char* firmwareVariant()
 {
     return "HostController";
 }
 
-// Defined in BuildInfo.cpp, which the build regenerates every time.
-extern const char* const kFirmwareBuildTime;
-
 const char* firmwareBuildTime()
 {
     return kFirmwareBuildTime;
+}
+
+uint32_t firmwareBuildNumber()
+{
+    return kFirmwareBuildNumber;
 }

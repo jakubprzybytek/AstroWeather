@@ -87,7 +87,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | Local LED board: interrupt-driven multiplexing, refresh progress bar | ✅ | Matrix column 1 stays lit on the prototype ([Display-Issues.md](../../KiCad/Docs/Display-Issues.md)) | [Display.md](../Docs/Display.md) |
 | Blinking and four brightness levels per segment and pixel | ✅ | The forecast's matrix rows carry levels and blink; the clock's colon and the progress bar blink | [Display.md](../Docs/Display.md#blink-and-brightness-levels) |
 | Numeric formatting: fixed point, time, `?`, "no data" | ✅ | -0.5 shows as `-0.5`; values that do not fit four digits show the error pattern | [Display.md](../Docs/Display.md#numeric-representation) |
-| Boot screens: slot test, then the host's strap address | ✅ | Shared with the display boards | [Display.md](../Docs/Display.md#boot-screens) |
+| Boot screens: slot test, then the host's strap address and build number | ✅ | Shared with the display boards | [Display.md](../Docs/Display.md#boot-screens) |
 | Remote display boards over I2C | ✅ | Board `0x11` runs the [DisplayController](../DisplayController/README.md) firmware; I2C pull-ups needed (H-4) | [I2C.md](../Docs/I2C.md) |
 | Timeline sync: the display boards' refresh, blinking and heartbeat in step with the host's | 🟡 | `DisplaySync` broadcasts on the I2C general call at boot, on request and every 2 min, and polls each board's status; `time sync [now]`. Unit tested, simulated and bench-measured on one board | [TimelineSync.md](../Docs/TimelineSync.md) |
 | Heartbeat on `LED_1`, 20 ms every 2 s | ✅ | From the refresh interrupt, so it shows the refresh is running | [TimelineSync.md](../Docs/TimelineSync.md#the-timeline-on-every-board) |
@@ -108,7 +108,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | Error log: the last 24 warnings and errors, kept over resets | ✅ | `errors [clear]`; lost on power loss | [Console.md](Docs/Console.md#error-log) |
 | EEPROM settings | ✅ | | [Settings.md](Docs/Settings.md) |
 | Interrupt priorities: USB 1, everything else 3 | ✅ | | [Architecture.md](Docs/Architecture.md#interrupt-priorities) |
-| Firmware version and git hash | 🔴 | Only the build time is stamped | [Architecture.md](Docs/Architecture.md#shared-code) |
+| Firmware version and git hash | 🔴 | Only the build time and a build number (`BUILD_NUMBER`, one more every build) are stamped | [Architecture.md](Docs/Architecture.md#shared-code) |
 | Unit tests | 🟡 | 16 native suites run in CI; the console, the settings store and the remote boards are not covered yet | [Testing.md](Docs/Testing.md) |
 
 ## Known Limitations and Open Items

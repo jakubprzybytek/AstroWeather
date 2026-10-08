@@ -117,9 +117,11 @@ mapper, progress bar and schedule), `Clock/`, `WiFi/`, `Console/`, `Settings/`,
 `SyncSchedule`, `LowBrightness` and `MainLoopTask`.
 Shared code must not depend on any of these, in particular not on `LogService`.
 
-Every build also regenerates `BuildInfo.cpp` with the build time
-(`cmake/BuildInfo.cmake`), reported by the console. There is no version number
-or git hash.
+Every build also counts itself in `BUILD_NUMBER` and regenerates
+`BuildInfo.cpp` with that number and the build time
+(`../Common/cmake/BuildInfo.cmake`), reported by the console and the address
+boot screen ([Development.md](../../Docs/Development.md#build)). There is no
+version number or git hash.
 
 ## Static Object Graph
 
