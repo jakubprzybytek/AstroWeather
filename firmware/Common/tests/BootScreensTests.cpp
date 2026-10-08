@@ -59,8 +59,8 @@ void testSlotTest()
         }
         for (uint8_t row = 0U; row < Display::kMatrixRowCount; ++row) {
             const uint32_t expectedRow =
-                (row == Display::kMatrixRowCount - 1U - slot) ? Display::kMatrixMask : 0U;
-            expectEqual(state.matrix[row], expectedRow, "slot test: only the row that slot drives");
+                (row == slot) ? Display::kMatrixMask : 0U;
+            expectEqual(state.matrix[row], expectedRow, "slot test: matrix steps from the top row");
         }
     }
     const LogicalBoardState none = Display::slotTestState(Display::kSlotCount);

@@ -15,10 +15,11 @@ namespace Display {
 constexpr uint32_t kSlotTestMs = 200U;
 constexpr uint32_t kBootAddressMs = 2000U;
 
-// Everything slot `slot` (0-4) drives, nothing else: digit `slot` of every
-// numeric display with its decimal point (slot 4: the indicators L1-L3) and
-// the matrix row that slot drives (row 4 - slot, see DisplayCodec.cpp).
-// A dead slot switch shows as a step with nothing lit.
+// Digit `slot` (0-4) of every numeric display with its decimal point (slot 4:
+// the indicators L1-L3) and matrix row `slot`, so the matrix steps from the
+// top row down. That row is driven by slot 4 - slot (see DisplayCodec.cpp),
+// not by `slot`; only the middle step matches. A dead slot switch shows as a
+// step with its digits unlit.
 LogicalBoardState slotTestState(uint8_t slot);
 
 // "Ad" and the 7-bit I2C address in hex on numeric display 1, e.g. "Ad12" for

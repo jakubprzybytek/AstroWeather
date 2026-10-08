@@ -207,8 +207,9 @@ own state is untouched and shows afterwards:
 
 1. **Slot test**: each `DISPLAYx_EN` slot lit on its own for 200 ms (1 s in
    all), with everything that slot drives: digit *n* of every numeric display
-   with its dot (slot 5: L1-L3) and the matrix row it drives. A dead slot
-   switch shows as a step with nothing lit.
+   with its dot (slot 5: L1-L3), and matrix row *n* counted from the top, so
+   the matrix steps top to bottom (that row is driven by slot 6 - *n*). A dead
+   slot switch shows as a step with its digits unlit.
 2. **Address**: `Ad12` (for 0x12) on numeric display 1 for 2 s, from the
    board's straps; `Ad--` without a valid address.
 

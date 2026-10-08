@@ -30,7 +30,7 @@ LogicalBoardState slotTestState(uint8_t slot)
     for (NumericSegments& numeric : state.numeric) {
         numeric.slots[slot] = segments;
     }
-    state.matrix[kMatrixRowCount - 1U - slot] = kMatrixMask;
+    state.matrix[slot] = kMatrixMask; // top row first
     return state;
 }
 
