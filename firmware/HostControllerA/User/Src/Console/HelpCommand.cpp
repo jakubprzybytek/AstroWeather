@@ -183,11 +183,11 @@ const Command kTime[] = {
     {"time display on|off", "the time on numeric display 3 (saved)",
      "An astro refresh may overwrite display 3; the time returns at the next\n"
      "minute."},
-    {"time hsi [<0-127>]", "trim this board's HSI16 clock (saved)",
-     "Higher runs faster, about 0.33 % a step; 64 is the chip's default. Applies\n"
-     "at once and at boot. See firmware/Docs/TimelineSync.md to measure it. Without\n"
-     "a value it shows the trim, HSICAL and the saved trim:\n"
-     "'OK time-hsi=63 cal=0x8E saved=63'. Not the RTC's clock: see 'time trim'."},
+    {"time hsi [<0-127>]", "the HSI16 trim (saved); no effect",
+     "The host runs from its 24 MHz crystal and HSI16 clocks nothing, so the\n"
+     "trim changes nothing. It applies at once and at boot. Without a value it\n"
+     "shows the trim, HSICAL and the saved trim:\n"
+     "'OK time-hsi=63 cal=0x8E saved=63'. See firmware/Docs/TimelineSync.md."},
     {"time sync [now]", "the display boards' timeline sync",
      "The host broadcasts its refresh timeline to every board every 2 min, and\n"
      "in a burst (0, 10, 40, 100 s) at boot and when a board asks for one; 'now'\n"
