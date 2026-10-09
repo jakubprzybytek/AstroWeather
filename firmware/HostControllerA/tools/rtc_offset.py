@@ -72,7 +72,7 @@ def main():
         print(f"over {elapsed / 3600:.2f} h the RTC gained {gained:+.3f} s: {residual_ppm:+.1f} ppm, "
               f"{residual_ppm * 86400 / 1e6:+.2f} s/day")
         if args.trim is not None:
-            # A clock still gaining means the LSI is faster than the trim assumes.
+            # A clock still gaining means its oscillator is faster than the trim assumes.
             suggested = round((1 + args.trim / 1e6) * (1 + residual_ppm / 1e6) * 1e6 - 1e6)
             print(f"suggested: time trim {suggested}")
     return 0

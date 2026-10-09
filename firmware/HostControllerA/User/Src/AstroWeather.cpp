@@ -126,6 +126,17 @@ void AstroWeather_Init() {
   localBoard.show(Display::slotTestState(0U), Display::BoardAttributes{});
   localBoard.start();
   ClockTask::instance().setDisplayEnabled(settingsStore.values().clockDisplayEnabled);
+  // A saved trim beyond RtcTrim::kMaxTrimPpm was measured for the LSI the RTC
+  // ran from before HSE / 32 (+19300 ppm on the first board). Applied to the
+  // crystal it would make the clock 2 % wrong, so it is dropped here, in RAM:
+  // the EEPROM cannot be written before the scheduler runs, and the next save
+  // of any setting writes 0.
+  if (!RtcTrim::isValidPpm(settingsStore.values().clockTrimPpm)) {
+    LogService::instance().logf(LogService::Level::Warn,
+                                "Clock trim %+ld ppm was for the LSI; using 0",
+                                static_cast<long>(settingsStore.values().clockTrimPpm));
+    settingsStore.values().clockTrimPpm = 0;
+  }
   if (!ClockTask::instance().setTrim(settingsStore.values().clockTrimPpm)) {
     LogService::instance().logf(LogService::Level::Error, "Clock trim %ld ppm not applied",
                                 static_cast<long>(settingsStore.values().clockTrimPpm));

@@ -50,7 +50,7 @@ constexpr uint8_t kContainerVersion = 1U;
 // enum, and update the registry there to match.
 enum class Tag : uint8_t {
     AdcFlags = 0x01,      // 1 byte: bit0 log enabled, bit1 display enabled
-    ClockTrim = 0x02,     // 4 bytes: signed LSI error in ppm, big endian; then
+    ClockTrim = 0x02,     // 4 bytes: signed RTC clock error in ppm, big endian; then
                           // optionally 1: HSITRIM 0-127 (from 2026-10)
     WifiSsid = 0x10,      // 1..32 bytes, not NUL terminated
     WifiPassword = 0x11,  // 1..63 bytes, not NUL terminated

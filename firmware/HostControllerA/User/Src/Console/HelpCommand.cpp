@@ -170,16 +170,16 @@ const Command kApi[] = {
 
 const Command kTime[] = {
     {"time show", "date and time to the ms, and the trim in use",
-     "e.g. 'OK time=2026-09-22 20:15:03.123 set=yes trim=+18400ppm\n"
-     "prediv=3/8146 calm=26'. set=no: not set since a power loss."},
+     "e.g. 'OK time=2026-10-09 22:26:10.284 set=yes trim=+0ppm\n"
+     "prediv=124/5999 calm=0'. set=no: not set since a power loss."},
     {"time set <YYYY-MM-DD> <HH:MM[:SS]>", "set the clock, 24-hour",
      "Seconds default to 00. The date is tracked but not shown. Kept over a\n"
      "reset or flashing; after a power loss display 3 shows --:-- until the\n"
      "clock is set again, by hand or by the first astro refresh.\n"
      "e.g. 'time set 2026-09-22 21:45' or 'time set 2026-09-22 21:45:30'"},
-    {"time trim <ppm>", "correct for this board's LSI clock (saved)",
-     "ppm the LSI runs fast (+) or slow (-) of 32 kHz, up to +-100000; 0 for\n"
-     "none. See Docs/RTC.md to measure it. e.g. 'time trim 18372'"},
+    {"time trim <ppm>", "correct for this board's RTC crystal (saved)",
+     "ppm the 750 kHz RTC clock (HSE / 32) runs fast (+) or slow (-), up to\n"
+     "+-1000; 0 for none. See Docs/RTC.md to measure it. e.g. 'time trim 12'"},
     {"time display on|off", "the time on numeric display 3 (saved)",
      "An astro refresh may overwrite display 3; the time returns at the next\n"
      "minute."},

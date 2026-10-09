@@ -50,7 +50,7 @@ public:
     // logging while it holds the mutex. For log timestamps.
     bool wallSecondsNow(uint32_t& seconds) const;
 
-    // Corrects the RTC for an LSI running `ppm` away from 32 kHz; see RtcTrim.
+    // Corrects the RTC for its clock running `ppm` away from 750 kHz; see RtcTrim.
     // Safe before the scheduler starts. Returns false for an out-of-range value
     // or if the RTC rejects it; the previous trim then stays in effect.
     bool setTrim(int32_t ppm);
@@ -89,7 +89,7 @@ private:
     volatile bool timeSet_ = false;
     int32_t trimPpm_ = 0;
     // What MX_RTC_Init() sets after a power-up; setTrim() at boot replaces it.
-    RtcTrim::Settings trimSettings_{127U, 249U, 0U};
+    RtcTrim::Settings trimSettings_{124U, 5999U, 0U};
     // Only syncToServer() uses the tracker; the console asks for a reset
     // through the flag, which syncToServer() acts on.
     ClockSync::DriftTracker drift_;

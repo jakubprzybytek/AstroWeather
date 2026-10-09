@@ -418,7 +418,7 @@ void ClockTask::logDrift(const ClockSync::Result& result, const ClockSync::Preci
     if (result.kind == ClockSync::Kind::Step)
     {
         log.log(LogService::Level::Warn,
-                "Clock drift: the offset jumped further than the LSI can drift (a DST change, "
+                "Clock drift: the offset jumped further than the clock can drift (a DST change, "
                 "or the time set elsewhere); measurement restarts at this sync");
         return;
     }
@@ -439,26 +439,27 @@ void ClockTask::logDrift(const ClockSync::Result& result, const ClockSync::Preci
     char perDayText[16];
     formatTenths(perDayText, sizeof(perDayText), static_cast<int64_t>(total.ppm) * 864, 10000,
                  true);
-    const uint32_t lsi = ClockSync::lsiMilliHz(trimPpm_, total.ppm);
-    // 32 mHz per ppm; to 0.1 Hz.
-    char lsiErrorText[16];
-    formatTenths(lsiErrorText, sizeof(lsiErrorText),
-                 static_cast<int64_t>(total.uncertaintyPpm) * 32, 1000, false);
+    const uint32_t clock = ClockSync::clockMilliHz(trimPpm_, total.ppm);
+    // To 0.1 Hz.
+    char clockErrorText[16];
+    formatTenths(clockErrorText, sizeof(clockErrorText),
+                 static_cast<int64_t>(total.uncertaintyPpm) * ClockSync::kClockMilliHzPerPpm, 1000,
+                 false);
     char referenceText[24];
     formatDateTime(referenceText, sizeof(referenceText),
                    Calendar::fromSecondsSince2000(
                        static_cast<uint32_t>(result.referenceMs / kMsPerSecond)));
     log.logf(LogService::Level::Info,
              "Clock drift since %s: %s over %s, %+ld ppm +-%ld, %s s/day; "
-             "LSI %lu.%01lu +-%s Hz at trim %+ld ppm",
+             "RTC clock %lu.%01lu +-%s Hz at trim %+ld ppm",
              referenceText, driftText, spanText, static_cast<long>(total.ppm),
              static_cast<long>(total.uncertaintyPpm), perDayText,
-             static_cast<unsigned long>((lsi + 50U) / 1000U),
-             static_cast<unsigned long>(((lsi + 50U) % 1000U) / 100U), lsiErrorText,
+             static_cast<unsigned long>((clock + 50U) / 1000U),
+             static_cast<unsigned long>(((clock + 50U) % 1000U) / 100U), clockErrorText,
              static_cast<long>(trimPpm_));
 
-    // What to do about the trim. Never applied automatically: the LSI moves
-    // with the conditions, so the user picks the span it is taken from.
+    // What to do about the trim. Never applied automatically: the user picks
+    // the span it is taken from.
     if (total.uncertaintyPpm > ClockSync::kUsefulUncertaintyPpm)
     {
         const int64_t neededMs = static_cast<int64_t>(2 * precision.sampleErrorMs) *
@@ -480,7 +481,7 @@ void ClockTask::logDrift(const ClockSync::Result& result, const ClockSync::Preci
     {
         log.logf(LogService::Level::Info,
                  "Clock trim: 'time trim %ld' would cancel this drift (+-%ld ppm). Not applied: "
-                 "the LSI moves with the conditions, so check the span is representative",
+                 "check the span is representative",
                  static_cast<long>(ClockSync::combinedTrimPpm(trimPpm_, total.ppm)),
                  static_cast<long>(total.uncertaintyPpm));
     }
@@ -556,9 +557,10 @@ void ClockTask::run()
         }
 
         // Sleep until the next minute, or until the time is set or the display
-        // switched. The tick (HSI) and the RTC (LSI) run at slightly different
-        // rates, so this may wake a little early; the minute is then unchanged
-        // and the next sleep covers the rest.
+        // switched. The tick and the RTC both run from the crystal, but the
+        // RTC's trim and the tick's rounding still differ slightly, so this
+        // may wake a little early; the minute is then unchanged and the next
+        // sleep covers the rest.
         const uint32_t flags = osThreadFlagsWait(
             kFlagRedraw, osFlagsWaitAny, (kSecondsPerMinute - time.second) * 1000U);
         if ((flags & osFlagsError) == 0U)

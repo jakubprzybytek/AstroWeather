@@ -23,8 +23,8 @@ void testArithmetic()
     // (1.0184)(1.000798) - 1 = 0.0192126832, as tools/rtc_offset.py suggested
     expect(ClockSync::combinedTrimPpm(18400, 798) == 19213, "the overnight run's trim");
     expect(ClockSync::combinedTrimPpm(0, -500) == -500, "untrimmed drift is the trim");
-    expect(ClockSync::lsiMilliHz(0, 0) == 32000000U, "nominal LSI");
-    expect(ClockSync::lsiMilliHz(18400, 798) == 32614816U, "32 614.816 Hz");
+    expect(ClockSync::clockMilliHz(0, 0) == 750000000U, "nominal 750 kHz");
+    expect(ClockSync::clockMilliHz(20, -5) == 750011250U, "750 011.25 Hz");
 }
 
 void testFirstSyncStartsTheMeasurement()

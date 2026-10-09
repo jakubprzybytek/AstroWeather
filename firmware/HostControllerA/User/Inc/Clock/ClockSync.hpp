@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
-// Setting the RTC from the time the astro API sends, and measuring the LSI
-// drift between syncs. Pure arithmetic, so it runs in the native tests; the RTC
+// Setting the RTC from the time the astro API sends, and measuring the RTC
+// clock's drift between syncs. Pure arithmetic, so it runs in the native tests; the RTC
 // access and the log lines are in ClockTask. See Docs/RTC.md.
 //
 // Times are in milliseconds since 2000-01-01 00:00 local time
@@ -38,7 +38,7 @@ constexpr Precision kMilliseconds{kLatencyMs, 150, 250};
 constexpr Precision kWholeSeconds{500 + kLatencyMs, 600, 1000};
 // A trim is suggested only once the drift is known at least this well.
 constexpr int32_t kUsefulUncertaintyPpm = 50;
-// Larger than any drift left on a trimmed LSI (the spread seen is ~800 ppm).
+// Far larger than any crystal drifts (tens of ppm).
 // A jump beyond it between two syncs is a step, not drift: a DST change, a
 // wrong server time, or the RTC set by other means.
 constexpr int32_t kMaxPlausiblePpm = 5000;
@@ -62,11 +62,13 @@ constexpr int32_t combinedTrimPpm(int32_t trimPpm, int32_t driftPpm)
     return static_cast<int32_t>(rounded - kPpmScale);
 }
 
-// LSI frequency in mHz implied by running `driftPpm` fast on `trimPpm`.
-constexpr uint32_t lsiMilliHz(int32_t trimPpm, int32_t driftPpm)
+// RTC clock (HSE / 32) frequency in mHz implied by running `driftPpm` fast on
+// `trimPpm`. 750 000 Hz = 750 000 000 mHz; 750 mHz per ppm.
+constexpr uint32_t kClockMilliHzPerPpm = 750U;
+constexpr uint32_t clockMilliHz(int32_t trimPpm, int32_t driftPpm)
 {
-    // 32 000 Hz = 32 000 000 mHz; 32 mHz per ppm.
-    return static_cast<uint32_t>(32000000 + 32 * static_cast<int64_t>(combinedTrimPpm(trimPpm, driftPpm)));
+    return static_cast<uint32_t>(750000000 + kClockMilliHzPerPpm *
+                                                 static_cast<int64_t>(combinedTrimPpm(trimPpm, driftPpm)));
 }
 
 // Error of a drift measured over `spanMs` between two syncs with those errors.
