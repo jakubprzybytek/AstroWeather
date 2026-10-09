@@ -73,8 +73,10 @@ the refresh interrupt drives it once `localBoard` starts):
    interrupt refreshes the board, keeps the refresh timeline and drives the
    `LED_1` heartbeat from then on. `Display` holds back every
    local submit until `MainLoopTask` has run the boot screens.
-8. `ClockTask`: display flag and trim from settings (an error is logged if the
-   trim is rejected), the display, `start()`.
+8. `ClockTask`: display flag and trim from settings, the display, `start()`. A
+   saved trim beyond ±1000 ppm, measured for the LSI the RTC ran from before,
+   is replaced by 0 with a warning; an error is logged if the RTC rejects
+   the trim ([RTC.md](RTC.md#trimming)).
 9. `DisplaySyncTask`: `init(&i2c1Bus, &display)`, `start()`; after
    `localBoard.start()`, since the sync carries its refresh timeline
    ([TimelineSync.md](../../Docs/TimelineSync.md#syncs-from-the-host)).
@@ -295,7 +297,7 @@ From `Core/Inc/main.h` and `HostControllerA.ioc`.
 | TIM2, 16 MHz / 16 = 1 MHz count | none | Display refresh: the interrupt sets each pass's length (four passes per 4 ms slot, 50 Hz frames) |
 | I2C1 | `PA9` SCL, `PA10` SDA | 24AA04 EEPROM (`0x50`), remote boards (`0x10`..`0x15`) and the timeline sync broadcast (general call `0x00`) |
 | ADC1, 16x oversampling | `PB2` `CURRENT_SENSE` (IN10), plus the internal temperature sensor and VREFINT | Current, temperature and VDDA; DMA1 channel 3 |
-| RTC | none (LSI) | Calendar and backup registers |
+| RTC | none (HSE / 32, 750 kHz) | Calendar and backup registers |
 | USB FS device, CDC | `PA11` DM, `PA12` DP | Console |
 | GPIO EXTI | `PB12` `SWITCH_1`, `PB13` `SWITCH_2` | Switches, falling edge |
 | GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat from the refresh interrupt; switch presses and USB CDC traffic |

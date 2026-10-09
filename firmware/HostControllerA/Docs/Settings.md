@@ -13,7 +13,7 @@ Currently persisted:
 - Current-sense logging on/off (`adc log`).
 - Current-sense display output on/off (`adc display`).
 - Clock display on/off (`time display`).
-- Clock trim, the measured LSI error in ppm (`time trim`).
+- Clock trim, the measured error of the RTC's crystal clock in ppm (`time trim`).
 - HSI trim, the HSI16 `HSITRIM` value 0-127 (`time hsi`); no effect since the
   host runs from its crystal.
 - Low brightness (`display low`, switch 2).
@@ -132,7 +132,7 @@ must match it.
 | Tag | Name | Length | Value |
 | --- | --- | --- | --- |
 | `0x01` | `AdcFlags` | 1 | Bit 0 = current-sense logging enabled, bit 1 = current-sense display enabled. Remaining bits reserved, write 0. |
-| `0x02` | `ClockTrim` | 4 or 5 | Bytes 0-3: signed LSI error in ppm, big endian; see [RTC.md](RTC.md#trimming). Byte 4, optional: the HSI trim, `HSITRIM` 0-127; see [TimelineSync.md](../../Docs/TimelineSync.md#the-hosts-clock). Written when either is not its default (LSI trim 0, HSI trim 64); the fifth byte only when the HSI trim is not 64. A fifth byte above 127 is ignored (HSI trim 64). An older build reads the first four bytes and ignores the fifth. |
+| `0x02` | `ClockTrim` | 4 or 5 | Bytes 0-3: signed RTC clock error in ppm, big endian; see [RTC.md](RTC.md#trimming). Byte 4, optional: the HSI trim, `HSITRIM` 0-127; see [TimelineSync.md](../../Docs/TimelineSync.md#the-hosts-clock). Written when either is not its default (LSI trim 0, HSI trim 64); the fifth byte only when the HSI trim is not 64. A fifth byte above 127 is ignored (HSI trim 64). An older build reads the first four bytes and ignores the fifth. |
 | `0x10` | `WifiSsid` | 1–32 | SSID bytes, not NUL terminated. |
 | `0x11` | `WifiPassword` | 1–63 | Passphrase bytes, not NUL terminated. |
 | `0x12` | `ApiHost` | 1–64 | API server host name, not NUL terminated. Absent: the built-in `APP_ST67_HTTP_HOST`. |
@@ -262,7 +262,7 @@ plus two bytes of framing.
 | Content | Payload cost |
 | --- | --- |
 | `AdcFlags` | 3 |
-| `ClockTrim`, only when an LSI or HSI trim is set | 6, or 7 with the HSI trim |
+| `ClockTrim`, only when an RTC or HSI trim is set | 6, or 7 with the HSI trim |
 | `ClockFlags`, only when the clock display is off | 3 |
 | `DisplayFlags`, only when low brightness is on | 3 |
 | WiFi, typical (15-char SSID, 20-char password) | 39 |

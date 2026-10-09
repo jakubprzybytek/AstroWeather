@@ -23,5 +23,6 @@ how the firmware works now, read the current document listed next to each one.
 | [CubeMX_Compliance_Migration.md](CubeMX_Compliance_Migration.md) | [Development.md](../../../Docs/Development.md) |
 | [USB_COM_Port_Investigation.md](USB_COM_Port_Investigation.md) | [Development.md](../../../Docs/Development.md), [Console.md](../Console.md) |
 | [RTC_Drift_Measurements.md](RTC_Drift_Measurements.md) | [RTC.md](../RTC.md) |
+| [RTC_LSI_Clock_2026-10.md](RTC_LSI_Clock_2026-10.md) | [RTC.md](../RTC.md) |
 | [RAM_Usage_History.md](RAM_Usage_History.md) | [Firmware-RAM-Usage.md](../Firmware-RAM-Usage.md) |
 | [Testing_Plan.md](Testing_Plan.md) | [Testing.md](../Testing.md) |

@@ -133,8 +133,9 @@ the arithmetic of `__HAL_ADC_CALC_TEMPERATURE()`: the reading rescaled to 3.0 V
 with the measured VDDA, then interpolated between the factory `TS_CAL1` (30 °C)
 and `TS_CAL2` (130 °C), which the task reads and passes in. `static_assert`s in
 the task keep the header's calibration constants equal to the device header's. It and VDDA are only logged;
-nothing else uses them yet. [RTC.md](RTC.md#trimming) notes that the
-temperature could explain the LSI drift if the two were logged together.
+nothing else uses them yet. Logged with the clock sync's drift lines, the
+temperature would show how much the RTC crystal moves with it
+([RTC.md](RTC.md#drift-measurement)).
 
 ## Display
 

@@ -1,45 +1,56 @@
-# RTC and Clock
+# RTC and Clock on the LSI, September-October 2026
+
+> Archived 2026-10-09. Current state: [RTC.md](../RTC.md).
+
+The RTC chapter as it stood while the RTC ran from the LSI, before it moved
+to HSE / 32 on build 4. Links in it point at the current documents.
 
 ## Overview
 
 The HostController keeps the date and time in the STM32G0B1 RTC and shows the
 time as `HH:MM` on numeric display 3 of the local board. The date is tracked
-but not displayed. The RTC runs from HSE / 32: the same 24 MHz crystal that
-runs the system clock, divided to 750 kHz. A crystal is accurate to a few tens
-of ppm, so the clock needs no trim to be useful; `time trim` remains for a
-measured crystal error.
+but not displayed. The RTC runs from the
+internal LSI oscillator, which is only accurate to a few percent, so each board
+is **trimmed**: its LSI error is measured once and stored in the EEPROM, and the
+RTC prescalers are set to cancel it.
 
 Every successful astro fetch compares the RTC with the time the server sends
-and steps it when it is 250 ms or more out; it also logs the drift measured
+and steps it when it is a second or more out; it also logs the drift measured
 across fetches and what that says about the trim. See
 [Sync from the API](#sync-from-the-api). `time set` sets it by hand. The time
-is kept over a reset or flashing, less the time the crystal was stopped. After
-a power loss display 3 shows `--:--` until the next fetch or `time set`. See
-[Reset and power loss](#reset-and-power-loss).
+is kept over a reset or flashing. After a power loss display 3 shows `--:--`
+until the next fetch or `time set`. See [Reset and power loss](#reset-and-power-loss).
 
 Only the HostController firmware has the clock; the DisplayController project
 has no RTC configured.
 
 ## Clock Source
 
-The G0B1 RTC can be clocked from three sources:
+The G0B1 RTC can be clocked from only three sources:
 
 | Source | Status on this board |
 | --- | --- |
-| HSE / 32, from the 24 MHz crystal `Y301` | **Used**: 750 kHz. |
 | LSE, a 32.768 kHz crystal on PC14/PC15 | Not fitted. PC14/PC15 are unused. |
-| LSI, the internal RC oscillator, nominally 32 kHz | Not used, and switched off. |
+| HSE / 32 | Possible: the 24 MHz crystal is fitted and runs the system clock, giving 750 kHz. Not used ([Open items](#open-items)). |
+| LSI, the internal RC oscillator, nominally 32 kHz | **Used.** |
 
 HSI16 cannot clock the RTC, and `time hsi`, which trims it
-([TimelineSync.md](../../Docs/TimelineSync.md#the-hosts-clock)), does not
+([TimelineSync.md](../../../Docs/TimelineSync.md#the-hosts-clock)), does not
 change the clock.
 
-The crystal's error against the server has not been measured yet; the drift
-line of each sync ([Drift measurement](#drift-measurement)) gives it once a
-measurement has run long enough. The LSI the RTC ran from before was 1.85 %
-fast and moved by about 1000 ppm with the conditions; those measurements are
-in [archive/RTC_LSI_Clock_2026-10.md](archive/RTC_LSI_Clock_2026-10.md) and
-[archive/RTC_Drift_Measurements.md](archive/RTC_Drift_Measurements.md).
+The LSI needs no parts, but it is not precise. The datasheet allows a wide
+spread between parts, and it moves with temperature and supply voltage. It also
+has no trim register: `RCC_CSR` only turns it on and reports it ready. The
+correction therefore happens in the RTC, not the oscillator.
+
+The first board's LSI runs **about 1.85% fast, between 32 589 and 32 615 Hz**
+against a nominal 32 000 Hz, well inside the datasheet spread. Untrimmed, the
+clock gained 66 s an hour, or 26 minutes a day. The 26 Hz is not scatter in the
+measurement: the frequency really moves, over hours. Each 1 Hz is about 30 ppm,
+or 2.6 s a day, so the trim needs the frequency to roughly 0.1 Hz to be worth
+much, and no fixed trim can beat the spread, about ±34 s a day here. The
+measurements are in
+[archive/RTC_Drift_Measurements.md](RTC_Drift_Measurements.md).
 
 ## CubeMX Configuration
 
@@ -47,28 +58,18 @@ In `HostControllerA.ioc`:
 
 - **Timers → RTC**: *Activate Clock Source* and *Activate Calendar* ticked.
   Alarms, wake-up, tamper and the outputs are off.
-- **Clock Configuration**: the RTC clock mux is set to **HSE / 32**, 750 kHz
-  from the 24 MHz HSE (`HAL_RTC_MspInit()` selects
-  `RCC_RTCCLKSOURCE_HSE_DIV32`). The LSI is not enabled.
-- **RTC → Parameter Settings**: 24-hour format, binary data format,
-  asynchronous prescaler **124**, synchronous prescaler **5999**, so
-  750 000 / 125 / 6000 = 1 Hz exactly.
-
-The RTC's bus clock, 16 MHz, is 21 times its 750 kHz clock; the G0 needs at
-least 7 times for reading the calendar through the shadow registers.
+- **Clock Configuration**: the RTC clock mux is set to **LSI**, which also
+  switches the LSI on in `SystemClock_Config()`.
+- **RTC → Parameter Settings**: 24-hour format, binary data format, asynchronous
+  prescaler 127, synchronous prescaler **249**, so 32 000 / 128 / 250 = 1 Hz
+  for a nominal LSI. The default of 255 assumes a 32 768 Hz LSE.
 
 The generated `MX_RTC_Init()` sets the time to 00:00:00, 1 September of year
 0, on every boot. The `USER CODE BEGIN Check_RTC_BKUP` section in `main.c` returns
 before that when the time has been set; `RTC_TIME_SET_MARKER` in `main.h`
 defines the marker. That is the only change to generated code; see
-[Development.md](../../Docs/Development.md) for the CubeMX rules and the next
+[Development.md](../../../Docs/Development.md) for the CubeMX rules and the next
 section.
-
-Changing the RTC's clock source is possible only with a backup-domain reset,
-which `HAL_RCCEx_PeriphCLKConfig()` does by itself when the source differs
-from the one in `RCC_BDCR`. It clears the time and the backup registers, so
-the first boot of an image with a new source starts at `--:--`, as after a
-power loss.
 
 ## Software
 
@@ -86,10 +87,9 @@ power loss.
 
 `ClockTask` redraws only when the minute changes. It sleeps until the next
 minute boundary, which it works out from the RTC seconds. `time set`, `time display`
-and a trim change wake it at once. The task's timer and the RTC both run from
-the crystal, but the trim and the tick's rounding differ slightly, so it may
-wake a little early. It then sees the same minute and sleeps for the
-remainder. A new minute can appear up to about 2 s late.
+and a trim change wake it at once. The task's timer runs on the crystal and the RTC
+on the LSI, so it may wake a little early. It then sees the same minute and
+sleeps for the remainder. A new minute can appear up to about 2 s late.
 
 Display 3 is shared. An astro refresh writes all four numeric displays, so its
 value shows until the next minute, when the time comes back. With `time display
@@ -116,12 +116,6 @@ cases are told apart by a marker, `"TIME"` (`0x54494D45`), which
 | Reset or flashing | kept, marker present | The time carries on. `MX_RTC_Init()` returns before setting 00:00. |
 | Power-up | cleared, no marker | 00:00 is set; display 3 shows `--:--` and `time show` reports `set=no` until the next astro fetch or `time set`. |
 
-A reset switches the HSE off until `SystemClock_Config()` of the new boot
-starts it again, and the RTC does not count while its clock is stopped. A
-reset therefore loses a few milliseconds, and flashing loses the whole time
-the chip is held in reset while it is programmed, a few seconds. Neither has
-been measured. The first sync after boot, about a minute later, corrects it.
-
 Two other boot steps would otherwise disturb a running clock, because
 rewriting the prescalers drops the part of the current second already counted:
 
@@ -130,13 +124,16 @@ rewriting the prescalers drops the part of the current second already counted:
   date that `setDateTime()` writes covers this, as the RTC's two-digit year
   holds 2000..2099 and is never 0.
 - `setTrim()` at boot compares the new prescalers with `RTC_PRER`, which still
-  holds the trim from before the reset, not with the generated 124/5999. It
+  holds the trim from before the reset, not with the generated 127/249. It
   rewrites them only if they differ.
 
-The crystal runs from VDD, so the clock cannot keep time while unpowered even
-if a battery were on VBAT: the registers would survive but not count. Keeping
-time through a power cut needs a 32.768 kHz crystal (LSE) as well as a
-battery.
+A reset or a re-flash costs less than 5 ms, below what `tools/rtc_offset.py`
+can resolve. The RTC keeps counting through a reset.
+
+The LSI runs from VDD, so the clock cannot keep time while unpowered even if a
+battery were on VBAT: the registers would survive but not count, and the time
+would resume from the moment of the outage. Keeping time through a power cut
+needs a 32.768 kHz crystal (LSE) as well as a battery.
 
 ## Console Commands
 
@@ -144,56 +141,65 @@ HostController only. See also `help time`.
 
 | Command | Effect |
 | --- | --- |
-| `time show` | `OK time=2026-10-09 22:26:10.284 set=yes trim=+0ppm prediv=124/5999 calm=0`: date and time to the millisecond, whether it has been set since power-up, and the trim with the registers it produced. |
+| `time show` | `OK time=2026-09-22 20:15:03.123 set=yes trim=+18400ppm prediv=3/8146 calm=26`: date and time to the millisecond, whether it has been set since power-up, and the trim with the registers it produced. |
 | `time set <YYYY-MM-DD> <HH:MM[:SS]>` | Set the date and time, 24-hour; seconds optional, 00 if left out. Kept over a reset; lost on power loss. |
-| `time trim <ppm>` | Apply and save the trim. `0` removes it. Valid range ±1000. |
+| `time trim <ppm>` | Apply and save the trim. `0` removes it. Valid range ±100 000. |
 | `time display on\|off` | Show the time on display 3, or blank it once and leave it to other writers. Saved. |
 
 `settings show` and `status` include the stored trim and display setting.
 
 ## Trimming
 
-The trim is the RTC clock's error from 750 kHz, in ppm. It is positive when
-the crystal is fast, which makes an untrimmed clock gain time. The trim is
-stored as the `ClockTrim` settings record (tag `0x02`, see
-[Settings.md](Settings.md)) and applied at every boot. It is limited to
-±1000 ppm (`RtcTrim::kMaxTrimPpm`), far beyond any crystal. A saved value
-outside that range is a trim measured for the LSI the RTC ran from before
-(the first board had +19 300 ppm): `AstroWeather_Init()` logs
-`Clock trim +19300 ppm was for the LSI; using 0` and uses 0. It changes the
-value in RAM only, since the EEPROM cannot be written before the scheduler
-runs; `time trim 0`, or saving any other setting, writes it.
+The trim is the LSI's error from 32 000 Hz, in ppm. It is positive when the LSI
+is fast, which makes an untrimmed clock gain time. The trim is stored as the
+`ClockTrim` settings record (tag `0x02`, see [Settings.md](../Settings.md)) and
+applied at every boot.
 
 The RTC makes its 1 Hz tick by dividing its clock by
 `(PREDIV_A + 1) × (PREDIV_S + 1)`. It can also discard `CALM` clock cycles out
-of every 2²⁰, which slows it by roughly 0.95 ppm per cycle.
+of every 2²⁰, about 32 s, which slows it by roughly 0.95 ppm per cycle.
 `RtcTrim::compute()` uses both:
 
-1. Work out the trimmed clock, `F = 750 000 Hz × (1 + ppm / 10⁶)`.
-2. Fix `PREDIV_A` at 124, so that 0 ppm divides exactly by 125 × 6000. Each
-   step of `PREDIV_S` is then about 167 ppm.
-3. Choose `PREDIV_S + 1 = floor(F / 125)`. Rounding down keeps the divided
-   clock at 1 Hz or faster, so the calibration only ever removes cycles and
-   the `CALP` bit is never needed.
+1. Work out the trimmed LSI frequency, `F = 32 000 Hz × (1 + ppm / 10⁶)`.
+2. Fix `PREDIV_A` at 3. With 127, each step of `PREDIV_S` would be about
+   3 900 ppm, far more than the calibration can make up. With 3 it is about
+   120 ppm.
+3. Choose `PREDIV_S + 1 = floor(F / 4)`. Rounding down keeps the divided clock
+   at 1 Hz or faster, so the calibration only ever removes cycles and the
+   `CALP` bit is never needed.
 4. Remove the remainder with `CALM = round(2²⁰ × (F − P) / P)`, where
-   `P = 125 × (PREDIV_S + 1)`. The calibrated clock is
-   `F × 2²⁰ / (2²⁰ + CALM)`, which then equals `P`.
+   `P = 4 × (PREDIV_S + 1)`. The calibrated clock is `F × 2²⁰ / (2²⁰ + CALM)`,
+   which then equals `P`.
 
-Across the whole ±1000 ppm range the tick is then within 1 ppm (0.09 s a day)
-of 1 Hz, assuming the trim is correct, and `CALM` stays under 200 of its 511.
-A crystal 20 ppm fast keeps 124/5999 with `CALM = 21`; one 20 ppm slow takes
-`PREDIV_S` down a step to 5998 and makes up the rest with `CALM`.
+Across the whole ±100 000 ppm range the tick is then within 1 ppm (0.09 s a day)
+of 1 Hz, assuming the trim is correct. For +18 400 ppm this gives
+`PREDIV_A = 3`, `PREDIV_S = 8146` and `CALM = 26`. Read back over SWD, that is
+`RTC_PRER = 0x00031FD2` and `RTC_CALR = 0x0000001A`.
 
 The prescalers can only be written in initialisation mode, which keeps the
 time but drops the part of the current second already counted, up to a second.
 A test measured 0.87 s lost each time. So `setTrim()` rewrites the prescalers
 only when they change, which a small adjustment usually does not.
-`HAL_RTCEx_SetSmoothCalib()` sets `CALM` with no added pulses, without
-initialisation mode.
+`HAL_RTCEx_SetSmoothCalib()` sets `CALM` with a 32 s period and no added
+pulses, without initialisation mode. Re-applying a trim, or moving it
+10 ppm, measured no loss beyond the 5 ms read noise.
 
-A trim is worth setting only once the drift measurement has settled to a few
-ppm and shows a crystal error of more than a few tens of ppm; resyncing from
-the API bounds the error regardless.
+The lower `PREDIV_A` makes the RTC draw slightly more current, which does not
+matter for a mains-powered controller.
+
+What limits accuracy is how stable the LSI stays, not the arithmetic or the
+trim. On the first board the LSI moves by about 1000 ppm with the conditions:
+the drift on one trim has ranged from +1 ppm just after a power-up to about
++1300 ppm, building up over hours and fastest overnight, which points at the
+ambient temperature or the supply rather than the chip warming up. The MCU's
+own temperature sensor would settle it; the ADC already reads it, but the two
+have not been logged together.
+
+The first board runs at **`time trim 19300`**, the middle of the range seen
+over day and night; the swing of about ±500 ppm (±43 s a day) around it
+remains. A trim is worth taking from a settled period, or aimed at the middle
+of the range over a whole day and night. Resyncing from the API bounds the
+error regardless, which matters more than refining the trim.
 
 ## Measuring the Drift
 
@@ -207,7 +213,7 @@ unsynchronized PC has been seen 0.7 s behind the server.
 firmware running. It stamps the PC time before and after each read and keeps the
 fastest of four reads, so one reading is good to a few tens of ms.
 
-1. Set a trim, or 0 to measure the crystal as it is: `time trim <ppm>`.
+1. Set a trim, or 0 to measure the raw LSI: `time trim <ppm>`.
 2. Set the time with `time set`, aiming at a whole second. Sending it over an
    already-open port, rather than starting a tool that then connects, keeps the
    delivery delay to a few tens of ms.
@@ -217,7 +223,7 @@ fastest of four reads, so one reading is good to a few tens of ms.
 4. Hours later, run it with that baseline and the trim in use:
 
    ```bash
-   python tools/rtc_offset.py --baseline "2026-09-22 22:51:31" 0.043 --trim 0
+   python tools/rtc_offset.py --baseline "2026-09-22 22:51:31" 0.043 --trim 18400
    ```
 
    It prints the drift in ppm and s/day, and the `time trim` to set next:
@@ -249,7 +255,7 @@ to release any freeze, then `SSR`, `TR` and `DR`, the same order as the HAL.
   logged but not stored with the clock, so `status` computes the age of the
   last weather fetch in local time, one hour off across a DST change.
 - **Synced only as often as something fetches.** The scheduled refresh runs
-  every 6 hours (see [AstroRefresh.md](AstroRefresh.md#schedule)),
+  every 6 hours (see [AstroRefresh.md](../AstroRefresh.md#schedule)),
   and switch 1, `astro refresh` and `wifi test` fetch in between. Each of
   those may step the RTC.
 - **The drift measurement is in RAM.** A reset or flashing restarts it, though
@@ -257,9 +263,9 @@ to release any freeze, then `SSR`, `TR` and `DR`, the same order as the HAL.
 - **The date is tracked but never shown.** It is kept so that an API sync and a
   future date display have it. The RTC rolls it over, including leap years. Its
   two-digit year limits it to 2000..2099.
-- **The crystal's error is not yet known.** It is typically a few tens of
-  ppm; the drift measurement gives it once it has run long enough
-  ([Drift measurement](#drift-measurement)).
+- **LSI stability.** The trim is right only for the conditions it was measured
+  in. The LSI has been seen to move by about 1000 ppm with the conditions; see
+  [Trimming](#trimming).
 
 ## Sync from the API
 
@@ -293,9 +299,9 @@ the sync is skipped with a warning.
 The RTC is stepped when the offset is 250 ms or more either way, or 1 s with a
 whole-seconds `time` (`Precision::adjustThresholdMs`). A smaller offset is
 within the error of the comparison, and stepping it would add noise rather than
-remove it. At 20 ppm, 250 ms builds up in about 3.5 hours, so an hourly
-fetch rarely steps the clock and a 6-hourly one does so by a fraction of a
-second. After a power-up, when the RTC has not been set, it is always set.
+remove it. At a drift of 500 ppm, 250 ms builds up in under 10 minutes, so
+nearly every fetch steps the clock by a fraction of a second. After a
+power-up, when the RTC has not been set, it is always set.
 
 The RTC can only be set to a whole second, and starts that second when it is
 written. So `stepToServer()` waits for the server's next second to begin, up to
@@ -324,43 +330,42 @@ change.
 
 ### Log
 
-Every sync logs the comparison and the decision, then the drift. The first
-sync after a power-up, or after the first boot with a new clock source, sets
-the RTC and starts the measurement:
+Every sync logs the comparison and the decision, then the drift. A sync that
+stepped the RTC after a flash, with a whole-seconds server:
 
 ```
-Clock sync: server 2026-10-09 22:25:36.531; the RTC was not set since power-up, now set to 2026-10-09 22:25:39 (+0 ms)
-Clock drift: measurement starts at this sync, trim +0 ppm
+Clock sync: server 2026-09-23 09:37:54 (response 1312 ms ago), RTC 2026-09-23 09:38:24.486, offset +28.574 s (RTC minus server, +-600 ms)
+Clock sync: RTC stepped by -28.574 s, as the offset reached the 1000 ms threshold; set to 2026-09-23 09:37:56 (+0 ms)
+Clock drift: measurement starts at this sync, trim +18400 ppm
 ```
 
-One 45 minutes later that kept it, on the crystal (2026-10-09):
+and one that kept it, with milliseconds:
 
 ```
-Clock sync: server 2026-10-09 23:10:53.363 (response 1781 ms ago), RTC 2026-10-09 23:10:55.024, offset -0.220 s (RTC minus server, +-150 ms)
+Clock sync: server 2026-09-23 10:26:57.134 (response 1313 ms ago), RTC 2026-09-23 10:26:58.601, offset +0.054 s (RTC minus server, +-150 ms)
 Clock sync: RTC kept, the offset is under the 250 ms threshold
-Clock drift since the previous sync: -0.220 s over 45 min, -81 ppm +-110
-Clock drift since 2026-10-09 22:25:36: -0.220 s over 45 min, -81 ppm +-110, -7.0 s/day; RTC clock 749939.3 +-82.5 Hz at trim +0 ppm
-Clock trim: too early to judge (+-110 ppm); +-50 ppm needs 100 min of syncs with no reset, time set or time trim
+Clock drift since the previous sync: +0.154 s over 4 min, +648 ppm +-3156
+Clock drift since 2026-09-23 10:23:00: +0.154 s over 4 min, +648 ppm +-3156, +56.0 s/day; LSI 32609.9 +-101.0 Hz at trim +18400 ppm
+Clock trim: too early to judge (+-3156 ppm); +-50 ppm needs 100 min of syncs with no reset, time set or time trim
 ```
 
-A sync that steps the RTC instead logs, for example,
-`Clock sync: RTC stepped by -0.312 s, as the offset reached the 250 ms threshold; set to <time> (+0 ms)`.
-With a whole-seconds server the error is ±600 ms and the threshold 1000 ms.
+That measurement started on a whole-seconds sync, so its ±3156 ppm is
+(600 + 150) ms over 4 minutes.
 
 The last line is the verdict on the trim. Once the error is within ±50 ppm it
 says either that the trim is right to within the error, or which `time trim`
-would cancel the drift. It never applies it: the user picks the span the
-trim is taken from.
+would cancel the drift. It never applies it: the LSI moves by about 1000 ppm
+with the conditions, so a trim taken from one span can be wrong for the next.
 
 ## Open Items
 
-- **The crystal's error.** A measurement over a day of syncs with no reset,
-  `time set` or `time trim`; set a trim only if it is more than a few tens of
-  ppm.
-- **The time lost over a reset or a flash**, while the crystal is stopped:
-  expected a few milliseconds and a few seconds; not measured.
 - **Automatic trim.** The drift measurement gives what it needs,
-  `trim' = (1 + trim) × (1 + ppm) − 1`, but the trim is set by hand. With a
-  crystal it is rarely worth it; if added, it should reject results far from
-  the current trim, move only part of the way, save to the EEPROM only when
-  the trim moves by more than a few ppm, and log each adjustment.
+  `trim' = (1 + trim) × (1 + ppm) − 1`, but the trim is still set by hand.
+  An automatic one should reject results far from the current trim (over
+  about 1000 ppm points at a bad timestamp), move only part of the way, save
+  to the EEPROM only when the trim moves by more than a few ppm, and log each
+  adjustment.
+- **HSE / 32 as the RTC clock.** The 24 MHz crystal that runs the system
+  clock could clock the RTC at 750 kHz, accurate to the crystal, which would
+  make the LSI trim unnecessary while the board is powered. The RTC is lost
+  on power loss either way (no battery).

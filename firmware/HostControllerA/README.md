@@ -17,9 +17,8 @@ to five remote display boards.
   board at address `0x10 + n`; every board, the host included, reads its
   address from its straps. It keeps the display boards' refresh in step with
   its own, so blinking and the `LED_1` heartbeat run together on every board.
-- It keeps the date and time in the RTC, which runs from the internal LSI
-  oscillator, trimmed per board and stepped to the server's time on every
-  fetch. The time is shown as `HH:MM` on numeric display 3.
+- It keeps the date and time in the RTC, which runs from the 24 MHz crystal
+  (HSE / 32) and is stepped to the server's time on every fetch. The time is shown as `HH:MM` on numeric display 3.
 - It offers a USB CDC console for logs, status and commands, and keeps the
   last 24 warnings and errors over resets.
 - It keeps its settings, including the Wi-Fi credentials, the server address
@@ -63,8 +62,9 @@ and its known issues are in [KiCad/Docs](../../KiCad/Docs/README.md).
    ```
 
    `wifi set` runs a refresh straight away; `status` shows the result.
-4. If the board is new, measure and set its clock trim (`time trim <ppm>`) as
-   described in [RTC.md](Docs/RTC.md#measuring-the-drift).
+4. The clock needs no trim. If the drift measurement of a new board shows a
+   crystal error of more than a few tens of ppm, set it with
+   `time trim <ppm>` as described in [RTC.md](Docs/RTC.md#trimming).
 
 ## Features
 
@@ -95,7 +95,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | **Time** | | | |
 | RTC clock on numeric display 3, `time` commands | ✅ | Lost on power loss (no LSE crystal or backup battery) | [RTC.md](Docs/RTC.md) |
 | Clock sync from the server, with drift measurement | ✅ | | [RTC.md](Docs/RTC.md#sync-from-the-api) |
-| Clock trim | 🟡 | Set by hand with `time trim`; automatic trim not started | [RTC.md](Docs/RTC.md#open-items) |
+| RTC on the 24 MHz crystal (HSE / 32), clock trim | ✅ | The crystal's error not measured yet; `time trim` by hand, ±1000 ppm | [RTC.md](Docs/RTC.md#clock-source) |
 | System clock from the 24 MHz crystal | ✅ | `time hsi` and `tools/hsi_measure.py`'s trim are left over from HSI16 and have no effect | [TimelineSync.md](../Docs/TimelineSync.md#the-hosts-clock) |
 | **Power and sensing** | | | |
 | Current, temperature and VDDA monitor | ✅ (reworked board) | Needs the C-1 and H-1 rework | [CurrentSense.md](Docs/CurrentSense.md) |
@@ -129,7 +129,8 @@ Firmware, with details in each document's open items:
   dates ([WiFi.md](Docs/WiFi.md#open-items)).
 - Astro refresh: stale data after a failed noon refresh, low-power wake
   ([AstroRefresh.md](Docs/AstroRefresh.md#open-items)).
-- Clock: automatic trim, or the RTC on HSE / 32 ([RTC.md](Docs/RTC.md#open-items)).
+- Clock: measure the crystal's error, and the time lost over a flash
+  ([RTC.md](Docs/RTC.md#open-items)).
 - Display timeline sync: a run over a day's temperature, the display boards'
   HSI16 wander, the leftover `time hsi`
   ([TimelineSync.md](../Docs/TimelineSync.md#open-items)).

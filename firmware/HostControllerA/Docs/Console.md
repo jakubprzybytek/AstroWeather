@@ -331,7 +331,7 @@ uptime     0d 00:03:11
 heap       24752 B free, 19352 B lowest since boot
 stats      off
 eeprom     answering at 0x50, 512 bytes
-settings   loaded at boot: ok; adc log off, adc display on, time display on, trim +18400 ppm, low brightness off
+settings   loaded at boot: ok; adc log off, adc display on, time display on, trim +0 ppm, low brightness off
 wifi       'MyNetwork' stored; last connect ok 0d 00:03:05 ago (channel 2, -39 dBm)
 astro      last refresh ok, 0d 00:02:25 ago, from console
 weather    last fetched by the server 2026-09-23 09:05:12 +02:00, 1 h 07 min ago
@@ -453,9 +453,9 @@ failed save `ERR settings-unavailable`.
 
 | Command | Reply |
 | --- | --- |
-| `time show` | `OK time=2026-09-22 20:15:03.123 set=yes trim=+18400ppm prediv=3/8146 calm=26` |
+| `time show` | `OK time=2026-10-09 22:26:10.284 set=yes trim=+0ppm prediv=124/5999 calm=0` |
 | `time set <YYYY-MM-DD> <HH:MM[:SS]>` | `OK time=2026-09-23 10:15:00`. Seconds default to `00`. |
-| `time trim <ppm>` | `OK time-trim=+18400ppm`. Range ±100000. Saved. |
+| `time trim <ppm>` | `OK time-trim=+12ppm`. The RTC crystal's error, range ±1000. Saved. |
 | `time display on\|off` | `OK time-display=on` or `OK time-display=off`. Saved. |
 | `time hsi` | `OK time-hsi=63 cal=0x8E saved=63`: the host's HSI16 trim (`HSITRIM`) in use, `HSICAL` as read back, and the saved trim. |
 | `time hsi <0-127>` | Sets the HSI16 trim; the same reply. Applies at once and at boot. Saved. No effect: the host runs from its crystal and HSI16 clocks nothing. |
