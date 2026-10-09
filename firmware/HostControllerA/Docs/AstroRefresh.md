@@ -43,7 +43,7 @@ The plan that led to this design is archived in
 | `User/Src/WiFi/St67HttpFetchTask.cpp` | The network fetch that the refresh waits on; see [WiFi.md](WiFi.md). |
 | `User/Src/AstroWeather.cpp` | Calls `init(&display)` after the WiFi fetch task has started, then starts the task. |
 
-`AstroDataRefreshTask` is a `Task<3328>` at `osPriorityNormal`. The parsed
+`AstroDataRefreshTask` is a `Task<3840>` at `osPriorityNormal`. The parsed
 `AstroData` (about 700 B), the clock sync and the formatted log lines all sit on
 its stack; 2048 bytes overflowed once the clock sync was added. The task object
 also holds its own 4096-byte response buffer (`APP_ST67_HTTP_MAX_RESPONSE_BYTES`).

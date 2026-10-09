@@ -164,7 +164,7 @@ queue.
 [0:00:06:40] [STATS] sent=412 dropped=0 busyDrop=37
 [0:00:06:40] [MEM] heapFree=24752 heapMin=19352
 [0:00:06:40] [STACK] name=LogService configured=1536 remaining=652
-[0:00:06:40] [STACK] name=ConsoleService configured=2304 remaining=1180
+[0:00:06:40] [STACK] name=ConsoleService configured=2816 remaining=1692
 ...
 ```
 
@@ -236,7 +236,7 @@ Only the HostController has the log.
 
 ## Console Service
 
-`ConsoleService` (`User/Src/Console/ConsoleService.cpp`) is a `Task<2304>` at
+`ConsoleService` (`User/Src/Console/ConsoleService.cpp`) is a `Task<2816>` at
 normal priority.
 
 ### Receive path
@@ -654,7 +654,7 @@ and `ERR settings-unavailable` replies for a start without those devices.
 
 | Resource | Limit | Where |
 | --- | ---: | --- |
-| Console task stack | 2304 bytes | `ConsoleService.hpp` |
+| Console task stack | 2816 bytes | `ConsoleService.hpp` |
 | RX ring | 256 bytes | `kRxRingSize` |
 | Command line | 127 characters | `kMaxLineLength` = 128 |
 | Command queue | 8 lines | `kCommandQueueDepth` |

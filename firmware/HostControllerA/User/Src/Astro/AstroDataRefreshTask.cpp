@@ -216,7 +216,7 @@ AstroDataRefreshTask& AstroDataRefreshTask::instance()
 }
 
 AstroDataRefreshTask::AstroDataRefreshTask()
-    : Task<3328>("AstroDataRefresh", osPriorityNormal)
+    : Task<3840>("AstroDataRefresh", osPriorityNormal)
 {
 }
 

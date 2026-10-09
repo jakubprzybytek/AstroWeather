@@ -28,7 +28,7 @@ ConsoleService& ConsoleService::instance()
 }
 
 ConsoleService::ConsoleService()
-    : Task<2304>("ConsoleService", osPriorityNormal),
+    : Task<2816>("ConsoleService", osPriorityNormal),
       commandQueueHandle_(nullptr), commandQueueCb_{}, commandQueueStorage_{},
       rxRing_{}, rxHead_(0U), rxTail_(0U), line_{}, lineLength_(0U),
     lineTruncated_(false), display_(nullptr), eeprom_(nullptr), settings_(nullptr)

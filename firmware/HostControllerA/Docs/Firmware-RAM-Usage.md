@@ -1,6 +1,6 @@
 # Firmware RAM Usage
 
-Where the HostController's RAM goes, from the Debug build of 2026-10-07
+Where the HostController's RAM goes, from the Debug build of 2026-10-10
 (`build/Debug/HostControllerA.elf`, GNU Tools for STM32 14.3.1). The ST67
 module runs the T01 firmware, so TCP/IP and TLS are in the module and no
 network stack is linked on the host; see [WiFi.md](WiFi.md). Earlier
@@ -13,10 +13,10 @@ plan are in [archive/RAM_Usage_History.md](archive/RAM_Usage_History.md).
 | --- | ---: |
 | RAM capacity, STM32G0B1CETx | 147456 (144 KiB): the 139 KiB `RAM` region plus the 5 KiB `NOINIT` region |
 | `.data` | 644 |
-| `.bss` | 90448 |
+| `.bss` | 91472 |
 | `._user_heap_stack`: C heap `0x200` + main stack `0x400` | 1536 |
-| **`RAM` region in use**, as the link reports it | **92632** of 142336 (65.1%) |
-| **`RAM` region left** | **49704** |
+| **`RAM` region in use**, as the link reports it | **93656** of 142336 (65.8%) |
+| **`RAM` region left** | **48680** |
 | `.noinit` (`NOINIT` region) | 4364 of 5120 |
 
 The `NOINIT` region at the top of RAM holds the error log
@@ -37,11 +37,11 @@ From `arm-none-eabi-nm -S --size-sort` on the same ELF:
 | --- | ---: | --- |
 | FreeRTOS heap (`ucHeap`) | 32000 | `configTOTAL_HEAP_SIZE` in `Core/Inc/FreeRTOSConfig.h` |
 | `St67HttpFetchTask` object | 8928 | 4096-byte stack and `St67Runtime`, including its own 4096-byte `httpPayload`, and the fetcher's `ApiTarget`; `User/Src/WiFi/St67HttpFetchTask.cpp` |
-| `AstroDataRefreshTask` object | 8040 | 3328-byte stack, 4096-byte response buffer and state; `User/Inc/Astro/AstroDataRefreshTask.hpp` |
+| `AstroDataRefreshTask` object | 8552 | 3840-byte stack, 4096-byte response buffer and state; `User/Inc/Astro/AstroDataRefreshTask.hpp` |
 | `LogService` object | 6464 | 1536-byte stack and a 16-entry queue of 257-byte events; `User/Inc/Debug/LogService.hpp` |
 | Error log (`errorLogStorage`, `NOINIT`) | 4364 | `User/Src/Debug/LogService.cpp` |
 | Error log copy for `errors` (`snapshot`) | 4364 | `User/Src/Console/ErrorsCommand.cpp` |
-| `ConsoleService` object | 4256 | 2304-byte stack, 8-entry command queue of 128-byte lines, 256-byte RX ring; `User/Inc/Console/ConsoleService.hpp` |
+| `ConsoleService` object | 4768 | 2816-byte stack, 8-entry command queue of 128-byte lines, 256-byte RX ring; `User/Inc/Console/ConsoleService.hpp` |
 | USB CDC buffers | 4096 | `UserRxBufferFS` and `UserTxBufferFS`, 2048 bytes each |
 | `CurrentSenseTask` object | 2480 | 2048-byte stack |
 | `MainLoopTask` object | 2480 | 2048-byte stack |
@@ -114,8 +114,8 @@ Application tasks, with static stacks inside their objects:
 | Task (name in `[STACK]`) | Stack | Priority | Source |
 | --- | ---: | --- | --- |
 | `St67HttpFetch` | 4096 | BelowNormal | `User/Src/WiFi/St67HttpFetchTask.cpp`; the W6X socket path and the driver's AT trace run on it |
-| `AstroDataRefresh` | 3328 | Normal | `AstroDataRefreshTask.hpp`; the clock sync and the logging run on it |
-| `ConsoleService` | 2304 | Normal | `ConsoleService.hpp`; `status` is its deepest command, about 490 B left |
+| `AstroDataRefresh` | 3840 | Normal | `AstroDataRefreshTask.hpp`; the clock sync and the logging run on it; 2936 used after a refresh with clock sync (bench, 2026-10-10) |
+| `ConsoleService` | 2816 | Normal | `ConsoleService.hpp`; `status` is its deepest command, 1824 used (bench, 2026-10-10) |
 | `CurrentSense` | 2048 | BelowNormal | `CurrentSenseTask.hpp` |
 | `MainLoopTask` | 2048 | Normal | `MainLoopTask.hpp`; the boot screens encode frames on it, 944 used at peak |
 | `LogService` | 1536 | Normal | `LogService.hpp` |

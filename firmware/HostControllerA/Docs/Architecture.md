@@ -172,8 +172,8 @@ DMA, so its timing depends on interrupt latency only; see
 | `DisplaySync` | `Display/DisplaySyncTask.cpp` | AboveNormal (32) | 2048 | static | Broadcasts the refresh timeline to the display boards, polls their status and re-sends the content of a board that asks for it; a few milliseconds a minute, above the normal tasks so a due sync is not held up ([TimelineSync.md](../../Docs/TimelineSync.md#syncs-from-the-host)) |
 | `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | heap | Starts USB, then exits (stack freed) |
 | `LogService` | `Debug/LogService.cpp` | Normal (24) | 1536 | static | Drains the log queue to USB CDC; `stats` output |
-| `ConsoleService` | `Console/ConsoleService.cpp` | Normal (24) | 2304 | static | Assembles and runs console commands |
-| `AstroDataRefresh` | `Astro/AstroDataRefreshTask.cpp` | Normal (24) | 3328 | static | Refresh pipeline, 6-hourly schedule, progress bar |
+| `ConsoleService` | `Console/ConsoleService.cpp` | Normal (24) | 2816 | static | Assembles and runs console commands |
+| `AstroDataRefresh` | `Astro/AstroDataRefreshTask.cpp` | Normal (24) | 3840 | static | Refresh pipeline, 6-hourly schedule, progress bar |
 | `MainLoopTask` | `MainLoopTask.cpp` | Normal (24) | 2048 | static | Boot screens on the local board (about 3 s, 944 B of stack at peak), then switch presses: switch 1 requests a refresh, switch 2 toggles low brightness and saves it |
 | `CurrentSense` | `Sensors/CurrentSenseTask.cpp` | BelowNormal (16) | 2048 | static | ADC every 100 ms, idle while `adc display` and `adc log` are both off |
 | `Clock` | `Clock/ClockTask.cpp` | BelowNormal (16) | 1024 | static | RTC, `HH:MM` on display 3 |
