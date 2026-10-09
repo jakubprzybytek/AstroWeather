@@ -32,7 +32,7 @@ to five remote display boards.
 
 | Part | Role |
 | --- | --- |
-| STM32G0B1CETx | MCU: Cortex-M0+, 512 KB flash, 144 KB RAM, run at 16 MHz |
+| STM32G0B1CETx | MCU: Cortex-M0+, 512 KB flash, 144 KB RAM, run at 16 MHz from a 24 MHz crystal |
 | ST67W611M1 | Wi-Fi module, on SPI1 with DMA; runs ST's T01 firmware, so TCP/IP, DNS and TLS are in the module |
 | 24AA04 | 512-byte I2C EEPROM for settings, on I2C1 at `0x50` |
 | SCT2xxx | LED drivers in one SPI3 daisy chain, multiplexed in five slots |
@@ -96,7 +96,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | RTC clock on numeric display 3, `time` commands | ✅ | Lost on power loss (no LSE crystal or backup battery) | [RTC.md](Docs/RTC.md) |
 | Clock sync from the server, with drift measurement | ✅ | | [RTC.md](Docs/RTC.md#sync-from-the-api) |
 | Clock trim | 🟡 | Set by hand with `time trim`; automatic trim not started | [RTC.md](Docs/RTC.md#open-items) |
-| HSI16 trim, measured against the PC | ✅ | `time hsi <0-127>`, saved and applied at boot; `tools/hsi_measure.py` suggests the value | [TimelineSync.md](../Docs/TimelineSync.md#trimming-the-hosts-hsi) |
+| System clock from the 24 MHz crystal | ✅ | `time hsi` and `tools/hsi_measure.py`'s trim are left over from HSI16 and have no effect | [TimelineSync.md](../Docs/TimelineSync.md#the-hosts-clock) |
 | **Power and sensing** | | | |
 | Current, temperature and VDDA monitor | ✅ (reworked board) | Needs the C-1 and H-1 rework | [CurrentSense.md](Docs/CurrentSense.md) |
 | VBUS voltage sense | ⚠️ | PC7 is not an ADC pin and has no divider (H-1, H-2) | [Hardware review](../../KiCad/Docs/Hardware_Review.md) |
@@ -129,9 +129,9 @@ Firmware, with details in each document's open items:
   dates ([WiFi.md](Docs/WiFi.md#open-items)).
 - Astro refresh: stale data after a failed noon refresh, low-power wake
   ([AstroRefresh.md](Docs/AstroRefresh.md#open-items)).
-- Clock: automatic trim ([RTC.md](Docs/RTC.md#open-items)).
-- Display timeline sync: a run over a day's temperature, the cause of the
-  host's clock wander
+- Clock: automatic trim, or the RTC on HSE / 32 ([RTC.md](Docs/RTC.md#open-items)).
+- Display timeline sync: a run over a day's temperature, the display boards'
+  HSI16 wander, the leftover `time hsi`
   ([TimelineSync.md](../Docs/TimelineSync.md#open-items)).
 - Settings: a torn write is detected but not recovered, credentials are stored
   in the clear, unknown tags are not preserved
@@ -161,7 +161,7 @@ Shared with the display boards ([firmware/Docs](../Docs/README.md)):
 
 - [Development.md](../Docs/Development.md): build, flash, debug, connecting over USB, CubeMX rules
 - [Display.md](../Docs/Display.md): the display, its encoding and refresh
-- [TimelineSync.md](../Docs/TimelineSync.md): the timeline sync to the display boards, its schedule, trimming the host's HSI
+- [TimelineSync.md](../Docs/TimelineSync.md): the timeline sync to the display boards, its schedule, the clocks
 - [I2C.md](../Docs/I2C.md): the bus, the messages, the addresses, both sides of the link
 - [Testing.md](../Docs/Testing.md): the native test kit
 - [Utilities.md](../Docs/Utilities.md): tasks, mutexes, switches, the microsecond clock, HSI trim, LEDs

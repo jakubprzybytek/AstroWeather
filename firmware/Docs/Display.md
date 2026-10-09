@@ -346,7 +346,7 @@ Set in each `.ioc`:
 
 | Setting | HostController | DisplayController |
 | --- | --- | --- |
-| Refresh timer | TIM2: prescaler 15 (1 MHz from 16 MHz HSI), period 3999 (a placeholder, rewritten every pass), up-counting, auto-reload preload off, update interrupt at priority 3 | TIM6: the same |
+| Refresh timer | TIM2: prescaler 15 (1 MHz from the 16 MHz system clock), period 3999 (a placeholder, rewritten every pass), up-counting, auto-reload preload off, update interrupt at priority 3 | TIM6: the same |
 | Display SPI | SPI3, master TX only, prescaler 16 (1 MHz), MSB first | SPI1, the same |
 | Display DMA | `SPI3_TX` on DMA1 channel 4, memory to peripheral, byte/byte, memory increment, normal mode, priority high; interrupt `DMA1_Ch4_7_DMA2_Ch1_5_DMAMUX1_OVR` at priority 3 | `SPI1_TX` on DMA1 channel 1, the same; interrupt `DMA1_Channel1` at priority 3 |
 
@@ -368,7 +368,7 @@ Every board's refresh frames form a timeline of 20 ms frames numbered from the
 host's boot, and the display boards keep theirs on the host's, so the blink
 phase and the `LED_1` heartbeat, which both run off the frame number, are in
 step on every board. The timeline, the host's schedule of syncs, how a board
-follows them, HSITRIM and how to measure it are in
+follows them, the clocks and HSITRIM, and how to measure it are in
 [TimelineSync.md](TimelineSync.md).
 
 ## Low Brightness

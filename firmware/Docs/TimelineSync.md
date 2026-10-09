@@ -1,8 +1,9 @@
 # Timeline Sync
 
 How the display boards keep their refresh in step with the host's: the shared
-timeline, the host's schedule of syncs, what a board does with each, how the
-boards' HSI16 clocks are trimmed and how to measure all of it. The display
+timeline, the host's schedule of syncs, what a board does with each, the
+boards' clocks and how the display boards trim their HSI16, and how to
+measure all of it. The display
 itself (content, levels, encoding, refresh) is in [Display.md](Display.md), the
 sync message on the wire in [I2C.md](I2C.md#timeline-sync).
 
@@ -162,62 +163,51 @@ to 2 %. The counters, the last error, drift and rate and the trim are in
 
 ## Clocks and HSITRIM
 
-Both boards clock everything from HSI16, an RC oscillator within a percent or
-two of 16 MHz before trimming and not steady to a few ppm. `HSITRIM` (0-127,
-64 by default) moves it about 0.33 % a step, measured on a G070 on
-2026-10-05: 0.338 % on the bench board, which is why the rate after a step is
-set afresh by a measurement and not computed.
+The host runs from a 24 MHz crystal (`Y301`, HSE) through the PLL: 24 MHz / 3
+× 16 / 8 gives the 16 MHz system clock, so its refresh, FreeRTOS tick and I2C
+timing are as steady as the crystal. The display boards clock everything from
+HSI16, an RC oscillator within a percent or two of 16 MHz before trimming and
+not steady to a few ppm. `HSITRIM` (0-127, 64 by default) moves it about
+0.33 % a step, measured on a G070 on 2026-10-05: 0.338 % on the bench board,
+which is why the rate after a step is set afresh by a measurement and not
+computed.
 
 - **Display boards** move their own HSITRIM to follow the host's rate (above),
   so the servo only has to cover what a step leaves, and a board's frames stay
-  near 20 ms. Where they end up depends on the chip: the bench boards booted
-  2100-5100 ppm slow of the host and settled at trim 65 or 66.
-- **The host** sets its trim from the console, `time hsi`, saved to the EEPROM
-  and applied at boot before the refresh starts. Trimming it close to 16 MHz
-  keeps its own frame rate, FreeRTOS tick and I2C timing near nominal; the
-  display boards follow it whatever its clock.
+  near 20 ms. Where they end up depends on the chip: the bench boards have
+  needed anything from no step (trim 64) to trim 66.
+- **The host's** HSI16 still runs after reset but clocks nothing. `time hsi`
+  still sets its trim, saved and applied at boot, which therefore has no
+  effect ([The Host's Clock](#the-hosts-clock)).
 
-### Trimming the Host's HSI
+### The Host's Clock
 
-`time hsi <0-127>` sets the host's HSITRIM: higher runs faster, 64 is the
-chip's default. It applies at once, is saved
-([Settings.md](../HostControllerA/Docs/Settings.md#tag-registry)) and is
-applied at boot. `time hsi` alone shows the trim, HSICAL and the saved trim
-([Console.md](../HostControllerA/Docs/Console.md#time)).
+The crystal's frequency is fixed by the part; there is nothing to trim. Two
+remnants of the HSI16 period remain:
 
-To measure, from `firmware/HostControllerA`, with no other program holding
-the console's COM port:
+- `time hsi [<0-127>]` and the saved HSI trim
+  ([Settings.md](../HostControllerA/Docs/Settings.md#tag-registry)) set and
+  show the host's `HSITRIM`, which clocks nothing
+  ([Console.md](../HostControllerA/Docs/Console.md#time)).
+- `HostControllerA/tools/hsi_measure.py` (`--duration`, default 600 s;
+  `--port`, default auto-detected; needs pyserial) fits a line to the PC's
+  arrival times of the `stats on` reports, which the host sends every 5000 ms
+  of its own clock, and prints the host's clock against the PC's. That now
+  measures the crystal; the trim it suggests should be ignored.
 
-1. Run `python tools/hsi_measure.py` (`--duration`, default 600 s; `--port`,
-   default auto-detected; needs pyserial). It reads the trim with `time hsi`,
-   turns on `stats on`, fits a line to the PC's arrival times of the reports
-   the host sends every 5000 ms of its own clock, and prints the host's clock
-   against the PC's and the trim to set:
-
-   ```text
-   host clock <ppm> ppm against the PC, from <n> reports over <s> s (worst arrival <ms> ms off the line)
-   trim <old> -> <new>: 'time hsi <new>', about <ppm> ppm after; measure again to confirm
-   ```
-
-   or `trim <n> is already the closest; no change`.
-2. Set the suggested value with `time hsi <new>`.
-3. Run the tool again to confirm.
-
-The PC's clock is the reference; its error, tens of ppm at most, does not
-change the step chosen. Measured on 2026-10-05 against the PC at trim 64: the
-host +2660 ppm (trim 63 estimated at about -650 ppm), the display board at
-`0x11` -2147 to -2500 ppm.
+The host's clock has not been measured against the PC since the change. The
+HSI16 measurements are in the
+[archive](archive/Host_HSI_Clock_2026-10.md).
 
 ### How Steady the Clocks Are
 
-Against the PC's clock, over 2-minute windows on 2026-10-07 the host's HSI16
-read +3052 to +3251 ppm with nothing in its log at those times; in 5-minute
-windows +2639 to +3252 ppm. The display board's clock against the host's
-moved by the same amounts the other way, a few ppm to 300 ppm between one
-interval's average and the next. The board's own warm-up (after a reset, or
-when `display all test` lit every element) adds a ramp of 50-150 ppm per
-interval for 20-30 minutes. The cause of the host's own movement is not
-known.
+With the host on its crystal, a display board's rate against the host is its
+own HSI16. On 2026-10-09, over the 38 minutes after a reset, one board's rate
+moved from +194 ppm to -375 ppm and back to about -310 ppm, by 112 ppm (root
+mean square) between one 2-minute interval and the next. A board's warm-up,
+after a reset or when `display all test` lights every element, adds a ramp of
+50-150 ppm per interval for 20-30 minutes, measured on 2026-10-07 while the
+host was still on HSI16.
 
 ## Measuring
 
@@ -253,7 +243,7 @@ The line after a reset has `frames` and `syncs` back at 0. A read that fails
 or is implausible (while the probe reconnects) prints `read failed`. The host
 side of the same run is the console's `time sync` (broadcasts sent and
 answered, each board's `locked` or `wants-sync`, with `+needs-content`) and `tools/hsi_measure.py`
-for the host against the PC.
+for the host's crystal against the PC.
 
 ## Accuracy
 
@@ -268,16 +258,19 @@ settling:
 | -2500 ppm, drifting +400 ppm an hour | 0 | about 2 ms at the end of every 2-minute interval: the rate is the last interval's average, *k*·*I*²/2 stale by the end of the next, for a drift of *k* per unit time |
 | +1500 ppm, drifting -400 ppm an hour | 0 | about 2 ms, likewise |
 
-On the bench the stamps are not exact and the clocks move in steps. Board
-`0x11`, 14 regular 2-minute syncs from 15:10 on 2026-10-07: +7.3, -9.5,
-+15.6, -16.5, +6.9, +16.3, +3.6, -0.5, -22.4, +6.1, +1.0, +0.1, -11.3 and
-+9.6 ms, nine of them within 10 ms; locked throughout, no burst, no HSITRIM
-step. The larger ones coincide with the host's HSI16 moving 100-200 ppm within
-an interval ([How Steady the Clocks Are](#how-steady-the-clocks-are)); the
-interval's length, and not the estimate, sets how much that costs. With
-5-minute syncs the same bench found 30-50 ms, and 90 ms when the host's clock
-stepped. Against 20 ms frames and a 1 s blink phase, a few milliseconds are
-not visible; 20 ms is one frame.
+On the bench the stamps are not exact and the board's clock moves in steps.
+On 2026-10-09, with the host on its crystal and the board just reset: the
+board locked 21 s after its first sync and stayed locked, with no burst after
+the first and no HSITRIM step. Its 18 regular 2-minute syncs from 15:59 found
++18.6, -18.4, -19.2, +14.4, +3.7, +8.2, +14.1, +8.5, -10.0, +20.0, +8.5, +1.1,
+-16.9, -15.3, +0.6, +10.7, +17.4 and -4.2 ms: median 12.4 ms, root mean square
+13.6 ms, worst 20.0 ms, mean +2.3 ms. The errors follow the board's rate
+moving about 100 ppm within an interval
+([How Steady the Clocks Are](#how-steady-the-clocks-are)); the interval's
+length, and not the estimate, sets how much that costs. Against 20 ms frames
+and a 1 s blink phase, a few milliseconds are not visible; 20 ms is one
+frame. The measurements with the host on HSI16 are in the
+[archive](archive/Host_HSI_Clock_2026-10.md).
 
 A trend carried on from the previous interval would halve the error of a
 steady ramp and double that of a step; the rate moves in both ways about as
@@ -295,8 +288,12 @@ host's schedule above. The host's schedule is `sync_schedule_tests` in
 ## Open Items
 
 - A run over a day's temperature, on more than one board.
-- The cause of the host's HSI16 moving 100-200 ppm within minutes, which sets
-  the floor of the error (its supply and load are the first things to try).
+- The display boards' HSI16 moving about 100 ppm between 2-minute intervals,
+  which sets the floor of the error now that the host runs from a crystal: a
+  shorter interval, or stamps from the refresh timer, are the options.
+- `time hsi`, the saved host HSI trim and `hsi_measure.py`'s trim suggestion
+  have no effect since the host moved to its crystal; remove them or keep
+  the measurement only.
 - The host's stamp is taken with interrupts off, but interrupts are enabled
   again before the START; its refresh interrupt (up to 850 us) running in
   between delays the START and the board's stamp with it, unseen by the

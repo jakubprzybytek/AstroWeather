@@ -449,7 +449,7 @@ failed save `ERR settings-unavailable`.
 
 **HC.** The clock commands are detailed in [RTC.md](RTC.md#console-commands),
 `time hsi` and `time sync` in
-[TimelineSync.md](../../Docs/TimelineSync.md).
+[TimelineSync.md](../../Docs/TimelineSync.md#the-hosts-clock).
 
 | Command | Reply |
 | --- | --- |
@@ -458,15 +458,14 @@ failed save `ERR settings-unavailable`.
 | `time trim <ppm>` | `OK time-trim=+18400ppm`. Range ±100000. Saved. |
 | `time display on\|off` | `OK time-display=on` or `OK time-display=off`. Saved. |
 | `time hsi` | `OK time-hsi=63 cal=0x8E saved=63`: the host's HSI16 trim (`HSITRIM`) in use, `HSICAL` as read back, and the saved trim. |
-| `time hsi <0-127>` | Sets the HSI16 trim; the same reply. Higher runs faster, about 0.33 % a step; 64 is the chip's default. Applies at once and at boot. Saved. Not the RTC's clock: see `time trim`. |
+| `time hsi <0-127>` | Sets the HSI16 trim; the same reply. Applies at once and at boot. Saved. No effect: the host runs from its crystal and HSI16 clocks nothing. |
 | `time sync` | `OK time-sync sent=2 answered=0 last=9s-ago next=15s burst`: the timeline sync broadcasts sent, those at least one display board acknowledged, the age of the last, the time to the next, and `burst` or `every-120s`. Each board that answered the last status poll is appended as ` 0x11=locked` or ` 0x11=wants-sync`, with `+needs-content` added while the board asks for its content, which the host then re-sends ([Display.md](Display.md#the-display-aggregate)). |
 | `time sync now` | `OK time-sync=burst`: starts a burst of syncs, unless one is running. |
 
 `set=no` in `time show` means the clock has not been set since a power loss.
 The `prediv` and `calm` values depend on the trim; see
-[RTC.md](RTC.md#trimming). How to measure the host's HSI and choose
-`time hsi` is in
-[TimelineSync.md](../../Docs/TimelineSync.md#trimming-the-hosts-hsi). An invalid date or
+[RTC.md](RTC.md#trimming). The host's clock and how to measure it are in
+[TimelineSync.md](../../Docs/TimelineSync.md#the-hosts-clock). An invalid date or
 time, a trim out of range, an HSI trim above 127, or any other `time` line gets
 `ERR invalid-argument`.
 

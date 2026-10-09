@@ -24,7 +24,7 @@ A display board gets `VBUS`, `GND`, I2C, `LED_BRIGHTNESS` and `LOW_POWER_ENABLE`
 | Power Supply sheet (`U601`, `U602`, `L601`, `C601`-`C608`, `R601`, `R602`) | Light Sensor sheet (`Q701`, `R701`-`R705`) |
 | Display sheet, including the `MCP6006` + `BC847` current-set stages | USB-C `J106`, `R102`/`R103`, `D101`/`D102`, `J105` |
 | | `U101` INA180 + `R101` shunt, `R304`/`C306`, `R305`/`C307` |
-| | Optional: `Y301` crystal (firmware uses HSI), LEDs, buttons, `U301` EEPROM, `R301`/`R302` (DNP) |
+| | Optional: `Y301` crystal (the display firmware uses HSI; the host needs it, 24 MHz), LEDs, buttons, `U301` EEPROM, `R301`/`R302` (DNP) |
 
 The `MCP6006` + `BC847` stages (`U503`/`U507`/`U511`/`U515`, `Q506`-`Q509`) are required. They load the SCT drivers' `REXT` pins from `LED_BRIGHTNESS`. Without them the displays stay dark.
 

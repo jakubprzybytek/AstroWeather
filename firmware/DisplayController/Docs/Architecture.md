@@ -222,7 +222,8 @@ current pass.
 - Not yet checked on the board: rejecting unknown commands and short writes,
   recovery from bus errors, the 7-hour "no data" timeout and the switch test
   screens.
-- The timeline sync: a run over a day's temperature, and the cause of the
-  host's clock moving 100-200 ppm within minutes
+- The timeline sync: a run over a day's temperature, and the board's own HSI16
+  moving about 100 ppm within minutes, which sets the error now that the host
+  runs from a crystal
   ([TimelineSync.md](../../Docs/TimelineSync.md#open-items)).
 - Console over USART2 (`PA2`/`PA3`); see the [README](../README.md#features).

@@ -26,12 +26,12 @@ The G0B1 RTC can be clocked from only three sources:
 | Source | Status on this board |
 | --- | --- |
 | LSE, a 32.768 kHz crystal on PC14/PC15 | Not fitted. PC14/PC15 are unused. |
-| HSE / 32 | No HSE is fitted. |
+| HSE / 32 | Possible: the 24 MHz crystal is fitted and runs the system clock, giving 750 kHz. Not used ([Open items](#open-items)). |
 | LSI, the internal RC oscillator, nominally 32 kHz | **Used.** |
 
-HSI16 cannot clock the RTC, so `time hsi`, which trims the HSI16 for the
-display timeline ([TimelineSync.md](../../Docs/TimelineSync.md#trimming-the-hosts-hsi)),
-does not change the clock.
+HSI16 cannot clock the RTC, and `time hsi`, which trims it
+([TimelineSync.md](../../Docs/TimelineSync.md#the-hosts-clock)), does not
+change the clock.
 
 The LSI needs no parts, but it is not precise. The datasheet allows a wide
 spread between parts, and it moves with temperature and supply voltage. It also
@@ -82,7 +82,7 @@ section.
 
 `ClockTask` redraws only when the minute changes. It sleeps until the next
 minute boundary, which it works out from the RTC seconds. `time set`, `time display`
-and a trim change wake it at once. The task's timer runs on the HSI and the RTC
+and a trim change wake it at once. The task's timer runs on the crystal and the RTC
 on the LSI, so it may wake a little early. It then sees the same minute and
 sleeps for the remainder. A new minute can appear up to about 2 s late.
 
@@ -360,3 +360,7 @@ with the conditions, so a trim taken from one span can be wrong for the next.
   about 1000 ppm points at a bad timestamp), move only part of the way, save
   to the EEPROM only when the trim moves by more than a few ppm, and log each
   adjustment.
+- **HSE / 32 as the RTC clock.** The 24 MHz crystal that runs the system
+  clock could clock the RTC at 750 kHz, accurate to the crystal, which would
+  make the LSI trim unnecessary while the board is powered. The RTC is lost
+  on power loss either way (no battery).

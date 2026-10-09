@@ -54,7 +54,7 @@ ST67W611M1, T01 firmware: TCP/IP, DHCP, DNS, TLS
 | --- | --- |
 | Module firmware | T01, SDK 2.0.106 (`st67w611m_mission_t01_v2.0.106.bin`, programmed with `firmware/Bypass`), reported at start-up as `ST67 module=... sdk=...`. `W6X_Init()` refuses a module running the T02 image |
 | Driver | X-CUBE-ST67W61 1.3.0, `ST67_ARCH=W6X_ARCH_T01` (`cmake/stm32cubemx/CMakeLists.txt`) |
-| SPI | SPI1 master, HSI 16 MHz / 8 = 2 MHz; DMA1 channel 1 RX, channel 2 TX, high priority, IRQ priority 3 |
+| SPI | SPI1 master, PCLK 16 MHz / 8 = 2 MHz; DMA1 channel 1 RX, channel 2 TX, high priority, IRQ priority 3 |
 | Largest SPI transfer | `W61_MAX_SPI_XFER = 1520` (`ST67W6X_Network_Driver/Target/w61_driver_config.h`) |
 | `ST67_RDY` | PA4, EXTI on both edges (EXTI4_15, priority 3) |
 | Power save | `W6X_POWER_SAVE_AUTO = 1` (`w6x_config.h`) |

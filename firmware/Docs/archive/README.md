@@ -9,3 +9,4 @@ document listed next to each one.
 | Archived document | Current replacement |
 | --- | --- |
 | [Timeline_Sync_Bench_2026-10-07.md](Timeline_Sync_Bench_2026-10-07.md) | [TimelineSync.md](../TimelineSync.md) |
+| [Host_HSI_Clock_2026-10.md](Host_HSI_Clock_2026-10.md) | [TimelineSync.md](../TimelineSync.md#clocks-and-hsitrim) |

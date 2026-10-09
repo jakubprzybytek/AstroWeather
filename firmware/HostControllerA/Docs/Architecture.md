@@ -10,7 +10,8 @@ documents listed in the [README](../README.md#documentation) describe each
 subsystem in depth.
 
 The firmware is C++17 on top of the STM32CubeMX-generated C code for an
-STM32G0B1CETx (Cortex-M0+, 16 MHz from HSI16, 512 KB flash, 144 KB RAM),
+STM32G0B1CETx (Cortex-M0+, 16 MHz from a 24 MHz crystal through the PLL,
+512 KB flash, 144 KB RAM),
 FreeRTOS through CMSIS-RTOS2 and the ST67W6X network driver in its T01
 architecture, where TCP/IP and TLS run in the Wi-Fi module. Application
 code lives under `User/` and, for the parts shared with the DisplayController
@@ -57,9 +58,9 @@ the refresh interrupt drives it once `localBoard` starts):
 3. `settingsStore.load()` reads the EEPROM; the outcome, not the values, is
    logged. This works before the scheduler because EEPROM reads take no
    `osDelay` and the bus mutex is uncontended. A saved HSI trim other than 64
-   is applied at once (`HsiTrim::set()`, logged as `HSI trim <n>`), so the
-   refresh timeline runs at the trimmed rate from its first frame; see
-   [TimelineSync.md](../../Docs/TimelineSync.md#trimming-the-hosts-hsi).
+   is applied at once (`HsiTrim::set()`, logged as `HSI trim <n>`); it has no
+   effect, since the host runs from its crystal and HSI16 clocks nothing
+   ([TimelineSync.md](../../Docs/TimelineSync.md#the-hosts-clock)).
 4. `CurrentSenseTask`: logging and display flags from settings, the display,
    then `start()`.
 5. `ConsoleService`: `init(&display)`, EEPROM and settings pointers, `start()`.
@@ -300,6 +301,7 @@ From `Core/Inc/main.h` and `HostControllerA.ioc`.
 | GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat from the refresh interrupt; switch presses and USB CDC traffic |
 | GPIO | `PB8` `LOW_POWER_EN` | Low-brightness step for every board, set by `display low` and toggled by switch 2 (HostController only; see [Display.md](Display.md#low-brightness)) |
 | GPIO inputs | `PB10`, `PB11`, `PB14` = `ADDR_0`..`ADDR_2` | Board address straps, read once at boot by `detectBoardAddress()`, then left analog |
+| HSE | `PF0` `OSC_IN`, `PF1` `OSC_OUT` | 24 MHz crystal `Y301`; the PLL makes the 16 MHz system clock |
 | SWD | `PA13`, `PA14` | Debug |
 | TIM1 | none | HAL time base |
 

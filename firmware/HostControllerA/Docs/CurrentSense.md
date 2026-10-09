@@ -61,7 +61,7 @@ As generated into `MX_ADC1_Init()` in `Core/Src/main.c` from
 
 | Setting | Value |
 | --- | --- |
-| Clock | `ADC_CLOCK_SYNC_PCLK_DIV2`: 8 MHz from the 16 MHz HSI |
+| Clock | `ADC_CLOCK_SYNC_PCLK_DIV2`: 8 MHz from the 16 MHz PCLK |
 | Resolution, alignment | 12-bit, right |
 | Mode | Scan, 3 regular conversions, single (not continuous), software start |
 | Rank 1 | `ADC_CHANNEL_10`, `PB2`, the current |

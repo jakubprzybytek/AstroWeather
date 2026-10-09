@@ -70,8 +70,9 @@ use it ([TimelineSync.md](TimelineSync.md#the-timeline-on-every-board)).
 
 ## HSI Trim
 
-Both boards clock everything from HSI16: the refresh, the I2C timing and the
-FreeRTOS tick. `HsiTrim` reads and sets its user trim, `RCC_ICSCR.HSITRIM`:
+The display boards clock everything from HSI16: the refresh, the I2C timing
+and the FreeRTOS tick. The host runs from a crystal, and its HSI16 clocks
+nothing. `HsiTrim` reads and sets the HSI16 user trim, `RCC_ICSCR.HSITRIM`:
 0-127, 64 by default, higher runs faster, about 0.33 % a step (measured on a
 G070 on 2026-10-05). A trim applies at once and is lost at reset.
 
@@ -82,9 +83,10 @@ G070 on 2026-10-05). A trim applies at once and is lost at reset.
 | `set(trim)` | Sets 0-127; false, and nothing changed, beyond that |
 | `allowedSteps(calibration, trim, steps, start, limit)` | How much of `steps` the trim may move: within ±`limit` of `start` and 0-127, and never letting `HSICAL` cross a multiple of 64, where AN5126 warns the frequency can step backwards. Pure |
 
-The host sets its trim from the console (`time hsi`, saved); a display board
-moves its own to follow the host's timeline, at most 8 steps from its boot
-trim. Both are described in [TimelineSync.md](TimelineSync.md).
+A display board moves its trim to follow the host's timeline, at most 8 steps
+from its boot trim. The host still sets its own from the console (`time hsi`,
+saved), which has no effect. Both are described in
+[TimelineSync.md](TimelineSync.md#clocks-and-hsitrim).
 
 ## LEDs
 

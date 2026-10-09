@@ -11,7 +11,7 @@ display board's target side in [DisplayController](../DisplayController/README.m
 | | |
 | --- | --- |
 | Peripheral | I2C1 on both boards, `PA9` SCL, `PA10` SDA, 7-bit addressing |
-| Speed | 100 kHz standard mode (`Timing` `0x00503D58` from the 16 MHz HSI), analog filter on, digital filter off |
+| Speed | 100 kHz standard mode (`Timing` `0x00503D58` from the 16 MHz PCLK), analog filter on, digital filter off |
 | Pull-ups | 2.2 kΩ to 3V3 on SCL and SDA, fitted once on the bus |
 | Wiring | Daisy-chained through `J102`/`J104` together with power, `LED_BRIGHTNESS` and `LOW_POWER_ENABLE` |
 | Controller | The host, the only master |
