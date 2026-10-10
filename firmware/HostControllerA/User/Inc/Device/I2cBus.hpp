@@ -26,6 +26,12 @@ namespace Device {
 //
 // Device addresses are 7-bit; the read/write bit is added here so call sites
 // cannot get the shift wrong. Memory addresses are 8-bit (I2C_MEMADD_SIZE_8BIT).
+//
+// A transfer that fails other than by a NACK resets the peripheral. The HAL
+// returns from a timeout without doing so, and a master left waiting for its
+// next byte holds SCL low, so every later transfer found the bus busy until
+// the next reset. That happened after a display board without firmware had
+// held SCL high (firmware/Docs/I2C.md, "A board without firmware").
 class I2cBus
 {
 public:
@@ -53,6 +59,7 @@ public:
         const HAL_StatusTypeDef status = HAL_I2C_Master_Transmit(
             &handle_, static_cast<uint16_t>(deviceAddress << 1U), data, size, timeoutMs);
         (void)xTaskResumeAll();
+        recoverAfterFailure(status);
         return status;
     }
     HAL_StatusTypeDef receive(uint16_t deviceAddress, uint8_t* data, uint16_t size,
@@ -68,6 +75,9 @@ public:
     const I2C_HandleTypeDef& handle() const { return handle_; }
 
 private:
+    // Called with mutex_ held, after every transfer.
+    void recoverAfterFailure(HAL_StatusTypeDef status);
+
     I2C_HandleTypeDef& handle_;
     Mutex mutex_;
 };
