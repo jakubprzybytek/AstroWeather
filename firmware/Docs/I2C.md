@@ -47,6 +47,9 @@ The host used to read its settings before the scheduler started, where the
 HAL's timeout cannot expire, and hung there with no USB. It now reads them
 once the scheduler runs, so the read fails after 50 ms and the host boots with
 the defaults ([Architecture.md](../HostControllerA/Docs/Architecture.md#init-order)).
+Its I2C peripheral is reset after the failed transfer
+([`Device::I2cBus`](#devicei2cbus)), so once the board is flashed or removed
+the bus works again; the settings stay at the defaults until the next reset.
 Flash display boards before connecting them to the bus.
 
 Programming the board resets it into the new firmware. A board erased while
@@ -178,6 +181,15 @@ the bus is free it fills the message with interrupts off, then transmits with
 the scheduler suspended, so no task runs between the fill and the START. The
 scheduler is suspended inside the critical section, so no tick is held back
 before the fill reads the time. The 7-byte sync takes about 1 ms.
+
+After a transfer that fails other than by a NACK (a timeout, a bus error, lost
+arbitration, the bus found busy), `I2cBus` clears and sets `PE`, the
+peripheral's software reset. The HAL returns from a timeout without it, and a
+master left waiting for its next byte holds SCL low: on 2026-10-11 the host's
+I2C1 sat at `ISR` `0x8003` (`BUSY`, `TXIS`) after a timed-out EEPROM read, and
+every later transfer failed until a reset. The reset does not free SDA held
+low by a slave cut off mid-byte; that would need nine clocks on SCL as a GPIO,
+which no fault has called for yet.
 
 ### `BufferedDisplayBoard`
 
