@@ -30,16 +30,20 @@ uint8_t detectBoardId(GPIO_TypeDef* port0, uint16_t pin0,
     const uint8_t state1 = readPin(port1, pin1);
     const uint8_t state2 = readPin(port2, pin2);
     // Analog afterwards: no pull current into a strap tied to VCC, and no
-    // floating digital input buffer on a strap left open.
+    // floating digital input buffer on a strap left open. The G0 HAL leaves
+    // PUPDR alone in analog mode, so the pull is cleared as an input first.
     GPIO_InitTypeDef restore{};
-    restore.Mode = GPIO_MODE_ANALOG;
     restore.Pull = GPIO_NOPULL;
-    restore.Pin = pin0;
-    HAL_GPIO_Init(port0, &restore);
-    restore.Pin = pin1;
-    HAL_GPIO_Init(port1, &restore);
-    restore.Pin = pin2;
-    HAL_GPIO_Init(port2, &restore);
+    const uint32_t modes[] = {GPIO_MODE_INPUT, GPIO_MODE_ANALOG};
+    for (const uint32_t mode : modes) {
+        restore.Mode = mode;
+        restore.Pin = pin0;
+        HAL_GPIO_Init(port0, &restore);
+        restore.Pin = pin1;
+        HAL_GPIO_Init(port1, &restore);
+        restore.Pin = pin2;
+        HAL_GPIO_Init(port2, &restore);
+    }
     return static_cast<uint8_t>(state0 + 3U * state1 + 9U * state2);
 }
 

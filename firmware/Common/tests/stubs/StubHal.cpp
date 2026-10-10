@@ -101,9 +101,12 @@ void HAL_GPIO_Init(GPIO_TypeDef* port, GPIO_InitTypeDef* init)
     if (init == nullptr) {
         return;
     }
+    // As the G0 HAL: analog mode leaves PUPDR, and so the pull, as it was.
     forEachPin(port, static_cast<uint16_t>(init->Pin), [init](PinModel& model) {
         model.mode = init->Mode;
-        model.pull = init->Pull;
+        if (init->Mode != GPIO_MODE_ANALOG) {
+            model.pull = init->Pull;
+        }
     });
 }
 
