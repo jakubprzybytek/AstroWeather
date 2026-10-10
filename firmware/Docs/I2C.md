@@ -33,6 +33,29 @@ the peripheral latches BUSY on its first START and no device responds. They are
 
 `eeprom scan` on the host console lists every device that answers.
 
+### A board without firmware
+
+A display board whose STM32G070 has empty flash runs ST's ROM bootloader,
+which listens on USART1, the same `PA9`/`PA10` pins as the bus. It sets
+`PA9` (SCL) as `USART1_TX`, push-pull with the transmitter on, so SCL is
+driven high and the host cannot pull it low; no transfer on the bus completes
+while that board is connected. Read over SWD on 2026-10-11: `GPIOA_MODER`
+`EBEBAAAF`, `AFRH` `00000110` (AF1 on both pins), `OTYPER` `0`,
+`USART1_CR1` `0000140D`.
+
+The host used to read its settings before the scheduler started, where the
+HAL's timeout cannot expire, and hung there with no USB. It now reads them
+once the scheduler runs, so the read fails after 50 ms and the host boots with
+the defaults ([Architecture.md](../HostControllerA/Docs/Architecture.md#init-order)).
+Flash display boards before connecting them to the bus.
+
+Programming the board resets it into the new firmware. A board erased while
+powered keeps running from its old reset decision: the chip sets its
+flash-empty flag (`FLASH_ACR.EMPTY`) only at power-up, so after a mass erase
+and a reset the core runs from the erased flash and locks up instead of
+entering the bootloader. Setting the bit over SWD before the reset gives the
+same start as a new board.
+
 ## Messages
 
 Every message to a board's own address is 36 bytes: one command byte and one

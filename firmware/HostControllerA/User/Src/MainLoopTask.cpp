@@ -18,16 +18,22 @@ MainLoopTask::MainLoopTask()
 {
 }
 
-void MainLoopTask::init(PulseLed& led, Settings::Store* settings, Display::Display* display)
+void MainLoopTask::init(PulseLed& led, Settings::Store* settings, Display::Display* display,
+                        void (*startup)())
 {
     led_ = &led;
     settings_ = settings;
     display_ = display;
+    startup_ = startup;
 }
 
 void MainLoopTask::run()
 {
-    // First, the local board's boot screens (about 3 s). Switch presses
+    if (startup_ != nullptr)
+    {
+        startup_();
+    }
+    // Then the local board's boot screens (about 3 s). Switch presses
     // meanwhile stay pending in the thread flags.
     if (display_ != nullptr)
     {

@@ -62,38 +62,23 @@ Device::Eeprom24AA04 settingsEeprom(i2c1Bus);
 
 Settings::Store settingsStore(settingsEeprom);
 
+namespace {
 
-// Runs from main() before osKernelStart(), so nothing here may block on the
-// scheduler; the tasks started below only run once it is up.
-void AstroWeather_Init() {
-  // LED_1 is the heartbeat, driven by localBoard's refresh interrupt on the
-  // timeline the display boards follow (Display/Timeline.hpp).
-  // LED2: switch presses and USB CDC traffic; before the USB device starts.
-  activityLed().init();
-
-  LogService::instance().init();
-  LogService::instance().start();
-
-  // The host's place in the chain comes from its straps, as on a display
-  // board; before anything submits, so no frame goes to its own address.
-  display.setLocalAddress(Display::detectBoardAddress());
-  if (display.localInChain()) {
-    LogService::instance().logf(LogService::Level::Info,
-                                "Display address 0x%02X: forecast block %u",
-                                static_cast<unsigned>(display.localAddress()),
-                                static_cast<unsigned>(Display::chainPosition(display.localAddress())));
-  } else {
-    LogService::instance().logf(LogService::Level::Warn,
-                                "Display address 0x%02X is outside 0x10-0x15: no forecast block",
-                                static_cast<unsigned>(display.localAddress()));
-  }
-
-  // Runs before osKernelStart(); reads take no osDelay and the bus mutex is
-  // uncontended here, so this does not block. Log the outcome rather than the
-  // values, since they include credentials.
+// The start-up steps that read the settings, run by MainLoopTask before its
+// boot screens. The settings EEPROM is on the display bus, so the read waits
+// for the scheduler: before it, FreeRTOS keeps interrupts masked, the HAL tick
+// stands still and an I2C timeout never expires. A display board without
+// firmware holds SCL high from its ROM bootloader, which hung the host there.
+// Now the read fails after its timeout and the host boots on defaults.
+void startWithSettings() {
+  // Before any task that reads the settings starts: load() takes no mutex.
+  // Log the outcome rather than the values, since they include credentials.
+  // A failed read is a warning, so the error log keeps it.
   const Settings::LoadResult loaded = settingsStore.load();
   LogService::instance().logf(
-      LogService::Level::Info, "Settings load=%s stored=%s",
+      (loaded == Settings::LoadResult::ReadFailed) ? LogService::Level::Warn
+                                                   : LogService::Level::Info,
+      "Settings load=%s stored=%s",
       (loaded == Settings::LoadResult::Ok)
           ? "ok"
           : ((loaded == Settings::LoadResult::ReadFailed) ? "read-failed" : "defaulted"),
@@ -128,9 +113,8 @@ void AstroWeather_Init() {
   ClockTask::instance().setDisplayEnabled(settingsStore.values().clockDisplayEnabled);
   // A saved trim beyond RtcTrim::kMaxTrimPpm was measured for the LSI the RTC
   // ran from before HSE / 32 (+19300 ppm on the first board). Applied to the
-  // crystal it would make the clock 2 % wrong, so it is dropped here, in RAM:
-  // the EEPROM cannot be written before the scheduler runs, and the next save
-  // of any setting writes 0.
+  // crystal it would make the clock 2 % wrong, so it is dropped here, in RAM;
+  // the next save of any setting writes 0.
   if (!RtcTrim::isValidPpm(settingsStore.values().clockTrimPpm)) {
     LogService::instance().logf(LogService::Level::Warn,
                                 "Clock trim %+ld ppm was for the LSI; using 0",
@@ -152,7 +136,37 @@ void AstroWeather_Init() {
   HostController::StartSt67HttpFetchTask();
   HostController::AstroDataRefreshTask::instance().init(&display);
   HostController::AstroDataRefreshTask::instance().start();
-  MainLoopTask::instance().init(activityLed(), &settingsStore, &display);
+}
+
+} // namespace
+
+// Runs from main() before osKernelStart(), so nothing here may block on the
+// scheduler or touch I2C (see startWithSettings()); the tasks started below
+// only run once it is up.
+void AstroWeather_Init() {
+  // LED_1 is the heartbeat, driven by localBoard's refresh interrupt on the
+  // timeline the display boards follow (Display/Timeline.hpp).
+  // LED2: switch presses and USB CDC traffic; before the USB device starts.
+  activityLed().init();
+
+  LogService::instance().init();
+  LogService::instance().start();
+
+  // The host's place in the chain comes from its straps, as on a display
+  // board; before anything submits, so no frame goes to its own address.
+  display.setLocalAddress(Display::detectBoardAddress());
+  if (display.localInChain()) {
+    LogService::instance().logf(LogService::Level::Info,
+                                "Display address 0x%02X: forecast block %u",
+                                static_cast<unsigned>(display.localAddress()),
+                                static_cast<unsigned>(Display::chainPosition(display.localAddress())));
+  } else {
+    LogService::instance().logf(LogService::Level::Warn,
+                                "Display address 0x%02X is outside 0x10-0x15: no forecast block",
+                                static_cast<unsigned>(display.localAddress()));
+  }
+
+  MainLoopTask::instance().init(activityLed(), &settingsStore, &display, &startWithSettings);
   MainLoopTask::instance().start();
   Utils::SwitchInput::instance().attach(
       MainLoopTask::instance().getHandle(), MainLoopTask::kEventSwitch1,

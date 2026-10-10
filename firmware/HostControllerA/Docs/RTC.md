@@ -159,10 +159,10 @@ stored as the `ClockTrim` settings record (tag `0x02`, see
 [Settings.md](Settings.md)) and applied at every boot. It is limited to
 ±1000 ppm (`RtcTrim::kMaxTrimPpm`), far beyond any crystal. A saved value
 outside that range is a trim measured for the LSI the RTC ran from before
-(the first board had +19 300 ppm): `AstroWeather_Init()` logs
-`Clock trim +19300 ppm was for the LSI; using 0` and uses 0. It changes the
-value in RAM only, since the EEPROM cannot be written before the scheduler
-runs; `time trim 0`, or saving any other setting, writes it.
+(the first board had +19 300 ppm): the start-up (`startWithSettings()` in
+`AstroWeather.cpp`) logs `Clock trim +19300 ppm was for the LSI; using 0` and
+uses 0. It changes the value in RAM only; `time trim 0`, or saving any other
+setting, writes it.
 
 The RTC makes its 1 Hz tick by dividing its clock by
 `(PREDIV_A + 1) × (PREDIV_S + 1)`. It can also discard `CALM` clock cycles out

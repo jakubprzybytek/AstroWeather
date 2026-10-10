@@ -83,7 +83,7 @@ void ConsoleService::sendWelcome()
     // the host, so restate the one boot-time result worth knowing.
     if (settings_ != nullptr) {
         reply("Settings loaded from EEPROM: %s",
-              Settings::Store::describe(settings_->lastDecode()));
+              settings_->describeLoad());
     }
     Console::sendErrorLogSummary();
     reply("Type 'help' for commands. Periodic stats are %s; 'stats %s' to switch.",

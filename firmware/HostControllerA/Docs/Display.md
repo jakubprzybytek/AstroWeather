@@ -112,7 +112,8 @@ pin (`PB8`), through `LowBrightness::set()`/`toggle()` in
 
 - `display low on|off` on the console sets it and saves it (settings tag
   `DisplayFlags`, [Settings.md](Settings.md#tag-registry));
-  `AstroWeather_Init()` applies the saved state before the local board starts.
+  the start-up (`startWithSettings()`) applies the saved state before the local
+  board starts.
   `display low` reports the state in use and the saved one; see
   [Console.md](Console.md#display).
 - Switch 2 toggles it, logs `Low brightness on` or `off`, and saves it from

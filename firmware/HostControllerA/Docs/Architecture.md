@@ -36,9 +36,13 @@ there stay inside `USER CODE` sections (see
    `RTOS_THREADS` user section.
 5. `osKernelStart()`.
 
-All of `AstroWeather_Init()` runs before the scheduler starts. The objects it
-uses are file-scope statics, constructed before `main()`; their `Mutex` members
-create their FreeRTOS mutexes from static storage at that point.
+`AstroWeather_Init()` runs before the scheduler starts and touches no I2C:
+FreeRTOS keeps interrupts masked from its first critical section until
+`osKernelStart()`, so the HAL tick stands still and an I2C timeout would never
+expire. Everything that needs the settings EEPROM runs later, in
+`MainLoopTask`. The objects it uses are file-scope statics, constructed before
+`main()`; their `Mutex` members create their FreeRTOS mutexes from static
+storage at that point.
 
 ### Init order
 
@@ -55,44 +59,59 @@ the refresh interrupt drives it once `localBoard` starts):
    with a warning if it is outside `0x10`–`0x15`, but USB CDC has not
    enumerated yet, so the line is normally lost (the warning is also kept in
    `errors`); `status` shows the address as `host` on the `remote` line.
-3. `settingsStore.load()` reads the EEPROM; the outcome, not the values, is
-   logged. This works before the scheduler because EEPROM reads take no
-   `osDelay` and the bus mutex is uncontended. A saved HSI trim other than 64
-   is applied at once (`HsiTrim::set()`, logged as `HSI trim <n>`); it has no
-   effect, since the host runs from its crystal and HSI16 clocks nothing
+3. `MainLoopTask`: `init(activityLed(), &settingsStore, &display,
+   &startWithSettings)` (switch 2 saves low brightness), `start()`.
+4. `SwitchInput::attach()` routes the `SWITCH_1`/`SWITCH_2` EXTI interrupts to
+   `MainLoopTask` as thread flags. A press before the start-up below has
+   finished waits in the flags.
+
+Once the scheduler runs, `MainLoopTask` first calls `startWithSettings()`
+(`AstroWeather.cpp`), which does the rest in order:
+
+1. `settingsStore.load()` reads the EEPROM; the outcome, not the values, is
+   logged, as a warning (kept in `errors`) if the read failed. No task that
+   reads the settings runs yet, since `load()` takes no mutex. With the
+   scheduler running, a stuck bus fails the read after its 50 ms timeout and
+   the host carries on with the defaults: a display board without firmware
+   holds SCL high from its ROM bootloader (see
+   [I2C.md](../../Docs/I2C.md#a-board-without-firmware)). A saved HSI trim
+   other than 64 is applied at once (`HsiTrim::set()`, logged as
+   `HSI trim <n>`); it has no effect, since the host runs from its crystal and
+   HSI16 clocks nothing
    ([TimelineSync.md](../../Docs/TimelineSync.md#the-hosts-clock)).
-4. `CurrentSenseTask`: logging and display flags from settings, the display,
+2. `CurrentSenseTask`: logging and display flags from settings, the display,
    then `start()`.
-5. `ConsoleService`: `init(&display)`, EEPROM and settings pointers, `start()`.
-6. `LowBrightness::set()` applies the saved low brightness to `PB8`, before the
+3. `ConsoleService`: `init(&display)`, EEPROM and settings pointers, `start()`.
+   USB enumerates later than this, so no console input is missed.
+4. `LowBrightness::set()` applies the saved low brightness to `PB8`, before the
    displays light up.
-7. The local board gets the "no data" state (`Display::noDataState()`, see
+5. The local board gets the "no data" state (`Display::noDataState()`, see
    [Display.md](../../Docs/Display.md#time-blank-and-no-data)) but does not show it yet: the first
    slot-test frame (`Display::slotTestState(0)`) is shown instead, then
    `localBoard.start()` enables the SCT outputs and starts TIM2, whose
    interrupt refreshes the board, keeps the refresh timeline and drives the
    `LED_1` heartbeat from then on. `Display` holds back every
    local submit until `MainLoopTask` has run the boot screens.
-8. `ClockTask`: display flag and trim from settings, the display, `start()`. A
+6. `ClockTask`: display flag and trim from settings, the display, `start()`. A
    saved trim beyond ±1000 ppm, measured for the LSI the RTC ran from before,
    is replaced by 0 with a warning; an error is logged if the RTC rejects
    the trim ([RTC.md](RTC.md#trimming)).
-9. `DisplaySyncTask`: `init(&i2c1Bus, &display)`, `start()`; after
+7. `DisplaySyncTask`: `init(&i2c1Bus, &display)`, `start()`; after
    `localBoard.start()`, since the sync carries its refresh timeline
    ([TimelineSync.md](../../Docs/TimelineSync.md#syncs-from-the-host)).
-10. `SetSt67CredentialSource(&settingsStore)`, then `StartSt67HttpFetchTask()`.
+8. `SetSt67CredentialSource(&settingsStore)`, then `StartSt67HttpFetchTask()`.
    The credential source must be set first, since the fetch task reads the
    credentials on every connect.
-11. `AstroDataRefreshTask`: `init(&display)` restores the last successful
-    refresh time from backup register DR1 when the RTC is set, then `start()`.
-12. `MainLoopTask`: `init(activityLed(), &settingsStore, &display)` (switch 2
-    saves low brightness), `start()`. Its first act once the scheduler runs is
-    `display.runBootScreens()`: each `DISPLAYx_EN` slot lit on its own for
-    200 ms, then `AdNN` (the host's strap address) on numeric display 1 for
-    2 s, then the local board's own state, which clients have kept writing
-    meanwhile. See [DisplayController Architecture](../../DisplayController/Docs/Architecture.md#screens).
-13. `SwitchInput::attach()` routes the `SWITCH_1`/`SWITCH_2` EXTI interrupts to
-    `MainLoopTask` as thread flags.
+9. `AstroDataRefreshTask`: `init(&display)` restores the last successful
+   refresh time from backup register DR1 when the RTC is set, then `start()`.
+
+A task started here can run at once if its priority is higher than that of
+`MainLoopTask`, so each step only starts a task whose inputs are already set.
+`MainLoopTask` then runs `display.runBootScreens()`: each `DISPLAYx_EN` slot
+lit on its own for 200 ms, then `AdNN` (the host's strap address) on numeric
+display 1 for 2 s, then the local board's own state, which clients have kept
+writing meanwhile. See
+[DisplayController Architecture](../../DisplayController/Docs/Architecture.md#screens).
 
 `defaultTask` initialises the USB device (`MX_USB_Device_Init()`) once the
 scheduler runs and then ends itself (`osThreadExit()` in the `USER CODE 5`

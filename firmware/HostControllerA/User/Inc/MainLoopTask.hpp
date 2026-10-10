@@ -27,7 +27,10 @@ public:
 
     // `settings` may be null; switch 2 then changes brightness without saving it.
     // `display` may be null; the boot screens are then skipped.
-    void init(PulseLed& led, Settings::Store* settings, Display::Display* display);
+    // `startup` runs first, once the scheduler is up: the start-up steps that
+    // need I2C, whose timeouts only run then. May be null.
+    void init(PulseLed& led, Settings::Store* settings, Display::Display* display,
+              void (*startup)());
 
 protected:
     void run() override;
@@ -38,4 +41,5 @@ private:
     PulseLed* led_ = nullptr;
     Settings::Store* settings_ = nullptr;
     Display::Display* display_ = nullptr;
+    void (*startup_)() = nullptr;
 };

@@ -64,8 +64,8 @@ The third line appears only while the [error log](#error-log) holds entries.
 The build number and time come from `../Common/cmake/BuildInfo.cmake`, which
 counts every build in `BUILD_NUMBER` and regenerates both, so they identify
 the flashed image ([Development.md](../../Docs/Development.md#build)). The settings line gives
-`Settings::Store::describe()` of the boot-time load (`ok`, `blank`,
-`bad-crc`, ...; see [Settings.md](Settings.md#decode-results)). It is repeated
+the boot-time load (`ok`, `blank`, `bad-crc`, ..., or `read-failed` if the
+EEPROM did not answer; see [Settings.md](Settings.md#decode-results)). It is repeated
 here because the startup log is written before USB has enumerated and never
 reaches the host.
 

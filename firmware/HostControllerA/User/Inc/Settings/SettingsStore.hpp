@@ -61,6 +61,9 @@ public:
 
     // Detail behind a Defaulted load, for logging.
     DecodeResult lastDecode() const { return lastDecode_; }
+    // The boot-time load for the console: "read-failed" when the EEPROM did
+    // not answer, otherwise describe(lastDecode()).
+    const char* describeLoad() const;
 
     static const char* describe(DecodeResult result);
 
@@ -68,11 +71,13 @@ private:
     Device::Eeprom24AA04& eeprom_;
     Values values_{};
     DecodeResult lastDecode_ = DecodeResult::Blank;
+    bool readFailed_ = false;
     mutable Mutex mutex_;
     // Working images for load() and save(), kept here rather than on the stack:
     // save() runs on the console task and on MainLoopTask (switch 2), and two
     // 256-byte images there would crowd MainLoopTask's 1536-byte stack.
-    // load() runs once before the scheduler; save() uses them under mutex_.
+    // load() runs once at start-up, before any other user of the store;
+    // save() uses them under mutex_.
     uint8_t desired_[kImageSize] = {};
     uint8_t current_[kImageSize] = {};
 };

@@ -72,7 +72,7 @@ void showSettings(const Settings::Store& store)
     // Describes what load() found at startup, not the chip's present content,
     // so it still reads "blank" after the first save of a fresh chip.
     std::snprintf(message, sizeof(message), "OK settings boot-load=%s",
-                  Settings::Store::describe(store.lastDecode()));
+                  store.describeLoad());
     LogService::instance().sendLine(message);
 }
 

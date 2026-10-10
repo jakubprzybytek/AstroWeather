@@ -9,9 +9,11 @@ LoadResult Store::load()
     if (eeprom_.read(0U, current_, static_cast<uint16_t>(sizeof(current_))) != HAL_OK) {
         values_ = Values{};
         lastDecode_ = DecodeResult::Blank;
+        readFailed_ = true;
         return LoadResult::ReadFailed;
     }
 
+    readFailed_ = false;
     lastDecode_ = decode(current_, sizeof(current_), values_);
     return (lastDecode_ == DecodeResult::Ok) ? LoadResult::Ok : LoadResult::Defaulted;
 }
@@ -109,6 +111,11 @@ void Store::resetToDefaults()
 {
     MutexGuard guard(mutex_);
     values_ = Values{};
+}
+
+const char* Store::describeLoad() const
+{
+    return readFailed_ ? "read-failed" : describe(lastDecode_);
 }
 
 const char* Store::describe(DecodeResult result)

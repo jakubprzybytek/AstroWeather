@@ -4,7 +4,7 @@
 
 The Host Controller keeps a small set of user-configurable settings in an
 on-board EEPROM so that they survive a power cycle. Settings are read once
-during startup and applied to the owning tasks before the scheduler runs, and
+during startup and applied to the owning tasks before they start, and
 they are written back immediately whenever a console command or switch 2
 changes one.
 
@@ -170,8 +170,8 @@ that field at its compile-time default.
    settings free. See [Space budget](#space-budget).
 5. In `applyRecord()`, handle the new tag. Validate `length` before reading the
    value; a record on the chip may be any length.
-6. Apply the value at startup in `AstroWeather_Init()`, before the owning task is
-   started.
+6. Apply the value at startup in `startWithSettings()` (`AstroWeather.cpp`),
+   before the owning task is started.
 7. Persist it from whichever console command changes it, by updating
    `store.values()` and calling `store.save()`. If a task other than the
    console reads or writes the field, add a setter or copier on `Store` that
@@ -226,11 +226,10 @@ for logging. `settings show` reports it as `boot-load=`, `status` in its
 `Settings loaded from EEPROM: <result>`. All three describe what was found at
 startup, not the chip's present content.
 
-An EEPROM **read failure** at startup also sets `lastDecode()` to `Blank`
-(`SettingsStore.cpp`), so those three places report it as `blank`, the same as
-a never-written chip. Only the startup log line, `Settings load=read-failed
-stored=blank`, tells the two apart, and it is emitted before USB has
-enumerated; see [Startup](#startup).
+An EEPROM **read failure** at startup reports as `read-failed` in those three
+places (`Store::describeLoad()`); `lastDecode()` is then `Blank`. The startup
+log line, `Settings load=read-failed stored=blank`, is a warning, so `errors`
+keeps it; see [Startup](#startup).
 
 A failure is never fatal: the firmware boots on defaults, and the next save
 overwrites the bad image.
@@ -375,18 +374,22 @@ checked on hardware only.
 
 ## Startup
 
-`Settings::Store::load()` is called from `AstroWeather_Init()`, which runs before
-`osKernelStart()`. This is safe because EEPROM reads take no `osDelay` and the
-I2C bus mutex is uncontended at that point, so acquiring it takes the
-non-blocking path.
+`Settings::Store::load()` is called from `startWithSettings()`
+(`AstroWeather.cpp`), which `MainLoopTask` runs first once the scheduler is up,
+before it starts the tasks that read the settings. It used to run before
+`osKernelStart()`, where FreeRTOS keeps interrupts masked and the HAL tick
+stands still: an I2C timeout could not expire there, and a display board
+without firmware on the bus hung the host. Now a failed read returns after its
+50 ms timeout, the host boots with the defaults, and
+`Settings load=read-failed` is logged as a warning, which `errors` keeps.
 
 A saved HSI trim is applied right after the load, before the display refresh
 starts; it has no effect, since the host runs from its crystal.
 
-The outcome is logged, but not the values, since they include credentials. Note
-that this log line is emitted before USB CDC has enumerated, so it is only
-visible to a debugger attached over SWD. Use `settings show` to inspect the
-loaded state from the console.
+The outcome is logged, but not the values, since they include credentials. The
+log line is emitted before USB CDC has enumerated, so it does not reach the
+console; the welcome line restates the result, a failed read is in `errors`,
+and `settings show` shows the loaded state.
 
 ## Limitations
 
