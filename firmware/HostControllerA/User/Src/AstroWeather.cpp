@@ -146,7 +146,8 @@ void startWithSettings() {
 void AstroWeather_Init() {
   // LED_1 is the heartbeat, driven by localBoard's refresh interrupt on the
   // timeline the display boards follow (Display/Timeline.hpp).
-  // LED2: switch presses and USB CDC traffic; before the USB device starts.
+  // LED2: switch presses and USB CDC, I2C and ST67 SPI traffic; before the
+  // USB device starts.
   activityLed().init();
 
   LogService::instance().init();

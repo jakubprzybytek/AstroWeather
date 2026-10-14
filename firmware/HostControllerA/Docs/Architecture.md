@@ -161,7 +161,7 @@ others hold a reference to it.
 | `display` | `Display::Display` | `localBoard` plus the six remote boards; `AstroWeather_Init()` sets the host's address from its straps (`setLocalAddress()`) |
 | `settingsEeprom` | `Device::Eeprom24AA04` | `i2c1Bus`, address `0x50` |
 | `settingsStore` | `Settings::Store` | `settingsEeprom` and the in-RAM `Values` |
-| `activityLed()` | `PulseLed` (`../Common/Src/Debug/PulseLed.cpp`) | `LED_2`: a 250 ms pulse for switch 1, 50 ms for switch 2 (`MainLoopTask`), and 20 ms for every USB CDC transfer in either direction (`CDC_Receive_FS` in the USB interrupt, `CDC_Transmit_FS` after a successful send). The pin is set at once and a static FreeRTOS one-shot timer clears it, so a pulse never blocks and works from an interrupt; overlapping pulses merge. |
+| `activityLed()` | `PulseLed` (`../Common/Src/Debug/PulseLed.cpp`) | `LED_2`: a 250 ms pulse for switch 1, 50 ms for switch 2 (`MainLoopTask`), and 20 ms (`ACTIVITY_LED_COMMS_PULSE_MS`) for every transfer on the host's links: USB CDC in either direction (`CDC_Receive_FS` in the USB interrupt, `CDC_Transmit_FS` after a successful send), every I2C transfer through `I2cBus`, failed ones included, and every ST67 SPI transfer (`spi_port_transfer()` and `spi_port_transfer_dma()` in user sections of `spi_port.c`). The pin is set at once and a static FreeRTOS one-shot timer clears it, so a pulse never blocks and works from an interrupt; overlapping pulses merge. |
 
 The application tasks are singletons reached through `instance()`. The fetch task is private to `User/Src/WiFi/St67HttpFetchTask.cpp`
 and is reached through `StartSt67HttpFetchTask()`, `FetchSt67Data()` and
@@ -319,7 +319,7 @@ From `Core/Inc/main.h` and `HostControllerA.ioc`.
 | RTC | none (HSE / 32, 750 kHz) | Calendar and backup registers |
 | USB FS device, CDC | `PA11` DM, `PA12` DP | Console |
 | GPIO EXTI | `PB12` `SWITCH_1`, `PB13` `SWITCH_2` | Switches, falling edge |
-| GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat from the refresh interrupt; switch presses and USB CDC traffic |
+| GPIO | `PC13` `LED_1`, `PB9` `LED_2` | Heartbeat from the refresh interrupt; switch presses and USB CDC, I2C and ST67 SPI traffic |
 | GPIO | `PB8` `LOW_POWER_EN` | Low-brightness step for every board, set by `display low` and toggled by switch 2 (HostController only; see [Display.md](Display.md#low-brightness)) |
 | GPIO inputs | `PB10`, `PB11`, `PB14` = `ADDR_0`..`ADDR_2` | Board address straps, read once at boot by `detectBoardAddress()`, then left analog |
 | HSE | `PF0` `OSC_IN`, `PF1` `OSC_OUT` | 24 MHz crystal `Y301`; the PLL makes the 16 MHz system clock |

@@ -37,7 +37,7 @@ to five remote display boards.
 | SCT2xxx | LED drivers in one SPI3 daisy chain, multiplexed in five slots |
 | INA180A2 | Current-sense amplifier into ADC1 channel 10 (`PB2`) |
 | `SWITCH_1`, `SWITCH_2` | Push buttons on `PB12` (astro refresh) and `PB13` (low brightness) |
-| `LED_1`, `LED_2` | Heartbeat from the display refresh (`PC13`); switch presses and USB console traffic (`PB9`) |
+| `LED_1`, `LED_2` | Heartbeat from the display refresh (`PC13`); switch presses and USB console, I2C and ST67 SPI traffic (`PB9`) |
 | USB FS | CDC virtual COM port for the console |
 
 The full pin map and the interrupt priorities are in

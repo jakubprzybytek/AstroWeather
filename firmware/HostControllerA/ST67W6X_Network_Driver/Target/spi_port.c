@@ -38,6 +38,7 @@
 
 /* USER CODE BEGIN Includes */
 #include <main.h>
+#include "Debug/ActivityLedBridge.h"
 /* USER CODE END Includes */
 
 /* Global variables ----------------------------------------------------------*/
@@ -171,7 +172,7 @@ int32_t spi_port_transfer(void *tx_buf, void *rx_buf, uint16_t len, uint32_t tim
     status = HAL_SPI_TransmitReceive(&NCP_SPI_HANDLE, tx_dummy, rx_buf, len, timeout);
   }
   /* USER CODE BEGIN spi_port_transfer_2 */
-
+  ActivityLed_Pulse(ACTIVITY_LED_COMMS_PULSE_MS);
   /* USER CODE END spi_port_transfer_2 */
 
   return ((status == HAL_OK) ? 0 : -1);
@@ -214,7 +215,7 @@ int32_t spi_port_transfer_dma(void *tx_buf, void *rx_buf, uint16_t len)
     /* USER CODE END spi_port_transfer_dma_rx */
   }
   /* USER CODE BEGIN spi_port_transfer_dma_2 */
-
+  ActivityLed_Pulse(ACTIVITY_LED_COMMS_PULSE_MS);
   /* USER CODE END spi_port_transfer_dma_2 */
 
   return ((status == HAL_OK) ? 0 : -1);

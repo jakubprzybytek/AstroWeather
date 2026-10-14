@@ -59,7 +59,7 @@ public:
         const HAL_StatusTypeDef status = HAL_I2C_Master_Transmit(
             &handle_, static_cast<uint16_t>(deviceAddress << 1U), data, size, timeoutMs);
         (void)xTaskResumeAll();
-        recoverAfterFailure(status);
+        afterTransfer(status);
         return status;
     }
     HAL_StatusTypeDef receive(uint16_t deviceAddress, uint8_t* data, uint16_t size,
@@ -75,7 +75,9 @@ public:
     const I2C_HandleTypeDef& handle() const { return handle_; }
 
 private:
-    // Called with mutex_ held, after every transfer.
+    // Called with mutex_ held, after every transfer: pulses LED_2 and
+    // recovers from a failure.
+    void afterTransfer(HAL_StatusTypeDef status);
     void recoverAfterFailure(HAL_StatusTypeDef status);
 
     I2C_HandleTypeDef& handle_;
