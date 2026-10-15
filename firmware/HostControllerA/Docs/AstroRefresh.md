@@ -30,7 +30,7 @@ The plan that led to this design is archived in
 | File | Responsibility |
 | --- | --- |
 | `User/Inc/Astro/AstroDataRefreshTask.hpp`, `User/Src/Astro/AstroDataRefreshTask.cpp` | The refresh task: triggers, pipeline, schedule driver, status summaries; draws the display mapping and the progress bar. |
-| `User/Inc/Astro/AstroDisplayMapper.hpp`, `User/Src/Astro/AstroDisplayMapper.cpp` | Pure display mapping: `AstroData` to the six boards' numerics and matrix rows, with the rows' levels and blinking. Tested by `tests/AstroDisplayMapperTests.cpp`. |
+| `User/Inc/Astro/AstroDisplayMapper.hpp`, `User/Src/Astro/AstroDisplayMapper.cpp` | Pure display mapping: `AstroData` to the chain's boards' numerics and matrix rows, with the rows' levels and blinking. Tested by `tests/AstroDisplayMapperTests.cpp`. |
 | `User/Inc/Astro/AstroProgressBar.hpp`, `User/Src/Astro/AstroProgressBar.cpp` | Pure progress bar: the row's columns and blink mask per step, and the outcome indicator's timing. Tested by `tests/AstroProgressBarTests.cpp`. |
 | `../Common/Inc/Utils/Crc32.hpp` | The CRC-32 of the recheck. Tested by `../Common/tests/Crc32Tests.cpp`. |
 | `User/Inc/Astro/AstroData.hpp` | The parsed model: six boards, the server `time`, `lastWeatherFetchTime` and the four aurora fetch times. |
@@ -108,7 +108,7 @@ for the refresh to finish; the outcome follows in the log. See
 7. **Clock sync** from the `time` record; see
    [RTC.md](RTC.md#sync-from-the-api). A missing or malformed `time` skips the
    sync with a warning but keeps the forecast.
-8. **Publish** to all six boards and `Display::submit()`; see
+8. **Publish** to every board of the chain and `Display::submit()`; see
    [Display Mapping](#display-mapping).
 9. **Schedule outcome.** The scheduler records success or failure; a success
    with the clock set is also written to RTC backup register `DR1`. The next
@@ -248,16 +248,22 @@ submits them. Block *n* of the payload goes to the board at I2C address
 | `display=0` | `0x10` |
 | `display=1` | `0x11` |
 | … | … |
-| `display=5` | `0x15` |
+| `display=4` | `0x14` |
+| `display=5` | none for now |
+
+The chain is five boards, `0x10` to `0x14`: the host and four display boards
+(`kChainLength` in `BoardChain.hpp`). The server still sends six blocks; the
+sixth is parsed and logged but not drawn. Re-introducing `0x15` means
+`kChainLength` 6 and a `remoteBoard15` in `AstroWeather.cpp`.
 
 The host reads its own address from its `ADDR_0`..`ADDR_2` straps at boot, the
 same way a display board does (`Display::detectBoardAddress()`), and logs
 `Display address 0x10: forecast block 0`. Its own display shows the block at
 that address and the remote board object at that address is never used; the
-other five blocks go over I2C. A host with no straps fitted is `0x10`, so it
+other four go over I2C. A host with no straps fitted is `0x10`, so it
 shows tonight, but only because of its address. A host strapped outside
-`0x10`–`0x15` shows no block (logged as a warning, and `status` says so): all
-six go to remote boards, and its progress bar is cleared when a refresh is
+`0x10`–`0x14` shows no block (logged as a warning, and `status` says so): all
+five go to remote boards, and its progress bar is cleared when a refresh is
 published.
 
 On each board:

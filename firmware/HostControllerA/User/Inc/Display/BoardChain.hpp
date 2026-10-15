@@ -9,8 +9,11 @@
 // the mapping is tested natively.
 namespace Display {
 
-// One position per forecast block, 0x10 to 0x15.
-constexpr uint8_t kChainLength = 6U;
+// One position per board, 0x10 to 0x14: the host and four display boards.
+// The payload carries six forecast blocks; the sixth (0x15) has no board for
+// now and is not shown. Re-introducing it means 6 here and a remote board for
+// 0x15 in AstroWeather.cpp.
+constexpr uint8_t kChainLength = 5U;
 constexpr uint16_t kChainFirstAddress = 0x10U;
 // chainPosition() of an address with no block.
 constexpr uint8_t kNotInChain = 0xFFU;

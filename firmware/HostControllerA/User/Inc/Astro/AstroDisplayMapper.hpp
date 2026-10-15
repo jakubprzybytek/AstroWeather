@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Display/BoardChain.hpp>
 #include <Display/DisplayTypes.hpp>
 #include <Astro/AstroData.hpp>
 
@@ -10,7 +11,8 @@
 // and then submits them. See Docs/AstroRefresh.md#display-mapping.
 //
 // Block n goes to the board at I2C address 0x10 + n (Display/BoardChain.hpp),
-// which is the local board when that is the host's own address. Each numeric
+// which is the local board when that is the host's own address; a block past
+// the chain's end has no board and is not drawn. Each numeric
 // is drawn as its payload value says: a time as HH:MM (the payload's numerics
 // 0-1), a value in whole units (numerics 2-3), and a `?` as the "unavailable"
 // pattern, the decimal point on all four digits; the numerics' attributes are
@@ -61,7 +63,7 @@ void mapBoard(const HostController::AstroBoardData& data, bool localBoard, Board
 template <typename Boards>
 void mapAll(const HostController::AstroData& data, Boards& boards)
 {
-    for (uint8_t block = 0U; block < data.boards.size(); ++block)
+    for (uint8_t block = 0U; block < data.boards.size() && block < Display::kChainLength; ++block)
     {
         mapBoard(data.boards[block], boards.isLocal(block), boards.board(block));
     }

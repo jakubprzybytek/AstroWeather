@@ -236,7 +236,8 @@ AstroData sixBlocks()
 }
 
 // The default host, no straps: 0x10 shows block 0 and the remote boards at
-// 0x11-0x15 blocks 1-5. The remote board at 0x10 is not touched.
+// 0x11-0x14 blocks 1-4. The remote board at 0x10 is not touched, and block 5
+// has no board.
 void testAllBlocks()
 {
     const AstroData data = sixBlocks();
@@ -251,9 +252,9 @@ void testAllBlocks()
     expectBoard(boards.localBoard, 0U, "block 0 on the host at 0x10");
     expectEqual(boards.remoteBoards[0].state().matrix[4], 0x1FFFFFU,
                 "no block for a remote at the host's address");
-    const char* remoteCases[5] = {"block 1 on 0x11", "block 2 on 0x12", "block 3 on 0x13",
-                                  "block 4 on 0x14", "block 5 on 0x15"};
-    for (uint8_t position = 1U; position < 6U; ++position) {
+    const char* remoteCases[4] = {"block 1 on 0x11", "block 2 on 0x12", "block 3 on 0x13",
+                                  "block 4 on 0x14"};
+    for (uint8_t position = 1U; position < Display::kChainLength; ++position) {
         expectBoard(boards.remoteBoards[position], position, remoteCases[position - 1U]);
     }
 }
@@ -271,16 +272,17 @@ void testHostInMiddleOfChain()
     expectBoard(boards.localBoard, 2U, "block 2 on the host at 0x12");
     expectEqual(boards.remoteBoards[2].state().matrix[4], 0x1FFFFFU,
                 "the remote at 0x12 is left alone");
-    const char* remoteCases[6] = {"block 0 on 0x10", "block 1 on 0x11", "",
-                                  "block 3 on 0x13", "block 4 on 0x14", "block 5 on 0x15"};
-    for (uint8_t position = 0U; position < 6U; ++position) {
+    const char* remoteCases[5] = {"block 0 on 0x10", "block 1 on 0x11", "",
+                                  "block 3 on 0x13", "block 4 on 0x14"};
+    for (uint8_t position = 0U; position < Display::kChainLength; ++position) {
         if (position != 2U) {
             expectBoard(boards.remoteBoards[position], position, remoteCases[position]);
         }
     }
 }
 
-// A host outside 0x10-0x15 has no block; all six go to remote boards.
+// A host outside 0x10-0x14 has no block; blocks 0-4 go to the remote boards
+// and block 5, past the chain's end, to none.
 void testHostOutsideChain()
 {
     const AstroData data = sixBlocks();
@@ -291,7 +293,7 @@ void testHostOutsideChain()
     AstroDisplayMapper::mapAll(data, boards);
 
     expectEqual(boards.localBoard.state().matrix[0], 0x123456U, "host outside the chain untouched");
-    for (uint8_t position = 0U; position < 6U; ++position) {
+    for (uint8_t position = 0U; position < Display::kChainLength; ++position) {
         expectBoard(boards.remoteBoards[position], position, "every block on a remote board");
     }
 }
@@ -299,11 +301,11 @@ void testHostOutsideChain()
 void testChainAddresses()
 {
     expectEqual(Display::chainAddress(0U), 0x10U, "position 0 is 0x10");
-    expectEqual(Display::chainAddress(5U), 0x15U, "position 5 is 0x15");
+    expectEqual(Display::chainAddress(4U), 0x14U, "position 4 is 0x14");
     expectEqual(Display::chainPosition(0x10U), 0U, "0x10 is position 0");
-    expectEqual(Display::chainPosition(0x15U), 5U, "0x15 is position 5");
+    expectEqual(Display::chainPosition(0x14U), 4U, "0x14 is position 4");
     expectEqual(Display::chainPosition(0x0FU), Display::kNotInChain, "0x0F has no block");
-    expectEqual(Display::chainPosition(0x16U), Display::kNotInChain, "0x16 has no block");
+    expectEqual(Display::chainPosition(0x15U), Display::kNotInChain, "0x15 has no board for now");
     expectEqual(Display::chainPosition(0U), Display::kNotInChain, "no address has no block");
 }
 
@@ -335,7 +337,8 @@ void testParsedPayload()
     boards.localBoard.state().matrix[4] = 0x000003U;
     AstroDisplayMapper::mapAll(data, boards);
 
-    for (uint8_t board = 0U; board < 6U; ++board) {
+    // Six blocks parsed; the chain's boards show the first ones.
+    for (uint8_t board = 0U; board < Display::kChainLength; ++board) {
         const auto& state = boards.board(board).state();
         expectEqual(state.matrix[0], 1UL << board, "parsed block marker on its board");
         expectEqual(state.matrix[1], 0U, "parsed whole-row ? is all off");

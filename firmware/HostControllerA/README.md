@@ -3,7 +3,7 @@
 Firmware for the AstroWeather host controller board: an STM32G0B1 with an
 ST67W611M1 Wi-Fi module that fetches an astronomy and weather forecast and
 shows it on seven-segment and dot-matrix LED displays, its own and those of up
-to five remote display boards.
+to four remote display boards.
 
 ## What It Does
 

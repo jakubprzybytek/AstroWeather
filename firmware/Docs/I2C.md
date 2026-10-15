@@ -28,7 +28,7 @@ the peripheral latches BUSY on its first START and no device responds. They are
 | --- | --- |
 | `0x00` | General call: the host's timeline sync, taken by every display board ([Timeline sync](#timeline-sync)) |
 | `0x08` | The host's own address in CubeMX; unused, since the host is never addressed. `eeprom scan` skips it |
-| `0x10`-`0x15` | Display boards, one per forecast block ([Addresses and straps](#addresses-and-straps)) |
+| `0x10`-`0x14` | The chain: the host and four display boards, one per forecast block ([Addresses and straps](#addresses-and-straps)) |
 | `0x50`-`0x57` | The 24AA04 settings EEPROM. The SOT-23 part has no address pins and uses the low bit as the block select, so it answers on all eight; treat them as reserved. See [Settings.md](../HostControllerA/Docs/Settings.md#storage-medium) |
 
 `eeprom scan` on the host console lists every device that answers.
@@ -154,7 +154,9 @@ The pins are then left in analog mode, so a strap tied to VCC draws no pull
 current, and `id = ADDR_0 + 3 × ADDR_1 + 9 × ADDR_2`.
 
 The address decides what a board shows: forecast block *n* goes to the board at
-`0x10 + n` (`BoardChain.hpp`, chain positions 0 to 5). The host's own display is
+`0x10 + n` (`BoardChain.hpp`, chain positions 0 to 4: the host and four
+display boards; the payload's sixth block, `0x15`, has no board for now and is
+not shown). The host's own display is
 not special; it shows the block of its own address, block 0 with no straps.
 The host sends to every other address of the chain and skips its own. A host
 strapped outside the chain shows no block. Boards boot showing their address

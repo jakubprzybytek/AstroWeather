@@ -44,7 +44,7 @@ Display::PcbDisplayBoard localBoard(
     {DISPLAY_1_EN_Pin, DISPLAY_2_EN_Pin, DISPLAY_3_EN_Pin, DISPLAY_4_EN_Pin,
      DISPLAY_5_EN_Pin});
 
-// One remote board per forecast block, 0x10 to 0x15 (Display/BoardChain.hpp).
+// One remote board per chain position, 0x10 to 0x14 (Display/BoardChain.hpp).
 // The one at the host's own address is never used: the local board shows that
 // block instead.
 Display::BufferedDisplayBoard remoteBoard10(i2c1Bus, 0x10U);
@@ -52,11 +52,10 @@ Display::BufferedDisplayBoard remoteBoard11(i2c1Bus, 0x11U);
 Display::BufferedDisplayBoard remoteBoard12(i2c1Bus, 0x12U);
 Display::BufferedDisplayBoard remoteBoard13(i2c1Bus, 0x13U);
 Display::BufferedDisplayBoard remoteBoard14(i2c1Bus, 0x14U);
-Display::BufferedDisplayBoard remoteBoard15(i2c1Bus, 0x15U);
 
 Display::Display display(localBoard, {&remoteBoard10, &remoteBoard11,
                                       &remoteBoard12, &remoteBoard13,
-                                      &remoteBoard14, &remoteBoard15});
+                                      &remoteBoard14});
 
 Device::Eeprom24AA04 settingsEeprom(i2c1Bus);
 
@@ -163,7 +162,7 @@ void AstroWeather_Init() {
                                 static_cast<unsigned>(Display::chainPosition(display.localAddress())));
   } else {
     LogService::instance().logf(LogService::Level::Warn,
-                                "Display address 0x%02X is outside 0x10-0x15: no forecast block",
+                                "Display address 0x%02X is outside 0x10-0x14: no forecast block",
                                 static_cast<unsigned>(display.localAddress()));
   }
 

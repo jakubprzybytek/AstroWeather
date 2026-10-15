@@ -58,7 +58,7 @@ const Command kStatus[] = {
      "schedule   the next scheduled refresh or retry, and the last success\n"
      "api        the URL the next fetch uses, saved or built-in\n"
      "display    brightness in use, and this board's refresh counters\n"
-     "remote     each address 0x10-0x15: host, or whether a board answers now"},
+     "remote     each address 0x10-0x14: host, or whether a board answers now"},
 };
 
 const Command kStats[] = {
@@ -78,7 +78,7 @@ static_assert(ErrorLog::kCapacity == 24U && ErrorLog::kTextSize == 160U,
 const Command kErrors[] = {
     {"errors", "list the last 24 warnings and errors",
      "One line per problem, the one quiet longest first, the latest last:\n"
-     "  W 2026-10-06 08:43:09: DisplayBoard 0x15 unreachable status=1 ...\n"
+     "  W 2026-10-06 08:43:09: DisplayBoard 0x14 unreachable status=1 ...\n"
      "  E 2026-09-27 13:30:02 4x, first 2026-09-27 12:20:31: <message>\n"
      "E is an error, W a warning. A repeat of a message bumps its count and\n"
      "moves it to the end instead of taking a new line. An uptime stamp\n"
@@ -92,7 +92,7 @@ const Command kErrors[] = {
 
 const Command kDisplay[] = {
     {"display <board> <command> ...", "show to clear on another board, or on all",
-     "<board> is 0x10-0x15, the board at that address as 'status' lists them,\n"
+     "<board> is 0x10-0x14, the board at that address as 'status' lists them,\n"
      "or 'all' for every board; without it a command changes this board. A\n"
      "remote board keeps the change until the next astro refresh redraws it.\n"
      "Replies 'OK display 0x12', 'ERR display-unreachable 0x12' when the board\n"
@@ -238,7 +238,7 @@ const Command kWifi[] = {
 const Command kEeprom[] = {
     {"eeprom probe", "whether the chip answers, its size and page", nullptr},
     {"eeprom scan", "list every device answering on the I2C bus",
-     "The EEPROM answers on 0x50-0x57, remote display boards on 0x10-0x15."},
+     "The EEPROM answers on 0x50-0x57, remote display boards on 0x10-0x14."},
     {"eeprom dump", "print all 512 bytes, 16 per line", nullptr},
     {"eeprom read <offset> [length]", "print length bytes (default 1)",
      "e.g. 'eeprom read 070 10' prints 070-07F"},

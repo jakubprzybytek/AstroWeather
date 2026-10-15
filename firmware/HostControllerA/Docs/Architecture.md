@@ -56,7 +56,7 @@ the refresh interrupt drives it once `localBoard` starts):
    before anything submits: it decides which forecast block the local board
    shows and which remote address is skipped (see
    [AstroRefresh.md](AstroRefresh.md#display-mapping)). The address is logged,
-   with a warning if it is outside `0x10`–`0x15`, but USB CDC has not
+   with a warning if it is outside `0x10`–`0x14`, but USB CDC has not
    enumerated yet, so the line is normally lost (the warning is also kept in
    `errors`); `status` shows the address as `host` on the `remote` line.
 3. `MainLoopTask`: `init(activityLed(), &settingsStore, &display,
@@ -157,8 +157,8 @@ others hold a reference to it.
 | `i2c1Bus` | `Device::I2cBus` | `hi2c1`, with a mutex per transfer |
 | `localSct` | `SCT2xxx` | `hspi3`, `SCT_ENABLE`, `SCT_LATCH` |
 | `localBoard` | `Display::PcbDisplayBoard` | `localSct`, `htim2`, `DISPLAY_1_EN`..`DISPLAY_5_EN`; refreshed from TIM2's interrupt, which also keeps the refresh timeline the display boards follow and drives the `LED_1` heartbeat |
-| `remoteBoard10`..`remoteBoard15` | `Display::BufferedDisplayBoard` | `i2c1Bus` at 7-bit addresses `0x10`..`0x15`, one per forecast block; the one at the host's own address is unused |
-| `display` | `Display::Display` | `localBoard` plus the six remote boards; `AstroWeather_Init()` sets the host's address from its straps (`setLocalAddress()`) |
+| `remoteBoard10`..`remoteBoard14` | `Display::BufferedDisplayBoard` | `i2c1Bus` at 7-bit addresses `0x10`..`0x14`, one per chain position; the one at the host's own address is unused |
+| `display` | `Display::Display` | `localBoard` plus the five remote boards; `AstroWeather_Init()` sets the host's address from its straps (`setLocalAddress()`) |
 | `settingsEeprom` | `Device::Eeprom24AA04` | `i2c1Bus`, address `0x50` |
 | `settingsStore` | `Settings::Store` | `settingsEeprom` and the in-RAM `Values` |
 | `activityLed()` | `PulseLed` (`../Common/Src/Debug/PulseLed.cpp`) | `LED_2`: a 250 ms pulse for switch 1, 50 ms for switch 2 (`MainLoopTask`), and 20 ms (`ACTIVITY_LED_COMMS_PULSE_MS`) for every transfer on the host's links: USB CDC in either direction (`CDC_Receive_FS` in the USB interrupt, `CDC_Transmit_FS` after a successful send), every I2C transfer through `I2cBus`, failed ones included, and every ST67 SPI transfer (`spi_port_transfer()` and `spi_port_transfer_dma()` in user sections of `spi_port.c`). The pin is set at once and a static FreeRTOS one-shot timer clears it, so a pulse never blocks and works from an interrupt; overlapping pulses merge. |
@@ -278,7 +278,7 @@ All are `Utils::Mutex` (priority inheritance, static storage).
 
 | Mutex | Protects |
 | --- | --- |
-| `I2cBus::mutex_` | One I2C1 transfer at a time: the EEPROM and the five remote boards, driven from the console, refresh and `DisplaySync` tasks. The clock and current-sense tasks only use `submitLocal()` and never touch I2C. Held per transfer, not per operation; the sync broadcast also suspends the scheduler for its transfer, about 1 ms ([I2C.md](../../Docs/I2C.md#devicei2cbus)). |
+| `I2cBus::mutex_` | One I2C1 transfer at a time: the EEPROM and the four remote boards, driven from the console, refresh and `DisplaySync` tasks. The clock and current-sense tasks only use `submitLocal()` and never touch I2C. Held per transfer, not per operation; the sync broadcast also suspends the scheduler for its transfer, about 1 ms ([I2C.md](../../Docs/I2C.md#devicei2cbus)). |
 | `Display::submitMutex_` | The SPI/I2C transfer sequence of `submit()` and `submitLocal()`. Setters are not locked; concurrent writers are last-writer-wins. |
 | `PcbDisplayBoard::submitMutex_` | One `submit()` at a time encoding into the back frame set; the refresh interrupt takes no lock and swaps the sets at a frame boundary. |
 | `ClockTask::rtcMutex_` | RTC reads and writes, from the clock task, the console and the refresh task's clock sync. |
@@ -314,7 +314,7 @@ From `Core/Inc/main.h` and `HostControllerA.ioc`.
 | GPIO | `PB6` `SCT_LATCH`, `PB7` `SCT_ENABLE` | SCT latch and output enable |
 | GPIO | `PD3`, `PA15`, `PD1`, `PD2`, `PD0` = `DISPLAY_1_EN`..`DISPLAY_5_EN` | Multiplex selects |
 | TIM2, 16 MHz / 16 = 1 MHz count | none | Display refresh: the interrupt sets each pass's length (four passes per 4 ms slot, 50 Hz frames) |
-| I2C1 | `PA9` SCL, `PA10` SDA | 24AA04 EEPROM (`0x50`), remote boards (`0x10`..`0x15`) and the timeline sync broadcast (general call `0x00`) |
+| I2C1 | `PA9` SCL, `PA10` SDA | 24AA04 EEPROM (`0x50`), remote boards (`0x10`..`0x14`) and the timeline sync broadcast (general call `0x00`) |
 | ADC1, 16x oversampling | `PB2` `CURRENT_SENSE` (IN10), plus the internal temperature sensor and VREFINT | Current, temperature and VDDA; DMA1 channel 3 |
 | RTC | none (HSE / 32, 750 kHz) | Calendar and backup registers |
 | USB FS device, CDC | `PA11` DM, `PA12` DP | Console |

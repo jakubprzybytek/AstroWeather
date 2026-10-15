@@ -12,7 +12,7 @@ boards is in [firmware/Docs/I2C.md](../../Docs/I2C.md).
 holds:
 
 - the local board, a `PcbDisplayBoard` on SPI3 and TIM2;
-- one `BufferedDisplayBoard` per chain position, `0x10` to `0x15`, on the
+- one `BufferedDisplayBoard` per chain position, `0x10` to `0x14`, on the
   shared `Device::I2cBus` ([I2C.md](../../Docs/I2C.md#host-side)).
 
 Boards are addressed by chain position (`User/Inc/Display/BoardChain.hpp`):
@@ -141,7 +141,7 @@ differs in other light.
 
 - `localBoard`, the `PcbDisplayBoard` on `localSct` (SPI3 DMA) and TIM2;
 - `remoteBoard10` to `remoteBoard15` on `i2c1Bus`;
-- `display`, holding the local board and the six remote boards.
+- `display`, holding the local board and the five remote boards.
 
 `AstroWeather_Init()` sets the host's address from its straps
 (`setLocalAddress()`), applies the saved low brightness, puts the "no data"

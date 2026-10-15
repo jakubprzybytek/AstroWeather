@@ -82,7 +82,7 @@ The host's schedule (`HostControllerA/User/Inc/Display/SyncSchedule.hpp`):
 | --- | --- |
 | At boot, and when a board asks or `time sync now` is given | A burst of four syncs, at 0, 10, 40 and 100 s. The first two set each board's phase, the last two measure its rate, over 30 and then 60 s, and pick its HSITRIM. A request during a burst is ignored: the burst serves it. A request within 10 s after a sync was sent, as a poll that follows a regular sync makes, takes that sync as the burst's first |
 | After a burst | One sync every 120 s, counted from the burst's last |
-| 15 s after boot, then every 60 s | A one-byte status read of each remote chain address, `0x10`-`0x15` except the host's own. A board that answers "wants syncs" starts a burst, logged as `Display sync: burst, 0x11 wants syncs` |
+| 15 s after boot, then every 60 s | A one-byte status read of each remote chain address, `0x10`-`0x14` except the host's own. A board that answers "wants syncs" starts a burst, logged as `Display sync: burst, 0x11 wants syncs` |
 
 With no display board on the bus the broadcast is not acknowledged; that is
 not an error. `time sync` on the console shows the broadcasts sent and
