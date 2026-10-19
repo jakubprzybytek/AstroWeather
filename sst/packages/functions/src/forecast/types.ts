@@ -7,8 +7,8 @@ export type ForecastDisplay = {
   display: number;
   board: "num4x4_matrix5x21";
   nightId: string;
-  sunset: string;
-  sunrise: string;
+  astronomicalDusk: string;  // the night's date
+  astronomicalDawn: string;  // the next date
   sun: MatrixValue;
   moon: MatrixValue;
   cloud: MatrixValue;

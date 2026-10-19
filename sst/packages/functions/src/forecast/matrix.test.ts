@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { minutesAboveHorizon } from "./astronomy";
-import { cloudLevel, encodeMatrix, minutesLevel, quartileLevel } from "./matrix";
+import { minutesAboveHorizon, slotSkyLevel } from "./astronomy";
+import { cloudLevel, encodeMatrix, majorityLevel, minutesLevel, quartileLevel, skyLevel } from "./matrix";
 import { observingSlots } from "./nights";
 import { precipitationCell, wholeDegrees } from "./weather-reader";
 
@@ -9,6 +9,19 @@ describe("matrix cells", () => {
     [0, 0], [1, 1], [29, 1], [30, 2], [59, 2], [60, 3]
   ])("%i minutes above the horizon is level %i", (minutes, level) => {
     expect(minutesLevel(minutes)).toBe(level);
+  });
+
+  test.each([
+    [10, 3], [-0.8, 3], [-0.833, 2], [-6, 2], [-11.9, 2], [-12, 1], [-17.9, 1], [-18, 0], [-40, 0]
+  ])("a sun altitude of %d degrees is sky level %i", (altitude, level) => {
+    expect(skyLevel(altitude)).toBe(level);
+  });
+
+  test("takes the level held for most minutes, a tie going to the brighter", () => {
+    expect(majorityLevel([0, 0, 1, 2])).toBe(0);
+    expect(majorityLevel([0, 1, 1, 3])).toBe(1);
+    expect(majorityLevel([0, 0, 2, 2])).toBe(2);
+    expect(majorityLevel([1, 2, 3])).toBe(3);
   });
 
   test.each([
@@ -52,5 +65,15 @@ describe("matrix cells", () => {
     expect(minutesAboveHorizon(slot, risesAt(20))).toBe(40);
     expect(minutesAboveHorizon(slot, risesAt(59.4))).toBe(1);
     expect(minutesAboveHorizon(slot, risesAt(59.6))).toBe(0);
+  });
+
+  test("grades a slot by the sky level held for most of its minutes", () => {
+    const slot = observingSlots("2026-09-17", "Europe/Warsaw")[0];
+    // The sun sinks 0.25 degrees a minute from -10 at the slot's start: level 2
+    // for 8 minutes, 1 for 24, 0 for 28.
+    const sinking = (instant: Date) => -10 - 0.25 * (instant.getTime() - slot.start.getTime()) / 60_000;
+    expect(slotSkyLevel(slot, sinking)).toBe(0);
+    expect(slotSkyLevel(slot, () => -15)).toBe(1);
+    expect(slotSkyLevel(slot, () => 5)).toBe(3);
   });
 });

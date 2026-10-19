@@ -11,7 +11,7 @@ const AURORA_FEEDS: AuroraFeed[] = ["gfz", "noaa3", "noaa27", "ovation"];
 function emptyDisplay(display: number, nightId: string): ForecastDisplay {
   return {
     display, board: BOARD, nightId,
-    sunset: "?", sunrise: "?", sun: "?", moon: "?", cloud: "?",
+    astronomicalDusk: "?", astronomicalDawn: "?", sun: "?", moon: "?", cloud: "?",
     precipitation: "?", aurora: "?", maximumTemperature: "?", minimumTemperature: "?"
   };
 }

@@ -1,4 +1,4 @@
-import { encodeMatrix, minutesLevel, type MatrixCell } from "./matrix";
+import { encodeMatrix, majorityLevel, minutesLevel, type MatrixCell, type SteadyLevel } from "./matrix";
 import { nextNightIds } from "./nights";
 import type { AssembledForecast, ForecastDisplay } from "./types";
 
@@ -92,9 +92,32 @@ function slotLevels(intervals: Array<[number, number]>): MatrixCell[] {
   });
 }
 
+// Twilight as in autumn at 50 degrees north: civil and nautical together last
+// about 75 minutes, astronomical twilight about 37 more.
+const NAUTICAL_TWILIGHT_MINUTES = 75;
+const ASTRONOMICAL_TWILIGHT_MINUTES = 37;
+
+// The sky level of each slot, held for most of its hour, from the sun's
+// set and rise in minutes from local noon.
+function skyLevels(sunsetFromNoon: number, sunriseFromNoon: number): MatrixCell[] {
+  const twilight = NAUTICAL_TWILIGHT_MINUTES + ASTRONOMICAL_TWILIGHT_MINUTES;
+  const levelAt = (minute: number): SteadyLevel => {
+    const fromLight = Math.min(minute - sunsetFromNoon, sunriseFromNoon - minute);
+    if (fromLight < 0) return 3;
+    if (fromLight < NAUTICAL_TWILIGHT_MINUTES) return 2;
+    if (fromLight < twilight) return 1;
+    return 0;
+  };
+  return Array.from({ length: 21 }, (_, index) => {
+    const start = FIRST_SLOT_FROM_NOON + index * 60;
+    return majorityLevel(Array.from({ length: 60 }, (_, minute) => levelAt(start + minute + 0.5)));
+  });
+}
+
 // Six nights of demo data. Sunset and sunrise start at random times and move by
 // a few minutes a night, as in autumn; the moon rises about 50 minutes later
-// each night. The sun and moon rows follow those times.
+// each night. Astronomical dusk and dawn, the sun row and the moon row follow
+// those times.
 export function demoForecast(now: Date, random: () => number = Math.random): AssembledForecast {
   const nightIds = nextNightIds(now, DEMO_TIMEZONE);
   let sunset = randomInt(random, 17 * 60, 20 * 60 + 30);     // minutes of the day
@@ -110,12 +133,12 @@ export function demoForecast(now: Date, random: () => number = Math.random): Ass
       moonrise += randomInt(random, 40, 60);
     }
     // From local noon: the sun is up until sunset and again from sunrise the
-    // next morning; the moon from its rise for `moonHours`, and the previous
+    // next morning, with twilight on either side; the moon from its rise for `moonHours`, and the previous
     // day's moon until it sets.
     const sunsetFromNoon = sunset - 12 * 60;
     const sunriseFromNoon = sunrise + 12 * 60;
     const moonriseFromNoon = moonrise - 12 * 60;
-    const sun = slotLevels([[0, sunsetFromNoon], [sunriseFromNoon, DAY_MINUTES]]);
+    const sun = skyLevels(sunsetFromNoon, sunriseFromNoon);
     const moon = slotLevels([
       [moonriseFromNoon, moonriseFromNoon + moonHours],
       [moonriseFromNoon - DAY_MINUTES - 50, moonriseFromNoon - DAY_MINUTES - 50 + moonHours]
@@ -125,8 +148,8 @@ export function demoForecast(now: Date, random: () => number = Math.random): Ass
       display,
       board: "num4x4_matrix5x21",
       nightId,
-      sunset: clockTime(sunset),
-      sunrise: clockTime(sunrise),
+      astronomicalDusk: clockTime(sunset + NAUTICAL_TWILIGHT_MINUTES + ASTRONOMICAL_TWILIGHT_MINUTES),
+      astronomicalDawn: clockTime(sunrise - NAUTICAL_TWILIGHT_MINUTES - ASTRONOMICAL_TWILIGHT_MINUTES),
       sun: encodeMatrix(sun),
       moon: night.moonUnavailable ? "?" : encodeMatrix(moon),
       cloud: night.cloud,

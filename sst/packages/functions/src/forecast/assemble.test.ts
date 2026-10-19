@@ -14,7 +14,7 @@ describe("assembleForecast", () => {
 
     expect(result.displays).toHaveLength(6);
     expect(result.displays[0].nightId).toBe("2026-09-17");
-    expect(result.displays[0].sunset).not.toBe("?");
+    expect(result.displays[0].astronomicalDusk).not.toBe("?");
     expect(result.displays[0].cloud).toBe("?");
     expect(result.lastWeatherFetch).toBeUndefined();
     expect(log).toHaveBeenCalledWith("Forecast weather failed", expect.objectContaining({ source: "weather" }));
@@ -41,18 +41,28 @@ describe("assembleForecast", () => {
     expect(result.displays[0].precipitation).toBe("*????????????????????");
   });
 
-  test("grades the sun by minutes above the horizon in each hour", async () => {
-    const result = await assembleForecast("krakow", { lat: 50.06, lon: 19.94, tz: "Europe/Warsaw" }, { kpMain: 7.5 }, {
-      now: () => new Date("2026-09-17T10:00:00Z"),
+  test("grades the sun row by twilight, and gives astronomical dusk and dawn", async () => {
+    const krakow = (now: string) => assembleForecast("krakow", { lat: 50.06, lon: 19.94, tz: "Europe/Warsaw" }, { kpMain: 7.5 }, {
+      now: () => new Date(now),
       readWeather: async () => new Map(),
       readAurora: async () => new Map(),
       log: vi.fn()
     });
-    // 2026-09-17 in Krakow: sunset about 18:50, sunrise about 06:21. Slots 0-3
-    // (14:00-17:00) are whole hours up, slot 4 (18:00) has 50 minutes, slots
-    // 5-15 (19:00-05:00) are night, slot 16 (06:00) has 39 minutes, 17-20 whole.
-    expect(result.displays[0].sun).toMatch(/^3333[12]0{11}[12]3333$/);
-    expect(result.displays[0].moon).toMatch(/^[0-3]{21}$/);
+    // 2026-10-19 in Krakow: sunset 17:43, astronomical dusk 19:31, astronomical
+    // dawn 05:22, sunrise 07:01. 17:00 is mostly up, 18:00 mostly civil and
+    // nautical twilight, 19:00 just mostly astronomical twilight; 05:00 too.
+    const october = (await krakow("2026-10-19T10:00:00Z")).displays[0];
+    expect(october.astronomicalDusk).toBe("19:31");
+    expect(october.astronomicalDawn).toBe("05:22");
+    expect(october.sun).toBe("333321000000000123333");
+    expect(october.moon).toMatch(/^[0-3]{21}$/);
+
+    // 2026-06-21: the sun gets no lower than about -16.6 degrees, so there is
+    // no astronomical night: no dusk or dawn, and the darkest hours are 1.
+    const june = (await krakow("2026-06-21T10:00:00Z")).displays[0];
+    expect(june.astronomicalDusk).toBe("?");
+    expect(june.astronomicalDawn).toBe("?");
+    expect(june.sun).toBe("333333322111122333333");
   });
 
   test("reports the newest weather fetch among the nights used", async () => {

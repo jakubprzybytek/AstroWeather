@@ -3,7 +3,8 @@
 // down (alternating with off), `*` for level 3 blinking (as `c`), or `?` when
 // unavailable. See docs/api-payload.md.
 
-export type MatrixCell = 0 | 1 | 2 | 3 | "a" | "b" | "c" | "*";
+export type SteadyLevel = 0 | 1 | 2 | 3;
+export type MatrixCell = SteadyLevel | "a" | "b" | "c" | "*";
 
 // How much of an hour a body is above the horizon: none, under half an hour,
 // half an hour or more, the whole hour.
@@ -12,6 +13,26 @@ export function minutesLevel(minutesUp: number): MatrixCell {
   if (minutesUp < 30) return 1;
   if (minutesUp < 60) return 2;
   return 3;
+}
+
+// How dark the sky is for a sun altitude in degrees: 3 the sun up (above
+// -0.833 degrees, suncalc's sunrise and sunset), 2 civil or nautical twilight
+// (down to -12), 1 astronomical twilight (down to -18), 0 astronomical night.
+export function skyLevel(sunAltitudeDegrees: number): SteadyLevel {
+  if (sunAltitudeDegrees > -0.833) return 3;
+  if (sunAltitudeDegrees > -12) return 2;
+  if (sunAltitudeDegrees > -18) return 1;
+  return 0;
+}
+
+// The level held for the most minutes of an hour; a tie goes to the brighter
+// level, so that a darker level means the darker sky really prevails.
+export function majorityLevel(levels: SteadyLevel[]): SteadyLevel {
+  const counts = [0, 0, 0, 0];
+  for (const level of levels) counts[level] += 1;
+  let best = 3;
+  for (let level = 2; level >= 0; level -= 1) if (counts[level] > counts[best]) best = level;
+  return best as SteadyLevel;
 }
 
 // A percentage in quarters: 0-24, 25-49, 50-74, 75-100.

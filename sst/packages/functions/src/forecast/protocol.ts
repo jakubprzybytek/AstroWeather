@@ -28,7 +28,7 @@ function validMatrix(value: string): boolean {
 function validate(display: ForecastDisplay): void {
   if (display.board !== BOARD || !/^\d{4}-\d{2}-\d{2}$/.test(display.nightId)) throw new Error("Invalid forecast display");
   if (![display.sun, display.moon, display.cloud, display.precipitation, display.aurora].every(validMatrix)) throw new Error("Invalid forecast matrix");
-  if (![display.sunset, display.sunrise, display.maximumTemperature, display.minimumTemperature].every((value) => value === "?" || /^[0-9:.+-]+$/.test(value))) throw new Error("Invalid forecast value");
+  if (![display.astronomicalDusk, display.astronomicalDawn, display.maximumTemperature, display.minimumTemperature].every((value) => value === "?" || /^[0-9:.+-]+$/.test(value))) throw new Error("Invalid forecast value");
 }
 
 // `time` is local `YYYY-MM-DDTHH:MM:SS.mmm+HH:MM`; `lastWeatherFetchTime` and the
@@ -57,7 +57,7 @@ export function serializeForecast(configurationId: string, time: string, lastWea
     if (index > 0) lines.push("");
     const values: Record<typeof DISPLAY_KEYS[number], string | number> = {
       display: display.display, board: display.board, nightId: display.nightId,
-      numeric_0: display.sunset, numeric_1: display.sunrise,
+      numeric_0: display.astronomicalDusk, numeric_1: display.astronomicalDawn,
       matrix_0: display.sun, matrix_1: display.moon, matrix_2: display.cloud,
       matrix_3: display.precipitation, matrix_4: display.aurora, numeric_2: display.maximumTemperature,
       numeric_3: display.minimumTemperature
