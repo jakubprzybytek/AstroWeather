@@ -62,7 +62,7 @@ than locking it down: anyone may create an account.
 - **Forecast handler** (`packages/functions/src/astro.ts`): a thin adapter that
   resolves the configuration and delegates to `forecast/`:
   - `nights.ts` derives the six observing nights and 21 local-hour slots;
-  - `astronomy.ts` calculates sunset, sunrise, and sun/moon matrices with `suncalc`;
+  - `astronomy.ts` calculates astronomical dusk and dawn, the sky-darkness (sun) and moon matrices with `suncalc`;
   - `weather-reader.ts` reads and projects the stored `#WEATHER` items;
   - the aurora store (`aurora/storage.ts`) reads the stored `#AURORA#…` items
     and `aurora/merge.ts` merges them into the aurora row, slot by slot;

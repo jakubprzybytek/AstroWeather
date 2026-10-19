@@ -174,8 +174,8 @@ Within each block the records must come in this order:
 | --- | --- | --- |
 | 1 | `board` | Exactly `num4x4_matrix5x21`. |
 | 2 | `nightId` | Not validated; kept (up to 15 characters) for the log. |
-| 3 | `numeric_0` | Sunset, `HH:MM` or `?`. |
-| 4 | `numeric_1` | Sunrise, `HH:MM` or `?`. |
+| 3 | `numeric_0` | Astronomical dusk, `HH:MM` or `?`. |
+| 4 | `numeric_1` | Astronomical dawn, `HH:MM` or `?`. |
 | 5–9 | `matrix_0` … `matrix_4` | 21 characters from `0`–`3`, `a`–`c`, `*` and `?`, or the single `?`. `matrix_4` is the aurora. |
 | 10 | `numeric_2` | Maximum temperature, or `?`. |
 | 11 | `numeric_3` | Minimum temperature, or `?`. |

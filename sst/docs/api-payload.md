@@ -211,14 +211,17 @@ nightId
   Local date in YYYY-MM-DD format for the noon-to-noon observing night.
 
 numeric_0
-  Local sunset time in HH:MM, or ? when no sunset occurs.
+  Local astronomical dusk (the sun 18° below the horizon) on nightId, in
+  HH:MM, or ? when the sun does not get that low, as on summer nights at
+  50° N.
 
 numeric_1
-  Local sunrise time in HH:MM, or ? when no sunrise occurs. This is normally
-  the morning after nightId.
+  Local astronomical dawn on the morning after nightId, in HH:MM, or ? when
+  the sun does not get that low.
 
 matrix_0
-  Sun by local-hour slot: how much of the hour the sun is above the horizon.
+  Sky darkness by local-hour slot, from the sun's altitude: sun up, civil or
+  nautical twilight, astronomical twilight, astronomical night.
 
 matrix_1
   Moon by local-hour slot: how much of the hour the moon is above the horizon.
@@ -262,7 +265,7 @@ within these supported ranges and formats.
 
 For this protocol:
 
-- `numeric_0` and `numeric_1` contain local sunset and sunrise times;
+- `numeric_0` and `numeric_1` contain local astronomical dusk and dawn times;
 - `numeric_2` and `numeric_3` contain temperatures in whole degrees, such as
   `18` or `-3`.
 - `numeric_0` and `numeric_1` use the missing-value sentinel `?` when
@@ -301,7 +304,8 @@ ranks them. What a level means depends on the row:
 
 | Row | `0` | `1` | `2` | `3` | `*` |
 |---|---|---|---|---|---|
-| `matrix_0` sun and `matrix_1` moon: minutes of the hour above the horizon | 0 | 1-29 | 30-59 | 60 | - |
+| `matrix_0` sky, by the sun's altitude held for most of the hour | below −18°: astronomical night | −18° to −12°: astronomical twilight | −12° to −0.833°: civil or nautical twilight | above −0.833°: sun up | - |
+| `matrix_1` moon: minutes of the hour above the horizon | 0 | 1-29 | 30-59 | 60 | - |
 | `matrix_2` total cloud coverage | 0 % | 1-33 % | 34-66 % | 67-100 % | - |
 | `matrix_3` precipitation probability | 0-24 % | 25-49 % | 50-74 % | 75-100 % | thunderstorm predicted, whatever the probability |
 | `matrix_4` aurora (Kp relative to the location's `kpMain`) | below `kpMain` − 1 | from `kpMain` − 1: faint, camera | from `kpMain`: naked eye, low | from `kpMain` + 1: bright | - |
@@ -311,8 +315,10 @@ and the one before it: an aurora there now. Slots taken from the 27-day
 outlook are `1` ("possible") at most.
 
 For the sun and moon rows, the body's altitude is sampled at the middle of
-every minute of the slot, from the slot's start, and the minutes above the
-horizon are counted, so a rise or set partway through an hour grades that
+every minute of the slot, from the slot's start. The sun row takes the level
+held for the most minutes, a tie going to the brighter level; −0.833° is the
+altitude of suncalc's sunrise and sunset. The moon row counts the minutes
+above the horizon, so a rise or set partway through an hour grades that
 hour. All time calculations use the configuration's timezone, including DST
 transitions. The protocol still emits 21 wall-clock slots on a DST transition;
 the server maps each labeled local hour to the appropriate instant.

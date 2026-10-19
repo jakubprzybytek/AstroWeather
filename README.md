@@ -1,7 +1,7 @@
 # AstroWeather
 
 AstroWeather shows whether the coming nights are good for observing the sky. A
-serverless API combines astronomy (sunset, sunrise, sun and moon) with weather
+serverless API combines astronomy (astronomical dusk and dawn, twilight and moon) with weather
 forecasts for a configured location and serves them as a compact text payload.
 A Wi-Fi host board fetches that payload every 6 hours and shows six observing
 nights on LED displays: its own and up to five chained display boards.

@@ -19,8 +19,8 @@ For a valid `configurationId`, the main endpoint returns:
   device uses to synchronize its real-time clock;
 - six observing nights, starting with the current night in the configuration's
   local timezone;
-- local sunset and next-day sunrise times for each night;
-- fixed-size hourly sun, moon, cloud, and precipitation matrices for each
+- local astronomical dusk and next-day astronomical dawn times for each night;
+- fixed-size hourly sky darkness, moon, cloud, and precipitation matrices for each
   night, graded in four levels, with thunderstorms blinking;
 - the supported display board identifier for each night;
 - available maximum and minimum temperature for each night;
@@ -62,8 +62,9 @@ The payload is a normal protocol 3 response for six consecutive nights
   from it; `lastWeatherFetchTime` and the four aurora fetch times are `?`, and
   `refreshIntervalMinutes` is `360`.
 - Sunset and sunrise start at random times and move by 1–3 minutes a night;
-  the moon rises 40–60 minutes later each night. The sun and moon rows follow
-  those times.
+  the moon rises 40–60 minutes later each night. Twilight lasts a fixed 75
+  minutes to −12° and 37 more to −18°, as in autumn at 50° N. Astronomical
+  dusk and dawn and the sun and moon rows follow those times.
 - Each night has a theme: clear sky with an aurora storm blinking "now";
   overcast with rain; thunderstorms clearing; a frosty evening clouding over
   with an aurora burst; every level and blink in turn; and missing data (gaps,
@@ -87,7 +88,7 @@ offset as `YYYY-MM-DDTHH:MM:SS.mmm+HH:MM`; `lastWeatherFetchTime` is the local
 the four aurora records are the same for each aurora feed. Each block contains, in order,
 `display`, `board`, `nightId`, `numeric_0`, `numeric_1`, `matrix_0` through
 `matrix_4`, `numeric_2`, and `numeric_3`. `numeric_0` and `numeric_1`
-are sunset and sunrise; `matrix_0` through `matrix_4` are sun, moon, cloud,
+are astronomical dusk and dawn; `matrix_0` through `matrix_4` are sky, moon, cloud,
 precipitation and aurora; and `numeric_2` and `numeric_3` are maximum and minimum
 temperature. `board` is `num4x4_matrix5x21` in version 3.
 `refreshIntervalMinutes` is `60` on a storm night and `360` otherwise.
@@ -156,16 +157,22 @@ The `FLAG` item is not a feed and has no record. The demo configuration sends
 ### Astronomy
 
 Astronomical events are calculated for each night from the configured latitude
-and longitude. Sunset belongs to the date that starts the night, and sunrise
-belongs to the following local date. Moonrise and moonset times are not
-emitted; the moon is represented only by its hourly above-horizon matrix.
+and longitude. Astronomical dusk (the sun 18° below the horizon) belongs to
+the date that starts the night, and astronomical dawn belongs to the following
+local date. Sunset, sunrise, moonrise and moonset times are not emitted.
 
-Sunset and sunrise are serialized as local `HH:MM` values. An event that does
-not occur is represented by `?`. Sun and moon are graded for the 21
-local-hour slots, 14:00 through 10:00 on the following date, by the minutes
-of each hour the body is above the horizon: `0` for none, `1` for under half
-an hour, `2` for half an hour or more, `3` for the whole hour. The altitude
-is sampled at the middle of every minute. The 11:00-12:00 interval is not
+Astronomical dusk and dawn are serialized as local `HH:MM` values. An event
+that does not occur is represented by `?`: at 50° N the sun stays above −18°
+on summer nights, from about late May to mid-July. Sun and moon are graded
+for the 21 local-hour slots, 14:00 through 10:00 on the following date, with
+the altitude sampled at the middle of every minute. The sun row grades the
+sky by the level held for the most minutes of the hour, a tie going to the
+brighter: `3` sun up (above −0.833°), `2` civil or nautical twilight (down to
+−12°), `1` astronomical twilight (down to −18°), `0` astronomical night. A
+summer night without astronomical night thus bottoms out at `1`. The moon row
+counts the minutes of each hour the moon is above the horizon: `0` for none,
+`1` for under half an hour, `2` for half an hour or more, `3` for the whole
+hour. The 11:00-12:00 interval is not
 displayed. The server emits the same 21 wall-clock slots across DST
 transitions and maps each local hour to the appropriate instant.
 
@@ -206,7 +213,7 @@ weather retrieval must not prevent available astronomy from being returned.
 The affected weather matrix slots and weather-derived numeric values use `?`.
 
 Likewise, an astronomy calculation failure must not prevent available weather
-from being returned. The affected sunset and sunrise values and sun or moon
+from being returned. The affected dusk and dawn values and sun or moon
 matrix slots use `?`.
 
 The endpoint always returns all six display blocks with the complete fixed
