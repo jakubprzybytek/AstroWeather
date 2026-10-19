@@ -93,6 +93,16 @@ UI change are always released at the same time.
    path, which the suite does not cover.
 4. Deploy to `prod` and repeat the checks against its hostname.
 
+### Deploying from GitHub Actions
+
+The `Deploy SST` workflow (`.github/workflows/deploy-sst.yml`) deploys the
+`int` stage when started by hand from the Actions tab. It installs both
+lockfiles, runs `npm run test` and `npm run test:web`, and only then signs in
+to AWS and deploys. It signs in through GitHub's OIDC provider as the role in
+the `AWS_ROLE_ARN` repository variable (`GitHub-AstroWeather`), in the
+`AWS_REGION` variable's region. The role trusts this repository only and has
+the `AstroWeather-Deployment` and `SST-Deployment` policies attached.
+
 ### Testing a deployed stage
 
 `npm run test:integration` runs Vitest inside `sst shell`, which selects the
