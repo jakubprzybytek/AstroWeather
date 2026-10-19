@@ -1,6 +1,11 @@
 name: Deploy SST
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'sst/**'
+      - '.github/workflows/deploy-sst.yml'
   workflow_dispatch:
 
 permissions:

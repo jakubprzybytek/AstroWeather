@@ -96,7 +96,9 @@ UI change are always released at the same time.
 ### Deploying from GitHub Actions
 
 The `Deploy SST` workflow (`.github/workflows/deploy-sst.yml`) deploys the
-`int` stage when started by hand from the Actions tab. It installs both
+`int` stage on every push to `main` that changes `sst/` or the workflow, and
+when started by hand from the Actions tab; a newer run cancels one in
+progress. `prod` is deployed by hand. It installs both
 lockfiles, runs `npm run test` and `npm run test:web`, and only then signs in
 to AWS and deploys. It signs in through GitHub's OIDC provider as the role in
 the `AWS_ROLE_ARN` repository variable (`GitHub-AstroWeather`), in the
