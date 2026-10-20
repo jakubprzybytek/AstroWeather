@@ -2,7 +2,9 @@
 
 #include <Astro/AstroData.hpp>
 #include <Astro/AstroProgressBar.hpp>
+#include <Astro/HourIndicator.hpp>
 #include <Astro/RefreshSchedule.hpp>
+#include <Display/BoardChain.hpp>
 #include <WiFi/St67FetchTypes.hpp>
 #include <Utils/Task.hpp>
 
@@ -112,6 +114,19 @@ private:
     void startIndicator(AstroProgressBar::Indicator::Kind kind, uint8_t failedSegment);
     void clearIndicator();
 
+    // Current-hour indicator; see HourIndicator. publishDisplay() keeps each
+    // board's night and rows, and draws the indicator with them; between
+    // refreshes it moves when the clock enters another hour, checked each
+    // time run() wakes. True when it drew something, for the caller to submit.
+    bool updateHourIndicator();
+    void drawNightRows(uint8_t block, uint8_t column);
+
+    struct ShownNight
+    {
+        std::array<char, 16> nightId{};  // empty: no data published for the board
+        std::array<AstroMatrixRow, 5> rows{};
+    };
+
     static constexpr uint32_t kFlagRun = 1U << 0;
     static constexpr uint32_t kScheduleCheckMs = 60000U;
 
@@ -129,6 +144,11 @@ private:
     static constexpr AstroProgressBar::Row kNoRowShown{0xFFFFFFFFU, 0xFFFFFFFFU};
     AstroProgressBar::Row shownRow_ = kNoRowShown;
     uint8_t loggedStage_ = 0xFFU;
+    // Written and read by this task only.
+    static constexpr uint8_t kNoBlock = 0xFFU;
+    std::array<ShownNight, Display::kChainLength> shownNights_{};
+    uint8_t indicatorBlock_ = kNoBlock;
+    uint8_t indicatorColumn_ = HourIndicator::kNoColumn;
 };
 
 const char* refreshTriggerName(RefreshTrigger trigger);

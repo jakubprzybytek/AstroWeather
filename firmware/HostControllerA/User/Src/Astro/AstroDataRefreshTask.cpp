@@ -11,6 +11,8 @@
 
 #include <Debug/LogService.hpp>
 
+#include <cstring>
+
 #include "FreeRTOS.h"
 #include "main.h"
 
@@ -321,9 +323,69 @@ bool AstroDataRefreshTask::publishDisplay(const AstroData& data)
         clearIndicator();
     }
     AstroDisplayMapper::mapAll(data, *display_);
-    display_->submit();
     shownRow_ = kNoRowShown;
+    for (uint8_t block = 0U; block < shownNights_.size(); ++block)
+    {
+        shownNights_[block].nightId = data.boards[block].nightId;
+        shownNights_[block].rows = data.boards[block].matrix;
+    }
+    // mapAll drew every board without it: draw it afresh.
+    indicatorBlock_ = kNoBlock;
+    indicatorColumn_ = HourIndicator::kNoColumn;
+    (void)updateHourIndicator();
+    display_->submit();
     return true;
+}
+
+bool AstroDataRefreshTask::updateHourIndicator()
+{
+    if (display_ == nullptr)
+    {
+        return false;
+    }
+    uint8_t block = kNoBlock;
+    uint8_t column = HourIndicator::kNoColumn;
+    const RefreshSchedule::Clock clock = readClock();
+    if (clock.timeSet)
+    {
+        const HourIndicator::Position position = HourIndicator::at(clock.now);
+        for (uint8_t candidate = 0U; candidate < shownNights_.size(); ++candidate)
+        {
+            if (position.column != HourIndicator::kNoColumn &&
+                shownNights_[candidate].nightId[0] != '\0' &&
+                std::strcmp(shownNights_[candidate].nightId.data(),
+                            position.nightId.data()) == 0)
+            {
+                block = candidate;
+                column = position.column;
+                break;
+            }
+        }
+    }
+    if (block == indicatorBlock_ && column == indicatorColumn_)
+    {
+        return false;
+    }
+    if (indicatorBlock_ != kNoBlock && indicatorBlock_ != block)
+    {
+        drawNightRows(indicatorBlock_, HourIndicator::kNoColumn);
+    }
+    if (block != kNoBlock)
+    {
+        drawNightRows(block, column);
+    }
+    indicatorBlock_ = block;
+    indicatorColumn_ = column;
+    return true;
+}
+
+void AstroDataRefreshTask::drawNightRows(uint8_t block, uint8_t column)
+{
+    // On the local board, row 4 belongs to the progress bar while it shows a
+    // refresh or its outcome, and stays empty after a failure's outcome.
+    const bool skipProgressRow = display_->isLocal(block) && shownRow_ != kNoRowShown;
+    AstroDisplayMapper::mapMatrixRows(shownNights_[block].rows, column, skipProgressRow,
+                                      display_->board(block));
 }
 
 namespace {
@@ -655,6 +717,10 @@ void AstroDataRefreshTask::run()
         if (flags == static_cast<uint32_t>(osFlagsErrorTimeout))
         {
             checkSchedule();
+            if (updateHourIndicator())
+            {
+                display_->submit();
+            }
             continue;
         }
         if ((flags & osFlagsError) != 0U)

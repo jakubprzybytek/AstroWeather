@@ -63,7 +63,12 @@ add_native_test(astro_display_mapper_tests
     SOURCES AstroDisplayMapperTests.cpp
     SUT User/Src/Astro/AstroDisplayMapper.cpp
         User/Src/Astro/AstroDataParser.cpp
+        User/Src/Astro/HourIndicator.cpp
         ../Common/Src/Display/DisplayTypes.cpp
+)
+add_native_test(hour_indicator_tests
+    SOURCES HourIndicatorTests.cpp
+    SUT User/Src/Astro/HourIndicator.cpp
 )
 # STUBS for cmsis_os2.h, which St67FetchTypes.hpp (FetchStage) includes.
 add_native_test(astro_progress_bar_tests

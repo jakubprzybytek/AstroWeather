@@ -111,6 +111,7 @@ const Command kDisplay[] = {
      "  0-3  that level, steady        a-c  levels 1-3, blinking\n"
      "  *    full level, blinking      . ?  off\n"
      "Missing columns are off. On this board row 4 also shows refresh progress.\n"
+     "On tonight's board the hour indicator redraws the rows every hour.\n"
      "e.g. 'display row 0 0123abc*0123abc*012300' shows every kind"},
     {"display blink <n> off|colon|all", "blink nothing, the colon, or all of display n",
      "n is 0-3; the colon is L1 and L2. e.g. 'display blink 3 colon'"},

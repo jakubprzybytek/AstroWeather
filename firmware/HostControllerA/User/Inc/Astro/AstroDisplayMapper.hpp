@@ -3,6 +3,7 @@
 #include <Display/BoardChain.hpp>
 #include <Display/DisplayTypes.hpp>
 #include <Astro/AstroData.hpp>
+#include <Astro/HourIndicator.hpp>
 
 #include <cstdint>
 
@@ -19,7 +20,8 @@
 // reset to plain (full, no blink). All five matrix rows come from the payload
 // with their levels and blinking. Row 4, the aurora, is also where the local
 // board shows the refresh progress bar; a published refresh overwrites the bar
-// when the local board has a block.
+// when the local board has a block. The current-hour indicator is drawn over
+// the rows by mapMatrixRows (Astro/HourIndicator.hpp).
 namespace AstroDisplayMapper {
 
 constexpr uint8_t kPayloadMatrixRows = 5U;
@@ -40,6 +42,25 @@ void mapMatrixRow(const HostController::AstroMatrixRow& row, uint8_t index,
 // Board: anything with numeric(index), matrix(row) and attributes() returning
 // a Display::NumericDisplay, a Display::MatrixRow and Display::BoardAttributes,
 // such as Display::DisplayBoard or Display::DisplayBoardState.
+//
+// Draws the five rows, with the current-hour indicator at `indicatorColumn`
+// (HourIndicator::kNoColumn for none). With `skipProgressRow` row 4 is left
+// alone: the local board's progress bar or refresh outcome is on it.
+template <typename Board>
+void mapMatrixRows(const std::array<HostController::AstroMatrixRow, kPayloadMatrixRows>& rows,
+                   uint8_t indicatorColumn, bool skipProgressRow, Board& board)
+{
+    for (uint8_t matrixIndex = 0U; matrixIndex < kPayloadMatrixRows; ++matrixIndex)
+    {
+        if (skipProgressRow && matrixIndex == kProgressRow)
+        {
+            continue;
+        }
+        mapMatrixRow(HourIndicator::withIndicator(rows[matrixIndex], indicatorColumn),
+                     matrixIndex, board.matrix(matrixIndex), board.attributes());
+    }
+}
+
 template <typename Board>
 void mapBoard(const HostController::AstroBoardData& data, bool localBoard, Board& board)
 {
@@ -51,10 +72,7 @@ void mapBoard(const HostController::AstroBoardData& data, bool localBoard, Board
         attributes.setNumericLevel(numericIndex, Display::kLevelFull);
     }
     (void)localBoard;
-    for (uint8_t matrixIndex = 0U; matrixIndex < kPayloadMatrixRows; ++matrixIndex)
-    {
-        mapMatrixRow(data.matrix[matrixIndex], matrixIndex, board.matrix(matrixIndex), attributes);
-    }
+    mapMatrixRows(data.matrix, HourIndicator::kNoColumn, false, board);
 }
 
 // Boards: anything with isLocal(position) and board(position) returning boards

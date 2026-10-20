@@ -178,6 +178,39 @@ void testMatrixRows()
     expectEqual(attributes.level0.matrix[0], Display::kMatrixMask, "level plane masked");
 }
 
+void testHourIndicatorRows()
+{
+    AstroBoardData data{};
+    data.matrix[0] = {0x1FFFFFU, 0x1FFFFFU, 0x1FFFFFU, 0U};  // all 3: the sun up
+    data.matrix[1] = {0U, 0U, 0U, 0U};                      // all off
+    data.matrix[2] = {0x000020U, 0x000020U, 0U, 0x000020U}; // column 5 'a'
+    data.matrix[4] = {0x1FFFFFU, 0U, 0x1FFFFFU, 0U};        // all 2
+    DisplayBoardState board{};
+    AstroDisplayMapper::mapBoard(data, false, board);
+
+    AstroDisplayMapper::mapMatrixRows(data.matrix, 5U, false, board);
+    const Display::BoardAttributes& attributes = board.attributes();
+    expectEqual(attributes.matrixLevel(0, 5), 2U, "indicator: full drops to 2");
+    expectEqual(attributes.matrixLevel(0, 4), 3U, "next column still full");
+    expectEqual(board.state().matrix[1], 0x000020U, "indicator: off column lit");
+    expectEqual(attributes.matrixLevel(1, 5), 1U, "at level 1");
+    expectEqual(attributes.matrixLevel(2, 5), 2U, "blinking 1 raised to 2");
+    expectEqual(attributes.blink.matrix[2], 0x000020U, "and still blinking");
+    expectEqual(attributes.matrixLevel(4, 5), 3U, "2 raised to 3");
+
+    // Moving on: the old column is back as the payload has it.
+    AstroDisplayMapper::mapMatrixRows(data.matrix, 6U, false, board);
+    expectEqual(attributes.matrixLevel(0, 5), 3U, "old column back to full");
+    expectEqual(board.state().matrix[1], 0x000040U, "only the new column lit");
+    expectEqual(attributes.matrixLevel(2, 5), 1U, "old blinking cell back to 1");
+
+    // The local board's progress row is left to the progress bar.
+    board.matrix(4).setRow(0x3U);
+    AstroDisplayMapper::mapMatrixRows(data.matrix, HourIndicator::kNoColumn, true, board);
+    expectEqual(board.state().matrix[4], 0x3U, "progress row untouched");
+    expectEqual(board.state().matrix[1], 0U, "no column: off row clear again");
+}
+
 void testNumericAttributesReset()
 {
     AstroBoardData data = blockData(0U);
@@ -370,6 +403,7 @@ int main()
     testNumericKinds();
     testUnavailableNumeric();
     testMatrixRows();
+    testHourIndicatorRows();
     testNumericAttributesReset();
     testAuroraRowReplacesProgressBar();
     testAllBlocks();
