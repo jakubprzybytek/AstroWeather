@@ -15,6 +15,38 @@ The console commands are in the host's [Console.md](../HostControllerA/Docs/Cons
 To set up a new host board (Wi-Fi credentials, server, clock trim), follow
 [Quick Start](../HostControllerA/README.md#quick-start) after flashing.
 
+## Development Cycle
+
+A firmware change goes through these steps, in this order:
+
+1. **Change** the code in `User/`, in `firmware/Common`, or in a CubeMX
+   user-code section, never in generated code
+   ([CubeMX Compliance](#cubemx-compliance)). Logic that needs no hardware goes
+   in hardware-free code, so that the native tests cover it
+   ([Testing.md](Testing.md)).
+2. **Test natively** in every affected project, both of them for a change
+   under `firmware/Common` ([Native Tests](#native-tests)).
+3. **Build** `Debug` of every affected project and check the memory summary
+   ([Build](#build)). Each build adds one to the project's `BUILD_NUMBER`.
+4. **Flash** the board, after checking which board the ST-LINK is on
+   ([Which Board Is on the ST-LINK](#which-board-is-on-the-st-link),
+   [From the command line](#from-the-command-line)).
+5. **Check on the board**: the welcome line shows the new build number, then
+   `status` and the commands the change affects
+   ([Connecting over USB CDC](#connecting-over-usb-cdc),
+   [Validation Checklist](#validation-checklist)).
+6. **Update the docs** to the code as it now is: the feature's document, the
+   project README's feature table and open items, and for a console change
+   both `Console.md` and the help text. The `sync-docs` skill
+   (`.claude/skills/sync-docs`) has the rules and the link checks.
+7. **Commit** in the root checkout on `main`: the code together with the
+   `BUILD_NUMBER` it was built from, the docs separately when practical.
+8. **Push** to `origin`. GitHub Actions runs the native tests of every
+   project (`.github/workflows/firmware-native-tests.yml`) on each push and
+   pull request that touches `firmware/Common`, `HostControllerA` or
+   `DisplayController`. Nothing builds or flashes firmware in CI: boards are
+   flashed by hand.
+
 ## Prerequisites
 
 Commands below are run from the project directory, for example

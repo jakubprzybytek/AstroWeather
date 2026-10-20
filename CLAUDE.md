@@ -7,7 +7,9 @@ The repository layout and what each folder holds are in [README.md](README.md).
 Before building, testing, flashing or debugging anything under `firmware/`,
 read [firmware/Docs/Development.md](firmware/Docs/Development.md) and follow it:
 the toolchain `PATH`, the CMake presets, the native tests, flashing and SWD
-reads, the USB CDC console, and the CubeMX rules.
+reads, the USB CDC console, and the CubeMX rules. Take every firmware change
+through its [Development Cycle](firmware/Docs/Development.md#development-cycle):
+change, native tests, build, flash, check on the board, docs, commit, push.
 
 - **Check the MCU before every flash or SWD read** unless you have just seen
   which board the ST-LINK is on
