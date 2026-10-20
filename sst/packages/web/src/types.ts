@@ -13,6 +13,7 @@ export type ClearOutsideHour = {
   hour: number;
   timestampUtc: string;
   temperatureC: number | null;
+  dewPointC?: number | null;
   cloudCoverTotalPct: number | null;
   precipitationProbabilityPct: number | null;
   thunderstormRisk: boolean | null;

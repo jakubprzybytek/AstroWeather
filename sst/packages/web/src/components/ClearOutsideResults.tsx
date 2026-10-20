@@ -1,8 +1,8 @@
 import { Card, Table } from "react-bootstrap";
 import type { ClearOutsideResponse } from "../types";
 
-function value(value: number | null, suffix = "") {
-  return value === null ? "—" : `${value}${suffix}`;
+function value(value: number | null | undefined, suffix = "") {
+  return value == null ? "—" : `${value}${suffix}`;
 }
 
 export function ClearOutsideResults({ data }: { data: ClearOutsideResponse }) {
@@ -31,6 +31,10 @@ export function ClearOutsideResults({ data }: { data: ClearOutsideResponse }) {
                 <tr>
                   <th scope="row">Temperature</th>
                   {night.hours.map((hour) => <td key={hour.hour}>{value(hour.temperatureC, "°C")}</td>)}
+                </tr>
+                <tr>
+                  <th scope="row">Dew point</th>
+                  {night.hours.map((hour) => <td key={hour.hour}>{value(hour.dewPointC, "°C")}</td>)}
                 </tr>
                 <tr>
                   <th scope="row">Cloud coverage</th>

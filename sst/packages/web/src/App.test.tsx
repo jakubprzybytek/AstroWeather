@@ -106,7 +106,7 @@ describe("AstroWeather app", () => {
       nights: [{
         nightId: "2026-09-11",
         hours: [
-          { hour: 12, timestampUtc: "2026-09-11T11:00:00.000Z", temperatureC: 20, cloudCoverTotalPct: 10, precipitationProbabilityPct: 0, thunderstormRisk: true },
+          { hour: 12, timestampUtc: "2026-09-11T11:00:00.000Z", temperatureC: 20, dewPointC: 13, cloudCoverTotalPct: 10, precipitationProbabilityPct: 0, thunderstormRisk: true },
           { hour: 13, timestampUtc: "2026-09-11T12:00:00.000Z", temperatureC: 19, cloudCoverTotalPct: 20, precipitationProbabilityPct: 5, thunderstormRisk: false }
         ]
       }]
@@ -124,6 +124,8 @@ describe("AstroWeather app", () => {
     ));
     expect(await screen.findByText("2026-09-11")).toBeInTheDocument();
     expect(screen.getByText("⚡")).toBeInTheDocument();
+    const dewPoints = screen.getByRole("rowheader", { name: "Dew point" }).parentElement;
+    expect(dewPoints?.textContent).toBe("Dew point13°C—");
   });
 
   test("opens the NOAA 27-day tool with the first configuration preselected and renders a night from two consecutive UTC days", async () => {

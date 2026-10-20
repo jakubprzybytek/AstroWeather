@@ -25,6 +25,7 @@ describe("parseClearOutside", () => {
       hour: 12,
       timestampUtc: "2026-09-11T09:00:00.000Z",
       temperatureC: 36,
+      dewPointC: 18,
       cloudCoverTotalPct: 0,
       precipitationProbabilityPct: 0,
       thunderstormRisk: false
@@ -32,6 +33,22 @@ describe("parseClearOutside", () => {
     expect(night.hours[12].timestampUtc).toBe("2026-09-11T21:00:00.000Z");
     expect(night.hours[6].thunderstormRisk).toBe(true);
     expect(night.hours[6].precipitationProbabilityPct).toBe(40);
+  });
+
+  test("parses the dew point, negative values included", () => {
+    const [night] = parseClearOutside(fixture);
+
+    expect(night.hours[19].dewPointC).toBe(27);
+    expect(night.hours[23].dewPointC).toBe(-3);
+  });
+
+  test("keeps parsing with null dew points when the row is missing or misaligned", () => {
+    const missing = parseClearOutside(fixture.replace("Dew Point (&deg;C)", "Dew"))[0];
+    expect(missing.hours.every((hour) => hour.dewPointC === null)).toBe(true);
+    expect(missing.hours[0].temperatureC).toBe(36);
+
+    const misaligned = parseClearOutside(fixture.replace("<li>25</li><li>-3</li>", "<li>25</li>"))[0];
+    expect(misaligned.hours.every((hour) => hour.dewPointC === null)).toBe(true);
   });
 
   test("fails closed when a required weather row is missing", () => {

@@ -4,6 +4,9 @@ export type ClearOutsideHour = {
   hour: number;
   timestampUtc: string;
   temperatureC: number | null;
+  // Optional: absent from records stored before it was collected, and null
+  // when the page has no Dew Point row.
+  dewPointC?: number | null;
   cloudCoverTotalPct: number | null;
   precipitationProbabilityPct: number | null;
   thunderstormRisk: boolean | null;
@@ -25,6 +28,11 @@ const REQUIRED_ROWS = [
   "Precipitation Probability",
   "Precipitation Type"
 ] as const;
+
+// Collected for a later dew-risk indicator (docs/api.md, Open Items). Not
+// required: a page without it, or with it misaligned, still parses, with null
+// dew points.
+const DEW_POINT_ROW = "Dew Point";
 
 function parseNumber(value: string): number | null {
   const match = value.trim().match(/-?\d+(?:\.\d+)?/);
@@ -130,6 +138,9 @@ export function parseClearOutside(html: string): ClearOutsideNight[] {
     if (rows.some((row) => row.length !== hours.length)) {
       throw new Error(`Clear Outside day ${dayIndex} has misaligned hourly rows`);
     }
+    const dewPointRow = findRow(day, DEW_POINT_ROW);
+    const dewPoints = dewPointRow ? rowValues(dewPointRow) : [];
+    const hasDewPoints = dewPoints.length === hours.length;
 
     return {
       nightId: formatDate(nightDate),
@@ -144,6 +155,7 @@ export function parseClearOutside(html: string): ClearOutsideNight[] {
           hour,
           timestampUtc: toUtcTimestamp(formatDate(nightDate), hour, header.utcOffsetMinutes),
           temperatureC: parseNumber(rows[0][hourIndex].textContent),
+          dewPointC: hasDewPoints ? parseNumber(dewPoints[hourIndex].textContent) : null,
           cloudCoverTotalPct: parseNumber(rows[1][hourIndex].textContent),
           precipitationProbabilityPct: parseNumber(rows[2][hourIndex].textContent),
           thunderstormRisk: thunderstormMatch ? true : precipitationType ? false : null
