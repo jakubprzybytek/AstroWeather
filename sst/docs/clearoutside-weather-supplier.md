@@ -18,8 +18,10 @@ forecast API; no documented weather API is integrated yet. The implementation
 follows the recommended integration below, with these differences:
 
 - It stores general weather fields rather than the differentiated astronomy
-  fields: `temperatureC`, `cloudCoverTotalPct`, `precipitationProbabilityPct`,
-  and `thunderstormRisk` per hour. The observing rating, Bortle estimate, and
+  fields: `temperatureC`, `dewPointC`, `cloudCoverTotalPct`,
+  `precipitationProbabilityPct`, and `thunderstormRisk` per hour. The dew
+  point is optional: a page without its row, or with the row misaligned,
+  still parses, with null dew points. The observing rating, Bortle estimate, and
   dark windows are not parsed.
 - The scheduled job runs every six hours (00:00, 06:00, 12:00 and 18:00
   Europe/Warsaw) and fails its invocation when any

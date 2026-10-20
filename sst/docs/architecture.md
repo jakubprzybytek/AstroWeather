@@ -165,10 +165,11 @@ SK = NIGHT#<nightId>#WEATHER
 
 Each item contains the configuration identifier, `nightId`,
 `service: "skyConditions"`, coordinates, normalized hourly Clearoutside fields
-(`hour`, `timestampUtc`, `temperatureC`, `cloudCoverTotalPct`,
+(`hour`, `timestampUtc`, `temperatureC`, `dewPointC`, `cloudCoverTotalPct`,
 `precipitationProbabilityPct`, `thunderstormRisk`), `fetchedAt`, and an
 `expireAt` timestamp (epoch seconds) 72 hours after the last hourly forecast
-value. Raw Clearoutside HTML is never persisted. DynamoDB TTL deletion is
+value. `dewPointC` is absent from items stored before it was collected and
+null when the page has no Dew Point row. Raw Clearoutside HTML is never persisted. DynamoDB TTL deletion is
 eventual, so the forecast reader also discards items whose `expireAt` is at or
 before the request time.
 

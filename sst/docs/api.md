@@ -310,11 +310,12 @@ The aurora row uses:
 
 ## Open Items
 
-- **Dew risk.** Clear Outside also gives an hourly dew point, which the
-  scraper does not parse. The night's minimum temperature minus the dew point
-  at that hour says whether dew will form on the optics (within about 2–3 °C).
-  It needs the scraper to keep the dew point and a place on the board: all
-  four numerics and all five matrix rows are in use.
+- **Dew risk.** The ingestion stores Clear Outside's hourly dew point
+  (`dewPointC`, see [architecture.md](architecture.md)), and the web UI's
+  Clearoutside table shows it, but the payload does not use it yet. The
+  night's minimum temperature minus the dew point at that hour says whether
+  dew will form on the optics (within about 2–3 °C). It needs a place on the
+  board: all four numerics and all five matrix rows are in use.
 
 ## Clients
 
