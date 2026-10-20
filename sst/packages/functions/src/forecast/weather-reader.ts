@@ -2,6 +2,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { Resource } from "sst";
 import type { ClearOutsideItem } from "../weather/clearoutside-storage";
+import type { NightWindow } from "./astronomy";
 import { cloudLevel, encodeMatrix, quartileLevel, type MatrixCell } from "./matrix";
 import { instantAtLocal, observingSlots } from "./nights";
 
@@ -18,8 +19,8 @@ function isWeatherItem(value: unknown): value is ClearOutsideItem {
     && typeof item.expireAt === "number";
 }
 
-export function projectWeather(item: ClearOutsideItem, timezone: string): Pick<ReturnType<typeof weatherFields>, "cloud" | "precipitation" | "maximumTemperature" | "minimumTemperature"> {
-  return weatherFields(item, timezone);
+export function projectWeather(item: ClearOutsideItem, timezone: string, night: NightWindow | null): Pick<ReturnType<typeof weatherFields>, "cloud" | "precipitation" | "duskTemperature" | "nightMinimumTemperature"> {
+  return weatherFields(item, timezone, night);
 }
 
 // Precipitation probability in quarters; a thunderstorm risk
@@ -35,11 +36,48 @@ export function wholeDegrees(celsius: number): string {
   return String(Math.round(celsius));
 }
 
-function weatherFields(item: ClearOutsideItem, timezone: string) {
+const HOUR_MS = 3_600_000;
+
+type Reading = { time: number; celsius: number };
+
+// The temperature at `instant`, interpolated between the hourly readings on
+// either side; with only one of them within the hour, that one; null with
+// neither.
+export function temperatureAt(readings: Reading[], instant: number): number | null {
+  let before: Reading | undefined;
+  let after: Reading | undefined;
+  for (const reading of readings) {
+    if (reading.time <= instant && instant - reading.time < HOUR_MS && (!before || reading.time > before.time)) before = reading;
+    if (reading.time > instant && reading.time - instant < HOUR_MS && (!after || reading.time < after.time)) after = reading;
+  }
+  if (before && after) {
+    return before.celsius + (after.celsius - before.celsius) * (instant - before.time) / (after.time - before.time);
+  }
+  return before?.celsius ?? after?.celsius ?? null;
+}
+
+// The observing night's temperatures: at its start (dusk), and the lowest
+// from its start to its end, counting the interpolated values at both ends.
+// `?` without a night or without readings for it.
+export function nightTemperatures(readings: Reading[], night: NightWindow | null): { duskTemperature: string; nightMinimumTemperature: string } {
+  if (!night) return { duskTemperature: "?", nightMinimumTemperature: "?" };
+  const start = night.start.getTime();
+  const end = night.end.getTime();
+  const atStart = temperatureAt(readings, start);
+  const atEnd = temperatureAt(readings, end);
+  const values = readings.filter((reading) => reading.time > start && reading.time < end).map((reading) => reading.celsius);
+  if (atStart !== null) values.push(atStart);
+  if (atEnd !== null) values.push(atEnd);
+  return {
+    duskTemperature: atStart === null ? "?" : wholeDegrees(atStart),
+    nightMinimumTemperature: values.length ? wholeDegrees(Math.min(...values)) : "?"
+  };
+}
+
+function weatherFields(item: ClearOutsideItem, timezone: string, night: NightWindow | null) {
   const slots = observingSlots(item.nightId, timezone);
   const cloudValues: Array<MatrixCell | null> = [];
   const precipitationValues: Array<MatrixCell | null> = [];
-  const temperatures: number[] = [];
 
   for (const slot of slots) {
     const hour = item.hours.find((candidate) => {
@@ -50,20 +88,16 @@ function weatherFields(item: ClearOutsideItem, timezone: string) {
     precipitationValues.push(precipitationCell(hour?.precipitationProbabilityPct, hour?.thunderstormRisk));
   }
 
-  const start = instantAtLocal(item.nightId, 12, 0, timezone).getTime();
-  const nextDate = new Date(`${item.nightId}T12:00:00Z`);
-  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
-  const endInstant = instantAtLocal(nextDate.toISOString().slice(0, 10), 12, 0, timezone).getTime();
+  const readings: Reading[] = [];
   for (const hour of item.hours) {
-    const timestamp = Date.parse(hour.timestampUtc);
-    if (timestamp >= start && timestamp < endInstant && hour.temperatureC != null) temperatures.push(hour.temperatureC);
+    const time = Date.parse(hour.timestampUtc);
+    if (!Number.isNaN(time) && hour.temperatureC != null) readings.push({ time, celsius: hour.temperatureC });
   }
 
   return {
     cloud: encodeMatrix(cloudValues),
     precipitation: encodeMatrix(precipitationValues),
-    maximumTemperature: temperatures.length ? wholeDegrees(Math.max(...temperatures)) : "?",
-    minimumTemperature: temperatures.length ? wholeDegrees(Math.min(...temperatures)) : "?"
+    ...nightTemperatures(readings, night)
   };
 }
 

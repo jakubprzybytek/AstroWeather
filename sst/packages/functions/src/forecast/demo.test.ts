@@ -53,7 +53,7 @@ describe("demo forecast", () => {
         expect(row === "?" || row.length === 21).toBe(true);
       }
     }
-    const temperatures = DEMO_NIGHTS.flatMap((night) => [night.maximumTemperature, night.minimumTemperature]);
+    const temperatures = DEMO_NIGHTS.flatMap((night) => [night.duskTemperature, night.nightMinimumTemperature]);
     expect(temperatures).toEqual(expect.arrayContaining(["4", "-3", "17", "-14", "0", "?"]));
   });
 

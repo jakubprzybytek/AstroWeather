@@ -1,5 +1,5 @@
 import { auroraCell, mergeAurora } from "../aurora/merge";
-import { calculateAstronomy } from "./astronomy";
+import { calculateAstronomy, observingNight, type NightWindow } from "./astronomy";
 import { encodeMatrix } from "./matrix";
 import { nextNightIds } from "./nights";
 import { projectWeather } from "./weather-reader";
@@ -12,7 +12,7 @@ function emptyDisplay(display: number, nightId: string): ForecastDisplay {
   return {
     display, board: BOARD, nightId,
     astronomicalDusk: "?", astronomicalDawn: "?", sun: "?", moon: "?", cloud: "?",
-    precipitation: "?", aurora: "?", maximumTemperature: "?", minimumTemperature: "?"
+    precipitation: "?", aurora: "?", duskTemperature: "?", nightMinimumTemperature: "?"
   };
 }
 
@@ -40,12 +40,21 @@ export async function assembleForecast(
     }
   }
 
+  // The observing night bounds the temperatures; failed astronomy leaves them `?`.
+  const nightOf = (nightId: string): NightWindow | null => {
+    try {
+      return observingNight(nightId, location);
+    } catch {
+      return null;
+    }
+  };
+
   try {
     const weather = await dependencies.readWeather(configurationId, nightIds, now);
     for (const display of displays) {
       const item = weather.get(display.nightId);
       if (!item) continue;
-      Object.assign(display, projectWeather(item, location.tz));
+      Object.assign(display, projectWeather(item, location.tz, nightOf(display.nightId)));
       const fetchedAt = new Date(item.fetchedAt);
       if (!Number.isNaN(fetchedAt.getTime()) && (!lastWeatherFetch || fetchedAt > lastWeatherFetch)) {
         lastWeatherFetch = fetchedAt;

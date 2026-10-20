@@ -18,8 +18,8 @@ type DemoNight = {
   cloud: string;
   precipitation: string;
   aurora: string;
-  maximumTemperature: string;
-  minimumTemperature: string;
+  duskTemperature: string;
+  nightMinimumTemperature: string;
   moonUnavailable?: boolean;
 };
 
@@ -29,42 +29,42 @@ export const DEMO_NIGHTS: DemoNight[] = [
     cloud: "000000000000000000000",
     precipitation: "000000000000000000000",
     aurora: "000112233bcc332211000",
-    maximumTemperature: "4", minimumTemperature: "-3"
+    duskTemperature: "4", nightMinimumTemperature: "-3"
   },
   {
     theme: "overcast, steady then heavy rain",
     cloud: "333333333333333333333",
     precipitation: "112233332222333322111",
     aurora: "000000000000000000000",
-    maximumTemperature: "17", minimumTemperature: "11"
+    duskTemperature: "17", nightMinimumTemperature: "11"
   },
   {
     theme: "thunderstorms, then clearing; aurora possible all night",
     cloud: "333333322211100000000",
     precipitation: "01223***c**2110000000",
     aurora: "111111111111111111111",
-    maximumTemperature: "28", minimumTemperature: "19"
+    duskTemperature: "28", nightMinimumTemperature: "19"
   },
   {
     theme: "clouding over after a clear frosty evening; a short aurora burst",
     cloud: "000000011112222233333",
     precipitation: "000000000011122233333",
     aurora: "0000abcba000000123000",
-    maximumTemperature: "-2", minimumTemperature: "-14"
+    duskTemperature: "-2", nightMinimumTemperature: "-14"
   },
   {
     theme: "changing sky: every level and blink in turn",
     cloud: "012301230123012301230",
     precipitation: "0a0b0c0*0a0b0c0*01230",
     aurora: "0123012301230123abc*0",
-    maximumTemperature: "0", minimumTemperature: "-8"
+    duskTemperature: "0", nightMinimumTemperature: "-8"
   },
   {
     theme: "unavailable data: gaps, whole rows and temperatures missing",
     cloud: "3322????????????11000",
     precipitation: "?",
     aurora: "?",
-    maximumTemperature: "?", minimumTemperature: "?",
+    duskTemperature: "?", nightMinimumTemperature: "?",
     moonUnavailable: true
   }
 ];
@@ -155,8 +155,8 @@ export function demoForecast(now: Date, random: () => number = Math.random): Ass
       cloud: night.cloud,
       precipitation: night.precipitation,
       aurora: night.aurora,
-      maximumTemperature: night.maximumTemperature,
-      minimumTemperature: night.minimumTemperature
+      duskTemperature: night.duskTemperature,
+      nightMinimumTemperature: night.nightMinimumTemperature
     };
   });
 

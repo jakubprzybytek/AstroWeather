@@ -14,8 +14,8 @@ export type ForecastDisplay = {
   cloud: MatrixValue;
   precipitation: MatrixValue;  // probability, `*` for a thunderstorm risk
   aurora: MatrixValue;         // level; blinking down where the nowcast says now
-  maximumTemperature: string;
-  minimumTemperature: string;
+  duskTemperature: string;          // at the start of the observing night
+  nightMinimumTemperature: string;  // the lowest from its start to its end
 };
 
 // The aurora feeds with a fetch time in the payload, as `AuroraNight` names them.

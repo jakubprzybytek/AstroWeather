@@ -9,7 +9,7 @@ function display(index: number): ForecastDisplay {
     nightId: `2026-09-${String(17 + index).padStart(2, "0")}`,
     astronomicalDusk: "20:30", astronomicalDawn: "05:59",
     sun: "333320000000000002333", moon: "?", cloud: "000000000000000000000",
-    precipitation: "?", aurora: "000000000000000000000", maximumTemperature: "18", minimumTemperature: "9"
+    precipitation: "?", aurora: "000000000000000000000", duskTemperature: "18", nightMinimumTemperature: "9"
   };
 }
 
