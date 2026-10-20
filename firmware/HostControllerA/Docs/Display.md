@@ -46,7 +46,7 @@ other clients share some of them, through `submitLocal()`:
 | Numeric 3 | Clock, `HH:MM`, redrawn each minute ([RTC.md](RTC.md)) | on (`time display`) |
 | Matrix row 4 | Astro refresh progress bar while a refresh runs or its failure shows; otherwise the aurora row | always |
 
-With the defaults, the local board's night-0 maximum and minimum temperatures
+With the defaults, the local board's night-0 dusk and minimum temperatures
 are therefore overwritten: numeric 2 within 100 ms, numeric 3 at the next
 minute. There is no field ownership; the last writer wins.
 

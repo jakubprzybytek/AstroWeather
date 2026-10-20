@@ -150,7 +150,7 @@ rejects. With a 1.32 A full scale that cannot happen in practice.
 
 `adc display off` stops the writes but does not blank the display: it keeps the
 last reading until something else writes numeric 2. The astro refresh does, with
-block 0's maximum temperature; see
+block 0's temperature at dusk; see
 [AstroRefresh.md](AstroRefresh.md#local-numerics-2-and-3). With `adc display on`,
 that temperature is overwritten within 100 ms.
 

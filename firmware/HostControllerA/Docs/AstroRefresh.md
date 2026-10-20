@@ -178,8 +178,8 @@ Within each block the records must come in this order:
 | 3 | `numeric_0` | Astronomical dusk, `HH:MM` or `?`. |
 | 4 | `numeric_1` | Astronomical dawn, `HH:MM` or `?`. |
 | 5–9 | `matrix_0` … `matrix_4` | 21 characters from `0`–`3`, `a`–`c`, `*` and `?`, or the single `?`. `matrix_4` is the aurora. |
-| 10 | `numeric_2` | Maximum temperature, or `?`. |
-| 11 | `numeric_3` | Minimum temperature, or `?`. |
+| 10 | `numeric_2` | Temperature at dusk, or `?`. |
+| 11 | `numeric_3` | The night's minimum temperature, or `?`. |
 
 - An unknown key anywhere in a block, or after the last block, is ignored.
 - A known block key out of place is `missing-record`, as is a `display` record
@@ -341,7 +341,7 @@ by default. "Block 0" below is the host's block with no straps fitted; with
 other straps it is the block at the host's address:
 
 - **Numeric 2 shows the current sense reading** while `adc display` is on
-  (default on). It is rewritten ten times a second, so block 0's maximum
+  (default on). It is rewritten ten times a second, so block 0's dusk
   temperature is overwritten within 100 ms. See [CurrentSense.md](CurrentSense.md).
 - **Numeric 3 shows the clock** while `time display` is on (default on). The
   clock redraws only when the minute changes, so block 0's minimum temperature

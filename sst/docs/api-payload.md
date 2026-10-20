@@ -242,11 +242,14 @@ matrix_4
   sources and the merge.
 
 numeric_2
-  Maximum temperature during the observing night, in whole degrees Celsius,
-  with no decimal point. A question mark means weather is unavailable.
+  Temperature at the start of the night, in whole degrees Celsius, with no
+  decimal point: at astronomical dusk, or at nautical dusk or sunset where
+  the night is never astronomically dark. A question mark means weather is
+  unavailable.
 
 numeric_3
-  Minimum temperature during the observing night, in whole degrees Celsius,
+  Lowest temperature from the start to the end of that night (to
+  astronomical dawn, or nautical dawn or sunrise), in whole degrees Celsius,
   with no decimal point. A question mark means weather is unavailable.
 
 Numeric display formats

@@ -23,7 +23,7 @@ For a valid `configurationId`, the main endpoint returns:
 - fixed-size hourly sky darkness, moon, cloud, and precipitation matrices for each
   night, graded in four levels, with thunderstorms blinking;
 - the supported display board identifier for each night;
-- available maximum and minimum temperature for each night;
+- the temperature at the start of each night and its minimum during the night;
 
 An observing night is the local-noon-to-local-noon window already used by
 weather ingestion. Its `nightId` is the local calendar date on which the window
@@ -89,8 +89,8 @@ the four aurora records are the same for each aurora feed. Each block contains, 
 `display`, `board`, `nightId`, `numeric_0`, `numeric_1`, `matrix_0` through
 `matrix_4`, `numeric_2`, and `numeric_3`. `numeric_0` and `numeric_1`
 are astronomical dusk and dawn; `matrix_0` through `matrix_4` are sky, moon, cloud,
-precipitation and aurora; and `numeric_2` and `numeric_3` are maximum and minimum
-temperature. `board` is `num4x4_matrix5x21` in version 3.
+precipitation and aurora; and `numeric_2` and `numeric_3` are the temperature
+at dusk and the night's minimum temperature. `board` is `num4x4_matrix5x21` in version 3.
 `refreshIntervalMinutes` is `60` on a storm night and `360` otherwise.
 
 Records remain present when a source is missing or fails and use the payload
@@ -201,10 +201,21 @@ Only `#WEATHER` records are part of the main API.
 
 DynamoDB TTL removal is asynchronous. The reader must exclude an item when
 `expireAt` is at or before the request time, even if DynamoDB has not deleted it
-yet. Temperature extrema are calculated only from hourly values within the
-requested observing night. The maximum is serialized in `numeric_2` and the
-minimum in `numeric_3`, each rounded to whole degrees and written without a
-decimal point (Clear Outside reports whole degrees).
+yet.
+
+The temperatures describe the observing session, not the day. They are taken
+over the darkest kind of night the location gets: astronomical dusk to
+astronomical dawn; without an astronomical night (at 50° N from about late May
+to mid-July), nautical dusk to dawn; without that, sunset to sunrise.
+`numeric_2` is the temperature at the start of that night, interpolated
+between the hourly values on either side (or the one within the hour, when
+the other is missing). `numeric_3` is the lowest temperature from its start to
+its end: the hourly values inside it and the interpolated values at both ends,
+so a night that is coldest at dusk or at dawn is right. Both are rounded to
+whole degrees and written without a decimal point. Either is `?` without
+weather for the night, and both are `?` when the night's dusk and dawn cannot
+be calculated. The difference between the two shows how much the night cools:
+a large drop is a clear, still night, with dew likely and optics to let cool.
 
 ### Graceful degradation
 
@@ -250,8 +261,8 @@ client. Operational details belong in structured Lambda logs.
    boundary; the next five night identifiers are consecutive local dates.
 3. Every display block contains the complete, fixed-order record set defined in
    `api-payload.md`; each matrix is either `?` or exactly 21 valid characters.
-4. Available, unexpired `#WEATHER` records supply the matching nights' minimum
-   and maximum temperatures.
+4. Available, unexpired `#WEATHER` records supply the matching nights'
+   temperatures at dusk and minimum temperatures.
 5. Expired, out-of-range, and other service records are not returned as weather.
 6. Missing or failed weather does not remove a display block or available
    astronomy; its numeric values and unavailable matrix rows or slots use
@@ -296,6 +307,14 @@ The aurora row uses:
 - Configuration CRUD or accepting arbitrary coordinates.
 - Additional forecast services beyond weather and aurora.
 - Guaranteeing that weather exists for every requested night.
+
+## Open Items
+
+- **Dew risk.** Clear Outside also gives an hourly dew point, which the
+  scraper does not parse. The night's minimum temperature minus the dew point
+  at that hour says whether dew will form on the optics (within about 2–3 °C).
+  It needs the scraper to keep the dew point and a place on the board: all
+  four numerics and all five matrix rows are in use.
 
 ## Clients
 
