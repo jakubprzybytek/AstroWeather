@@ -595,7 +595,9 @@ For example `display 0x12 test`, `display 0x14 show 1 12.3`,
 `display all clear`. The command changes the host's buffered copy of a remote
 board and sends that board its whole state, so the rest of its forecast stays.
 The next `astro refresh` (or scheduled one) redraws every board and replaces
-it. `passes` is the local board's only: the I2C messages carry no pass table,
+it. On the board showing the current night, the
+[current-hour indicator](AstroRefresh.md#current-hour-indicator) also redraws
+the five matrix rows each time it moves, once an hour. `passes` is the local board's only: the I2C messages carry no pass table,
 so with a remote target or `all` it replies `ERR unsupported-remote`.
 `display low` drives every board already and takes no target. The content,
 blink and level model is in [Display.md](../../Docs/Display.md#public-interface).

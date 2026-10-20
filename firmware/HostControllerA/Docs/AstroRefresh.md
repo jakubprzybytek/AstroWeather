@@ -31,6 +31,7 @@ The plan that led to this design is archived in
 | --- | --- |
 | `User/Inc/Astro/AstroDataRefreshTask.hpp`, `User/Src/Astro/AstroDataRefreshTask.cpp` | The refresh task: triggers, pipeline, schedule driver, status summaries; draws the display mapping and the progress bar. |
 | `User/Inc/Astro/AstroDisplayMapper.hpp`, `User/Src/Astro/AstroDisplayMapper.cpp` | Pure display mapping: `AstroData` to the chain's boards' numerics and matrix rows, with the rows' levels and blinking. Tested by `tests/AstroDisplayMapperTests.cpp`. |
+| `User/Inc/Astro/HourIndicator.hpp`, `User/Src/Astro/HourIndicator.cpp` | Pure current-hour indicator: the current night and column from the local time, and a row with that column one level brighter. Tested by `tests/HourIndicatorTests.cpp`. |
 | `User/Inc/Astro/AstroProgressBar.hpp`, `User/Src/Astro/AstroProgressBar.cpp` | Pure progress bar: the row's columns and blink mask per step, and the outcome indicator's timing. Tested by `tests/AstroProgressBarTests.cpp`. |
 | `../Common/Inc/Utils/Crc32.hpp` | The CRC-32 of the recheck. Tested by `../Common/tests/Crc32Tests.cpp`. |
 | `User/Inc/Astro/AstroData.hpp` | The parsed model: six boards, the server `time`, `lastWeatherFetchTime` and the four aurora fetch times. |
@@ -290,6 +291,49 @@ hour above 99. See [Display.md](../../Docs/Display.md#numeric-representation).
 Only a fully parsed payload is published. After a fetch, CRC or parse failure
 the display keeps whatever it showed.
 
+### Current-hour indicator
+
+On the board showing the current observing night, the column of the current
+hour is drawn one level brighter in all five matrix rows, so the forecast
+shows where the night stands:
+
+| Cell in the payload | In the indicator column |
+| --- | --- |
+| `0` (off) | level 1 |
+| `1` / `a` | level 2, still blinking for `a` |
+| `2` / `b` | level 3, still blinking for `b` |
+| `3` / `c` / `*` | level 2, still blinking for `c` and `*` |
+
+A full cell drops to level 2 instead, so the column also shows in a row that is
+full, such as the sun row in daylight or an overcast cloud row.
+
+The night and the column come from the RTC's local time
+(`HourIndicator::at()`). A night runs from noon to noon, as on the server:
+from 00:00 to 11:59 it is the previous date's. Column *i* is local hour
+14 + *i*, so 14:00â€“14:59 is column 0 and 10:00â€“10:59 the next morning is
+column 20. From 11:00 to 13:59 there is no column and no indicator. The RTC
+keeps local wall-clock time and the payload's columns are wall-clock hours, so
+a DST change needs nothing special.
+
+The board is the one whose block's `nightId` is the current night, not always
+block 0. So after the noon rollover, until the 12:10 refresh succeeds, the
+indicator is on board 1, and a forecast a day old still marks the right night.
+If no board shows the current night, or the clock is not set, there is no
+indicator.
+
+`publishDisplay()` keeps each board's `nightId` and five rows (480 B in the
+task object) and draws the indicator with the forecast. Between refreshes the
+task checks the clock each time it wakes, at least once a minute, so the
+column moves up to a minute after the hour. When it moves, the task redraws
+the five rows of the board it leaves and of the board it lands on from the
+kept rows, and submits. A remote board therefore gets one frame an hour, well
+within its content lifetime. On the local board, row 4 is left alone while the
+progress bar shows a refresh or its outcome, and after a failure's outcome has
+cleared it, until the next publish.
+
+A redraw replaces the whole rows, so a `display row` on the current night's
+board lasts until the indicator next moves.
+
 ### Local numerics 2 and 3
 
 On the local board, numeric 2 and numeric 3 have other owners, and both are on
@@ -460,6 +504,13 @@ Native tests, run with the other suites; see [Development.md](../../Docs/Develop
   row replacing the progress bar on the local board and drawn on the remotes,
   each block on its board, and a parsed payload's `0`–`3`, `a`–`c`, `?` cells
   through to the board bits and levels.
+- `tests/HourIndicatorTests.cpp`: the column for each hour, the noon
+  rollover and no column from 11:00 to 13:59, nights across month and year
+  ends and a leap day, the indicated level for each level, and a row's column
+  raised with its blinking kept and the other columns untouched.
+- `tests/AstroDisplayMapperTests.cpp` also draws the indicator through
+  `mapMatrixRows()`: the levels on the board, the old column restored when it
+  moves, and the local progress row left alone.
 - `tests/AstroProgressBarTests.cpp`: segment layout, the segment per stage, the
   fetching rows with the current step's blink mask, the failed segment per
   outcome, the success hold, the blinking failure bar per failed step and its
@@ -473,7 +524,8 @@ Not covered by tests:
   out-of-order records, bad display indexes, bad times and matrices,
   over-long lines, truncation, and `configurationId` over 20 characters.
 - The refresh task itself: triggers and the busy guard, the pipeline order,
-  drawing the mapping and the bar on the display, and restoring `DR1`.
+  drawing the mapping and the bar on the display, and restoring `DR1`; finding
+  the current night's board and moving the indicator on the hour.
 - `astro refresh` and the `status` lines.
 
 These have been checked on hardware only.

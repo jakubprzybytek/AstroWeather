@@ -192,7 +192,7 @@ DMA, so its timing depends on interrupt latency only; see
 | `defaultTask` | `Core/Src/main.c` | Normal (24) | 512 | heap | Starts USB, then exits (stack freed) |
 | `LogService` | `Debug/LogService.cpp` | Normal (24) | 1536 | static | Drains the log queue to USB CDC; `stats` output |
 | `ConsoleService` | `Console/ConsoleService.cpp` | Normal (24) | 2816 | static | Assembles and runs console commands |
-| `AstroDataRefresh` | `Astro/AstroDataRefreshTask.cpp` | Normal (24) | 3840 | static | Refresh pipeline, 6-hourly schedule, progress bar |
+| `AstroDataRefresh` | `Astro/AstroDataRefreshTask.cpp` | Normal (24) | 3840 | static | Refresh pipeline, 6-hourly schedule, progress bar, current-hour indicator |
 | `MainLoopTask` | `MainLoopTask.cpp` | Normal (24) | 2048 | static | Boot screens on the local board (about 3 s, 944 B of stack at peak), then switch presses: switch 1 requests a refresh, switch 2 toggles low brightness and saves it |
 | `CurrentSense` | `Sensors/CurrentSenseTask.cpp` | BelowNormal (16) | 2048 | static | ADC every 100 ms, idle while `adc display` and `adc log` are both off |
 | `Clock` | `Clock/ClockTask.cpp` | BelowNormal (16) | 1024 | static | RTC, `HH:MM` on display 3 |

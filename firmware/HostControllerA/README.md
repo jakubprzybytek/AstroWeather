@@ -83,6 +83,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | Payload parser (protocol 3, 6 blocks) | ✅ | Unit tested | [AstroRefresh.md](Docs/AstroRefresh.md) |
 | Refresh every 6 hours with retry and catch-up | ✅ | The last success is lost on power loss | [AstroRefresh.md](Docs/AstroRefresh.md#schedule) |
 | Refresh from switch 1 or the console | ✅ | A second request while busy is rejected | [AstroRefresh.md](Docs/AstroRefresh.md#triggers) |
+| Current-hour indicator: tonight's board shows the current hour's column one level brighter | 🟡 | Unit tested; not yet seen on the boards | [AstroRefresh.md](Docs/AstroRefresh.md#current-hour-indicator) |
 | **Display** | | | |
 | Local LED board: interrupt-driven multiplexing, refresh progress bar | ✅ | Matrix column 1 stays lit on the prototype ([Display-Issues.md](../../KiCad/Docs/Display-Issues.md)) | [Display.md](../Docs/Display.md) |
 | Blinking and four brightness levels per segment and pixel | ✅ | The forecast's matrix rows carry levels and blink; the clock's colon and the progress bar blink | [Display.md](../Docs/Display.md#blink-and-brightness-levels) |
