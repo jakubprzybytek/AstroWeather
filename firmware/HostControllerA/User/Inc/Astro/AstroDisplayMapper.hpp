@@ -13,11 +13,10 @@
 //
 // Block n goes to the board at I2C address 0x10 + n (Display/BoardChain.hpp),
 // which is the local board when that is the host's own address; a block past
-// the chain's end has no board and is not drawn. Each numeric
-// is drawn as its payload value says: a time as HH:MM (the payload's numerics
-// 0-1), a value in whole units (numerics 2-3), and a `?` as the "unavailable"
-// pattern, the decimal point on all four digits; the numerics' attributes are
-// reset to plain (full, no blink). All five matrix rows come from the payload
+// the chain's end has no board and is not drawn. Each numeric is the
+// payload's display text (NumericDisplay::setText()): `?` is the "unavailable"
+// pattern, the decimal point on all four digits, and text it cannot show the
+// error pattern; the numerics' attributes are reset to plain (full, no blink). All five matrix rows come from the payload
 // with their levels and blinking. Row 4, the aurora, is also where the local
 // board shows the refresh progress bar; a published refresh overwrites the bar
 // when the local board has a block. The current-hour indicator is drawn over
@@ -28,9 +27,6 @@ constexpr uint8_t kPayloadMatrixRows = 5U;
 // The local board's bottom row: the aurora row, and the progress bar while a
 // refresh runs or its failure is shown.
 constexpr uint8_t kProgressRow = 4U;
-
-// The decimal point on the four digits, nothing in the indicator slot.
-Display::NumericSegments unavailableSegments();
 
 void mapNumeric(Display::NumericDisplay display, const HostController::AstroNumericValue& value);
 

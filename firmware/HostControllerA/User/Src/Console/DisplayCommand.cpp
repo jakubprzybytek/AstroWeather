@@ -14,43 +14,6 @@ namespace {
 constexpr Display::NumericSegments kColon{{0U, 0U, 0U, 0U, 0x03U}};
 constexpr Display::NumericSegments kAllSegments{{0xFFU, 0xFFU, 0xFFU, 0xFFU, 0x07U}};
 
-// A signed decimal with up to four digits before the point and up to three
-// after: "12.34", "-45", "0.5". The precision is the number of decimals.
-bool parseNumber(const char* text, int16_t& mantissa, uint8_t& precision)
-{
-    const bool negative = *text == '-';
-    if (negative || *text == '+') {
-        ++text;
-    }
-    int32_t value = 0;
-    uint8_t digits = 0U;
-    while (*text >= '0' && *text <= '9') {
-        value = value * 10 + (*text - '0');
-        ++digits;
-        ++text;
-    }
-    if (digits == 0U || digits > 4U) {
-        return false;
-    }
-    precision = 0U;
-    if (*text == '.') {
-        ++text;
-        while (*text >= '0' && *text <= '9') {
-            value = value * 10 + (*text - '0');
-            ++precision;
-            ++text;
-        }
-        if (precision == 0U || precision > Display::kMaxPrecision) {
-            return false;
-        }
-    }
-    if (*text != '\0' || value > 32767) {
-        return false;
-    }
-    mantissa = static_cast<int16_t>(negative ? -value : value);
-    return true;
-}
-
 bool parseIndex(const char* text, unsigned int limit, uint8_t& index)
 {
     unsigned int value = 0U;
@@ -141,31 +104,32 @@ uint8_t resolveTargets(Display::Display& display, const char* target, Targets& t
     return 1U;
 }
 
-CommandResult show(Display::DisplayBoard& board, const char* index, const char* value)
+// args[1] onwards, `wordCount` words joined with one space, as display text in
+// the payload's alphabet, so "d 12" or "21:45" shows as the forecast would.
+CommandResult show(Display::DisplayBoard& board, uint8_t wordCount, const char (&args)[4][32])
 {
     uint8_t n = 0U;
-    if (!parseIndex(index, Display::kNumericDisplayCount, n)) {
+    if (!parseIndex(args[0], Display::kNumericDisplayCount, n)) {
         return CommandResult::InvalidArgument;
+    }
+    char text[32] = {};
+    for (uint8_t word = 0U; word < wordCount; ++word) {
+        const char* next = args[1U + word];
+        if (std::strlen(text) + std::strlen(next) + 2U > sizeof(text)) {
+            return CommandResult::InvalidArgument;
+        }
+        if (word != 0U) {
+            std::strcat(text, " ");
+        }
+        std::strcat(text, next);
     }
     Display::NumericDisplay numeric = board.numeric(n);
-    unsigned int hour = 0U;
-    unsigned int minute = 0U;
-    char extra = '\0';
-    int16_t mantissa = 0;
-    uint8_t precision = 0U;
-    if (std::strcmp(value, "blank") == 0) {
+    if (std::strcmp(text, "blank") == 0) {
         numeric.setBlank();
-    } else if (std::strcmp(value, "?") == 0) {
-        numeric.setSegments(AstroDisplayMapper::unavailableSegments());
-    } else if (std::sscanf(value, "%2u:%2u%c", &hour, &minute, &extra) == 2 &&
-               std::strlen(value) == 5U) {
-        numeric.setTime(static_cast<uint8_t>(hour), static_cast<uint8_t>(minute));
-    } else if (parseNumber(value, mantissa, precision)) {
-        numeric.setFixed(mantissa, precision);
-    } else {
-        return CommandResult::InvalidArgument;
+        return CommandResult::Ok;
     }
-    return CommandResult::Ok;
+    // Text it cannot show is drawn as the error pattern, as the forecast's is.
+    return numeric.setText(text) ? CommandResult::Ok : CommandResult::InvalidArgument;
 }
 
 CommandResult row(Display::DisplayBoard& board, const char* index, const char* cells)
@@ -309,8 +273,8 @@ CommandResult apply(Display::DisplayBoard& board, const char* sub, uint8_t count
                     char (&args)[4][32])
 {
     CommandResult result = CommandResult::InvalidArgument;
-    if (std::strcmp(sub, "show") == 0 && count == 2U) {
-        result = show(board, args[0], args[1]);
+    if (std::strcmp(sub, "show") == 0 && count >= 2U) {
+        result = show(board, static_cast<uint8_t>(count - 1U), args);
     } else if (std::strcmp(sub, "row") == 0 && count == 2U) {
         result = row(board, args[0], args[1]);
     } else if (std::strcmp(sub, "blink") == 0 && count == 2U) {

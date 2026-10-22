@@ -15,8 +15,6 @@ enum class AstroParseStatus : uint8_t
     UnsupportedBoard,
     MissingRecord,
     InvalidDisplay,
-    InvalidTime,
-    InvalidTemperature,
     InvalidMatrix,
     Truncated,
 };

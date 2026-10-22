@@ -84,9 +84,24 @@ struct BoardAttributes {
     uint8_t matrixLevel(uint8_t row, uint8_t column) const;
 };
 
+// One numeric display's content. Two kinds of setter share one digit font:
+// typed setters for values a board formats itself (the clock, the current
+// reading, the boot screens), and setText() for text formatted elsewhere (the
+// forecast payload, the console). See Docs/Display.md#numeric-representation.
 class NumericDisplay {
 public:
     explicit NumericDisplay(NumericSegments& data) : data_(data) {}
+
+    // Text of up to four characters from the display's character set
+    // (Docs/Display.md#text), right-aligned. A '.' lights the decimal point of
+    // the character before it and a ':' lights L1 and L2; neither takes a
+    // position. A lone "?" is the unavailable pattern. Anything else (an empty
+    // text, a character outside the set, more than four positions, a '.' with
+    // no character before it or a second one on it, a second ':') shows the
+    // error pattern and returns false.
+    bool setText(const char* text);
+    // "....": the decimal point on all four digits. The forecast has no value.
+    void setUnavailable();
 
     void setFixed(int16_t mantissa, uint8_t precision = 0);
     void setValue(int16_t value);

@@ -3,7 +3,6 @@
 #include <Display/DisplayTypes.hpp>
 #include <Clock/CalendarDate.hpp>
 
-#include <cmath>
 #include <cstring>
 
 namespace HostController {
@@ -79,19 +78,6 @@ bool parseUnsigned(const char* text, uint32_t& result)
         value = value * 10U + static_cast<uint32_t>(*cursor - '0');
     }
     result = value;
-    return true;
-}
-
-bool parseTime(const char* text, uint8_t& hour, uint8_t& minute)
-{
-    if (std::strlen(text) != 5U || text[2] != ':' ||
-        text[0] < '0' || text[0] > '9' || text[1] < '0' || text[1] > '9' ||
-        text[3] < '0' || text[3] > '9' || text[4] < '0' || text[4] > '9')
-    {
-        return false;
-    }
-    hour = static_cast<uint8_t>((text[0] - '0') * 10 + text[1] - '0');
-    minute = static_cast<uint8_t>((text[3] - '0') * 10 + text[4] - '0');
     return true;
 }
 
@@ -189,46 +175,6 @@ bool parseServerTime(const char* text, AstroServerTime& result)
     return true;
 }
 
-bool parseTemperature(const char* text, float& result)
-{
-    if (*text == '\0')
-    {
-        return false;
-    }
-    bool negative = false;
-    if (*text == '-' || *text == '+')
-    {
-        negative = *text == '-';
-        ++text;
-    }
-    if (*text < '0' || *text > '9')
-    {
-        return false;
-    }
-
-    float value = 0.0F;
-    while (*text >= '0' && *text <= '9')
-    {
-        value = value * 10.0F + static_cast<float>(*text - '0');
-        ++text;
-    }
-    // Whole degrees; an older server's one decimal is still accepted.
-    if (*text == '.')
-    {
-        if (text[1] < '0' || text[1] > '9' || text[2] != '\0')
-        {
-            return false;
-        }
-        value += static_cast<float>(text[1] - '0') * 0.1F;
-    }
-    else if (*text != '\0')
-    {
-        return false;
-    }
-    result = negative ? -value : value;
-    return std::isfinite(result);
-}
-
 // Protocol 3 cells: `0`-`3` a level, `a`-`c` levels 1-3 blinking (down, to
 // off), `*` level 3 blinking, `?` unavailable (off). A whole-row `?` is all off.
 bool parseMatrixCells(const char* text, AstroMatrixRow& result)
@@ -281,30 +227,16 @@ bool parseMatrixCells(const char* text, AstroMatrixRow& result)
     return true;
 }
 
-AstroParseStatus parseNumeric(const char* text, AstroNumericValue& output,
-                              uint8_t index)
+// The text is not checked here: setText() draws anything it cannot show as
+// the error pattern on that display alone, so one bad value does not cost the
+// whole payload.
+void parseNumeric(const char* text, AstroNumericValue& output)
 {
-    if (valueEquals(text, "?"))
+    output = {};
+    if (std::strlen(text) < output.text.size())
     {
-        output = {};
-        return AstroParseStatus::Success;
+        std::strcpy(output.text.data(), text);
     }
-    output.available = true;
-    if (index < 2U)
-    {
-        output.time = true;
-        if (!parseTime(text, output.hour, output.minute))
-        {
-            return AstroParseStatus::InvalidTime;
-        }
-        return AstroParseStatus::Success;
-    }
-    output.time = false;
-    if (!parseTemperature(text, output.value))
-    {
-        return AstroParseStatus::InvalidTemperature;
-    }
-    return AstroParseStatus::Success;
 }
 
 // A `last...FetchTime` record. Informational only: a bad value does not cost
@@ -375,7 +307,9 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
             {
                 return AstroParseStatus::MissingRecord;
             }
-            if (!valueEquals(value, "3"))
+            // Protocol 4's numerics are display text; protocol 3's times and
+            // whole or one-decimal numbers are valid text too.
+            if (!valueEquals(value, "3") && !valueEquals(value, "4"))
             {
                 return AstroParseStatus::UnsupportedProtocol;
             }
@@ -502,12 +436,7 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
         }
         else if (field >= 3U && field <= 4U)
         {
-            const AstroParseStatus status = parseNumeric(
-                value, board.numeric[field - 3U], static_cast<uint8_t>(field - 3U));
-            if (status != AstroParseStatus::Success)
-            {
-                return status;
-            }
+            parseNumeric(value, board.numeric[field - 3U]);
         }
         else if (field >= 5U && field <= 9U)
         {
@@ -518,12 +447,7 @@ AstroParseStatus parseAstroData(const uint8_t* data, uint32_t length,
         }
         else
         {
-            const AstroParseStatus status = parseNumeric(
-                value, board.numeric[field - 8U], static_cast<uint8_t>(field - 8U));
-            if (status != AstroParseStatus::Success)
-            {
-                return status;
-            }
+            parseNumeric(value, board.numeric[field - 8U]);
         }
         ++field;
     }

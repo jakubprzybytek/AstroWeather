@@ -5,6 +5,7 @@
 #include <Expect.hpp>
 
 #include <array>
+#include <cstdio>
 #include <cstdint>
 #include <string>
 
@@ -39,37 +40,26 @@ bool sameSegments(const NumericSegments& actual, const NumericSegments& expected
     return actual.slots == expected.slots;
 }
 
-// What the display's own setters draw, so these tests pin which setter the
-// mapper uses rather than the digit formatting (tested in NumericDisplayTests).
-NumericSegments expectedTime(uint8_t hour, uint8_t minute)
+// What the display's own setText() draws, so these tests pin that the mapper
+// draws the payload's text rather than the font (tested in NumericDisplayTests).
+NumericSegments expectedText(const char* text)
 {
     NumericSegments segments{};
-    Display::NumericDisplay(segments).setTime(hour, minute);
+    (void)Display::NumericDisplay(segments).setText(text);
     return segments;
 }
 
-NumericSegments expectedValue(float value)
+NumericSegments unavailableSegments()
 {
     NumericSegments segments{};
-    Display::NumericDisplay(segments).setValue(value, 0U);
+    Display::NumericDisplay(segments).setUnavailable();
     return segments;
 }
 
-AstroNumericValue timeValue(uint8_t hour, uint8_t minute)
+AstroNumericValue textValue(const char* text)
 {
     AstroNumericValue value{};
-    value.available = true;
-    value.time = true;
-    value.hour = hour;
-    value.minute = minute;
-    return value;
-}
-
-AstroNumericValue plainValue(float number)
-{
-    AstroNumericValue value{};
-    value.available = true;
-    value.value = number;
+    std::snprintf(value.text.data(), value.text.size(), "%s", text);
     return value;
 }
 
@@ -77,10 +67,10 @@ AstroNumericValue plainValue(float number)
 AstroBoardData blockData(uint8_t block)
 {
     AstroBoardData data{};
-    data.numeric[0] = timeValue(static_cast<uint8_t>(18U + block), 5U);
-    data.numeric[1] = timeValue(static_cast<uint8_t>(block), static_cast<uint8_t>(40U + block));
-    data.numeric[2] = plainValue(10.5F + static_cast<float>(block));
-    data.numeric[3] = plainValue(-3.0F - static_cast<float>(block));
+    std::snprintf(data.numeric[0].text.data(), data.numeric[0].text.size(), "%u:05", 18U + block);
+    std::snprintf(data.numeric[1].text.data(), data.numeric[1].text.size(), "0%u:4%u", block, block);
+    std::snprintf(data.numeric[2].text.data(), data.numeric[2].text.size(), "d %u", 10U + block);
+    std::snprintf(data.numeric[3].text.data(), data.numeric[3].text.size(), "-%u", 3U + block);
     for (uint8_t row = 0U; row < 5U; ++row) {
         const uint32_t lit = (static_cast<uint32_t>(block) << 8U) | (1UL << row) | (1UL << 20U);
         data.matrix[row] = {lit, lit, lit, 0U};  // all at level 3
@@ -88,59 +78,22 @@ AstroBoardData blockData(uint8_t block)
     return data;
 }
 
-void testUnavailablePattern()
-{
-    const NumericSegments unavailable = AstroDisplayMapper::unavailableSegments();
-    for (uint8_t slot = 0U; slot < 4U; ++slot) {
-        expectEqual(unavailable.slots[slot], Display::kSegmentDp, "unavailable digit is the DP");
-    }
-    expectEqual(unavailable.slots[4], 0U, "unavailable indicator slot is blank");
-}
-
-void testNumericKinds()
+void testNumericText()
 {
     NumericSegments segments{};
     segments.slots.fill(0x55U);
-    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), timeValue(21U, 7U));
-    expect(sameSegments(segments, expectedTime(21U, 7U)), "time drawn with setTime");
-    expectEqual(segments.slots[4], 0x03U, "time lights the colon");
+    for (const char* text : {"21:07", "18", "d 12", "F-14", "18.5", "?"}) {
+        AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), textValue(text));
+        expect(sameSegments(segments, expectedText(text)), "numeric drawn as its text");
+    }
+    expectEqual(segments.slots[0], Display::kSegmentDp, "? is the unavailable pattern");
 
-    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), timeValue(0U, 0U));
-    expect(sameSegments(segments, expectedTime(0U, 0U)), "midnight drawn with setTime");
-
-    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), plainValue(18.0F));
-    expect(sameSegments(segments, expectedValue(18.0F)), "value drawn in whole units");
-
-    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), plainValue(18.5F));
-    expect(sameSegments(segments, expectedValue(19.0F)), "a decimal value is rounded");
-
-    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), plainValue(-12.3F));
-    expect(sameSegments(segments, expectedValue(-12.0F)), "negative value in whole units");
-
-    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), plainValue(12345.0F));
-    expect(sameSegments(segments, expectedValue(12345.0F)),
-           "value too large takes the display's own error pattern");
-}
-
-void testUnavailableNumeric()
-{
-    NumericSegments segments{};
-    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), timeValue(12U, 0U));
-    // `?` wins whatever else the value holds.
-    AstroNumericValue unknownTime = timeValue(12U, 0U);
-    unknownTime.available = false;
-    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), unknownTime);
-    expect(sameSegments(segments, AstroDisplayMapper::unavailableSegments()),
-           "? time drawn as the unavailable pattern");
-
-    AstroNumericValue unknownValue = plainValue(5.0F);
-    unknownValue.available = false;
-    segments.slots.fill(0x7FU);
-    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), unknownValue);
-    expect(sameSegments(segments, AstroDisplayMapper::unavailableSegments()),
-           "? value drawn as the unavailable pattern");
-    expect(!sameSegments(segments, expectedValue(1.0E6F)),
-           "unavailable differs from the display error pattern");
+    // Text the display cannot show: its error pattern, not a stale value.
+    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), textValue("12345"));
+    expect(sameSegments(segments, expectedText("12345")), "too long: the error pattern");
+    AstroDisplayMapper::mapNumeric(Display::NumericDisplay(segments), textValue(""));
+    expect(sameSegments(segments, expectedText("")), "empty (over-long in the payload): error");
+    expect(!sameSegments(segments, unavailableSegments()), "error differs from unavailable");
 }
 
 void testMatrixRows()
@@ -248,12 +201,10 @@ void expectBoard(const DisplayBoardState& board, uint8_t block, const char* case
 {
     const AstroBoardData data = blockData(block);
     const auto& state = board.state();
-    expect(sameSegments(state.numeric[0], expectedTime(data.numeric[0].hour, data.numeric[0].minute)),
-           caseName);
-    expect(sameSegments(state.numeric[1], expectedTime(data.numeric[1].hour, data.numeric[1].minute)),
-           caseName);
-    expect(sameSegments(state.numeric[2], expectedValue(data.numeric[2].value)), caseName);
-    expect(sameSegments(state.numeric[3], expectedValue(data.numeric[3].value)), caseName);
+    for (uint8_t numeric = 0U; numeric < 4U; ++numeric) {
+        expect(sameSegments(state.numeric[numeric], expectedText(data.numeric[numeric].text.data())),
+               caseName);
+    }
     for (uint8_t row = 0U; row < 5U; ++row) {
         expectEqual(state.matrix[row], data.matrix[row].lit, caseName);
     }
@@ -386,12 +337,10 @@ void testParsedPayload()
         expectEqual(attributes.blink.matrix[4], 0x0E0000U, "parsed aurora row blinks");
         expectEqual(attributes.matrixLevel(4, 17), 1U, "parsed a");
         expectEqual(attributes.matrixLevel(4, 19), 3U, "parsed c");
-        expect(sameSegments(state.numeric[0], expectedTime(20U, 30U)), "parsed time");
-        expect(sameSegments(state.numeric[1], AstroDisplayMapper::unavailableSegments()),
-               "parsed ? time");
-        expect(sameSegments(state.numeric[2], expectedValue(19.0F)), "parsed value");
-        expect(sameSegments(state.numeric[3], AstroDisplayMapper::unavailableSegments()),
-               "parsed ? value");
+        expect(sameSegments(state.numeric[0], expectedText("20:30")), "parsed time");
+        expect(sameSegments(state.numeric[1], unavailableSegments()), "parsed ? time");
+        expect(sameSegments(state.numeric[2], expectedText("18.5")), "parsed value, as sent");
+        expect(sameSegments(state.numeric[3], unavailableSegments()), "parsed ? value");
     }
 }
 
@@ -399,9 +348,7 @@ void testParsedPayload()
 
 int main()
 {
-    testUnavailablePattern();
-    testNumericKinds();
-    testUnavailableNumeric();
+    testNumericText();
     testMatrixRows();
     testHourIndicatorRows();
     testNumericAttributesReset();

@@ -9,13 +9,13 @@
 
 namespace HostController {
 
+// A numeric record's value as sent: text drawn by
+// Display::NumericDisplay::setText(), `?` for unavailable. Four characters,
+// four points and a colon at most; a longer value is kept empty, which draws
+// as the error pattern.
 struct AstroNumericValue
 {
-    bool available = false;
-    bool time = false;
-    uint8_t hour = 0U;
-    uint8_t minute = 0U;
-    float value = 0.0F;
+    std::array<char, 12> text{};
 };
 
 // One matrix row as parsed, column i in bit i: which columns are lit, their

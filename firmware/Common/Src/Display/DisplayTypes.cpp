@@ -16,6 +16,36 @@ constexpr uint8_t kDigits[] = {
 };
 constexpr uint8_t kMinus = kSegmentG;
 
+// setText()'s characters besides the digits: one look each, none that could be
+// taken for a digit (no B, D, O, S, I, Z or g), and the case as drawn.
+struct Glyph {
+    char character;
+    uint8_t segments;
+};
+constexpr Glyph kGlyphs[] = {
+    {' ', 0x00U}, {'-', 0x40U}, {'_', 0x08U},
+    {'A', 0x77U}, {'C', 0x39U}, {'E', 0x79U}, {'F', 0x71U}, {'H', 0x76U},
+    {'J', 0x1EU}, {'L', 0x38U}, {'P', 0x73U}, {'U', 0x3EU},
+    {'b', 0x7CU}, {'c', 0x58U}, {'d', 0x5EU}, {'h', 0x74U}, {'n', 0x54U},
+    {'o', 0x5CU}, {'q', 0x67U}, {'r', 0x50U}, {'t', 0x78U}, {'u', 0x1CU},
+    {'y', 0x6EU},
+};
+
+bool glyphOf(char character, uint8_t& segments)
+{
+    if (character >= '0' && character <= '9') {
+        segments = kDigits[character - '0'];
+        return true;
+    }
+    for (const Glyph& glyph : kGlyphs) {
+        if (glyph.character == character) {
+            segments = glyph.segments;
+            return true;
+        }
+    }
+    return false;
+}
+
 // Digits drawn for a value: all of its significant digits, and at least the
 // digit left of the decimal point, so 0.5 shows as "0.5" and not ".5".
 uint8_t shownDigitCount(uint32_t magnitude, uint8_t precision)
@@ -51,6 +81,62 @@ bool fits(int16_t mantissa, uint8_t precision)
 void NumericDisplay::setError()
 {
     data_.slots.fill(kSegmentD);
+    data_.slots[4] = 0U;
+}
+
+bool NumericDisplay::setText(const char* text)
+{
+    if (text == nullptr) {
+        setError();
+        return false;
+    }
+    if (text[0] == '?' && text[1] == '\0') {
+        setUnavailable();
+        return true;
+    }
+    std::array<uint8_t, 4> positions{};
+    uint8_t count = 0U;
+    bool colon = false;
+    for (const char* cursor = text; *cursor != '\0'; ++cursor) {
+        const char character = *cursor;
+        if (character == '.') {
+            if (count == 0U || (positions[count - 1U] & kSegmentDp) != 0U) {
+                setError();
+                return false;
+            }
+            positions[count - 1U] |= kSegmentDp;
+            continue;
+        }
+        if (character == ':') {
+            if (colon) {
+                setError();
+                return false;
+            }
+            colon = true;
+            continue;
+        }
+        uint8_t segments = 0U;
+        if (count == positions.size() || !glyphOf(character, segments)) {
+            setError();
+            return false;
+        }
+        positions[count++] = segments;
+    }
+    if (count == 0U) {
+        setError();
+        return false;
+    }
+    data_.slots.fill(0U);
+    for (uint8_t index = 0U; index < count; ++index) {
+        data_.slots[static_cast<uint8_t>(4U - count + index)] = positions[index];
+    }
+    data_.slots[4] = colon ? static_cast<uint8_t>(kSegmentA | kSegmentB) : 0U;
+    return true;
+}
+
+void NumericDisplay::setUnavailable()
+{
+    data_.slots.fill(kSegmentDp);
     data_.slots[4] = 0U;
 }
 

@@ -39,6 +39,11 @@ HostController::AstroParseStatus parse(const std::string& payload,
         static_cast<uint32_t>(payload.size()), data);
 }
 
+std::string textOf(const HostController::AstroNumericValue& value)
+{
+    return std::string(value.text.data());
+}
+
 void testValidPayload()
 {
     const std::string payload = validPayload();
@@ -47,33 +52,13 @@ void testValidPayload()
         reinterpret_cast<const uint8_t*>(payload.data()),
         static_cast<uint32_t>(payload.size()), data);
     expect(status == HostController::AstroParseStatus::Success, "valid payload");
-    expect(data.boards[0].numeric[0].available, "time available");
-    expect(data.boards[0].numeric[0].time, "time type");
-    expect(data.boards[0].numeric[0].hour == 20U, "time hour");
-    expect(!data.boards[0].numeric[1].available, "missing time");
+    expect(textOf(data.boards[0].numeric[0]) == "20:30", "time kept as text");
+    expect(textOf(data.boards[0].numeric[1]) == "?", "? kept as text");
     expect(data.boards[0].matrix[0].lit == 1U, "matrix first pixel");
     expect(data.boards[0].matrix[0].level0 == 1U && data.boards[0].matrix[0].level1 == 0U,
            "matrix first pixel at level 1");
     expect(data.boards[0].matrix[1].lit == 0U, "missing matrix blank");
-    expect(data.boards[0].numeric[2].value > 18.4F &&
-               data.boards[0].numeric[2].value < 18.6F,
-           "maximum temperature");
-}
-
-void testMalformedTemperatureRejected()
-{
-    std::string payload = validPayload();
-    const std::string from = "numeric_2=18.5";
-    const std::string to = "numeric_2=18x5";
-    const std::size_t position = payload.find(from);
-    payload.replace(position, from.size(), to);
-
-    HostController::AstroData data{};
-    const auto status = HostController::parseAstroData(
-        reinterpret_cast<const uint8_t*>(payload.data()),
-        static_cast<uint32_t>(payload.size()), data);
-    expect(status == HostController::AstroParseStatus::InvalidTemperature,
-           "malformed temperature");
+    expect(textOf(data.boards[0].numeric[2]) == "18.5", "temperature kept as text");
 }
 
 void testUnknownKeysAreIgnored()
@@ -324,11 +309,9 @@ void testCrlfLineEndings()
     }
     HostController::AstroData data{};
     expectEqual(parse(crlf, data), AstroParseStatus::Success, "CRLF payload");
-    expectEqual(data.boards[0].numeric[0].hour, 20U, "CRLF time hour");
+    expect(textOf(data.boards[0].numeric[0]) == "20:30", "CRLF time");
     expectEqual(data.boards[5].matrix[0].lit, 1U, "CRLF matrix row");
-    expect(data.boards[0].numeric[3].available && data.boards[0].numeric[3].value < -1.9F &&
-               data.boards[0].numeric[3].value > -2.1F,
-           "CRLF temperature");
+    expect(textOf(data.boards[0].numeric[3]) == "-2", "CRLF temperature, no CR kept");
 }
 
 void testBlocksOutOfOrder()
@@ -381,8 +364,9 @@ void testTruncatedPayload()
     const std::size_t matrix2 = payload.find("matrix_2=", block3);
     expectEqual(parse(payload.substr(0U, matrix2 + 15U)), AstroParseStatus::InvalidMatrix,
                 "cut inside a matrix row");
+    // A numeric cut short is still text: the missing records report it.
     const std::size_t temperature = payload.find("numeric_2=18.5", block3);
-    expectEqual(parse(payload.substr(0U, temperature + 13U)), AstroParseStatus::InvalidTemperature,
+    expectEqual(parse(payload.substr(0U, temperature + 13U)), AstroParseStatus::Truncated,
                 "cut inside a temperature");
 
     // A payload that ends with the last record but no newline is complete.
@@ -414,7 +398,7 @@ void testAuroraRow()
     expectEqual(data.boards[3].matrix[4].blink, 0x00E000U, "aurora row blinking");
     expectEqual(data.boards[3].matrix[4].level0, 0x05A000U, "aurora level bit 0");
     expectEqual(data.boards[3].matrix[4].level1, 0x06C000U, "aurora level bit 1");
-    expect(data.boards[3].numeric[2].available, "temperature after matrix_4");
+    expect(!textOf(data.boards[3].numeric[2]).empty(), "temperature after matrix_4");
 
     expectEqual(parse(replaced(validPayload(), "matrix_4=0000000000000abc12300\n", "")),
                 AstroParseStatus::MissingRecord, "matrix_4 missing");
@@ -459,7 +443,9 @@ void testProtocol()
     expectEqual(parse(replaced(validPayload(), "protocol=3", "protocol=2")),
                 AstroParseStatus::UnsupportedProtocol, "protocol 2");
     expectEqual(parse(replaced(validPayload(), "protocol=3", "protocol=4")),
-                AstroParseStatus::UnsupportedProtocol, "protocol 4");
+                AstroParseStatus::Success, "protocol 4");
+    expectEqual(parse(replaced(validPayload(), "protocol=3", "protocol=5")),
+                AstroParseStatus::UnsupportedProtocol, "protocol 5");
     expectEqual(parse(replaced(validPayload(), "protocol=3\n", "")),
                 AstroParseStatus::MissingRecord, "protocol missing");
     expectEqual(parse(replaced(validPayload(), "protocol=3", "protocol 3")),
@@ -520,23 +506,29 @@ void testUnavailableValues()
     payload = replaced(validPayload(), "numeric_2=18.5", "numeric_2=?");
     payload = replaced(payload, "numeric_0=20:30", "numeric_0=?");
     expectEqual(parse(payload, data), AstroParseStatus::Success, "? numerics");
-    expect(!data.boards[0].numeric[0].available, "? time unavailable");
-    expect(!data.boards[0].numeric[2].available, "? temperature unavailable");
-    expect(data.boards[1].numeric[2].available, "next block's temperature available");
+    expect(textOf(data.boards[0].numeric[0]) == "?", "? time");
+    expect(textOf(data.boards[0].numeric[2]) == "?", "? temperature");
+    expect(textOf(data.boards[1].numeric[2]) != "?", "next block's temperature");
+}
 
-    expectEqual(parse(replaced(validPayload(), "numeric_2=18.5", "numeric_2=??")),
-                AstroParseStatus::InvalidTemperature, "?? temperature");
-    // Whole degrees, as the server sends them; one decimal from an older server.
-    expectEqual(parse(replaced(validPayload(), "numeric_2=18.5", "numeric_2=18"), data),
-                AstroParseStatus::Success, "whole-degree temperature");
-    expect(data.boards[0].numeric[2].value > 17.9F && data.boards[0].numeric[2].value < 18.1F,
-           "whole-degree value");
-    for (const char* bad : {"numeric_2=18.", "numeric_2=18.50", "numeric_2=-", "numeric_2=1 8"}) {
-        expectEqual(parse(replaced(validPayload(), "numeric_2=18.5", bad)),
-                    AstroParseStatus::InvalidTemperature, "rejected temperature");
+// The numerics are display text, drawn by setText(): text it cannot show is
+// its display's error pattern, not a parse failure.
+void testNumericText()
+{
+    HostController::AstroData data{};
+    for (const char* text : {"d 12", "F-14", "18x5", "??", "1 8", "20:3", ""}) {
+        expectEqual(parse(replaced(validPayload(), "numeric_2=18.5", std::string("numeric_2=") + text),
+                          data),
+                    AstroParseStatus::Success, "any text parses");
+        expect(textOf(data.boards[0].numeric[2]) == text, "and is kept as sent");
     }
-    expectEqual(parse(replaced(validPayload(), "numeric_0=20:30", "numeric_0=20:3")),
-                AstroParseStatus::InvalidTime, "short time");
+    // Longer than any text setText() can show: kept empty, the error pattern.
+    expectEqual(parse(replaced(validPayload(), "numeric_2=18.5", "numeric_2=123456789012"), data),
+                AstroParseStatus::Success, "an over-long text parses");
+    expect(textOf(data.boards[0].numeric[2]).empty(), "and is kept empty");
+    expectEqual(parse(replaced(validPayload(), "numeric_2=18.5", "numeric_2=1.2.3.4:"), data),
+                AstroParseStatus::Success, "the longest text parses");
+    expect(textOf(data.boards[0].numeric[2]) == "1.2.3.4:", "and is kept");
 }
 
 } // namespace
@@ -544,7 +536,6 @@ void testUnavailableValues()
 int main()
 {
     testValidPayload();
-    testMalformedTemperatureRejected();
     testUnknownKeysAreIgnored();
     testServerTime();
     testLastWeatherFetchTime();
@@ -560,5 +551,6 @@ int main()
     testAuroraRow();
     testRefreshInterval();
     testUnavailableValues();
+    testNumericText();
     return Test::finish("AstroDataParser");
 }

@@ -98,14 +98,17 @@ const Command kDisplay[] = {
      "Replies 'OK display 0x12', 'ERR display-unreachable 0x12' when the board\n"
      "does not answer, or 'OK display all; unreachable 0x13 0x14'.\n"
      "e.g. 'display 0x12 test', 'display 0x14 show 1 12.3', 'display all clear'"},
-    {"display show <n> <value>", "a number, time, ? or blank on numeric display n",
-     "n is 0-3. <value> is one of:\n"
-     "  12.34  -45  0.5   a number, -999.9 to 9999; the decimals set the precision\n"
-     "  21:45             a time HH:MM, 00-99 each, not checked as a clock\n"
-     "  ?                 the unavailable pattern: all four decimal points\n"
-     "  blank             nothing\n"
+    {"display show <n> <text>", "text, ? or blank on numeric display n",
+     "n is 0-3. <text> is display text, as the forecast sends it: up to four of\n"
+     "  0-9 space - _ A C E F H J L P U b c d h n o q r t u y\n"
+     "right-aligned; '.' lights the point of the character before it and ':'\n"
+     "the colon, neither taking a digit. Words are joined with one space.\n"
+     "  ?      the unavailable pattern: all four decimal points\n"
+     "  blank  nothing\n"
+     "Other text shows the error pattern and replies ERR.\n"
      "On this board display 2 also shows the current and 3 the clock, which\n"
-     "overwrite it. e.g. 'display show 0 12.34', 'display 0x12 show 1 21:45'"},
+     "overwrite it. e.g. 'display show 0 12.34', 'display 0x12 show 1 21:45',\n"
+     "'display show 2 d 12'"},
     {"display row <r> <cells>", "one matrix row, in the forecast's alphabet",
      "r is 0-4, 0 at the top. One character per column, up to 21:\n"
      "  0-3  that level, steady        a-c  levels 1-3, blinking\n"

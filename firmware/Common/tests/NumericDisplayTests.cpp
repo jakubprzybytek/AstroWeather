@@ -11,6 +11,7 @@ namespace {
 
 using Display::NumericDisplay;
 using Display::NumericSegments;
+using Test::expect;
 
 constexpr uint8_t kA = 0x01U;
 constexpr uint8_t kB = 0x02U;
@@ -222,6 +223,82 @@ void testSetValueFloat() {
               "-0.04 rounds to 0.0");
 }
 
+constexpr uint8_t kLetterD = 0x5EU;  // B, C, D, E, G
+constexpr uint8_t kLetterF = 0x71U;  // A, E, F, G
+constexpr std::array<uint8_t, 5> kUnavailable = {kDp, kDp, kDp, kDp, 0U};
+
+void testSetText() {
+  NumericSegments data{};
+  NumericDisplay display(data);
+
+  expect(display.setText("12"), "text accepted");
+  expectSlots(data, {0U, 0U, kDigits[1], kDigits[2], 0U}, "text right-aligned");
+
+  display.setText("d 12");
+  expectSlots(data, {kLetterD, 0U, kDigits[1], kDigits[2], 0U}, "mark, space, value");
+
+  display.setText("F-14");
+  expectSlots(data, {kLetterF, kG, kDigits[1], kDigits[4], 0U}, "mark and negative value");
+
+  display.setText("12.5");
+  expectSlots(data, {0U, kDigits[1], withDp(kDigits[2]), kDigits[5], 0U},
+              "a point takes no position");
+
+  display.setText("19:31");
+  expectSlots(data,
+              {kDigits[1], kDigits[9], kDigits[3], kDigits[1],
+               static_cast<uint8_t>(kA | kB)},
+              "a colon lights L1 and L2");
+
+  display.setText("-2");
+  expectSlots(data, {0U, 0U, kG, kDigits[2], 0U}, "the colon is cleared");
+
+  display.setText("....");
+  expectSlots(data, kError, "points with nothing before them: error");
+}
+
+void testSetTextCharacters() {
+  NumericSegments data{};
+  NumericDisplay display(data);
+
+  const char* accepted = "0123456789 -_ACEFHJLPUbcdhnoqrtuy";
+  for (const char* c = accepted; *c != '\0'; ++c) {
+    const char text[2] = {*c, '\0'};
+    expect(display.setText(text), "every character of the set is accepted");
+  }
+  for (const char* c = "BDOSIZgfkmvwxK?*a"; *c != '\0'; ++c) {
+    const char text[3] = {'1', *c, '\0'};
+    expect(!display.setText(text), "a character outside the set is rejected");
+    expectSlots(data, kError, "and shows the error pattern");
+  }
+}
+
+void testSetTextErrors() {
+  NumericSegments data{};
+  NumericDisplay display(data);
+
+  expect(!display.setText("12345"), "five positions rejected");
+  expectSlots(data, kError, "five positions: error");
+  expect(display.setText("-99.9"), "four positions and a point fit");
+  expect(!display.setText(""), "empty text rejected");
+  expectSlots(data, kError, "empty text: error");
+  expect(!display.setText(".5"), "a leading point rejected");
+  expect(!display.setText("1..5"), "two points on one character rejected");
+  expect(!display.setText("1:2:3"), "two colons rejected");
+  expect(!display.setText(nullptr), "no text rejected");
+}
+
+void testUnavailable() {
+  NumericSegments data{};
+  NumericDisplay display(data);
+
+  display.setUnavailable();
+  expectSlots(data, kUnavailable, "unavailable: the point on all four digits");
+  display.setText("12");
+  expect(display.setText("?"), "a lone ? accepted");
+  expectSlots(data, kUnavailable, "a lone ? is the unavailable pattern");
+}
+
 void testSetTime() {
   NumericSegments data{};
   NumericDisplay display(data);
@@ -304,6 +381,10 @@ int main() {
   testSetFixedBelowOne();
   testSetValueInteger();
   testSetValueFloat();
+  testSetText();
+  testSetTextCharacters();
+  testSetTextErrors();
+  testUnavailable();
   testSetTime();
   testSetTimeUnset();
   testSetBlank();

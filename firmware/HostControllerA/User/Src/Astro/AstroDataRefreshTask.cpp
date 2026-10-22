@@ -50,8 +50,6 @@ const char* parseStatusName(AstroParseStatus status)
     case AstroParseStatus::UnsupportedBoard: return "unsupported-board";
     case AstroParseStatus::MissingRecord: return "missing-record";
     case AstroParseStatus::InvalidDisplay: return "invalid-display";
-    case AstroParseStatus::InvalidTime: return "invalid-time";
-    case AstroParseStatus::InvalidTemperature: return "invalid-temperature";
     case AstroParseStatus::InvalidMatrix: return "invalid-matrix";
     case AstroParseStatus::Truncated: return "truncated";
     }
@@ -82,32 +80,8 @@ void logRawPayload(const uint8_t* data, uint32_t length)
 
 void logNumeric(uint8_t index, const AstroNumericValue& value)
 {
-    if (!value.available)
-    {
-        LogService::instance().logf(
-            LogService::Level::Info, "AstroDataRefresh numeric_%u=?",
-            static_cast<unsigned int>(index));
-    }
-    else if (value.time)
-    {
-        LogService::instance().logf(
-            LogService::Level::Info, "AstroDataRefresh numeric_%u=%02u:%02u",
-            static_cast<unsigned int>(index), static_cast<unsigned int>(value.hour),
-            static_cast<unsigned int>(value.minute));
-    }
-    else
-    {
-        const int32_t tenths = static_cast<int32_t>(value.value * 10.0F);
-        const int32_t magnitude = tenths < 0 ? -tenths : tenths;
-        const int32_t whole = magnitude / 10;
-        const int32_t fraction = magnitude % 10;
-        LogService::instance().logf(
-            LogService::Level::Info,
-            tenths < 0 ? "AstroDataRefresh numeric_%u=-%ld.%ld"
-                       : "AstroDataRefresh numeric_%u=%ld.%ld",
-            static_cast<unsigned int>(index), static_cast<long>(whole),
-            static_cast<long>(fraction));
-    }
+    LogService::instance().logf(LogService::Level::Info, "AstroDataRefresh numeric_%u=\"%s\"",
+                                static_cast<unsigned int>(index), value.text.data());
 }
 
 // The clock follows the server's `time` on every successful fetch; see
