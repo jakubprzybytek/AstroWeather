@@ -18,7 +18,7 @@ Wire example
 ------------
 
 ```
-protocol=3
+protocol=4
 configurationId=krakow
 time=2026-09-22T23:22:45.678+02:00
 lastWeatherFetchTime=2026-09-22T18:00:04+02:00
@@ -130,7 +130,7 @@ Framing and parsing rules
   character when the entire matrix row is unavailable. Within a 21-character
   row, `?` marks an unavailable individual slot.
 - A successful response always has six display blocks, with display indexes 0
-  to 5. There is no displayCount or end marker in version 3.
+  to 5. There is no displayCount or end marker in version 4.
 - The device must reject the update if the protocol version is unsupported, a
   required record is malformed or absent, the board is unsupported, display
   indexes are not consecutive, or the HTTP body ends before all required
@@ -142,17 +142,19 @@ Field definitions
 -----------------
 
 protocol
-  Decimal protocol version. The current version is 3, which added the
-  blinking levels `a`, `b` and `c` to the matrix cells, the `matrix_4` aurora
-  row and the `refreshIntervalMinutes` header record; see Matrix encoding.
-  Version 2 (levels and `*` only, no aurora) was retired with it: a device
-  accepts only version 3. Version 2 had replaced version 1's on/off cells.
-  The aurora fetch-time records were added to version 3 later without a
-  version change: they are additive, and a device that does not know them
-  ignores them.
+  Decimal protocol version. The current version is 4, which made the
+  numerics display text (see Numeric display text) and added the dew and
+  frost marks to the temperatures. Version 3's times and numbers are valid
+  text, so a device reading version 4 also reads version 3; a device reading
+  only version 3 rejects version 4. Version 3 added the blinking levels `a`,
+  `b` and `c` to the matrix cells, the `matrix_4` aurora row and the
+  `refreshIntervalMinutes` header record; see Matrix encoding. The aurora
+  fetch-time records were added to version 3 later without a version change:
+  they are additive, and a device that does not know them ignores them.
+  Versions 1 and 2 are retired.
 
 board
-  Display format identifier. Version 3 supports only
+  Display format identifier. Version 4 supports only
   `num4x4_matrix5x21`. The board record is repeated in every display block so
   a device can validate each block independently.
 
@@ -244,37 +246,58 @@ matrix_4
 numeric_2
   Temperature at the start of the night, in whole degrees Celsius, with no
   decimal point: at astronomical dusk, or at nautical dusk or sunset where
-  the night is never astronomically dark. A question mark means weather is
-  unavailable.
+  the night is never astronomically dark. With a dew or frost mark in the
+  first digit when the air is near its dew point then (see Temperature
+  marks). A question mark means weather is unavailable.
 
 numeric_3
   Lowest temperature from the start to the end of that night (to
   astronomical dawn, or nautical dawn or sunrise), in whole degrees Celsius,
-  with no decimal point. A question mark means weather is unavailable.
+  with no decimal point, marked like numeric_2 by the dew point at the hour
+  of the minimum. A question mark means weather is unavailable.
 
-Numeric display formats
--------------------------
+Numeric display text
+--------------------
 
-Every numeric display supports these value formats:
+Each numeric is the text its four-digit display shows, written by the server
+for board `num4x4_matrix5x21`. The payload carries characters, not segment
+bitmaps; what a numeric means is defined above, not by the format.
 
-- integer values from `-999` through `9999`;
-- fixed-precision numbers from `-999.9` through `999.9`, with a smallest
-  representable increment of `0.001`;
-- times in `HH:MM` format;
-- `?` for unavailable data.
-
-The payload carries values, not segment bitmaps. The server must emit values
-within these supported ranges and formats.
+- Up to four characters from the display's set: the digits `0`-`9`, space,
+  `-`, `_`, the upper-case letters `A C E F H J L P U` and the lower-case
+  letters `b c d h n o q r t u y`. Letters a seven-segment digit draws like a
+  digit (`B D O S I Z g`) are not in the set.
+- The text is right-aligned in the four digits. Spaces inside it are kept, so
+  `d  5` puts the mark in the first digit and the 5 in the last.
+- A `.` lights the decimal point of the character before it and a `:` lights
+  the colon; neither takes a digit. `20:30` and `12.5` are four and three
+  digits.
+- `?` alone is the missing-value sentinel: the display shows the decimal
+  point on all four digits.
+- The device shows its error pattern on a display whose text it cannot draw,
+  and still uses the rest of the payload. The server must only send text in
+  this format.
 
 For this protocol:
 
-- `numeric_0` and `numeric_1` contain local astronomical dusk and dawn times;
-- `numeric_2` and `numeric_3` contain temperatures in whole degrees, such as
-  `18` or `-3`.
-- `numeric_0` and `numeric_1` use the missing-value sentinel `?` when
-  the corresponding astronomical event is unavailable.
-- `numeric_2` and `numeric_3` use the missing-value sentinel `?` when
-  weather is unavailable.
+- `numeric_0` and `numeric_1` are local times `HH:MM`, such as `19:31` or
+  `05:22`, or `?` when the event does not occur.
+- `numeric_2` and `numeric_3` are whole degrees, such as `18` or `-3`,
+  optionally marked (see Temperature marks), or `?` when weather is
+  unavailable.
+
+Temperature marks
+-----------------
+
+A temperature whose air is within 2 °C of the dew point at the same time is
+marked: `d` for dew, or `F` for frost when the temperature is at or below
++1 °C. On a clear night the optics radiate and run 1-3 °C colder than the air,
+so dew and frost form before the air reaches its dew point or freezes. The
+mark goes in the first digit and the degrees are right-aligned after it:
+`d 12`, `d  5`, `F -3`, `F-14`. Without a dew point for that time there is no
+mark. Each temperature is judged at its own time: numeric_2 at dusk, numeric_3
+at the hour of the minimum. A `d` on numeric_3 only means dew later in the
+night; on both, dew from the start.
 
 Matrix encoding
 ---------------
@@ -354,7 +377,7 @@ Errors
 
 Errors also use text/plain and a small parseable body:
 
-protocol=3
+protocol=4
 error=configuration_not_found
 
 HTTP status remains authoritative: 404 for an unknown configuration and 500

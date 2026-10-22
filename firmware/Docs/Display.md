@@ -60,6 +60,8 @@ Each board exposes four numeric displays indexed `0` to `3` and five matrix
 rows indexed `0` to `4`; row `0` is the top.
 
 ```cpp
+numeric(i).setText(const char* text);   // false: drew the error pattern
+numeric(i).setUnavailable();
 numeric(i).setFixed(int16_t mantissa, uint8_t precision = 0);
 numeric(i).setValue(int16_t value);
 numeric(i).setValue(float value, uint8_t precision = 0);
@@ -154,9 +156,48 @@ Patterns with a meaning:
 | Pattern | Segments | Use |
 | --- | --- | --- |
 | Error | D on all four digits (`____`) | A setter got a value it cannot show |
-| Unavailable | DP on all four digits (`....`) | The forecast has no value (`?` in the payload) |
+| Unavailable | DP on all four digits (`....`) | `setUnavailable()`, or `setText("?")`: the forecast has no value (`?` in the payload) |
 | Time unset | G on all four digits, L1 and L2 (`--:--`) | `setTimeUnset()`: the clock is not set |
 | No data | G on the last digit only (`   -`) | `setNoData()`: no data received yet |
+
+There are two kinds of setter, drawing with one digit font. The typed setters
+(`setFixed()`, `setValue()`, `setTime()` and the patterns) are for values a
+board formats itself: the host's clock and current reading, the boot screens.
+`setText()` is for text formatted elsewhere: the forecast payload's numerics
+and the console's `display show`.
+
+### Text
+
+`setText()` draws up to four characters, right-aligned, from this set:
+
+| Kind | Characters |
+| --- | --- |
+| Digits | `0`–`9` |
+| Signs | space, `-` (G), `_` (D) |
+| Upper-case letters | `A` `C` `E` `F` `H` `J` `L` `P` `U` |
+| Lower-case letters | `b` `c` `d` `h` `n` `o` `q` `r` `t` `u` `y` |
+
+Each character has one look, in the case shown. Letters a seven-segment digit
+draws like a digit (`B` 8, `D` 0, `O` 0, `S` 5, `I` 1, `Z` 2, `g` 9) are not
+in the set, nor those it cannot draw (`K` `M` `V` `W` `X`); a lower-case `f`
+would look like `F`.
+
+- A `.` lights the decimal point of the character before it and takes no
+  position: `12.5` is three positions.
+- A `:` lights L1 and L2, wherever it stands: `19:31`.
+- `?` alone is the unavailable pattern.
+- Anything else shows the error pattern and returns false: an empty text, a
+  character outside the set, more than four positions, a `.` with no character
+  before it or a second `.` on one character, or a second `:`.
+
+| Text | Display |
+| --- | --- |
+| `12` | `12`, in the two rightmost positions |
+| `d 12` | `d 12` |
+| `F-14` | `F-14` |
+| `12.5` | `12.5` |
+| `19:31` | `19:31` |
+| `12345`, `dEw` | error pattern |
 
 ### Fixed-point values
 

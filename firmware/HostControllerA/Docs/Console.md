@@ -604,7 +604,7 @@ blink and level model is in [Display.md](../../Docs/Display.md#public-interface)
 
 | Command | Effect |
 | --- | --- |
-| `display show <n> <value>` | Numeric display `n` (0–3) shows `value`: a number with up to three decimals (`12.34`, `-45`, `0.5`; the decimals set the precision, −999.9 to 9999), a time `HH:MM` (00–99 each, not checked as a clock), `?` for the unavailable pattern (the decimal point on all four digits) or `blank`. |
+| `display show <n> <text>` | Numeric display `n` (0–3) shows display text, as the forecast sends it ([Display.md](../../Docs/Display.md#text)): up to four characters from the display's set, right-aligned, `.` lighting the point of the character before it and `:` the colon (`12.34`, `-45`, `21:45`, `d 12`, `F-14`). The words after `n` are joined with one space. `?` is the unavailable pattern (the decimal point on all four digits), `blank` nothing. Other text shows the error pattern and replies `ERR invalid-argument`. |
 | `display row <r> <cells>` | Matrix row `r` (0–4, 0 at the top), one character per column as the forecast payload sends them: `0`–`3` the level, `a`–`c` levels 1–3 blinking, `*` full and blinking, `.` or `?` off. Missing columns are off; more than 21 is an error. `display row 0 0123abc*0123abc*012300` shows every kind. |
 | `display blink <n> off\|colon\|all` | Nothing, the colon (L1 and L2), or every segment of display `n` blinks. |
 | `display level <n> <0-3>` | Brightness level of display `n`, all segments; 3 is full. |

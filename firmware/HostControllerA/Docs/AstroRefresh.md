@@ -151,7 +151,7 @@ whole payload has validated.
 
 ### Header
 
-1. The first record must be `protocol`, and its value exactly `3`. Versions 1 (on/off cells) and 2 (no blinking levels, no aurora row) are rejected.
+1. The first record must be `protocol`, and its value `3` or `4`. Version 4's numerics are display text; version 3's times and numbers are valid text too, so both are read the same way. Versions 1 (on/off cells) and 2 (no blinking levels, no aurora row) are rejected.
 2. The second must be `configurationId`, with a value of at most 20
    characters. The value is not compared with the configuration requested.
 3. Before `display=0`, `time`, `lastWeatherFetchTime`, the aurora fetch times
@@ -175,27 +175,28 @@ Within each block the records must come in this order:
 | --- | --- | --- |
 | 1 | `board` | Exactly `num4x4_matrix5x21`. |
 | 2 | `nightId` | Not validated; kept (up to 15 characters) for the log. |
-| 3 | `numeric_0` | Astronomical dusk, `HH:MM` or `?`. |
-| 4 | `numeric_1` | Astronomical dawn, `HH:MM` or `?`. |
+| 3 | `numeric_0` | Display text: astronomical dusk, such as `19:31`, or `?`. |
+| 4 | `numeric_1` | Display text: astronomical dawn, or `?`. |
 | 5–9 | `matrix_0` … `matrix_4` | 21 characters from `0`–`3`, `a`–`c`, `*` and `?`, or the single `?`. `matrix_4` is the aurora. |
-| 10 | `numeric_2` | Temperature at dusk, or `?`. |
-| 11 | `numeric_3` | The night's minimum temperature, or `?`. |
+| 10 | `numeric_2` | Display text: the temperature at dusk, such as `12` or `d 12`, or `?`. |
+| 11 | `numeric_3` | Display text: the night's minimum temperature, such as `F -3`, or `?`. |
 
 - An unknown key anywhere in a block, or after the last block, is ignored.
 - A known block key out of place is `missing-record`, as is a `display` record
   before the current block is complete, or after `display=5`.
-- A time is two digits, a colon, two digits. The digits are not range-checked;
-  the numeric display decides what it can show.
-- A temperature is an optional `+` or `-` and one or more digits: `18`, `-2`,
-  as the server sends it. A point and exactly one digit may follow (`18.5`),
-  the form an older server sent. `18.` and `18.50` are rejected.
+- A numeric is kept as the text it is (`AstroNumericValue`, up to 11
+  characters) and not checked: `NumericDisplay::setText()` draws it, and text
+  it cannot show is the error pattern on that display alone, not a parse
+  failure. A longer value is kept empty, which draws as the error pattern.
+  Protocol 3 allowed a leading `+`, which is not in the character set; the
+  server never sent one.
 - In a matrix row, each character is one column: `0` off, `1`–`3` lit at that
   brightness level, `a`–`c` lit at level 1–3 and blinking (alternating with
   off), `*` the same as `c`, `?` off. A whole-row `?` is all off. The row is
   kept as four bit-planes, column *i* in bit *i*: `lit`, the level's two bits
   `level0` and `level1`, and `blink` (`AstroMatrixRow`). Version 1's `.` is
   rejected.
-- `?` for a numeric is valid unavailable data, not a parse failure.
+- `?` for a numeric is unavailable data: the unavailable pattern.
 
 ### Parse results
 
@@ -204,12 +205,10 @@ Within each block the records must come in this order:
 | `Success` | `success` | Six complete blocks. |
 | `InvalidArgument` | `invalid-argument` | Empty body. |
 | `Malformed` | `malformed` | A line with no `=`. |
-| `UnsupportedProtocol` | `unsupported-protocol` | `protocol` is not `3`. |
+| `UnsupportedProtocol` | `unsupported-protocol` | `protocol` is neither `3` nor `4`. |
 | `UnsupportedBoard` | `unsupported-board` | `board` is not `num4x4_matrix5x21`. |
 | `MissingRecord` | `missing-record` | `protocol` or `configurationId` not first, `configurationId` over 20 characters, or a block record missing or out of order. |
 | `InvalidDisplay` | `invalid-display` | The first block is not `display=0`, or a block index is not the next one. |
-| `InvalidTime` | `invalid-time` | `numeric_0` or `numeric_1` is neither `?` nor `HH:MM`. |
-| `InvalidTemperature` | `invalid-temperature` | `numeric_2` or `numeric_3` is neither `?` nor a whole or one-decimal number. |
 | `InvalidMatrix` | `invalid-matrix` | A matrix row of the wrong length or with another character. |
 | `Truncated` | `truncated` | The body ended, or a line was too long, before six complete blocks. |
 
@@ -231,7 +230,10 @@ The firmware follows `api-payload.md` except in these details:
   from the wall-clock part only; see [RTC.md](RTC.md#limits).
 - A bad `time` or fetch time does not reject the payload; the
   contract's rejection rules cover only required records.
-- `nightId` is not checked to be a date, and times are not range-checked.
+- `nightId` is not checked to be a date, and the numerics' text is not
+  checked against the contract's meaning (a time, a temperature); a character
+  the display cannot draw shows the error pattern on that display instead of
+  rejecting the payload.
 - The contract rejects a body shorter than its `Content-Length`. That check is
   in the HTTP client; the parser only sees whether six blocks arrived.
 - An error payload (`error=...`, with HTTP 404 or 500) never reaches the
@@ -271,10 +273,7 @@ On each board:
 
 | Payload | Board element | How it is drawn |
 | --- | --- | --- |
-| `numeric_0` | Numeric 0 | `setTime(hour, minute)`: hour without a leading zero, colon lit. |
-| `numeric_1` | Numeric 1 | `setTime(hour, minute)` |
-| `numeric_2` | Numeric 2 | `setValue(value, 0)`: whole degrees, no decimal point, for example `18`, `-2`. A one-decimal value is rounded: `18.5` shows as `19`. |
-| `numeric_3` | Numeric 3 | `setValue(value, 0)` |
+| `numeric_0` … `numeric_3` | Numerics 0–3 | `setText()`: right-aligned, `:` lights the colon, `.` the point of the character before it; `20:30`, `d 12`, `F-14` as sent. The server writes the hour's leading zero (`05:22`), so it shows. |
 | `matrix_0` … `matrix_4` | Matrix rows 0–4 | `setRow()` with the lit columns, character *i* to column *i*; the level planes and the blink mask into the board's attributes. Unlit columns are left at full level, so a later `display row` lighting one shows it. On the local board row 4 replaces the progress bar. |
 
 The numerics carry no attributes in the payload, so the mapper resets theirs
@@ -284,9 +283,9 @@ described in [Display.md](../../Docs/Display.md#blink-and-brightness-levels).
 
 A numeric `?` is drawn as the decimal point on all four digits and nothing in
 the indicator slot. That is distinct from the numeric display's own error
-pattern, segment D (an underscore) on all four digits, which a value the
-display cannot show gets instead: a temperature outside -999 … 9999, or an
-hour above 99. See [Display.md](../../Docs/Display.md#numeric-representation).
+pattern, segment D (an underscore) on all four digits, which text the display
+cannot show gets instead: more than four positions, or a character outside its
+set. The character set is in [Display.md](../../Docs/Display.md#text).
 
 Only a fully parsed payload is published. After a fetch, CRC or parse failure
 the display keeps whatever it showed.
@@ -491,7 +490,8 @@ Native tests, run with the other suites; see [Development.md](../../Docs/Develop
 
 - `tests/AstroDataParserTests.cpp`: a valid six-block payload, time and matrix
   unavailable values, every matrix cell kind and its planes, the rejected
-  version 1 rows, one malformed temperature, an unknown header key, and the
+  version 1 rows, numerics kept as text (marks, text the display cannot show,
+  over-long text kept empty), protocols 3 and 4, an unknown header key, and the
   `time` and `lastWeatherFetchTime` records in all their accepted and
   malformed forms, and the aurora fetch times.
 - `tests/RefreshScheduleTests.cpp`: slot boundaries, retry delays, the first
@@ -499,7 +499,8 @@ Native tests, run with the other suites; see [Development.md](../../Docs/Develop
   counting, missed slots caught up once, backoff and its reset at the next
   slot, tick wrap, no retry without credentials, an unset clock, clock
   steps both ways, and switching to hourly slots and back.
-- `tests/AstroDisplayMapperTests.cpp`: each numeric kind and `?`, matrix rows
+- `tests/AstroDisplayMapperTests.cpp`: numerics drawn as their text, `?` and
+  the error pattern, matrix rows
   with their levels and blinking, the numerics' attributes reset, the aurora
   row replacing the progress bar on the local board and drawn on the remotes,
   each block on its board, and a parsed payload's `0`–`3`, `a`–`c`, `?` cells

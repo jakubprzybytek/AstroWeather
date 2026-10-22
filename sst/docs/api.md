@@ -55,7 +55,7 @@ made-up forecast that shows every display variant, for trying the boards out.
 `test` is not in `configurations.ts` and is not listed by
 `GET /configurations`; the web UI offers it on the Home view only, and the
 device fetches it with `astro test` (or with `api path /device/astro/test`).
-The payload is a normal protocol 3 response for six consecutive nights
+The payload is a normal protocol 4 response for six consecutive nights
 (`forecast/demo.ts`):
 
 - `time` is the real time in Europe/Warsaw, since the device sets its clock
@@ -90,12 +90,12 @@ the four aurora records are the same for each aurora feed. Each block contains, 
 `matrix_4`, `numeric_2`, and `numeric_3`. `numeric_0` and `numeric_1`
 are astronomical dusk and dawn; `matrix_0` through `matrix_4` are sky, moon, cloud,
 precipitation and aurora; and `numeric_2` and `numeric_3` are the temperature
-at dusk and the night's minimum temperature. `board` is `num4x4_matrix5x21` in version 3.
+at dusk and the night's minimum temperature. `board` is `num4x4_matrix5x21` in version 4.
 `refreshIntervalMinutes` is `60` on a storm night and `360` otherwise.
 
 Records remain present when a source is missing or fails and use the payload
 sentinel `?` for all unavailable times, weather values, and matrix slots. There is no
-`displayCount` or end marker in version 3. The wire
+`displayCount` or end marker in version 4. The wire
 format has one empty row between display blocks and no comments.
 
 Error responses use the same line protocol and stable machine-readable error
@@ -217,6 +217,13 @@ weather for the night, and both are `?` when the night's dusk and dawn cannot
 be calculated. The difference between the two shows how much the night cools:
 a large drop is a clear, still night, with dew likely and optics to let cool.
 
+Each temperature is marked when the air is within 2 °C of the dew point at its
+own time (Clear Outside's hourly dew point, interpolated like the
+temperature): `d` for dew, `F` for frost at or below +1 °C. The mark takes the
+first of the display's four digits and the degrees are right-aligned after it
+(`d 12`, `F -3`); see `api-payload.md` (Temperature marks). Nights stored
+before the dew point was collected have no marks.
+
 ### Graceful degradation
 
 Astronomy and weather are assembled independently. Missing, expired, or failed
@@ -256,7 +263,7 @@ client. Operational details belong in structured Lambda logs.
 ## Acceptance Criteria
 
 1. A request for a known configuration returns `200`, content type `text/plain`,
-   protocol version 3, and exactly six display blocks in ascending order.
+   protocol version 4, and exactly six display blocks in ascending order.
 2. The first night is selected using the location's timezone and local-noon
    boundary; the next five night identifiers are consecutive local dates.
 3. Every display block contains the complete, fixed-order record set defined in
@@ -310,12 +317,10 @@ The aurora row uses:
 
 ## Open Items
 
-- **Dew risk.** The ingestion stores Clear Outside's hourly dew point
-  (`dewPointC`, see [architecture.md](architecture.md)), and the web UI's
-  Clearoutside table shows it, but the payload does not use it yet. The
-  night's minimum temperature minus the dew point at that hour says whether
-  dew will form on the optics (within about 2–3 °C). It needs a place on the
-  board: all four numerics and all five matrix rows are in use.
+- **Frost chance.** Clear Outside also has a "Chance of Frost" row, not yet
+  parsed; it was empty for every hour of the October pages checked. It could
+  be compared with the `F` mark's own rule (dew point within 2 °C, +1 °C or
+  below).
 
 ## Clients
 

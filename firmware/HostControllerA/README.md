@@ -87,7 +87,7 @@ Hardware issue IDs (C-1, H-1, ...) refer to
 | **Display** | | | |
 | Local LED board: interrupt-driven multiplexing, refresh progress bar | ✅ | Matrix column 1 stays lit on the prototype ([Display-Issues.md](../../KiCad/Docs/Display-Issues.md)) | [Display.md](../Docs/Display.md) |
 | Blinking and four brightness levels per segment and pixel | ✅ | The forecast's matrix rows carry levels and blink; the clock's colon and the progress bar blink | [Display.md](../Docs/Display.md#blink-and-brightness-levels) |
-| Numeric formatting: fixed point, time, `?`, "no data" | ✅ | -0.5 shows as `-0.5`; values that do not fit four digits show the error pattern | [Display.md](../Docs/Display.md#numeric-representation) |
+| Numeric formatting: fixed point, time, display text, `?`, "no data" | ✅ | -0.5 shows as `-0.5`; the forecast's numerics are text such as `d 12`; anything that does not fit four digits shows the error pattern | [Display.md](../Docs/Display.md#numeric-representation) |
 | Boot screens: slot test, then the host's strap address and build number | ✅ | Shared with the display boards | [Display.md](../Docs/Display.md#boot-screens) |
 | Remote display boards over I2C | ✅ | Board `0x11` runs the [DisplayController](../DisplayController/README.md) firmware; I2C pull-ups needed (H-4) | [I2C.md](../Docs/I2C.md) |
 | Timeline sync: the display boards' refresh, blinking and heartbeat in step with the host's | 🟡 | `DisplaySync` broadcasts on the I2C general call at boot, on request and every 2 min, and polls each board's status; `time sync [now]`. Unit tested, simulated and bench-measured on one board | [TimelineSync.md](../Docs/TimelineSync.md) |
