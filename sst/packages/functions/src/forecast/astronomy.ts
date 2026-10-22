@@ -11,8 +11,10 @@ function validDate(date: Date | undefined): date is Date {
   return date !== undefined && !Number.isNaN(date.getTime());
 }
 
+// A local time as display text, the hour without a leading zero ("5:28"),
+// as a clock shows it; `?` for an event that does not occur.
 function eventTime(date: Date | undefined, timezone: string): string {
-  return validDate(date) ? localTime(date, timezone) : "?";
+  return validDate(date) ? localTime(date, timezone).replace(/^0(?=\d)/, "") : "?";
 }
 
 // Minutes of the slot's hour during which the body is above the horizon,

@@ -7,7 +7,8 @@ import { NO_AURORA_FETCH, serializeForecast, validNumericText } from "./protocol
 const NOW = new Date("2026-10-01T18:00:00Z");
 
 function minutes(time: string): number {
-  return Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+  const [hours, minutes] = time.split(":");
+  return Number(hours) * 60 + Number(minutes);
 }
 
 describe("demo forecast", () => {
@@ -37,7 +38,7 @@ describe("demo forecast", () => {
     // 05:00 mostly level 1 (dawn 04:58), 06:00 mostly level 2.
     const fixed = demoForecast(NOW, sequence([(18 * 60 + 30 - 17 * 60) / (3 * 60 + 31), (6 * 60 + 50 - 5 * 60 - 30) / 121, 0, 0]));
     expect(fixed.displays[0].astronomicalDusk).toBe("20:22");
-    expect(fixed.displays[0].astronomicalDawn).toBe("04:58");
+    expect(fixed.displays[0].astronomicalDawn).toBe("4:58");
     expect(fixed.displays[0].sun).toBe("333332000000000123333");
   });
 

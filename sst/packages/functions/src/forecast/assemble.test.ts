@@ -55,7 +55,7 @@ describe("assembleForecast", () => {
     // nautical twilight, 19:00 just mostly astronomical twilight; 05:00 too.
     const october = (await krakow("2026-10-19T10:00:00Z")).displays[0];
     expect(october.astronomicalDusk).toBe("19:31");
-    expect(october.astronomicalDawn).toBe("05:22");
+    expect(october.astronomicalDawn).toBe("5:22");  // no leading zero
     expect(october.sun).toBe("333321000000000123333");
     expect(october.moon).toMatch(/^[0-3]{21}$/);
 

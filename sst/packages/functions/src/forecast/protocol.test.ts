@@ -7,7 +7,7 @@ function display(index: number): ForecastDisplay {
     display: index,
     board: "num4x4_matrix5x21",
     nightId: `2026-09-${String(17 + index).padStart(2, "0")}`,
-    astronomicalDusk: "20:30", astronomicalDawn: "05:59",
+    astronomicalDusk: "20:30", astronomicalDawn: "5:59",
     sun: "333320000000000002333", moon: "?", cloud: "000000000000000000000",
     precipitation: "?", aurora: "000000000000000000000", duskTemperature: "18", nightMinimumTemperature: "9"
   };
@@ -26,7 +26,7 @@ describe("forecast protocol", () => {
       "lastWeatherFetchTime=2026-09-17T18:00:04+02:00", "lastGfzFetchTime=2026-09-17T17:03:40+02:00",
       "lastNoaaKpFetchTime=2026-09-17T17:03:41+02:00", "lastNoaaOutlookFetchTime=2026-09-17T11:03:41+02:00",
       "lastOvationFetchTime=?", "refreshIntervalMinutes=360", "", "display=0",
-      "board=num4x4_matrix5x21", "nightId=2026-09-17", "numeric_0=20:30", "numeric_1=05:59",
+      "board=num4x4_matrix5x21", "nightId=2026-09-17", "numeric_0=20:30", "numeric_1=5:59",
       "matrix_0=333320000000000002333", "matrix_1=?", "matrix_2=000000000000000000000",
       "matrix_3=?", "matrix_4=000000000000000000000", "numeric_2=18", "numeric_3=9", "", "display=1"
     ]);

@@ -161,7 +161,8 @@ and longitude. Astronomical dusk (the sun 18° below the horizon) belongs to
 the date that starts the night, and astronomical dawn belongs to the following
 local date. Sunset, sunrise, moonrise and moonset times are not emitted.
 
-Astronomical dusk and dawn are serialized as local `HH:MM` values. An event
+Astronomical dusk and dawn are serialized as local 24-hour times without a
+leading zero on the hour (`19:31`, `5:22`), as a clock shows them. An event
 that does not occur is represented by `?`: at 50° N the sun stays above −18°
 on summer nights, from about late May to mid-July. Sun and moon are graded
 for the 21 local-hour slots, 14:00 through 10:00 on the following date, with

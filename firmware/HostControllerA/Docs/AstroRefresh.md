@@ -273,7 +273,7 @@ On each board:
 
 | Payload | Board element | How it is drawn |
 | --- | --- | --- |
-| `numeric_0` … `numeric_3` | Numerics 0–3 | `setText()`: right-aligned, `:` lights the colon, `.` the point of the character before it; `20:30`, `d 12`, `F-14` as sent. The server writes the hour's leading zero (`05:22`), so it shows. |
+| `numeric_0` … `numeric_3` | Numerics 0–3 | `setText()`: right-aligned, `:` lights the colon, `.` the point of the character before it; `20:30`, `5:22`, `d 12`, `F-14` as sent; the server leaves out the hour's leading zero, so `5:22` shows as ` 5:22`. |
 | `matrix_0` … `matrix_4` | Matrix rows 0–4 | `setRow()` with the lit columns, character *i* to column *i*; the level planes and the blink mask into the board's attributes. Unlit columns are left at full level, so a later `display row` lighting one shows it. On the local board row 4 replaces the progress bar. |
 
 The numerics carry no attributes in the payload, so the mapper resets theirs

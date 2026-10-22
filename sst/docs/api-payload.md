@@ -214,11 +214,11 @@ nightId
 
 numeric_0
   Local astronomical dusk (the sun 18° below the horizon) on nightId, in
-  HH:MM, or ? when the sun does not get that low, as on summer nights at
+  H:MM or HH:MM (no leading zero), or ? when the sun does not get that low, as on summer nights at
   50° N.
 
 numeric_1
-  Local astronomical dawn on the morning after nightId, in HH:MM, or ? when
+  Local astronomical dawn on the morning after nightId, in H:MM or HH:MM, or ? when
   the sun does not get that low.
 
 matrix_0
@@ -280,8 +280,9 @@ bitmaps; what a numeric means is defined above, not by the format.
 
 For this protocol:
 
-- `numeric_0` and `numeric_1` are local times `HH:MM`, such as `19:31` or
-  `05:22`, or `?` when the event does not occur.
+- `numeric_0` and `numeric_1` are local 24-hour times with no leading zero on
+  the hour, such as `19:31` or `5:22` (shown as ` 5:22`), or `?` when the
+  event does not occur.
 - `numeric_2` and `numeric_3` are whole degrees, such as `18` or `-3`,
   optionally marked (see Temperature marks), or `?` when weather is
   unavailable.

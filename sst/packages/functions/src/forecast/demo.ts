@@ -79,7 +79,7 @@ function randomInt(random: () => number, low: number, high: number): number {
 
 function clockTime(minutesOfDay: number): string {
   const minutes = ((Math.round(minutesOfDay) % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
-  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
 // Minutes of each slot inside any of `intervals` (minutes from local noon).
