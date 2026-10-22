@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { NO_AURORA_FETCH, serializeError, serializeForecast } from "./protocol";
+import { NO_AURORA_FETCH, serializeError, serializeForecast, validNumericText } from "./protocol";
 import type { ForecastDisplay } from "./types";
 
 function display(index: number): ForecastDisplay {
@@ -22,7 +22,7 @@ describe("forecast protocol", () => {
     const aurora = { gfz: "2026-09-17T17:03:40+02:00", noaa3: "2026-09-17T17:03:41+02:00", noaa27: "2026-09-17T11:03:41+02:00", ovation: "?" };
     const body = serializeForecast("krakow", "2026-09-17T23:22:45.678+02:00", "2026-09-17T18:00:04+02:00", aurora, 360, displays());
     expect(body.split("\n").slice(0, 24)).toEqual([
-      "protocol=3", "configurationId=krakow", "time=2026-09-17T23:22:45.678+02:00",
+      "protocol=4", "configurationId=krakow", "time=2026-09-17T23:22:45.678+02:00",
       "lastWeatherFetchTime=2026-09-17T18:00:04+02:00", "lastGfzFetchTime=2026-09-17T17:03:40+02:00",
       "lastNoaaKpFetchTime=2026-09-17T17:03:41+02:00", "lastNoaaOutlookFetchTime=2026-09-17T11:03:41+02:00",
       "lastOvationFetchTime=?", "refreshIntervalMinutes=360", "", "display=0",
@@ -76,6 +76,22 @@ describe("forecast protocol", () => {
   });
 
   test("serializes stable machine-readable errors", () => {
-    expect(serializeError("configuration_not_found")).toBe("protocol=3\nerror=configuration_not_found\n");
+    expect(serializeError("configuration_not_found")).toBe("protocol=4\nerror=configuration_not_found\n");
+  });
+
+  test("accepts numerics the board can draw as display text", () => {
+    for (const text of ["?", "18", "-3", "20:30", "d 12", "F -3", "d-14", "12.5", "-99.9", "1.2.3.4:", "Err", "--"]) {
+      expect(validNumericText(text)).toBe(true);
+    }
+    for (const text of ["", "12345", "d 123", "B", "dEw", "+5", ".5", "1..5", "1:2:3", "??", "18x5"]) {
+      expect(validNumericText(text)).toBe(false);
+    }
+  });
+
+  test("rejects a numeric the board cannot draw", () => {
+    const bad = displays();
+    bad[0] = { ...bad[0], duskTemperature: "dew" };
+    expect(() => serializeForecast("krakow", "2026-09-17T23:22:45.678+02:00", "?", NO_AURORA_FETCH, 360, bad))
+      .toThrow("Invalid forecast value");
   });
 });

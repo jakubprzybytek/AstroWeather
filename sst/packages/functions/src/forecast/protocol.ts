@@ -1,10 +1,12 @@
 import type { AuroraFeed, ForecastDisplay } from "./types";
 
-// Version 3: matrix cells are levels 0-3, `a`/`b`/`c` (levels 1-3 blinking
-// down), `*` (level 3 blinking, as `c`) or `?`; adds `matrix_4` (aurora) and
-// the `refreshIntervalMinutes` header record. A device reading version 2
-// rejects this, and one reading version 3 rejects version 2.
-export const PROTOCOL = 3;
+// Version 4: the numerics are display text (validNumericText below); version
+// 3's times and numbers are valid text, so a device reading version 4 also
+// reads version 3, and one reading only version 3 rejects this. Version 3 made
+// the matrix cells levels 0-3, `a`/`b`/`c` (levels 1-3 blinking down), `*`
+// (level 3 blinking, as `c`) or `?`, and added `matrix_4` (aurora) and the
+// `refreshIntervalMinutes` header record.
+export const PROTOCOL = 4;
 const BOARD = "num4x4_matrix5x21";
 const DISPLAY_KEYS = ["display", "board", "nightId", "numeric_0", "numeric_1", "matrix_0", "matrix_1", "matrix_2", "matrix_3", "matrix_4", "numeric_2", "numeric_3"] as const;
 
@@ -25,10 +27,32 @@ function validMatrix(value: string): boolean {
   return value === "?" || (value.length === 21 && /^[0-3abc*?]+$/.test(value));
 }
 
+// Display text the board can draw: up to four characters from its set, a `.`
+// on the character before it and one `:`, neither taking a digit; or `?`
+// alone. The set leaves out letters that look like digits (B D O S I Z g).
+const NUMERIC_CHARACTERS = /^[0-9 \-_ACEFHJLPUbcdhnoqrtuy.:]+$/;
+
+export function validNumericText(value: string): boolean {
+  if (value === "?") return true;
+  if (!NUMERIC_CHARACTERS.test(value) || value.split(":").length > 2) return false;
+  let positions = 0;
+  let pointAllowed = false;
+  for (const character of value) {
+    if (character === ".") {
+      if (!pointAllowed) return false;
+      pointAllowed = false;
+    } else if (character !== ":") {
+      positions += 1;
+      pointAllowed = true;
+    }
+  }
+  return positions >= 1 && positions <= 4;
+}
+
 function validate(display: ForecastDisplay): void {
   if (display.board !== BOARD || !/^\d{4}-\d{2}-\d{2}$/.test(display.nightId)) throw new Error("Invalid forecast display");
   if (![display.sun, display.moon, display.cloud, display.precipitation, display.aurora].every(validMatrix)) throw new Error("Invalid forecast matrix");
-  if (![display.astronomicalDusk, display.astronomicalDawn, display.duskTemperature, display.nightMinimumTemperature].every((value) => value === "?" || /^[0-9:.+-]+$/.test(value))) throw new Error("Invalid forecast value");
+  if (![display.astronomicalDusk, display.astronomicalDawn, display.duskTemperature, display.nightMinimumTemperature].every(validNumericText)) throw new Error("Invalid forecast value");
 }
 
 // `time` is local `YYYY-MM-DDTHH:MM:SS.mmm+HH:MM`; `lastWeatherFetchTime` and the

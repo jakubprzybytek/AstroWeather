@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { createHandler } from "../astro";
 import { handler as configurationsHandler } from "../configurations-handler";
 import { DEMO_NIGHTS, demoForecast } from "./demo";
-import { NO_AURORA_FETCH, serializeForecast } from "./protocol";
+import { NO_AURORA_FETCH, serializeForecast, validNumericText } from "./protocol";
 
 const NOW = new Date("2026-10-01T18:00:00Z");
 
@@ -54,7 +54,8 @@ describe("demo forecast", () => {
       }
     }
     const temperatures = DEMO_NIGHTS.flatMap((night) => [night.duskTemperature, night.nightMinimumTemperature]);
-    expect(temperatures).toEqual(expect.arrayContaining(["4", "-3", "17", "-14", "0", "?"]));
+    expect(temperatures).toEqual(expect.arrayContaining(["4", "F -3", "d 17", "F-14", "0", "-8", "?"]));
+    expect(temperatures.every(validNumericText)).toBe(true);
   });
 
   test("is served as GET /astro/test with the real time, and is not listed as a configuration", async () => {
@@ -64,7 +65,7 @@ describe("demo forecast", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body.split("\n").slice(0, 9)).toEqual([
-      "protocol=3", "configurationId=test", "time=2026-10-01T20:00:00.000+02:00",
+      "protocol=4", "configurationId=test", "time=2026-10-01T20:00:00.000+02:00",
       "lastWeatherFetchTime=?", "lastGfzFetchTime=?", "lastNoaaKpFetchTime=?",
       "lastNoaaOutlookFetchTime=?", "lastOvationFetchTime=?", "refreshIntervalMinutes=360"
     ]);

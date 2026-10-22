@@ -11,8 +11,8 @@ export const DEMO_TIMEZONE = "Europe/Warsaw";
 
 // One night per board, each a theme: the rows must be 21 cells. Together they
 // use every cell character in every weather and aurora row, steady and
-// changing, and the temperatures cover one and two digits, both signs, zero
-// and unavailable.
+// changing, and the temperatures cover one and two digits, both signs, zero,
+// unavailable, and the dew (`d`) and frost (`F`) marks.
 type DemoNight = {
   theme: string;
   cloud: string;
@@ -29,14 +29,14 @@ export const DEMO_NIGHTS: DemoNight[] = [
     cloud: "000000000000000000000",
     precipitation: "000000000000000000000",
     aurora: "000112233bcc332211000",
-    duskTemperature: "4", nightMinimumTemperature: "-3"
+    duskTemperature: "4", nightMinimumTemperature: "F -3"
   },
   {
     theme: "overcast, steady then heavy rain",
     cloud: "333333333333333333333",
     precipitation: "112233332222333322111",
     aurora: "000000000000000000000",
-    duskTemperature: "17", nightMinimumTemperature: "11"
+    duskTemperature: "d 17", nightMinimumTemperature: "d 11"
   },
   {
     theme: "thunderstorms, then clearing; aurora possible all night",
@@ -50,7 +50,7 @@ export const DEMO_NIGHTS: DemoNight[] = [
     cloud: "000000011112222233333",
     precipitation: "000000000011122233333",
     aurora: "0000abcba000000123000",
-    duskTemperature: "-2", nightMinimumTemperature: "-14"
+    duskTemperature: "-2", nightMinimumTemperature: "F-14"
   },
   {
     theme: "changing sky: every level and blink in turn",

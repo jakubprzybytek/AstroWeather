@@ -17,7 +17,7 @@ describe("astro handler", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["content-type"]).toBe("text/plain; charset=utf-8");
     expect(response.body.split("\n").slice(0, 10)).toEqual([
-      "protocol=3", "configurationId=krakow", "time=2026-09-22T23:22:45.678+02:00",
+      "protocol=4", "configurationId=krakow", "time=2026-09-22T23:22:45.678+02:00",
       "lastWeatherFetchTime=?", "lastGfzFetchTime=?", "lastNoaaKpFetchTime=?",
       "lastNoaaOutlookFetchTime=?", "lastOvationFetchTime=?", "refreshIntervalMinutes=360", ""
     ]);
@@ -94,6 +94,6 @@ describe("astro handler", () => {
     const response = await handlerAt("2026-09-22T21:22:45Z")({ pathParameters: { configurationId: "unknown" } });
 
     expect(response.statusCode).toBe(404);
-    expect(response.body).toBe("protocol=3\nerror=configuration_not_found\n");
+    expect(response.body).toBe("protocol=4\nerror=configuration_not_found\n");
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { observingNight } from "./astronomy";
-import { nightTemperatures, temperatureAt } from "./weather-reader";
+import { moistureMark, nightTemperatures, temperatureAt, temperatureText } from "./weather-reader";
 
 const HOUR = 3_600_000;
 const T0 = Date.UTC(2026, 9, 19, 17);  // a whole hour
@@ -69,5 +69,51 @@ describe("observing night", () => {
     expect(sunsetToSunrise).toBeLessThan(420);
     // 70 degrees north: the midnight sun, no night at all.
     expect(observingNight("2026-06-21", { lat: 70, lon: 25, tz: "Europe/Oslo" })).toBeNull();
+  });
+});
+
+describe("dew and frost marks", () => {
+  // Readings with a dew point: [celsius, dewPointC] per hour from T0.
+  function moist(...pairs: Array<[number, number | null]>) {
+    return pairs.map(([celsius, dewPointC], index) => ({ time: T0 + index * HOUR, celsius, dewPointC }));
+  }
+
+  test("marks dew within 2 degrees of the dew point, frost at or below 1 degree", () => {
+    expect(moistureMark(12, 9)).toBe("");
+    expect(moistureMark(12, 10)).toBe("d");
+    expect(moistureMark(12, 12)).toBe("d");
+    expect(moistureMark(2, 0)).toBe("d");
+    expect(moistureMark(1, 0)).toBe("F");
+    expect(moistureMark(-5, -6)).toBe("F");
+    expect(moistureMark(-5, -9)).toBe("");
+    expect(moistureMark(12, null)).toBe("");
+  });
+
+  test("puts the mark in the first digit and right-aligns the degrees after it", () => {
+    expect(temperatureText(12.4, "")).toBe("12");
+    expect(temperatureText(12.4, "d")).toBe("d 12");
+    expect(temperatureText(-3, "F")).toBe("F -3");
+    expect(temperatureText(-14, "F")).toBe("F-14");
+    expect(temperatureText(5, "d")).toBe("d  5");
+  });
+
+  test("marks the dusk temperature and the minimum by the dew point at their own times", () => {
+    // Dry at dusk (12 against 5), damp by the coldest hour (6 against 5).
+    expect(nightTemperatures(moist([12, 5], [10, 5], [8, 5], [6, 5], [7, 5]), night(0, 4))).toEqual({
+      duskTemperature: "12", nightMinimumTemperature: "d  6"
+    });
+    // Damp from the start, freezing by the end.
+    expect(nightTemperatures(moist([9, 8], [5, 4], [1, 0], [0, -1]), night(0, 3))).toEqual({
+      duskTemperature: "d  9", nightMinimumTemperature: "F  0"
+    });
+  });
+
+  test("interpolates the dew point like the temperature, and leaves no mark without one", () => {
+    // At 0.5 h: 11 degrees, dew point halfway from 8 to 10, 9: within 2.
+    expect(nightTemperatures(moist([12, 8], [10, 10], [11, 4]), night(0.5, 1.5)).duskTemperature).toBe("d 11");
+    expect(nightTemperatures(moist([6, null], [6, null]), night(0, 1))).toEqual({
+      duskTemperature: "6", nightMinimumTemperature: "6"
+    });
+    expect(nightTemperatures(readings(6, 6), night(0, 1)).duskTemperature).toBe("6");
   });
 });

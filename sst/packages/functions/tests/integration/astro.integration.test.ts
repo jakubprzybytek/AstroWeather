@@ -26,7 +26,7 @@ describe("GET /device/astro/{configurationId}", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/plain");
-    expect(lines[0]).toBe("protocol=3");
+    expect(lines[0]).toBe("protocol=4");
     expect(lines[1]).toBe("configurationId=krakow");
     // Krakow is UTC+1 or UTC+2; with the offset the value names an exact instant.
     expect(lines[2]).toMatch(/^time=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+0[12]:00$/);
@@ -65,7 +65,7 @@ describe("GET /device/astro/{configurationId}", () => {
 
     expect(response.status).toBe(404);
     expect(response.headers.get("content-type")).toContain("text/plain");
-    expect(await response.text()).toBe("protocol=3\nerror=configuration_not_found\n");
+    expect(await response.text()).toBe("protocol=4\nerror=configuration_not_found\n");
   });
 
   test("returns non-200 when configurationId path parameter is missing", async () => {

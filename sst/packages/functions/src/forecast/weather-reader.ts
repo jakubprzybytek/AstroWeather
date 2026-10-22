@@ -38,39 +38,76 @@ export function wholeDegrees(celsius: number): string {
 
 const HOUR_MS = 3_600_000;
 
-type Reading = { time: number; celsius: number };
+type Reading = { time: number; celsius: number; dewPointC?: number | null };
 
-// The temperature at `instant`, interpolated between the hourly readings on
-// either side; with only one of them within the hour, that one; null with
-// neither.
-export function temperatureAt(readings: Reading[], instant: number): number | null {
-  let before: Reading | undefined;
-  let after: Reading | undefined;
+// A value at `instant`, interpolated between the hourly readings on either
+// side that have it; with only one of them within the hour, that one; null
+// with neither.
+function valueAt(readings: Reading[], instant: number, pick: (reading: Reading) => number | null | undefined): number | null {
+  let before: { time: number; value: number } | undefined;
+  let after: { time: number; value: number } | undefined;
   for (const reading of readings) {
-    if (reading.time <= instant && instant - reading.time < HOUR_MS && (!before || reading.time > before.time)) before = reading;
-    if (reading.time > instant && reading.time - instant < HOUR_MS && (!after || reading.time < after.time)) after = reading;
+    const value = pick(reading);
+    if (value == null) continue;
+    if (reading.time <= instant && instant - reading.time < HOUR_MS && (!before || reading.time > before.time)) before = { time: reading.time, value };
+    if (reading.time > instant && reading.time - instant < HOUR_MS && (!after || reading.time < after.time)) after = { time: reading.time, value };
   }
   if (before && after) {
-    return before.celsius + (after.celsius - before.celsius) * (instant - before.time) / (after.time - before.time);
+    return before.value + (after.value - before.value) * (instant - before.time) / (after.time - before.time);
   }
-  return before?.celsius ?? after?.celsius ?? null;
+  return before?.value ?? after?.value ?? null;
 }
 
-// The observing night's temperatures: at its start (dusk), and the lowest
-// from its start to its end, counting the interpolated values at both ends.
+export function temperatureAt(readings: Reading[], instant: number): number | null {
+  return valueAt(readings, instant, (reading) => reading.celsius);
+}
+
+// Dew on the optics when the air is within this of its dew point: on a clear
+// night the optics radiate and run 1-3 degrees colder than the air.
+export const DEW_SPREAD_C = 2;
+// Frost instead of dew at or below this air temperature, for the same reason.
+export const FROST_TEMPERATURE_C = 1;
+
+export type MoistureMark = "" | "d" | "F";
+
+// The mark for `celsius` with dew point `dewPointC`: `F` frost, `d` dew, ""
+// none, also when the dew point is not known.
+export function moistureMark(celsius: number, dewPointC: number | null): MoistureMark {
+  if (dewPointC === null || celsius - dewPointC > DEW_SPREAD_C) return "";
+  return celsius <= FROST_TEMPERATURE_C ? "F" : "d";
+}
+
+// Whole degrees as display text: with a mark, the mark in the first of the
+// four digits and the degrees right-aligned after it ("d 12", "F -3",
+// "d-14"); without, the degrees alone, which the board right-aligns.
+export function temperatureText(celsius: number, mark: MoistureMark): string {
+  const degrees = wholeDegrees(celsius);
+  return mark ? `${mark}${degrees.padStart(3)}` : degrees;
+}
+
+// The observing night's temperatures as display text: at its start (dusk),
+// and the lowest from its start to its end, counting the interpolated values
+// at both ends; each marked when the air there is near its dew point.
 // `?` without a night or without readings for it.
 export function nightTemperatures(readings: Reading[], night: NightWindow | null): { duskTemperature: string; nightMinimumTemperature: string } {
   if (!night) return { duskTemperature: "?", nightMinimumTemperature: "?" };
   const start = night.start.getTime();
   const end = night.end.getTime();
+  const dewPointAt = (instant: number) => valueAt(readings, instant, (reading) => reading.dewPointC);
+  const candidates = readings
+    .filter((reading) => reading.time > start && reading.time < end)
+    .map((reading) => ({ time: reading.time, celsius: reading.celsius }));
   const atStart = temperatureAt(readings, start);
   const atEnd = temperatureAt(readings, end);
-  const values = readings.filter((reading) => reading.time > start && reading.time < end).map((reading) => reading.celsius);
-  if (atStart !== null) values.push(atStart);
-  if (atEnd !== null) values.push(atEnd);
+  if (atStart !== null) candidates.push({ time: start, celsius: atStart });
+  if (atEnd !== null) candidates.push({ time: end, celsius: atEnd });
+  let minimum: { time: number; celsius: number } | undefined;
+  for (const candidate of candidates) {
+    if (!minimum || candidate.celsius < minimum.celsius) minimum = candidate;
+  }
   return {
-    duskTemperature: atStart === null ? "?" : wholeDegrees(atStart),
-    nightMinimumTemperature: values.length ? wholeDegrees(Math.min(...values)) : "?"
+    duskTemperature: atStart === null ? "?" : temperatureText(atStart, moistureMark(atStart, dewPointAt(start))),
+    nightMinimumTemperature: minimum ? temperatureText(minimum.celsius, moistureMark(minimum.celsius, dewPointAt(minimum.time))) : "?"
   };
 }
 
@@ -91,7 +128,7 @@ function weatherFields(item: ClearOutsideItem, timezone: string, night: NightWin
   const readings: Reading[] = [];
   for (const hour of item.hours) {
     const time = Date.parse(hour.timestampUtc);
-    if (!Number.isNaN(time) && hour.temperatureC != null) readings.push({ time, celsius: hour.temperatureC });
+    if (!Number.isNaN(time) && hour.temperatureC != null) readings.push({ time, celsius: hour.temperatureC, dewPointC: hour.dewPointC });
   }
 
   return {
