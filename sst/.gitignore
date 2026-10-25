@@ -1,2 +1,5 @@
 node_modules/
 .sst/
+
+# AWS IAM documents with the account number
+infra/github/private/

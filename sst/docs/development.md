@@ -12,10 +12,9 @@ All commands run from the `sst/` directory unless stated otherwise.
   npm --prefix packages/web install
   ```
 
-- AWS credentials in the default AWS profile. They need the permissions in
-  [deployment-role-policy.json](deployment-role-policy.json), which is the
-  source of the `AstroWeather-Deployment` managed IAM policy. The region comes
-  from the AWS profile configuration; `sst.config.ts` does not set one.
+- AWS credentials from `aws login` (AWS CLI 2.32+: console sign-in, temporary
+  credentials, no access keys). The region comes from the AWS profile
+  configuration; `sst.config.ts` does not set one.
 
 ## Stages
 
@@ -100,10 +99,11 @@ The `Deploy SST` workflow (`.github/workflows/deploy-sst.yml`) deploys the
 when started by hand from the Actions tab; a newer run cancels one in
 progress. `prod` is deployed by hand. It installs both
 lockfiles, runs `npm run test` and `npm run test:web`, and only then signs in
-to AWS and deploys. It signs in through GitHub's OIDC provider as the role in
-the `AWS_ROLE_ARN` repository variable (`GitHub-AstroWeather`), in the
-`AWS_REGION` variable's region. The role trusts this repository only and has
-the `AstroWeather-Deployment` and `SST-Deployment` policies attached.
+to AWS and deploys. It signs in through GitHub's OIDC provider as the role
+`GitHub-AstroWeather` (account number from the `AWS_ACCOUNT_ID` repository
+secret), in the `AWS_REGION` variable's region; no AWS access keys are stored
+in GitHub. The role, its trust and its permissions are described in
+[infra/github/README.md](../infra/github/README.md).
 
 ### Testing a deployed stage
 
@@ -135,8 +135,9 @@ Use this for personal or temporary stages. `prod` is configured with
 
 - **IAM authorization errors during deploy** (`AccessDenied`, `is not authorized
   to perform`): the deployment policy is missing an action. Follow the
-  `update-aws-deployment-policy` skill in `.github/skills/`, which adds the
-  smallest required permission to `deployment-role-policy.json` and publishes
-  it.
+  "fix missing permissions" procedure of the `aws-github-deploy` skill
+  ([agent-playbook](https://github.com/jakubprzybytek/agent-playbook/tree/main/skills/aws-github-deploy)):
+  add the action to [infra/github/deploy-policy.json](../infra/github/deploy-policy.json)
+  and publish it with `setup-role.sh`.
 - **Stale lock after an interrupted deploy**: confirm no other deployment is
   running, then run `npx sst unlock --stage <stage>`.
