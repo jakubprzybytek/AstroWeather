@@ -1,3 +1,4 @@
+import { withUserAccess } from "./auth/user-access";
 import { configurations } from "./configurations";
 import { assembleForecast } from "./forecast/assemble";
 import { DEMO_CONFIGURATION_ID, DEMO_TIMEZONE, demoForecast } from "./forecast/demo";
@@ -73,4 +74,4 @@ export function createHandler(
   };
 }
 
-export const handler = createHandler();
+export const handler = withUserAccess(createHandler());

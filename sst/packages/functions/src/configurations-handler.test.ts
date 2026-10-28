@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { handler } from "./configurations-handler";
+import { listConfigurations } from "./configurations-handler";
 
 describe("configurations handler", () => {
   test("returns the public configuration list", async () => {
-    const response = await handler();
+    const response = await listConfigurations();
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["content-type"]).toBe("application/json");

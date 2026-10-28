@@ -9,7 +9,7 @@ This repo deploys to AWS following the [aws-github-deploy standard](https://gith
 | SST app name | `astroweather-api` |
 | Resource prefix in the policy | `astro*` (see deviations) |
 | Region | `eu-west-1` (CloudFront certificate in `us-east-1`) |
-| Workflows that deploy | `.github/workflows/deploy-sst.yml` (stage `int`; `prod` is deployed by hand) |
+| Workflows that deploy | `.github/workflows/continuous-delivery.yaml` (stages `int` and `prod`) |
 | GitHub | secret `AWS_ACCOUNT_ID`, variable `AWS_REGION` |
 
 `deploy-policy.json` has `ACCOUNT_ID` in place of the account number. The rendered policy and the trust policy are in `private/` (gitignored).
@@ -25,6 +25,7 @@ The app is an API Gateway (HTTP API) with Lambda handlers and two authorizers, E
 - `Logs`: CloudWatch log groups in eu-west-1.
 - `ApiAccessLogDelivery`: log deliveries for the API's access logs; these actions only accept `Resource: "*"`.
 - `ApiGateway`: API Gateway in eu-west-1 (HTTP API, routes, authorizers, custom domain).
+- `UserPoolClients`: the stage's app client in the shared pool `AlbedoUserPool` (`eu-west-1_IVai0KEAA`): create, read, update, delete clients; read the pool. Added for the per-stage app clients.
 - `Table`: DynamoDB tables `astro*`.
 - `Schedules`: EventBridge Scheduler schedules `astro*` (any group).
 - `Edge`: CloudFront (distribution, function, KeyValueStore), ACM certificates and Route 53 records. Account-wide; these services can't be scoped usefully.

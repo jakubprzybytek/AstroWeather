@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { handler } from "./clearoutside";
+import { handleClearOutside as handler } from "./clearoutside";
 import { fetchClearOutsideHtml, parseClearOutside } from "./weather/clearoutside";
 
 vi.mock("./weather/clearoutside", () => ({

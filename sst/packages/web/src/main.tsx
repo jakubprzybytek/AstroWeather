@@ -7,8 +7,8 @@ import '@aws-amplify/ui-react/styles.css'
 import App from './App.tsx'
 import './styles/main.scss'
 
-// The API accepts any signed-in user of the shared pool; the Authenticator
-// handles sign-up, the emailed confirmation code and password reset.
+// The API accepts only users in the stage's groups (docs/development.md), so
+// there is no sign-up here; the Authenticator handles sign-in and password reset.
 Amplify.configure({
   Auth: {
     Cognito: {
@@ -21,7 +21,7 @@ Amplify.configure({
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Authenticator loginMechanisms={['email']}>
+    <Authenticator loginMechanisms={['email']} hideSignUp>
       {({ signOut, user }) => (
         <>
           <div className="auth-bar">
@@ -29,6 +29,7 @@ createRoot(document.getElementById('root')!).render(
             <Button variant="outline-secondary" size="sm" onClick={signOut}>Sign out</Button>
           </div>
           <App />
+          <footer className="app-version" data-testid="app-version">AstroWeather {import.meta.env.VITE_APP_VERSION ?? 'dev'}</footer>
         </>
       )}
     </Authenticator>

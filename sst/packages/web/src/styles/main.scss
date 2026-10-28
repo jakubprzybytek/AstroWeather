@@ -9,6 +9,13 @@ body {
   max-width: 1400px;
 }
 
+.app-version {
+  padding: 0 0.75rem 1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--bs-secondary-color);
+}
+
 .auth-bar {
   display: flex;
   justify-content: flex-end;

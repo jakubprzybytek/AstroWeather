@@ -32,11 +32,10 @@ describe("GET /device/astro/{configurationId}", () => {
     expect(lines[2]).toMatch(/^time=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+0[12]:00$/);
     const renderedAt = Date.parse(lines[2].slice(5));
     expect(Math.abs(renderedAt - Date.now())).toBeLessThan(60_000);
-    // Weather is ingested every six hours, so a working deployment has a value.
-    expect(lines[3]).toMatch(/^lastWeatherFetchTime=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+0[12]:00$/);
-    // A feed can be `?`: OVATION is fetched only on storm nights, and a stage
-    // may not have run every aurora job yet.
+    // A fetch time is `?` when the stage holds no data: dev and int run no
+    // ingestion (docs/development.md), and OVATION is fetched only on storm nights.
     const fetchTime = String.raw`(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+0[12]:00|\?)`;
+    expect(lines[3]).toMatch(new RegExp(`^lastWeatherFetchTime=${fetchTime}$`));
     expect(lines.slice(4, 8)).toEqual([
       expect.stringMatching(new RegExp(`^lastGfzFetchTime=${fetchTime}$`)),
       expect.stringMatching(new RegExp(`^lastNoaaKpFetchTime=${fetchTime}$`)),

@@ -1,6 +1,7 @@
+import { withUserAccess } from "./auth/user-access";
 import { configurations } from "./configurations";
 
-export const handler = async () => ({
+export const listConfigurations = async () => ({
   statusCode: 200,
   headers: {
     "content-type": "application/json"
@@ -10,3 +11,4 @@ export const handler = async () => ({
     label: configuration.label
   })))
 });
+export const handler = withUserAccess(listConfigurations);

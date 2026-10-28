@@ -1,0 +1,44 @@
+# Checks for every pull request (Dependabot's included), per agent-playbook/dependabot.
+# No AWS access and no secrets: Dependabot PRs don't get the repo's secrets anyway.
+# Covers the SST app (sst/); firmware changes have their own workflow.
+
+name: Pull Request Checks
+
+on:
+  pull_request:
+    paths:
+      - "sst/**"
+      - ".github/**"
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: sst
+
+jobs:
+  checks:
+    name: Unit tests, web tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            sst/package-lock.json
+            sst/packages/web/package-lock.json
+      - run: npm ci && npm ci --prefix packages/web
+      - name: Registry signatures
+        run: npm audit signatures && npm audit signatures --prefix packages/web
+      - run: npm test
+      - run: npm run test:web
+      # The web build runs tsc -b, so it is also the type check.
+      - run: npm run build --prefix packages/web

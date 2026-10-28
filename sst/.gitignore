@@ -3,3 +3,8 @@ node_modules/
 
 # AWS IAM documents with the account number
 infra/github/private/
+
+# Playwright
+tests/e2e/.auth/
+test-results/
+playwright-report/

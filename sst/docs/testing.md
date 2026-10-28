@@ -124,6 +124,8 @@ npm run test:integration
 
 # A named stage
 SST_STAGE=int npm run test:integration
+# or, as the pipeline does
+npx sst shell --stage int -- npx vitest run --project integration
 ```
 
 The suite covers:
@@ -136,8 +138,10 @@ The suite covers:
 - a missing path parameter is not `200`;
 - the device route answers `401` without a key and `403` with a wrong one;
 - the web UI's routes (`/configurations`, `/astro/krakow`) answer `401`
-  without a token and with one that is not a JWT. The suite has no Cognito
-  user, so the signed-in path is checked by hand in the web UI.
+  without a token and with one that is not a JWT;
+- signed in as the test user (`signed-in.integration.test.ts`, see
+  [development.md](development.md#tests)), `/configurations` lists the
+  configurations and `/astro/wroclaw` returns the forecast.
 
 Requests that hit the stage's one-request-per-second throttle (`429`) are
 retried a few times.
@@ -167,6 +171,9 @@ npm run test:clearoutside
 Use it to check whether a Clear Outside page change has broken the parser.
 
 ## Web Tests
+
+E2E tests (Playwright, `tests/e2e/`) sign in through the web UI as the test
+user and fetch a forecast: `npx sst shell --stage <stage> -- npm run test:e2e`.
 
 The web project uses React Testing Library with jsdom. API requests are stubbed
 with Vitest, so component tests do not require SST or a running API:

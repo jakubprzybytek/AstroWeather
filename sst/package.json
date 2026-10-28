@@ -12,9 +12,11 @@
     "test:integration": "sst shell -- vitest run --project integration",
     "test:clearoutside": "RUN_LIVE_SCRAPE=1 sst shell -- vitest run --project integration --disableConsoleIntercept packages/functions/tests/integration/clearoutside.integration.test.ts",
     "test:web": "vitest run --project web",
+    "test:e2e": "playwright test",
     "test:all": "vitest run"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/suncalc": "^1.9.2",
     "jsdom": "^30.0.1",
     "vitest": "^4.1.4"

@@ -1,3 +1,4 @@
+import { withUserAccess } from "./auth/user-access";
 import { configurations } from "./configurations";
 import { fetchClearOutsideHtml, parseClearOutside } from "./weather/clearoutside";
 
@@ -26,7 +27,7 @@ function isCoordinatePair(latitude: unknown, longitude: unknown): latitude is nu
     && typeof longitude === "number" && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180;
 }
 
-export const handler = async (event: ClearOutsideEvent) => {
+export const handleClearOutside = async (event: ClearOutsideEvent) => {
   let request: ClearOutsideRequest;
   try {
     request = JSON.parse(event.body ?? "{}");
@@ -74,3 +75,4 @@ export const handler = async (event: ClearOutsideEvent) => {
     });
   }
 };
+export const handler = withUserAccess(handleClearOutside);

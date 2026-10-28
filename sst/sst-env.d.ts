@@ -22,6 +22,15 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Dynamo"
     }
+    "TestUser": {
+      "clientId": string
+      "email": string
+      "type": "sst.sst.Linkable"
+    }
+    "TestUserPassword": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
   }
 }
 

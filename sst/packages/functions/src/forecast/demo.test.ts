@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { createHandler } from "../astro";
-import { handler as configurationsHandler } from "../configurations-handler";
+import { listConfigurations as configurationsHandler } from "../configurations-handler";
 import { DEMO_NIGHTS, demoForecast } from "./demo";
 import { NO_AURORA_FETCH, serializeForecast, validNumericText } from "./protocol";
 
