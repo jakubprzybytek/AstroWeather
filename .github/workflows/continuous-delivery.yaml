@@ -150,6 +150,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: |
+            sst/package-lock.json
+            sst/packages/web/package-lock.json
       - run: npm ci && npm ci --prefix packages/web
       - uses: aws-actions/configure-aws-credentials@v6
         with:
