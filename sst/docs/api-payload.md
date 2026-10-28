@@ -27,6 +27,7 @@ lastNoaaKpFetchTime=2026-09-22T23:03:41+02:00
 lastNoaaOutlookFetchTime=2026-09-22T23:03:41+02:00
 lastOvationFetchTime=2026-09-22T23:13:02+02:00
 refreshIntervalMinutes=60
+appVersion=v1.3
 
 display=0
 board=num4x4_matrix5x21
@@ -123,7 +124,7 @@ Framing and parsing rules
 - Header records occur once and in the documented order: `protocol`,
   `configurationId`, `time`, `lastWeatherFetchTime`, `lastGfzFetchTime`,
   `lastNoaaKpFetchTime`, `lastNoaaOutlookFetchTime`, `lastOvationFetchTime`,
-  `refreshIntervalMinutes`.
+  `refreshIntervalMinutes`, `appVersion`.
 - A display=<index> record starts a display block. It is followed by that
   block's records in the documented order.
 - Each matrix record contains either 21 slot characters or the single `?`
@@ -151,6 +152,7 @@ protocol
   `refreshIntervalMinutes` header record; see Matrix encoding. The aurora
   fetch-time records were added to version 3 later without a version change:
   they are additive, and a device that does not know them ignores them.
+  `appVersion` was added to version 4 the same way.
   Versions 1 and 2 are retired.
 
 board
@@ -204,6 +206,13 @@ refreshIntervalMinutes
   row and its nowcast stay current (every hour at 10 minutes past). The
   server decides it; once set for a night it stays for that night. It
   appears only in successful responses.
+
+appVersion
+  The server's release: the git tag it was deployed from (`v1.3`), a
+  `<branch>-<short sha>` for a branch deployment, or `dev`. 1 to 40 letters,
+  digits or `. _ -`; `?` if the deployment set something else. For display
+  and diagnostics only; a device must not depend on its format. It appears
+  only in successful responses.
 
 display
   Zero-based display index. Display 0 is the current observing night in the

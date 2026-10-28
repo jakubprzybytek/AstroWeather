@@ -153,7 +153,9 @@ export default $config({
     });
     const userAuth = { auth: { jwt: { authorizer: userAuthorizer.id } } };
     // Signed-in routes: the handler wrapper lets in only ACCESS_GROUPS.
-    const environment = { ACCESS_GROUPS: accessGroups.join(",") };
+    // The release tag set by continuous-delivery.yaml, sent as the forecast's appVersion and shown in the footer.
+    const appVersion = process.env.APP_VERSION ?? "dev";
+    const environment = { ACCESS_GROUPS: accessGroups.join(","), APP_VERSION: appVersion };
     const userRoute = (route: string, handler: string, link: sst.aws.FunctionArgs["link"] = []) =>
       api.route(route, { handler, link, environment }, userAuth);
 
@@ -163,7 +165,8 @@ export default $config({
     // headers, so its key travels in the `key` query parameter.
     api.route("GET /device/astro/{configurationId}", {
       handler: "packages/functions/src/astro.handler",
-      link: [forecastData]
+      link: [forecastData],
+      environment: { APP_VERSION: appVersion }
     }, {
       auth: { lambda: deviceAuthorizer.id }
     });
@@ -228,8 +231,7 @@ export default $config({
         VITE_API_URL: `https://${domain.api}`,
         VITE_USER_POOL_ID: userPool.id,
         VITE_USER_POOL_CLIENT_ID: webClient.id,
-        // Release tag set by continuous-delivery.yaml; shown in the footer.
-        VITE_APP_VERSION: process.env.APP_VERSION ?? "dev"
+        VITE_APP_VERSION: appVersion
       }
     });
 

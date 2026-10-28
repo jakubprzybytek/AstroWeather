@@ -43,8 +43,9 @@ describe("GET /device/astro/{configurationId}", () => {
       expect.stringMatching(new RegExp(`^lastOvationFetchTime=${fetchTime}$`))
     ]);
     expect(lines[8]).toMatch(/^refreshIntervalMinutes=(60|360)$/);
-    expect(lines[9]).toBe("");
-    expect(lines[10]).toBe("display=0");
+    expect(lines[9]).toMatch(/^appVersion=[A-Za-z0-9._-]+$/);
+    expect(lines[10]).toBe("");
+    expect(lines[11]).toBe("display=0");
     expect(body).toContain("\n\ndisplay=1");
 
     expect(lines.filter((line) => line.startsWith("display="))).toEqual([

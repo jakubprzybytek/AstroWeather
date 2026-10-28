@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { NO_AURORA_FETCH, serializeError, serializeForecast, validNumericText } from "./protocol";
+import { NO_AURORA_FETCH, appVersion, serializeError, serializeForecast, validNumericText } from "./protocol";
 import type { ForecastDisplay } from "./types";
 
 function display(index: number): ForecastDisplay {
@@ -17,21 +17,37 @@ function displays(): ForecastDisplay[] {
   return Array.from({ length: 6 }, (_, index) => display(index));
 }
 
+describe("appVersion", () => {
+  test("is the deployed release, dev without one, and ? for anything that is not a plain token", () => {
+    expect(appVersion("v1.3")).toBe("v1.3");
+    expect(appVersion("feature-x-1a2b3c4")).toBe("feature-x-1a2b3c4");
+    expect(appVersion(undefined)).toBe("dev");
+    expect(appVersion("  ")).toBe("dev");
+    expect(appVersion("v1.3\nprotocol=9")).toBe("?");
+    expect(appVersion("a=b")).toBe("?");
+  });
+
+  test("is refused when not a plain token", () => {
+    expect(() => serializeForecast("krakow", "2026-09-17T23:22:45.678+02:00", "?", NO_AURORA_FETCH, 360, displays(), "a b"))
+      .toThrow("Invalid app version");
+  });
+});
+
 describe("forecast protocol", () => {
   test("serializes six displays in the documented fixed order", () => {
     const aurora = { gfz: "2026-09-17T17:03:40+02:00", noaa3: "2026-09-17T17:03:41+02:00", noaa27: "2026-09-17T11:03:41+02:00", ovation: "?" };
-    const body = serializeForecast("krakow", "2026-09-17T23:22:45.678+02:00", "2026-09-17T18:00:04+02:00", aurora, 360, displays());
-    expect(body.split("\n").slice(0, 24)).toEqual([
+    const body = serializeForecast("krakow", "2026-09-17T23:22:45.678+02:00", "2026-09-17T18:00:04+02:00", aurora, 360, displays(), "v1.3");
+    expect(body.split("\n").slice(0, 25)).toEqual([
       "protocol=4", "configurationId=krakow", "time=2026-09-17T23:22:45.678+02:00",
       "lastWeatherFetchTime=2026-09-17T18:00:04+02:00", "lastGfzFetchTime=2026-09-17T17:03:40+02:00",
       "lastNoaaKpFetchTime=2026-09-17T17:03:41+02:00", "lastNoaaOutlookFetchTime=2026-09-17T11:03:41+02:00",
-      "lastOvationFetchTime=?", "refreshIntervalMinutes=360", "", "display=0",
+      "lastOvationFetchTime=?", "refreshIntervalMinutes=360", "appVersion=v1.3", "", "display=0",
       "board=num4x4_matrix5x21", "nightId=2026-09-17", "numeric_0=20:30", "numeric_1=5:59",
       "matrix_0=333320000000000002333", "matrix_1=?", "matrix_2=000000000000000000000",
       "matrix_3=?", "matrix_4=000000000000000000000", "numeric_2=18", "numeric_3=9", "", "display=1"
     ]);
     expect(body).not.toContain("displayCount");
-    expect(body).toContain("refreshIntervalMinutes=360\n\ndisplay=0");
+    expect(body).toContain("appVersion=v1.3\n\ndisplay=0");
     expect(body).toContain("numeric_3=9\n\ndisplay=1");
   });
 

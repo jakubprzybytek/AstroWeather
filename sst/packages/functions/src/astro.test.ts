@@ -16,10 +16,10 @@ describe("astro handler", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["content-type"]).toBe("text/plain; charset=utf-8");
-    expect(response.body.split("\n").slice(0, 10)).toEqual([
+    expect(response.body.split("\n").slice(0, 11)).toEqual([
       "protocol=4", "configurationId=krakow", "time=2026-09-22T23:22:45.678+02:00",
       "lastWeatherFetchTime=?", "lastGfzFetchTime=?", "lastNoaaKpFetchTime=?",
-      "lastNoaaOutlookFetchTime=?", "lastOvationFetchTime=?", "refreshIntervalMinutes=360", ""
+      "lastNoaaOutlookFetchTime=?", "lastOvationFetchTime=?", "refreshIntervalMinutes=360", "appVersion=dev", ""
     ]);
   });
 

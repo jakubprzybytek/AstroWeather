@@ -7,6 +7,14 @@ import type { AuroraFeed, ForecastDisplay } from "./types";
 // (level 3 blinking, as `c`) or `?`, and added `matrix_4` (aurora) and the
 // `refreshIntervalMinutes` header record.
 export const PROTOCOL = 4;
+
+// The release the function was deployed with (APP_VERSION, set from the pipeline's tag in sst.config.ts):
+// `vM.N`, `<branch>-<sha>` for a branch deploy, or `dev`. Anything that is not a plain token is sent as `?`.
+const APP_VERSION = /^([A-Za-z0-9._-]{1,40}|\?)$/;
+export function appVersion(env: string | undefined = process.env.APP_VERSION): string {
+  const value = env?.trim() || "dev";
+  return APP_VERSION.test(value) ? value : "?";
+}
 const BOARD = "num4x4_matrix5x21";
 const DISPLAY_KEYS = ["display", "board", "nightId", "numeric_0", "numeric_1", "matrix_0", "matrix_1", "matrix_2", "matrix_3", "matrix_4", "numeric_2", "numeric_3"] as const;
 
@@ -58,8 +66,9 @@ function validate(display: ForecastDisplay): void {
 // `time` is local `YYYY-MM-DDTHH:MM:SS.mmm+HH:MM`; `lastWeatherFetchTime` and the
 // aurora feeds' fetch times are local `YYYY-MM-DDTHH:MM:SS+HH:MM`, or `?` without
 // that source. The offset names the zone. `refreshIntervalMinutes` tells the
-// device how often to refresh.
-export function serializeForecast(configurationId: string, time: string, lastWeatherFetchTime: string, auroraFetchTimes: AuroraFetchTimes, refreshIntervalMinutes: number, displays: ForecastDisplay[]): string {
+// device how often to refresh. `appVersion` is the server's release (the tag,
+// e.g. `v1.3`), added without a protocol change: devices ignore unknown keys.
+export function serializeForecast(configurationId: string, time: string, lastWeatherFetchTime: string, auroraFetchTimes: AuroraFetchTimes, refreshIntervalMinutes: number, displays: ForecastDisplay[], version: string = appVersion()): string {
   if (!/^[\x21-\x7e]+$/.test(configurationId) || displays.length !== 6) throw new Error("Invalid forecast response");
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}$/.test(time)) throw new Error("Invalid forecast time");
   if (lastWeatherFetchTime !== "?" && !FETCH_TIME.test(lastWeatherFetchTime)) {
@@ -71,12 +80,13 @@ export function serializeForecast(configurationId: string, time: string, lastWea
     return `${AURORA_FETCH_RECORDS[feed]}=${value}`;
   });
   if (refreshIntervalMinutes !== 60 && refreshIntervalMinutes !== 360) throw new Error("Invalid refresh interval");
+  if (!APP_VERSION.test(version)) throw new Error("Invalid app version");
   displays.forEach((display, index) => {
     if (display.display !== index) throw new Error("Invalid display order");
     validate(display);
   });
   const lines = [`protocol=${PROTOCOL}`, `configurationId=${configurationId}`, `time=${time}`,
-    `lastWeatherFetchTime=${lastWeatherFetchTime}`, ...auroraRecords, `refreshIntervalMinutes=${refreshIntervalMinutes}`, ""];
+    `lastWeatherFetchTime=${lastWeatherFetchTime}`, ...auroraRecords, `refreshIntervalMinutes=${refreshIntervalMinutes}`, `appVersion=${version}`, ""];
   for (const [index, display] of displays.entries()) {
     if (index > 0) lines.push("");
     const values: Record<typeof DISPLAY_KEYS[number], string | number> = {
