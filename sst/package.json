@@ -16,7 +16,7 @@
     "test:all": "vitest run"
   },
   "devDependencies": {
-    "@playwright/test": "^1.56.1",
+    "@playwright/test": "^1.65.1",
     "@types/suncalc": "^1.9.2",
     "jsdom": "^30.0.1",
     "vitest": "^4.1.4"
