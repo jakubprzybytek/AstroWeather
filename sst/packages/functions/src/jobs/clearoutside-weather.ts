@@ -3,6 +3,7 @@ import { fetchClearOutsideHtml, parseClearOutside } from "../weather/clearoutsid
 import {
   createClearOutsideStore,
   toClearOutsideItem,
+  withEarlierHours,
   type ClearOutsideStore
 } from "../weather/clearoutside-storage";
 
@@ -69,6 +70,9 @@ export async function ingestClearOutside(
         night,
         fetchedAt
       ));
+
+      // Only the first night can start after its noon (see withEarlierHours).
+      items[0] = withEarlierHours(items[0], await dependencies.store.getNight(configurationId, items[0].nightId));
 
       for (const item of items) {
         await dependencies.store.putNight(item);

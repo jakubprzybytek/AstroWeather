@@ -8,6 +8,25 @@ const fixture = readFileSync(
   "utf8"
 );
 
+// A page in Clear Outside's layout: each day's columns start at the hour the
+// page was generated, so a day's hours can wrap past midnight or be empty.
+// The temperature is the hour, so tests can tell the hours apart.
+function page(generated: string, days: Array<{ label: string; hours: number[] }>): string {
+  const row = (label: string, values: string[]) =>
+    `<div class="fc_detail_row"><span class="fc_detail_label">${label}</span><div class="fc_hours"><ul>${values.map((v) => `<li>${v}</li>`).join("")}</ul></div></div>`;
+  return `<html><body><h2>Generated: ${generated}. Forecast: x. Timezone: UTC+1.00</h2>${days.map((day, index) => `
+    <div class="fc_day" id="day_${index}"><div class="fc_day_date"><span>Day</span> ${day.label}</div>
+    <div class="fc_hours fc_hour_ratings"><ul>${day.hours.map((h) => `<li>${String(h).padStart(2, "0")} <span>OK</span></li>`).join("")}</ul></div>
+    ${row("Temperature (&deg;C)", day.hours.map(String))}
+    ${row("Total Clouds (% Sky Obscured)", day.hours.map(() => "50"))}
+    ${row("Precipitation Probability (%)", day.hours.map(() => "0"))}
+    ${row("Precipitation Type", day.hours.map(() => "None"))}</div>`).join("")}</body></html>`;
+}
+
+const fromHour = (start: number, count = 24) => Array.from({ length: count }, (_, i) => (start + i) % 24);
+const summary = (nights: ReturnType<typeof parseClearOutside>) =>
+  nights.map((night) => `${night.nightId}: ${night.hours[0].timestampUtc} .. ${night.hours.at(-1)!.timestampUtc} (${night.hours.length})`);
+
 const originalFetch = globalThis.fetch;
 
 afterEach(() => {
@@ -49,6 +68,61 @@ describe("parseClearOutside", () => {
 
     const misaligned = parseClearOutside(fixture.replace("<li>25</li><li>-3</li>", "<li>25</li>"))[0];
     expect(misaligned.hours.every((hour) => hour.dewPointC === null)).toBe(true);
+  });
+
+  test("dates the hours of a page generated at 18:00 and regroups them into noon-to-noon nights", () => {
+    const nights = parseClearOutside(page("16/11/26 18:05:00", [
+      { label: "16", hours: fromHour(18) },
+      { label: "17", hours: fromHour(18) }
+    ]));
+
+    expect(summary(nights)).toEqual([
+      "2026-11-16: 2026-11-16T17:00:00.000Z .. 2026-11-17T10:00:00.000Z (18)",
+      "2026-11-17: 2026-11-17T11:00:00.000Z .. 2026-11-18T10:00:00.000Z (24)",
+      "2026-11-18: 2026-11-18T11:00:00.000Z .. 2026-11-18T16:00:00.000Z (6)"
+    ]);
+    // 12:00 on the 17th, the 19th column of the first day, not the 16th.
+    expect(nights[1].hours[0]).toMatchObject({ hour: 12, temperatureC: 12 });
+  });
+
+  test("dates the hours of a page generated at 06:00", () => {
+    const nights = parseClearOutside(page("17/11/26 06:03:00", [{ label: "17", hours: fromHour(6) }]));
+
+    expect(summary(nights)).toEqual([
+      "2026-11-16: 2026-11-17T05:00:00.000Z .. 2026-11-17T10:00:00.000Z (6)",
+      "2026-11-17: 2026-11-17T11:00:00.000Z .. 2026-11-18T04:00:00.000Z (18)"
+    ]);
+  });
+
+  test("skips a day that is already over at midnight instead of failing", () => {
+    const nights = parseClearOutside(page("17/11/26 00:04:00", [
+      { label: "16", hours: [] },
+      { label: "17", hours: fromHour(0) }
+    ]));
+
+    expect(summary(nights)).toEqual([
+      "2026-11-16: 2026-11-16T23:00:00.000Z .. 2026-11-17T10:00:00.000Z (12)",
+      "2026-11-17: 2026-11-17T11:00:00.000Z .. 2026-11-17T22:00:00.000Z (12)"
+    ]);
+  });
+
+  test("dates day labels across the end of a month", () => {
+    const nights = parseClearOutside(page("30/11/26 12:00:00", [
+      { label: "30", hours: fromHour(12) },
+      { label: "1", hours: fromHour(12) }
+    ]));
+
+    expect(nights.map((night) => night.nightId)).toEqual(["2026-11-30", "2026-12-01"]);
+  });
+
+  test("fails closed when the hours don't start at the generation time", () => {
+    expect(() => parseClearOutside(page("17/11/26 00:04:00", [{ label: "16", hours: fromHour(0) }])))
+      .toThrow("not near its generation time");
+  });
+
+  test("fails closed when a page has no hours at all", () => {
+    expect(() => parseClearOutside(page("17/11/26 00:04:00", [{ label: "16", hours: [] }])))
+      .toThrow("Clear Outside page contains no forecast hours");
   });
 
   test("fails closed when a required weather row is missing", () => {

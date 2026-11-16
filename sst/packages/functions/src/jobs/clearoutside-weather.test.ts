@@ -23,7 +23,7 @@ function dependencies(overrides: Partial<ClearOutsideIngestionDependencies> = {}
     configurations: locations,
     fetchHtml: vi.fn(async () => "html"),
     parse: vi.fn(() => [night]),
-    store: { putNight: vi.fn(async () => undefined) },
+    store: { getNight: vi.fn(async () => undefined), putNight: vi.fn(async () => undefined) },
     now: vi.fn(() => new Date("2026-09-13T06:00:00.000Z")),
     waitBetweenLocations: vi.fn(async () => undefined),
     ...overrides
@@ -31,6 +31,23 @@ function dependencies(overrides: Partial<ClearOutsideIngestionDependencies> = {}
 }
 
 describe("ingestClearOutside", () => {
+  test("keeps the stored earlier hours of the first night", async () => {
+    const stored = { ...night, pk: "LOC#first", sk: "NIGHT#2026-09-11#WEATHER", configurationId: "first", service: "skyConditions" as const,
+      coordinates: { latitude: 50, longitude: 20 }, fetchedAt: "x", expireAt: 0,
+      hours: [{ ...night.hours[0], timestampUtc: "2026-09-11T08:00:00.000Z", temperatureC: 18 }] };
+    const deps = dependencies({
+      configurations: { first: locations.first },
+      store: { getNight: vi.fn(async () => stored), putNight: vi.fn(async () => undefined) }
+    });
+
+    await ingestClearOutside(deps);
+
+    expect(deps.store.getNight).toHaveBeenCalledWith("first", "2026-09-11");
+    expect(deps.store.putNight).toHaveBeenCalledWith(expect.objectContaining({
+      hours: [expect.objectContaining({ temperatureC: 18 }), expect.objectContaining({ temperatureC: 20 })]
+    }));
+  });
+
   test("fetches and stores every configured location", async () => {
     const deps = dependencies();
 

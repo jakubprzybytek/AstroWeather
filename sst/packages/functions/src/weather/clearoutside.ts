@@ -19,6 +19,7 @@ export type ClearOutsideNight = {
 
 type ForecastHeader = {
   startDate: string;
+  generatedHour: number;
   utcOffsetMinutes: number;
 };
 
@@ -64,20 +65,33 @@ function parseUtcOffset(value: string): number {
 function parseForecastHeader(text: string): ForecastHeader {
   const generatedDate = parseDate(text);
   const startDate = generatedDate.toISOString().slice(0, 10);
+  const time = text.match(/Generated:\s+\d{2}\/\d{2}\/\d{2}\s+(\d{2}):\d{2}/i);
   return {
     startDate,
+    generatedHour: time ? Number(time[1]) : 12,
     utcOffsetMinutes: parseUtcOffset(text)
   };
 }
 
-function localDateAtNoon(startDate: string, dayOffset: number): Date {
-  const date = new Date(`${startDate}T12:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + dayOffset);
-  return date;
+function addDays(date: string, days: number): string {
+  const value = new Date(`${date}T12:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
 }
 
-function formatDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+// A day's label gives only the day of the month ("Monday 16"): the date with
+// that day closest after the day before the page was generated.
+function dayLabelDate(day: ReturnType<typeof parse>, generatedDate: string): string {
+  const label = (day.querySelector(".fc_day_date")?.textContent ?? "").replace(/\s+/g, " ").trim();
+  const match = label.match(/(\d{1,2})\s*$/);
+  if (!match) {
+    throw new Error(`Clear Outside day label has no date: ${label}`);
+  }
+  for (let offset = -1; offset <= 8; offset += 1) {
+    const date = addDays(generatedDate, offset);
+    if (Number(date.slice(8, 10)) === Number(match[1])) return date;
+  }
+  throw new Error(`Clear Outside day label is outside the forecast: ${label}`);
 }
 
 function findRow(day: ReturnType<typeof parse>, label: string) {
@@ -99,14 +113,18 @@ function parseHour(value: string): number {
   return hour;
 }
 
-function toUtcTimestamp(nightDate: string, hour: number, utcOffsetMinutes: number): string {
-  const localDate = new Date(`${nightDate}T00:00:00.000Z`);
-  localDate.setUTCDate(localDate.getUTCDate() + (hour < 12 ? 1 : 0));
+function toUtcTimestamp(localDateValue: string, hour: number, utcOffsetMinutes: number): string {
+  const localDate = new Date(`${localDateValue}T00:00:00.000Z`);
   localDate.setUTCHours(hour, 0, 0, 0);
   localDate.setUTCMinutes(localDate.getUTCMinutes() - utcOffsetMinutes);
   return localDate.toISOString();
 }
 
+// The page's days start at the hour it was generated (12-11 at noon, 00-23 at
+// midnight, 18-17 at 18:00), and a day can be empty. So each hour is dated from
+// its day's label, moving to the next date when the hours wrap past midnight,
+// and the hours are regrouped into noon-to-noon nights (nightIdFor). The first
+// and last nights can be partial.
 export function parseClearOutside(html: string): ClearOutsideNight[] {
   const document = parse(html);
   const header = parseForecastHeader(document.querySelector("body")?.textContent ?? "");
@@ -116,25 +134,22 @@ export function parseClearOutside(html: string): ClearOutsideNight[] {
     throw new Error("Clear Outside page contains no forecast days");
   }
 
-  return days.map((day, dayIndex) => {
-    const nightDate = localDateAtNoon(header.startDate, dayIndex);
+  const nights = new Map<string, ClearOutsideHour[]>();
+
+  days.forEach((day, dayIndex) => {
+    const hours = day.querySelectorAll(".fc_hours.fc_hour_ratings li");
+    if (hours.length > 24) {
+      throw new Error(`Clear Outside day ${dayIndex} has ${hours.length} hour labels`);
+    }
+    if (hours.length === 0) return; // a day already over when the page was generated
+
     const rows = REQUIRED_ROWS.map((label) => {
       const row = findRow(day, label);
       if (!row) {
         throw new Error(`Clear Outside page is missing the ${label} row`);
       }
-      const values = rowValues(row);
-      if (values.length === 0 || values.length > 24) {
-        throw new Error(`Clear Outside ${label} row has ${values.length} hourly values`);
-      }
-      return values;
+      return rowValues(row);
     });
-
-    const hours = day.querySelectorAll(".fc_hours.fc_hour_ratings li");
-    if (hours.length === 0 || hours.length > 24) {
-      throw new Error(`Clear Outside day ${dayIndex} has ${hours.length} hour labels`);
-    }
-
     if (rows.some((row) => row.length !== hours.length)) {
       throw new Error(`Clear Outside day ${dayIndex} has misaligned hourly rows`);
     }
@@ -142,27 +157,50 @@ export function parseClearOutside(html: string): ClearOutsideNight[] {
     const dewPoints = dewPointRow ? rowValues(dewPointRow) : [];
     const hasDewPoints = dewPoints.length === hours.length;
 
-    return {
-      nightId: formatDate(nightDate),
-      hours: hours.map((hourElement, hourIndex) => {
-        const hour = parseHour(hourElement.textContent.replace(/\s+/g, " ").trim().split(" ")[0]);
-        const precipitationType = rows[3][hourIndex].textContent.trim();
-        const thunderstormMatch = `${precipitationType} ${rows[3][hourIndex].getAttribute("title") ?? ""}`.match(
-          /thunderstorm|thunder storm/i
-        );
+    let date = dayLabelDate(day, header.startDate);
+    let previousHour = -1;
+    hours.forEach((hourElement, hourIndex) => {
+      const hour = parseHour(hourElement.textContent.replace(/\s+/g, " ").trim().split(" ")[0]);
+      if (hour <= previousHour) date = addDays(date, 1);
+      previousHour = hour;
 
-        return {
-          hour,
-          timestampUtc: toUtcTimestamp(formatDate(nightDate), hour, header.utcOffsetMinutes),
-          temperatureC: parseNumber(rows[0][hourIndex].textContent),
-          dewPointC: hasDewPoints ? parseNumber(dewPoints[hourIndex].textContent) : null,
-          cloudCoverTotalPct: parseNumber(rows[1][hourIndex].textContent),
-          precipitationProbabilityPct: parseNumber(rows[2][hourIndex].textContent),
-          thunderstormRisk: thunderstormMatch ? true : precipitationType ? false : null
-        };
-      })
-    };
+      const precipitationType = rows[3][hourIndex].textContent.trim();
+      const thunderstormMatch = `${precipitationType} ${rows[3][hourIndex].getAttribute("title") ?? ""}`.match(
+        /thunderstorm|thunder storm/i
+      );
+      const nightId = hour < 12 ? addDays(date, -1) : date;
+      const night = nights.get(nightId) ?? [];
+      nights.set(nightId, night);
+      night.push({
+        hour,
+        timestampUtc: toUtcTimestamp(date, hour, header.utcOffsetMinutes),
+        temperatureC: parseNumber(rows[0][hourIndex].textContent),
+        dewPointC: hasDewPoints ? parseNumber(dewPoints[hourIndex].textContent) : null,
+        cloudCoverTotalPct: parseNumber(rows[1][hourIndex].textContent),
+        precipitationProbabilityPct: parseNumber(rows[2][hourIndex].textContent),
+        thunderstormRisk: thunderstormMatch ? true : precipitationType ? false : null
+      });
+    });
   });
+
+  if (nights.size === 0) {
+    throw new Error("Clear Outside page contains no forecast hours");
+  }
+
+  // The first hour is the hour the page was generated: if the dating went
+  // wrong (a label read as the wrong date), fail rather than store a shifted day.
+  const generated = Date.parse(toUtcTimestamp(header.startDate, header.generatedHour, header.utcOffsetMinutes));
+  const first = Math.min(...[...nights.values()].flat().map((hour) => Date.parse(hour.timestampUtc)));
+  if (Math.abs(first - generated) > 2 * 3_600_000) {
+    throw new Error(`Clear Outside page starts at ${new Date(first).toISOString()}, not near its generation time`);
+  }
+
+  return [...nights.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([nightId, hours]) => ({
+      nightId,
+      hours: hours.sort((a, b) => a.timestampUtc.localeCompare(b.timestampUtc))
+    }));
 }
 
 export async function fetchClearOutsideHtml(latitude: number, longitude: number): Promise<string> {

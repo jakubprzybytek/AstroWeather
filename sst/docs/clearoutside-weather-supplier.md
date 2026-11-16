@@ -27,6 +27,13 @@ follows the recommended integration below, with these differences:
   Europe/Warsaw) and fails its invocation when any
   location fails, but no alarm or other monitoring alert is configured on that
   failure.
+- The page's days start at the hour it is generated, not at noon: 12-11 at
+  noon, 18-17 at 18:00, 00-23 at midnight (when the day before can come with
+  no hours at all), and the last day is cut short. The parser dates each hour
+  from its day's label, wrapping past midnight, and regroups the hours into
+  noon-to-noon nights; the night in progress keeps its earlier hours from the
+  stored night. A page whose first hour isn't near its generation time fails
+  the run rather than storing shifted hours.
 - No agreement with First Light Optics is recorded, so the first item of the
   decision checklist remains open until its outcome is noted here.
 
