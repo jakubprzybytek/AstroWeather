@@ -120,6 +120,19 @@ export async function ingestAuroraForecast(
         error: cause instanceof Error ? cause.message : String(cause),
         status: "failed"
       });
+      // A source that keeps failing leaves the row on ever older data, which
+      // the stale check above never sees: warn once the last good fetch is old.
+      const lastFetchedAt = await lastFetched(dependencies, source, now);
+      const age = lastFetchedAt ? now.getTime() - Date.parse(lastFetchedAt) : Infinity;
+      if (age > STALE_AFTER_MS) {
+        stale.push(source);
+        dependencies.log?.("Aurora forecast source stale", {
+          source,
+          lastFetchedAt,
+          ageHours: Number.isFinite(age) ? Math.round(age / 3_600_000) : null,
+          status: "down"
+        });
+      }
     }
   }
 
@@ -132,6 +145,24 @@ export async function ingestAuroraForecast(
     throw new Error(`Aurora forecast ingestion failed for: ${failed.join(", ")}`);
   }
   return summary;
+}
+
+// When the source was last fetched successfully, from the items it stored for
+// the displayed nights of the first location; null when none is left.
+async function lastFetched(
+  dependencies: AuroraForecastDependencies,
+  source: AuroraSourceKey,
+  now: Date
+): Promise<string | null> {
+  const first = Object.entries(dependencies.configurations)[0];
+  if (!first) return null;
+  const [configurationId, configuration] = first;
+  let latest: string | null = null;
+  for (const nightId of nextNightIds(now, configuration.location.tz, NIGHT_COUNT)) {
+    const item = await dependencies.store.get(configurationId, nightId, source);
+    if (item && (latest === null || item.fetchedAt > latest)) latest = item.fetchedAt;
+  }
+  return latest;
 }
 
 // A night is flagged once, when any hour of it triggers, and stays flagged.
@@ -171,8 +202,10 @@ async function flagStormNights(
       if (!gfzHit && !noaaHit) continue;
       if (alreadyFlagged) continue;
 
+      // Names the values the trigger compared, so either GFZ rule can be told apart.
       const reason = gfzHit
         ? `gfz ${gfzHit.start}: q75=${gfzHit.quantile75} median=${gfzHit.median}`
+          + ` P(>=${kpMain - 1})=${Math.round(probabilityAtLeast(gfzHit, kpMain - 1) * 100) / 100}`
         : `noaa ${noaaHit!.start}: kp=${noaaHit!.kp}`;
       await dependencies.store.put({
         ...auroraKey(configurationId, nightId, "FLAG"),

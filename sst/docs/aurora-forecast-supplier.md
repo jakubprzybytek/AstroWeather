@@ -283,8 +283,7 @@ aurora. The flag is:
 
 | Situation | Job runs | Fetches |
 | --- | --- | --- |
-| Quiet (no location flagged) | with the existing weather job, every 6 h at 00/06/12/18 local | Hp60, NOAA 3-day, 27-day outlook |
-| Daily | once at ~03:00 UTC | 27-day outlook (issued Mondays ~02:20 UTC; catches a mid-week reissue) |
+| Quiet (no location flagged) | with the existing weather job, every 6 h at 00/06/12/18 local | Hp60, NOAA 3-day, 27-day outlook (issued Mondays ~02:20 UTC; a mid-week reissue is picked up within six hours, so it needs no run of its own) |
 | Storm night (a location flagged and dark there) | **every 10 minutes** | Hp60, NOAA 3-day, OVATION |
 | Any dark night | every 10 minutes | NOAA live Kp (28 KB): a storm no forecast flagged sets the flag and starts the sampling |
 
@@ -303,6 +302,19 @@ is stored as usual, and the merge passes it over (see
 12 hours old the run logs `Aurora forecast source stale` and lists the source
 under `stale` in its summary. GFZ went quiet this way from 3 October 2026,
 and nothing showed it in the logs.
+
+A feed that does not answer fails the run, which logs
+`Aurora forecast source failed` and ends in an error. That alone does not say
+how long the row has been living on old data, so when the source's last good
+fetch (the newest `fetchedAt` among the items it stored for the displayed
+nights) is more than 12 hours old, or none is left, the run also logs
+`Aurora forecast source stale` with `status: "down"` and `lastFetchedAt`, and
+lists the source under `stale`. GFZ failed every fetch this way from
+28 October to 6 November 2026.
+
+A failed run is not retried: the next scheduled run is the retry. Both the
+schedule and the function (Lambda's async invocation, which otherwise
+retries twice) are set to `retries: 0`.
 
 ### Why ten minutes and not an hour
 
@@ -587,7 +599,7 @@ uses `c`, which in that row still means "thunderstorm").
 
 1. Add an aurora job on the cadence in [Fetch Cadence](#fetch-cadence): with
    the six-hourly weather job when quiet, every ten minutes on a flagged
-   storm night, plus a daily 27-day fetch. It fetches the GFZ Hp60 JSON, the
+   storm night. It fetches the GFZ Hp60 JSON, the
    NOAA 3-day Kp JSON (used only if the GFZ fetch or parse fails), the NOAA
    27-day outlook, and on storm nights OVATION. The forecast feeds are global,
    so fetch once and derive every configured location from the same payload.

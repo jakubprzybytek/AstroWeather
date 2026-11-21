@@ -186,7 +186,9 @@ export default $config({
         function: {
           handler: "packages/functions/src/jobs/clearoutside-weather.handler",
           link: [forecastData],
-          timeout: "2 minutes"
+          timeout: "2 minutes",
+          // See AuroraIngestion: without it Lambda reruns a failed run twice.
+          retries: 0
         }
       });
 
@@ -199,7 +201,10 @@ export default $config({
         function: {
           handler: "packages/functions/src/jobs/aurora-forecast.handler",
           link: [forecastData],
-          timeout: "2 minutes"
+          timeout: "2 minutes",
+          // The schedule's `retries` covers the scheduler only; Lambda's own
+          // async retries (two by default) would rerun a failed fetch twice.
+          retries: 0
         }
       });
 
@@ -212,7 +217,8 @@ export default $config({
           handler: "packages/functions/src/jobs/aurora-nowcast.handler",
           link: [forecastData],
           timeout: "2 minutes",
-          memory: "512 MB"
+          memory: "512 MB",
+          retries: 0
         }
       });
     }

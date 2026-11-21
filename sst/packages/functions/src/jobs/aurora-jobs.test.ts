@@ -143,6 +143,53 @@ describe("ingestAuroraForecast", () => {
     expect([...items.keys()].some((key) => key.endsWith("#GFZ"))).toBe(false);
     expect(items.has("LOC#wroclaw|NIGHT#2026-10-01#AURORA#NOAA3")).toBe(true);
   });
+
+  test("warns that a failing source is down once its last good fetch is over 12 hours old", async () => {
+    const { dependencies } = forecastDependencies();
+    let clock = NOW;
+    dependencies.now = () => clock;
+    await ingestAuroraForecast(dependencies);
+    dependencies.loadGfz = vi.fn().mockRejectedValue(new Error("fetch failed"));
+
+    // Six hours after the last good fetch: failed, not yet down.
+    clock = new Date(NOW.getTime() + 6 * HOUR);
+    await expect(ingestAuroraForecast(dependencies)).rejects.toThrow("GFZ");
+    expect(dependencies.log).not.toHaveBeenCalledWith("Aurora forecast source stale", expect.anything());
+    expect(dependencies.log).toHaveBeenLastCalledWith("Aurora forecast ingestion completed",
+      expect.objectContaining({ failed: ["GFZ"], stale: [] }));
+
+    clock = new Date(NOW.getTime() + 13 * HOUR);
+    await expect(ingestAuroraForecast(dependencies)).rejects.toThrow("GFZ");
+    expect(dependencies.log).toHaveBeenCalledWith("Aurora forecast source stale", {
+      source: "GFZ", lastFetchedAt: NOW.toISOString(), ageHours: 13, status: "down"
+    });
+    expect(dependencies.log).toHaveBeenLastCalledWith("Aurora forecast ingestion completed",
+      expect.objectContaining({ failed: ["GFZ"], stale: ["GFZ"] }));
+  });
+
+  test("warns that a failing source is down when nothing it stored is left", async () => {
+    const { dependencies } = forecastDependencies({ loadGfz: vi.fn().mockRejectedValue(new Error("fetch failed")) });
+
+    await expect(ingestAuroraForecast(dependencies)).rejects.toThrow("GFZ");
+    expect(dependencies.log).toHaveBeenCalledWith("Aurora forecast source stale", {
+      source: "GFZ", lastFetchedAt: null, ageHours: null, status: "down"
+    });
+  });
+
+  test("names the GFZ probability in the reason of a flag it triggered", async () => {
+    const { dependencies, items } = forecastDependencies({
+      loadGfz: vi.fn(async () => ({
+        spans: [gfzHour(new Date("2026-10-01T20:00:00Z"), { quantile75: 2.666666, prob6to7: 0.25 })],
+        lastModified: "Thu, 01 Oct 2026 09:05:00 GMT"
+      }))
+    });
+
+    await ingestAuroraForecast(dependencies);
+
+    expect(items.get("LOC#wroclaw|NIGHT#2026-10-01#AURORA#FLAG")).toMatchObject({
+      reason: "gfz 2026-10-01T20:00:00.000Z: q75=2.666666 median=1 P(>=6)=0.25"
+    });
+  });
 });
 
 // 20:10Z on 1 October; the nowcast is valid at 21:20Z, in the slot from 21:00Z.
