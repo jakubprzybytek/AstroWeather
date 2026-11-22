@@ -101,7 +101,10 @@ export default $config({
         sk: "string"
       },
       primaryIndex: { hashKey: "pk", rangeKey: "sk" },
-      ttl: "expireAt"
+      ttl: "expireAt",
+      // On prod the table can't be deleted (by a deploy, the console or the API) until this is turned off
+      // (agent-playbook aws-app-guidelines). The forecasts are re-ingested every 6 hours, so PITR is optional.
+      deletionProtection: isProd
     });
 
     const api = new sst.aws.ApiGatewayV2("AstroApi", {
