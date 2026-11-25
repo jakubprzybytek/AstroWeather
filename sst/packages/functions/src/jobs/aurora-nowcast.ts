@@ -1,10 +1,10 @@
-import SunCalc from "suncalc";
 import { flagKp, levelForNowcast, probabilityAtLeast } from "../aurora/levels";
 import { mergeAurora } from "../aurora/merge";
 import { loadLiveKp, type LiveKp } from "../aurora/noaa-live";
 import { loadOvationGrid, type OvationGrid } from "../aurora/ovation";
 import { auroraExpireAt, auroraKey, createAuroraStore, type AuroraStore, type OvationItem } from "../aurora/storage";
 import { configurations } from "../configurations";
+import { sunAltitudeDegrees as geometricSunAltitude } from "../forecast/astronomy";
 import { nightIdFor, observingSlots } from "../forecast/nights";
 import { ingestAuroraForecast, type AuroraForecastDependencies } from "./aurora-forecast";
 
@@ -14,7 +14,7 @@ import { ingestAuroraForecast, type AuroraForecastDependencies } from "./aurora-
 // docs/aurora-forecast-supplier.md#fetch-cadence and #calibrating-the-nowcast.
 
 // Sun below -6°: civil twilight is over.
-const DARK_ALTITUDE_RAD = -6 * Math.PI / 180;
+const DARK_ALTITUDE_DEGREES = -6;
 // The cells north of the location logged for calibration.
 const NORTH_PROFILE_DEGREES = 8;
 
@@ -39,11 +39,11 @@ export type AuroraNowcastSummary = {
 };
 
 function sunIsDown(instant: Date, latitude: number, longitude: number): boolean {
-  return SunCalc.getPosition(instant, latitude, longitude).altitude < DARK_ALTITUDE_RAD;
+  return geometricSunAltitude(instant, latitude, longitude) < DARK_ALTITUDE_DEGREES;
 }
 
 function sunAltitudeDegrees(instant: Date, latitude: number, longitude: number): number {
-  return Math.round(SunCalc.getPosition(instant, latitude, longitude).altitude * 180 / Math.PI * 10) / 10;
+  return Math.round(geometricSunAltitude(instant, latitude, longitude) * 10) / 10;
 }
 
 function createProductionDependencies(): AuroraNowcastDependencies {
