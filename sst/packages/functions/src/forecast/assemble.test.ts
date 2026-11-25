@@ -50,13 +50,14 @@ describe("assembleForecast", () => {
       readAurora: async () => new Map(),
       log: vi.fn()
     });
-    // 2026-10-19 in Krakow: sunset 17:43, astronomical dusk 19:31, astronomical
-    // dawn 05:22, sunrise 07:01. 17:00 is mostly up, 18:00 mostly civil and
-    // nautical twilight, 19:00 just mostly astronomical twilight; 05:00 too.
+    // 2026-10-19 in Krakow: sunset 17:41, astronomical dusk 19:28, astronomical
+    // dawn 05:21, sunrise 07:10. 17:00 is mostly up, 18:00 mostly civil and
+    // nautical twilight, 19:00 just mostly night (dusk at 19:28), 05:00 mostly
+    // astronomical twilight (dawn at 05:21).
     const october = (await krakow("2026-10-19T10:00:00Z")).displays[0];
-    expect(october.astronomicalDusk).toBe("19:31");
-    expect(october.astronomicalDawn).toBe("5:22");  // no leading zero
-    expect(october.sun).toBe("333321000000000123333");
+    expect(october.astronomicalDusk).toBe("19:28");
+    expect(october.astronomicalDawn).toBe("5:21");  // no leading zero
+    expect(october.sun).toBe("333320000000000123333");
     expect(october.moon).toMatch(/^[0-3]{21}$/);
 
     // 2026-06-21: the sun gets no lower than about -16.6 degrees, so there is
@@ -68,8 +69,8 @@ describe("assembleForecast", () => {
   });
 
   test("gives the temperature at astronomical dusk and the night's minimum", async () => {
-    // 2026-10-19 in Krakow: astronomical dusk 19:31 (17:31Z), dawn 05:22
-    // (03:22Z). Readings every hour from 12:00Z: 15 degrees at 12:00Z, falling
+    // 2026-10-19 in Krakow: astronomical dusk 19:28 (17:28Z), dawn 05:21
+    // (03:21Z). Readings every hour from 12:00Z: 15 degrees at 12:00Z, falling
     // a degree an hour to 3 at 00:00Z, then rising a degree an hour.
     const hours = Array.from({ length: 24 }, (_, index) => ({
       hour: (14 + index) % 24,
@@ -90,8 +91,8 @@ describe("assembleForecast", () => {
       log: vi.fn()
     });
 
-    // At 17:31Z, just past halfway from 10 (17:00Z) to 9 (18:00Z): 9.48.
-    expect(result.displays[0].duskTemperature).toBe("9");
+    // At 17:28Z, just before halfway from 10 (17:00Z) to 9 (18:00Z): 9.52.
+    expect(result.displays[0].duskTemperature).toBe("10");
     expect(result.displays[0].nightMinimumTemperature).toBe("3");
   });
 

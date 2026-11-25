@@ -1,19 +1,29 @@
-import SunCalc from "suncalc";
+import * as SunCalc from "suncalc";
 import { encodeMatrix, majorityLevel, minutesLevel, skyLevel, type MatrixCell } from "./matrix";
 import { instantAtLocal, localTime, observingSlots, type ObservingSlot } from "./nights";
 import type { ForecastDisplay } from "./types";
 
 type Location = { lat: number; lon: number; tz: string };
 
-const DEGREES_PER_RADIAN = 180 / Math.PI;
+// suncalc 2 gives the sun's apparent altitude, raised by refraction, which
+// below the horizon is a constant 0.484 degrees. Twilight, suncalc's own event
+// times and skyLevel's limits use the geometric altitude, so take it back off.
+// Above the horizon the result is a little low, but stays above every limit.
+const HORIZON_REFRACTION_DEGREES = 0.484;
 
-function validDate(date: Date | undefined): date is Date {
-  return date !== undefined && !Number.isNaN(date.getTime());
+export function sunAltitudeDegrees(instant: Date, latitude: number, longitude: number): number {
+  return SunCalc.getPosition(instant, latitude, longitude).altitude - HORIZON_REFRACTION_DEGREES;
+}
+
+// suncalc gives null for an event that does not occur (no astronomical night
+// in summer).
+function validDate(date: Date | null | undefined): date is Date {
+  return date != null && !Number.isNaN(date.getTime());
 }
 
 // A local time as display text, the hour without a leading zero ("5:28"),
 // as a clock shows it; `?` for an event that does not occur.
-function eventTime(date: Date | undefined, timezone: string): string {
+function eventTime(date: Date | null | undefined, timezone: string): string {
   return validDate(date) ? localTime(date, timezone).replace(/^0(?=\d)/, "") : "?";
 }
 
@@ -71,7 +81,7 @@ export type NightWindow = { start: Date; end: Date };
 // dawn; without that, sunset to sunrise; null without a sunset.
 export function observingNight(nightId: string, location: Location): NightWindow | null {
   const { times, nextTimes } = sunTimes(nightId, location);
-  const pairs: Array<[Date | undefined, Date | undefined]> = [
+  const pairs: Array<[Date | null, Date | null]> = [
     [times.night, nextTimes.nightEnd],
     [times.nauticalDusk, nextTimes.nauticalDawn],
     [times.sunset, nextTimes.sunrise]
@@ -94,7 +104,7 @@ export function calculateAstronomy(nightId: string, location: Location): Pick<Fo
     astronomicalDusk: eventTime(times.night, location.tz),
     astronomicalDawn: eventTime(nextTimes.nightEnd, location.tz),
     sun: encodeMatrix(sample(slots, (slot) => slotSkyLevel(slot, (instant) =>
-      SunCalc.getPosition(instant, location.lat, location.lon).altitude * DEGREES_PER_RADIAN))),
+      sunAltitudeDegrees(instant, location.lat, location.lon)))),
     moon: encodeMatrix(sample(slots, (slot) => minutesLevel(minutesAboveHorizon(slot, (instant) =>
       SunCalc.getMoonPosition(instant, location.lat, location.lon).altitude))))
   };

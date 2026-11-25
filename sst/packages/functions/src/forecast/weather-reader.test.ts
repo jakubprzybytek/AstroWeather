@@ -54,8 +54,8 @@ describe("observing night", () => {
 
   test("is astronomical dusk to dawn when there is an astronomical night", () => {
     const window = observingNight("2026-10-19", krakow);
-    expect(window?.start.toISOString().slice(11, 16)).toBe("17:31");
-    expect(window?.end.toISOString().slice(11, 16)).toBe("03:22");
+    expect(window?.start.toISOString().slice(11, 16)).toBe("17:28");
+    expect(window?.end.toISOString().slice(11, 16)).toBe("03:21");
   });
 
   test("falls back to nautical, then to sunset and sunrise", () => {
